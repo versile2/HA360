@@ -56,7 +56,8 @@ jobs:
     if: ${{ always() && !cancelled() }}
     runs-on: ubuntu-latest
     permissions: { contents: write }
-    concurrency: { group: ci-artifacts-publish, cancel-in-progress: false }
+    # No job-level concurrency here on purpose: GitHub keeps one running and ONE pending job per group and cancels the
+    # rest, so a third publisher would lose its SUMMARY. The script serializes itself (orphan commit, --force-with-lease, retries).
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7

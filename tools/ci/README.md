@@ -81,12 +81,14 @@ fail, `- why:` and the Notes say `guards failed: <guard names>` instead of the c
 
 ## Authentication of the publish step
 
-`publish-ci-artifacts.sh` pushes with `--force-with-lease` against the tip it just fetched, retries 3 times, and every push
-is a fresh root commit. When `GH_TOKEN` is set and the remote is an `https://github.com/<owner>/<repo>` URL, it pushes through
+`publish-ci-artifacts.sh` pushes with `--force-with-lease` against the tip it just fetched, retries up to 6 times with a
+jittered, growing backoff, and every push is a fresh root commit. The `publish-ci` job has no `concurrency:` on purpose:
+GitHub keeps one running and only one pending job per group and cancels the rest, so a third simultaneous publisher would
+lose its SUMMARY, while this script already makes parallel publishers queue up safely (the workflow-level per-ref group stays). When `GH_TOKEN` is set and the remote is an `https://github.com/<owner>/<repo>` URL, it pushes through
 `https://x-access-token:<token>@github.com/<owner>/<repo>.git` itself and masks the token in anything it prints; it does not
 depend on the credentials `actions/checkout` persisted. It never runs with `set -x`. It works against any remote, which is
 how the tests exercise it (a `file://` bare repository). Environment: `CI_OUT` (default `ci-out`), `CI_REMOTE` (default
-`origin`), `PUBLISH_BACKOFF_S` (default 2).
+`origin`), `PUBLISH_BACKOFF_S` (base of the backoff in seconds, default 2).
 
 ## Tests
 

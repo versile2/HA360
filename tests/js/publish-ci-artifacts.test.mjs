@@ -119,12 +119,41 @@ test('two publishers racing: the loser retries on top of the winner and both run
   ]);
   assert.equal(one.status, 0, one.stderr);
   assert.equal(two.status, 0, two.stderr);
-  assert.match(one.stderr + two.stderr, /retrying, attempt 2 of 3/, 'one of them had to retry');
+  assert.match(one.stderr + two.stderr, /retrying, attempt 2 of 6/, 'one of them had to retry');
 
   const tree = treeOf(remote.dir);
   assert.ok(tree.includes('runs/slice-s1-hosting-shell/21-abcdef0/SUMMARY.md'), 'no run was lost');
   assert.ok(tree.includes('runs/slice-s3-domain-core/22-1234567/SUMMARY.md'), 'no run was lost');
   assert.equal(git(remote.dir, ['rev-list', '--count', 'ci-artifacts']), '1');
+});
+
+test('five publishers racing (three branches finishing together is the real case): every run ends up under runs/, none is lost', async () => {
+  const remote = createBareRemote();
+  // The slow pre-receive hook keeps all five pushes of a round in flight together: exactly one ref update wins per
+  // round, the others are rejected and retry on top of the new tip, so the last one needs five attempts at most.
+  const hook = path.join(remote.dir, 'hooks', 'pre-receive');
+  writeFile(hook, '#!/bin/sh\nsleep 1\n');
+  fs.chmodSync(hook, 0o755);
+
+  const branches = ['slice/S1-hosting-shell', 'slice/S2-contracts', 'slice/S3-domain-core', 'slice/S4-persistence', 'slice/S5-map-1'];
+  const runs = branches.map((branch, i) => ({ branch, slug: branch.toLowerCase().replaceAll('/', '-'), run: 30 + i, sha: `${hex(i + 1, 7)}${hex(i + 1, 33)}` }));
+  const results = await Promise.all(
+    runs.map(({ branch, run, sha }) =>
+      // A small non-zero base also exercises the jittered sleep (the harness default is 0).
+      runScriptAsync(tools.publish, [], { cwd: tempDir('cwd'), env: { CI_OUT: ciOut({ branch, sha, run }), CI_REMOTE: remote.url, PUBLISH_BACKOFF_S: '0.05' } }),
+    ),
+  );
+  results.forEach((result, i) => assert.equal(result.status, 0, `${runs[i].branch}: ${result.stderr}`));
+  assert.match(results.map((r) => r.stderr).join(''), /retrying, attempt 2 of 6, after [0-9.]+s/, 'the race was real: somebody had to retry');
+
+  const tree = treeOf(remote.dir);
+  for (const { slug, run, sha } of runs) {
+    assert.ok(tree.includes(`runs/${slug}/${run}-${sha.slice(0, 7)}/SUMMARY.md`), `run ${run} (${slug}) is published`);
+    assert.ok(tree.includes(`runs/${slug}/${run}-${sha.slice(0, 7)}/errors.log`), `run ${run} (${slug}) is complete`);
+  }
+  assert.equal(tree.filter((f) => f.endsWith('/SUMMARY.md')).length, 5, 'exactly the five runs, one folder each');
+  assert.ok(runs.some(({ slug }) => slug === JSON.parse(showFile(remote.dir, 'ci-artifacts:LATEST.json')).slug), 'LATEST names one of the five');
+  assert.equal(git(remote.dir, ['rev-list', '--count', 'ci-artifacts']), '1', 'still one orphan commit');
 });
 
 test('GH_TOKEN: an https://github.com remote is pushed through the x-access-token URL, and the token is never printed', () => {
@@ -146,14 +175,14 @@ test('GH_TOKEN: an https://github.com remote is pushed through the x-access-toke
   assert.ok(treeOf(remote.dir).includes('runs/main/5-abcdef0/SUMMARY.md'), 'the push went through the rewritten token URL');
 });
 
-test('GH_TOKEN: a failing push gives up after 3 attempts (exit 1) without printing the token', () => {
+test('GH_TOKEN: a failing push gives up after 6 attempts (exit 1) without printing the token', () => {
   const token = 'ghs_SENTINELfailing456';
   const result = publish(ciOut({ branch: 'main', sha: SHA_A, run: 1 }), 'https://github.com/Versile2/ha360', {
     env: { GH_TOKEN: token, GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'http.proxy', GIT_CONFIG_VALUE_0: 'http://127.0.0.1:9' },
   });
   assert.equal(result.status, 1);
-  assert.match(result.stderr, /attempt 3 of 3/);
-  assert.match(result.stderr, /failed after 3 attempts/);
+  assert.match(result.stderr, /attempt 6 of 6/);
+  assert.match(result.stderr, /failed after 6 attempts/);
   assert.ok(!(result.stdout + result.stderr).includes(token), 'the token never reaches stdout or stderr');
 });
 
@@ -184,6 +213,15 @@ test('usage errors exit 64: no SUMMARY.md, and a header without a usable sha, ru
   }
   const noOrigin = publish(ciOut({ branch: 'main', sha: SHA_A, run: 1 }), undefined, { cwd: tempDir('not-a-repo') });
   assert.equal(noOrigin.status, 64);
+});
+
+test('PUBLISH_BACKOFF_S must be a number of seconds; decimals are fine', () => {
+  const remote = createBareRemote();
+  const bad = publish(ciOut({ branch: 'main', sha: SHA_A, run: 1 }), remote.url, { env: { PUBLISH_BACKOFF_S: 'soon' } });
+  assert.equal(bad.status, 64);
+  assert.match(bad.stderr, /PUBLISH_BACKOFF_S/);
+  const ok = publish(ciOut({ branch: 'main', sha: SHA_A, run: 1 }), remote.url, { env: { PUBLISH_BACKOFF_S: '0.25' } });
+  assert.equal(ok.status, 0, ok.stderr);
 });
 
 test('branch_slug (shared by publish and wait): lower-case, everything outside [a-z0-9._-] becomes "-"', () => {
