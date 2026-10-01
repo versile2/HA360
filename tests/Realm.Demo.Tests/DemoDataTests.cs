@@ -94,8 +94,8 @@ public class DemoDataTests
         var snapshot = Snapshot();
 
         Assert.Equal(4, snapshot.Members.Count(m => m.Kind == MemberKind.Live));
-        Assert.Equal("prince", Assert.Single(snapshot.Members.Where(m => m.Kind == MemberKind.Static)).Id);
-        Assert.Equal("queen", Assert.Single(snapshot.Members.Where(m => m.IsDriving)).Id);
+        Assert.Equal("prince", Assert.Single(snapshot.Members, m => m.Kind == MemberKind.Static).Id);
+        Assert.Equal("queen", Assert.Single(snapshot.Members, m => m.IsDriving).Id);
     }
 
     [Fact]
@@ -231,7 +231,7 @@ public class DemoDataTests
     {
         var live = Snapshot().Members.Where(m => m.Kind == MemberKind.Live).ToList();
 
-        Assert.Equal("king", Assert.Single(live.Where(m => m.Charging == true)).Id);
+        Assert.Equal("king", Assert.Single(live, m => m.Charging == true).Id);
         Assert.All(live.Where(m => m.Id != "king"), m => Assert.False(m.Charging));
     }
 

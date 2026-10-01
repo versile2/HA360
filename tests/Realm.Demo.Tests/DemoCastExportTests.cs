@@ -92,7 +92,7 @@ public class DemoCastExportTests
     [Fact]
     public void Only_the_king_is_phone_capable()
     {
-        Assert.Equal("king", Assert.Single(DemoCast.Members.Where(m => m.PhoneCapable)).Id);
+        Assert.Equal("king", Assert.Single(DemoCast.Members, m => m.PhoneCapable).Id);
     }
 
     [Fact]
@@ -298,7 +298,7 @@ public class DemoCastExportTests
         var strays = new List<string>();
         CollectStrings(Export(), strays);
 
-        Assert.Empty(strays.Where(s => !allowed.Contains(s)));
+        Assert.DoesNotContain(strays, s => !allowed.Contains(s));
         Assert.True(strays.Count > 0);
     }
 
