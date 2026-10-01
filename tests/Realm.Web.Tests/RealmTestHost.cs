@@ -12,14 +12,17 @@ namespace Realm.Web.Tests;
 /// <summary>
 /// Starts the Realm pipeline on a real Kestrel host, composed with the same calls as <c>Program.cs</c> except <c>MapStaticAssets</c>
 /// (a hand-started host has no static-web-assets manifest). It adds two test-only endpoints: <c>echo</c> reports what the pipeline
-/// did to the request, and <c>boom</c> throws.
+/// did to the request, and <c>boom</c> throws. A test that needs more endpoints, such as the Razor components, passes them in <c>mapEndpoints</c>.
 /// </summary>
 internal static class RealmTestHost
 {
     // A path that never exists, so a developer's own /data/options.json cannot change the mode a test sees.
     private static readonly string NoOptionsFile = Path.Combine(AppContext.BaseDirectory, "no-options.json");
 
-    public static Task<KestrelHost> StartAsync(InMemoryLogSink? logs = null, IReadOnlyDictionary<string, string?>? settings = null)
+    public static Task<KestrelHost> StartAsync(
+        InMemoryLogSink? logs = null,
+        IReadOnlyDictionary<string, string?>? settings = null,
+        Action<WebApplication>? mapEndpoints = null)
     {
         return KestrelHost.StartAsync(
             builder =>
@@ -48,6 +51,7 @@ internal static class RealmTestHost
                     request.PathBase.Value ?? string.Empty,
                     request.Path.Value ?? string.Empty)));
                 app.MapGet("boom", Boom);
+                mapEndpoints?.Invoke(app);
             });
     }
 

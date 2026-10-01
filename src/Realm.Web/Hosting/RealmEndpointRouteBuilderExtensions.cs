@@ -1,3 +1,7 @@
+using System.Text;
+using Microsoft.Net.Http.Headers;
+using Realm.Web.Theme;
+
 namespace Realm.Web.Hosting;
 
 public static class RealmEndpointRouteBuilderExtensions
@@ -11,6 +15,18 @@ public static class RealmEndpointRouteBuilderExtensions
         // The exception handler re-runs the request here; the 500 status is already set, so this writes only the generic text.
         endpoints.MapGet("error-plain", () => Results.Text("Something went wrong in the Realm."));
 
+        // The theme tokens are an endpoint, not a file (03 sections 3.8 and 5.3): no-cache plus a strong ETag, so a revalidation costs a 304.
+        endpoints.MapGet("css/tokens.css", TokensCss);
+
         return endpoints;
+    }
+
+    private static IResult TokensCss(HttpContext context)
+    {
+        context.Response.Headers.CacheControl = "no-cache";
+        return Results.Bytes(
+            Encoding.UTF8.GetBytes(RealmTokens.Css()),
+            "text/css; charset=utf-8",
+            entityTag: new EntityTagHeaderValue(RealmTokens.ETag()));
     }
 }

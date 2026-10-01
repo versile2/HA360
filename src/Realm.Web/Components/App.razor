@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <base href="@BaseHref" />
+    <link rel="stylesheet" href="@Assets["_content/MudBlazor/MudBlazor.min.css"]" />
+    <link rel="stylesheet" href="css/tokens.css" />
+    <link rel="stylesheet" href="css/app.css" />
+    <script src="js/theme-boot.js"></script>
+    <ImportMap />
+    <HeadOutlet @rendermode="InteractiveServer" />
+</head>
+
+<body>
+    <div id="components-reconnect-modal" class="realm-reconnect" role="status" data-testid="banner-reconnect" hidden>
+        <span class="realm-reconnect-text"></span>
+        <button type="button" class="realm-reconnect-retry" hidden>Try again</button>
+    </div>
+    <Routes @rendermode="InteractiveServer" ViewerMemberId="@MeId" />
+    <script src="@Assets["_content/MudBlazor/MudBlazor.min.js"]"></script>
+    <script src="@Assets["_framework/blazor.web.js"]" autostart="false"></script>
+    <script src="js/reconnect-banner.js"></script>
+    <script src="js/blazor-start.js"></script>
+</body>
+
+</html>
+
+@code {
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
+
+    // The ingress prefix with one trailing slash ("" becomes "/"); every URL in the page resolves against it (03 section 5.4).
+    private string BaseHref => (HttpContext?.Request.PathBase.Value ?? string.Empty) + "/";
+
+    // S8 resolves the viewer from the SSR request headers (03 section 3.1) and returns the member slug here; until then nobody is "me".
+    private static string? MeId => null;
+}

@@ -1,5 +1,6 @@
 using Realm.Demo;
 using Realm.Web;
+using Realm.Web.Components;
 using Realm.Web.Hosting;
 
 if (args is ["healthcheck"]) return await HealthProbe.RunAsync();
@@ -13,5 +14,6 @@ var app = builder.Build();
 app.UseRealmPipeline();
 app.MapStaticAssets();
 app.MapRealmEndpoints();
+app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
 app.Run();
 return 0;
