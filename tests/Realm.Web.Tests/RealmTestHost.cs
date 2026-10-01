@@ -1,4 +1,6 @@
+using System.Diagnostics;
 using System.Net.Http.Json;
+using System.Runtime.CompilerServices;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
@@ -11,20 +13,30 @@ namespace Realm.Web.Tests;
 
 /// <summary>
 /// Starts the Realm pipeline on a real Kestrel host, composed with the same calls as <c>Program.cs</c> except <c>MapStaticAssets</c>
-/// (a hand-started host has no static-web-assets manifest). It adds two test-only endpoints: <c>echo</c> reports what the pipeline
-/// did to the request, and <c>boom</c> throws. A test that needs more endpoints, such as the Razor components, passes them in <c>mapEndpoints</c>.
+/// (a hand-started host has no static-web-assets manifest). The services come from <c>AddRealmApp</c>, the method <c>Program.cs</c> uses
+/// too, so the two cannot drift apart. It adds two test-only endpoints: <c>echo</c> reports what the pipeline did to the request, and
+/// <c>boom</c> throws. A test that needs more endpoints, such as the Razor components, passes them in <c>mapEndpoints</c>.
 /// </summary>
+/// <remarks>
+/// Every host logs into an <see cref="InMemoryLogSink"/> (the one the test passes, or its own), with exceptions written out in full.
+/// <see cref="EnsureSuccessAsync"/> turns a failed response into an exception that carries those logged errors, because the response of a
+/// failed request is only a generic 500 (03 section 5.2).
+/// </remarks>
 internal static class RealmTestHost
 {
     // A path that never exists, so a developer's own /data/options.json cannot change the mode a test sees.
     private static readonly string NoOptionsFile = Path.Combine(AppContext.BaseDirectory, "no-options.json");
 
-    public static Task<KestrelHost> StartAsync(
+    // The sink of each started host, so a helper that only holds the host can read what the server logged.
+    private static readonly ConditionalWeakTable<KestrelHost, InMemoryLogSink> Sinks = new();
+
+    public static async Task<KestrelHost> StartAsync(
         InMemoryLogSink? logs = null,
         IReadOnlyDictionary<string, string?>? settings = null,
         Action<WebApplication>? mapEndpoints = null)
     {
-        return KestrelHost.StartAsync(
+        var sink = logs ?? new InMemoryLogSink();
+        var host = await KestrelHost.StartAsync(
             builder =>
             {
                 builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?> { ["Realm:OptionsPath"] = NoOptionsFile });
@@ -33,13 +45,10 @@ internal static class RealmTestHost
                     builder.Configuration.AddInMemoryCollection(settings);
                 }
 
-                if (logs is not null)
-                {
-                    builder.Logging.AddProvider(logs);
-                }
+                builder.Logging.AddProvider(new ExceptionTextLogProvider(sink));
 
                 var runtime = RuntimeOptions.Detect(builder.Configuration, builder.Environment);
-                builder.Services.AddRealmWeb(runtime);
+                builder.Services.AddRealmApp(runtime);
             },
             app =>
             {
@@ -53,6 +62,9 @@ internal static class RealmTestHost
                 app.MapGet("boom", Boom);
                 mapEndpoints?.Invoke(app);
             });
+
+        Sinks.Add(host, sink);
+        return host;
     }
 
     private static IResult Boom() => throw new InvalidOperationException("secret detail that must not reach the response");
@@ -68,8 +80,54 @@ internal static class RealmTestHost
         }
 
         using var response = await client.SendAsync(request);
-        response.EnsureSuccessStatusCode();
+        await EnsureSuccessAsync(host, response);
         return await response.Content.ReadFromJsonAsync<RequestEcho>()
             ?? throw new InvalidOperationException("The echo endpoint returned no body.");
+    }
+
+    /// <summary>
+    /// Like <see cref="HttpResponseMessage.EnsureSuccessStatusCode"/>, but the exception also lists what the host logged at warning level
+    /// or above, exceptions and stack traces included, so a 500 shows the server-side cause and not just its status code.
+    /// </summary>
+    public static async Task EnsureSuccessAsync(KestrelHost host, HttpResponseMessage response)
+    {
+        if (response.IsSuccessStatusCode)
+        {
+            return;
+        }
+
+        var logged = "The server logged no warning or error.";
+        if (Sinks.TryGetValue(host, out var sink))
+        {
+            if ((int)response.StatusCode >= 500)
+            {
+                await WaitForLoggedErrorAsync(sink);
+            }
+
+            var problems = sink.Entries
+                .Where(entry => entry.Level >= LogLevel.Warning)
+                .Select(entry => $"[{entry.Level}] {entry.Category}: {entry.Message}")
+                .ToList();
+            if (problems.Count > 0)
+            {
+                logged = $"The server logged:{Environment.NewLine}{string.Join(Environment.NewLine, problems)}";
+            }
+        }
+
+        throw new HttpRequestException(
+            $"{(int)response.StatusCode} ({response.ReasonPhrase}) from {response.RequestMessage?.RequestUri}. {logged}",
+            null,
+            response.StatusCode);
+    }
+
+    // The exception handler writes the 500 first and logs the exception afterwards, so on a cold host the client can have the response
+    // before the entry exists. A failing test waits for it (at most five seconds); a passing test never gets here.
+    private static async Task WaitForLoggedErrorAsync(InMemoryLogSink sink)
+    {
+        var waited = Stopwatch.StartNew();
+        while (waited.Elapsed < TimeSpan.FromSeconds(5) && !sink.Entries.Any(entry => entry.Level >= LogLevel.Error))
+        {
+            await Task.Delay(20);
+        }
     }
 }
