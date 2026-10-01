@@ -1,7 +1,67 @@
 @page "/"
+@implements IDisposable
+@using Realm.Demo
+@using Realm.Domain
+@using Realm.Web.Components.Map
+@using Realm.Web.Components.Shell
+@using Realm.Web.Map
+@inject IConfiguration Configuration
 
+@* The Location screen (01 section 3). The map fills the canvas behind the sheet; the sheet itself arrives with S7, so until then the page keeps
+   the placeholder that reserves its Peek band (03 section 3.1). The session comes from RealmShell's cascading value and its snapshot is read at
+   render: the page re-renders on IRealmSession.Changed and passes the new immutable lists down, so MapView's reference check sends only what
+   changed. The instant is the session's own clock (no wall clock). *@
 <section class="realm-location">
+    <MapView Members="@Snapshot.Members"
+             Vehicles="@Snapshot.Vehicles"
+             Places="@Snapshot.Places"
+             Now="@Session.Time.GetUtcNow()"
+             StyleId="@StyleId"
+             TestHooks="@TestHooks" />
+
     <div class="realm-peek-placeholder">
         <p class="realm-summoning" role="status">Summoning the court…</p>
     </div>
 </section>
+
+@code {
+    private bool _subscribed;
+
+    /// <summary>The circuit's session, cascaded by <c>RealmShell</c>.</summary>
+    [CascadingParameter]
+    public IRealmSession Session { get; set; } = default!;
+
+    /// <summary>The Appendix-B overrides of this circuit (<c>style</c> for now), cascaded by <c>RealmShell</c>.</summary>
+    [CascadingParameter]
+    public DemoUiOverrides? Overrides { get; set; }
+
+    private RealmSnapshot Snapshot => Session.Current;
+
+    // A Demo session (Demo mode, or a Live circuit that opened with demo=1 while it is allowed) installs window.__realm, as does
+    // the hosting switch Realm:TestHooks (03 section 4.10). The style defaults to Night; Demo and CI ask for demo-offline with ?style=.
+    private bool TestHooks => Session is DemoRealmSession || (bool.TryParse(Configuration["Realm:TestHooks"], out var on) && on);
+
+    private string StyleId => Overrides?.Style ?? MapStyleIds.Night;
+
+    // Prerendering creates the page and discards it, so the subscription waits for the circuit's first render.
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender && !_subscribed)
+        {
+            _subscribed = true;
+            Session.Changed += OnSessionChanged;
+        }
+    }
+
+    // Raised off the UI thread (IRealmSession.Changed): marshal back before rendering.
+    private void OnSessionChanged() => _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        if (_subscribed)
+        {
+            _subscribed = false;
+            Session.Changed -= OnSessionChanged;
+        }
+    }
+}

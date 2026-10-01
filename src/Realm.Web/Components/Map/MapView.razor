@@ -1,0 +1,22 @@
+@* The map (03 section 3.4): the element MapLibre draws into, and nothing else. Pins, bubbles, chips and zones are made by realmMap.js from the
+   payloads this component sends (MapView.razor.cs), never by Razor. The canvas is fixed to the viewport behind the sheet and the navigation
+   (01 section 3.3); the inline style is the one place that rule lives until the layout slice moves it into app.css. When the browser has no
+   WebGL 2 the canvas is replaced by a plain message and the rest of the page keeps working (03 section 4.4). *@
+@if (_webGlUnavailable)
+{
+    <div class="realm-map-unavailable"
+         data-testid="map-unavailable"
+         role="status"
+         style="position: fixed; inset: 0; z-index: 0; display: flex; align-items: center; justify-content: center; padding: 16px; text-align: center; color: var(--realm-text-2);">
+        @WebGlMessage
+    </div>
+}
+else
+{
+    <div id="@ContainerId"
+         class="realm-map-canvas"
+         data-testid="map-canvas"
+         role="application"
+         aria-label="@MapStrings.Default.MapLabel"
+         style="position: fixed; inset: 0; z-index: 0;"></div>
+}
