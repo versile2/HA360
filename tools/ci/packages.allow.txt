@@ -1,0 +1,10 @@
+# Package ids the repository may reference (03 section 1.3: the 8 pins of Directory.Packages.props).
+# One id per line, compared case-insensitively; text after # is a comment. A new package needs a decision first.
+MudBlazor
+MudX.MudBlazor.Extension
+Microsoft.EntityFrameworkCore.Sqlite
+Microsoft.NET.Test.Sdk
+xunit
+xunit.runner.visualstudio
+bunit
+Microsoft.Extensions.TimeProvider.Testing
