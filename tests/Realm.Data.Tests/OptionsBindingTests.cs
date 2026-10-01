@@ -486,7 +486,7 @@ public class OptionsBindingTests
         Assert.StartsWith("members[2].static_latitude", validation.Warnings[1], StringComparison.Ordinal);
         Assert.StartsWith("me_fallback_member", validation.Warnings[2], StringComparison.Ordinal);
         Assert.DoesNotContain(validation.Warnings, warning => warning.Contains("ghost", StringComparison.Ordinal));
-        Assert.Empty(OptionsValidator.Validate(options with { MeFallbackMember = "king" }).Warnings.Where(warning => warning.StartsWith("me_fallback_member", StringComparison.Ordinal)));
+        Assert.DoesNotContain(OptionsValidator.Validate(options with { MeFallbackMember = "king" }).Warnings, warning => warning.StartsWith("me_fallback_member", StringComparison.Ordinal));
     }
 
     private static MemberOption Member(string id, MemberKind kind = MemberKind.Live, double? latitude = null, double? longitude = null)
