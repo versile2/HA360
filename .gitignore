@@ -1,0 +1,9 @@
+.private/
+bin/
+obj/
+node_modules/
+*.user
+.vs/
+TestResults/
+playwright-report/
+test-results/
