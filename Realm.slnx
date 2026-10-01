@@ -6,6 +6,7 @@
     <Project Path="src/Realm.Web/Realm.Web.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Realm.Demo.Tests/Realm.Demo.Tests.csproj" />
     <Project Path="tests/Realm.Domain.Tests/Realm.Domain.Tests.csproj" />
   </Folder>
 </Solution>
