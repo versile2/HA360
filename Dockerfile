@@ -6,7 +6,14 @@ COPY src/Realm.Domain/Realm.Domain.csproj               src/Realm.Domain/
 COPY src/Realm.Infrastructure/Realm.Infrastructure.csproj src/Realm.Infrastructure/
 COPY src/Realm.Demo/Realm.Demo.csproj                   src/Realm.Demo/
 COPY src/Realm.Web/Realm.Web.csproj                     src/Realm.Web/
-RUN dotnet restore src/Realm.Web/Realm.Web.csproj
+# The SDK adds Microsoft.AspNetCore.App.Internal.Assets (the package that holds _framework/blazor.web.js) only to a project that
+# contains a .razor file, and only restore can fetch it: publish below runs --no-restore. This layer holds the csproj files alone,
+# so a stub stands in for the real components while restoring and is gone again at the end of the same layer. Without it the image
+# serves a 404 for the Blazor script (S2 fix 1). <RequiresAspNetWebAssets>true</RequiresAspNetWebAssets> in Realm.Web.csproj
+# would make the stub unnecessary.
+RUN touch src/Realm.Web/RestoreStub.razor \
+ && dotnet restore src/Realm.Web/Realm.Web.csproj \
+ && rm src/Realm.Web/RestoreStub.razor
 COPY src/ src/
 ARG VERSION=0.0.0-dev
 ARG REVISION=unknown

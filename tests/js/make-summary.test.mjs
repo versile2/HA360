@@ -332,8 +332,8 @@ const smokeData = (overrides = {}) => ({
   time_to_healthy_s: 1.842,
   item1: 'PASS', item1_title: 'first /healthz 200', item1_detail: '1.842 s',
   item2: 'PASS', item2_title: 'base href follows X-Ingress-Path', item2_detail: "'/' without the header, '/api/hassio_ingress/TOKEN/' with it, an invalid value ignored",
-  item3: 'PASS', item3_title: 'content types', item3_detail: '_framework/blazor.web.js (text/javascript)',
-  item4: 'PASS', item4_title: 'no Set-Cookie on /', item4_detail: 'GET / answered 200 without Set-Cookie',
+  item3: 'PASS', item3_title: 'content types', item3_detail: '_framework/blazor.web.k3j9x.js (text/javascript)',
+  item4: 'PASS', item4_title: 'Set-Cookie on / (informational)', item4_detail: 'GET / answered 200 without Set-Cookie',
   item9: 'PASS', item9_title: 'image runs as root', item9_detail: 'id -u prints 0',
   item10: 'PASS', item10_title: 'no forbidden path in the image', item10_detail: '412 entries checked',
   ...overrides,
@@ -364,7 +364,7 @@ test('docker smoke: image size, time to healthy and every item are rendered; a p
   const order = lines.filter((l) => /^\| \d+ \|/.test(l)).map((l) => Number(/^\| (\d+) \|/.exec(l)[1]));
   assert.deepEqual(order, [1, 2, 3, 4, 9, 10], 'items are listed by number, 10 after 9');
   assert.match(smoke, /^Items: 6 PASS, 0 WARN, 0 FAIL, 0 SKIP\./m);
-  assert.doesNotMatch(smoke, /Container log/);
+  assert.doesNotMatch(smoke, /Container log|Response headers/);
   assert.ok(run.summary.indexOf('## Tests') < run.summary.indexOf('## Docker smoke'), 'after the test results');
   assert.ok(run.summary.indexOf('## Docker smoke') < run.summary.indexOf('## Warnings'), 'before the warnings');
 });
@@ -378,6 +378,7 @@ test('docker smoke: a FAIL item fails the run and is named in why; the job is no
         item3_detail: "_framework/blazor.web.js: status 200, type 'application/javascript' | want text/javascript",
         item9: 'FAIL',
         item9_detail: "id -u printed '1654'",
+        failing_requests: 'item 3 content types\n  response headers of GET /_framework/blazor.web.js -> 404\n    HTTP/1.1 404 Not Found\n    Content-Length: 0\n  the image\'s static web assets (what MapStaticAssets reads)\n    ./Realm.Web.staticwebassets.endpoints.json: 4096 bytes, 40 routes\n',
         container_log_tail: 'info: Now listening on: http://[::]:8099\nfail: Unhandled exception. System.InvalidOperationException: boom\n',
       }),
     },
@@ -392,6 +393,9 @@ test('docker smoke: a FAIL item fails the run and is named in why; the job is no
   assert.ok(smoke.split('\n').includes("| 9 | image runs as root | FAIL | id -u printed '1654' |"));
   assert.match(smoke, /^Items: 4 PASS, 0 WARN, 2 FAIL, 0 SKIP\./m);
   assert.match(smoke, /Container log \(last lines[^\n]*\n\n```text\ninfo: Now listening on: http:\/\/\[::\]:8099\nfail: Unhandled exception\. System\.InvalidOperationException: boom\n```/);
+  assert.match(smoke, /^Response headers of the failing requests[^\n]*\n\n```text\nitem 3 content types\n  response headers of GET \/_framework\/blazor\.web\.js -> 404\n    HTTP\/1\.1 404 Not Found\n    Content-Length: 0\n  the image's static web assets[^\n]*\n    \.\/Realm\.Web\.staticwebassets\.endpoints\.json: 4096 bytes, 40 routes\n```/m, 'the request evidence is fenced, indentation kept');
+  assert.ok(smoke.indexOf('Response headers of the failing requests') < smoke.indexOf('Container log'), 'headers before the container log');
+  assert.ok(smoke.indexOf('Items: 4 PASS') < smoke.indexOf('Response headers of the failing requests'), 'after the table');
 
   const one = summarize({ files: { 'dotnet/errors.log': '', ...smokeFile({ item10: 'FAIL' }) }, needs: smokeNeeds('failure') });
   assert.match(one.summary, /^- why: docker smoke failed: item 10$/m, 'a single item is "item N"');
@@ -404,6 +408,8 @@ test('docker smoke: a slow start (WARN) and sizes over the 6.5 lines are reporte
       ...smokeFile({
         item1: 'WARN',
         item1_detail: '4.173 s is over the 3 s target',
+        item4: 'WARN',
+        item4_detail: 'GET / sets a cookie: .AspNetCore.Antiforgery.VyLW6ORzMgk (D61: informational; the Blazor antiforgery cookie is expected)',
         time_to_healthy_s: 4.173,
         image_size_bytes: 451000000,
         app_layer_bytes: 46000000,
@@ -415,7 +421,9 @@ test('docker smoke: a slow start (WARN) and sizes over the 6.5 lines are reporte
   assert.match(run.summary, /^- result: success$/m);
   const smoke = section(run.summary, 'Docker smoke');
   assert.ok(smoke.split('\n').includes('| 1 | first /healthz 200 | WARN | 4.173 s is over the 3 s target |'));
-  assert.match(smoke, /^Items: 5 PASS, 1 WARN, 0 FAIL, 0 SKIP\./m);
+  assert.ok(smoke.split('\n').includes('| 4 | Set-Cookie on / (informational) | WARN | GET / sets a cookie: .AspNetCore.Antiforgery.VyLW6ORzMgk (D61: informational; the Blazor antiforgery cookie is expected) |'), 'the cookie warning (D61) is a row, not a failure');
+  assert.match(smoke, /^Items: 4 PASS, 2 WARN, 0 FAIL, 0 SKIP\./m);
+  assert.doesNotMatch(run.summary, /^- why:/m, 'WARN items never put a reason on the run');
   assert.match(smoke, /^- time to healthy: 4.17 s/m);
   assert.match(smoke, /^- image size \(uncompressed\): 451\.0 MB, over the fail line /m);
   assert.match(smoke, /^- app layer \(published output\): 46\.0 MB, over the warn line /m, 'the app layer row has no fail line');
@@ -491,6 +499,10 @@ test('helpers: parseSmoke reads items by number, tolerates case and gaps, and co
   assert.deepEqual(parsed.failed.map((i) => i.n), [1]);
   assert.equal(parsed.problem, 'docker smoke failed: item 1');
   assert.equal(parseSmoke('{"item1":"PASS"}').problem, null);
+  assert.equal(parseSmoke('{"item1":"PASS"}').requests, null, 'no failing_requests, no block');
+  assert.equal(parseSmoke('{"item1":"PASS","failing_requests":"  \\n"}').requests, null, 'a blank value is no block');
+  assert.equal(parseSmoke('{"item1":"WARN","failing_requests":"item 4"}').requests, 'item 4');
+  assert.equal(parseSmoke('{"item1":"WARN","item4":"WARN"}').problem, null, 'WARN is not a failure');
   assert.match(parseSmoke('nope').unreadable, /not valid JSON/);
   assert.match(smokeSection(parseSmoke('nope')), /^## Docker smoke\n\nsmoke\.json is not valid JSON/);
   const long = smokeSection(parseSmoke(JSON.stringify({ item1: 'FAIL', item1_title: 't', item1_detail: `${'x'.repeat(600)}\nsecond line` })));

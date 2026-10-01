@@ -10,14 +10,16 @@
 # Items (numbers are 03 section 7.8's; this file is append-only, one numbered block per slice, 04 G-17):
 #   1  first /healthz 200 after the container starts (target at most 3 s = WARN above, FAIL above 10 s)
 #   2  base href with and without X-Ingress-Path, an invalid value is ignored
-#   3  Content-Type of the scripts and fonts
-#   4  no Set-Cookie on GET /
+#   3  Content-Type of the scripts and fonts (the Blazor script is requested under the name the page itself advertises)
+#   4  Set-Cookie on GET /: informational (D61), WARN with the cookie names, never FAIL
 #   9  the image runs as uid 0 (asserted, not assumed)
 #   10 no forbidden path in docker export
 # Items 5, 7 and 8 belong to S16a and item 6 to S10a: each adds its own block here and touches no other item.
 #
 # Environment: CI_OUT (default ci-out), SMOKE_PORT (host port, default 18099), SMOKE_HEALTHY_CAP_S (how long to wait for
 # the first 200 before giving up, default 30; the FAIL line stays at 10 s, the cap only lets a slow start still be measured).
+# When an item fails on a request, the response headers of that request (and, for the Blazor script, what the image holds for
+# static web assets) are printed under the item's line and kept in smoke.json as failing_requests (make-summary.mjs shows them).
 # No `set -e` on purpose: every item runs and reports; the exit status comes from the items.
 set -uo pipefail
 
@@ -40,6 +42,8 @@ ingress_token="AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-AbCdE"
 declare -A item_status item_title item_detail
 json_fields=()
 log_tail=""
+pending_log=""   # evidence for the item being checked: printed under its line by record(), then moved to request_log
+request_log=""   # all of it, for smoke.json
 failures=0
 
 now_ms() {
@@ -62,6 +66,46 @@ record() {
     failures=$((failures + 1))
   fi
   printf '%s item%s %s: %s\n' "$2" "$1" "$3" "$4"
+  if [[ -n $pending_log ]]; then
+    printf '%s' "$pending_log"
+    request_log+="item $1 $3"$'\n'"$pending_log"
+    pending_log=""
+  fi
+}
+
+# queue_block <heading> <body>: evidence for the item being checked, printed (indented) under its line once record() runs.
+queue_block() {
+  local body
+  body=$(printf '%s\n' "$2" | head -c 1500 | sed 's/^/    /')
+  pending_log+="  $1"$'\n'"$body"$'\n'
+}
+
+# queue_request <label> <headers file>: the response headers of a request that failed the item.
+queue_request() {
+  local headers=""
+  if [[ -s $2 ]]; then
+    headers=$(tr -d '\r' <"$2")
+  fi
+  queue_block "response headers of $1" "${headers:-(none: curl got no response)}"
+}
+
+# asset_diag: what the running container holds for static web assets, to tell a manifest without the Blazor script from a missing
+# manifest or a wrong content root. Read-only, runs inside the container (its shell is fed through stdin).
+asset_diag() {
+  docker exec -i "$container" sh -s 2>&1 <<'EOF'
+cd /app 2>/dev/null || { echo "no /app in the image"; exit 0; }
+echo "content root: $(pwd); ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-unset}; ASPNETCORE_CONTENTROOT=${ASPNETCORE_CONTENTROOT:-unset}"
+found=0
+for m in ./*.staticwebassets.endpoints.json; do
+  [ -f "$m" ] || continue
+  found=1
+  echo "$m: $(wc -c <"$m" | tr -d ' ') bytes, $(grep -o '"Route": *"' "$m" | wc -l | tr -d ' ') routes"
+  grep -o '"Route": *"_framework/[^"]*"' "$m" | sort -u | head -n 8
+  echo "routes of _framework/blazor*: $(grep -o '"Route": *"_framework/blazor[^"]*"' "$m" | sort -u | wc -l | tr -d ' ')"
+done
+[ "$found" = 1 ] || echo "no *.staticwebassets.endpoints.json next to the app: MapStaticAssets has no manifest"
+echo "wwwroot/_framework: $(ls wwwroot/_framework 2>&1 | head -n 8 | tr '\n' ' ')"
+EOF
 }
 
 # join_problems: the entries of the global array "problems", separated by "; "
@@ -96,6 +140,13 @@ write_json() {
     fields+=("\"item${n}_title\": $(json_string "${item_title[$n]}")")
     fields+=("\"item${n}_detail\": $(json_string "${item_detail[$n]}")")
   done
+  if [[ -n $request_log ]]; then
+    local requests=$request_log
+    if ((${#requests} > 6000)); then
+      requests=${requests:0:6000}
+    fi
+    fields+=("\"failing_requests\": $(json_string "$requests")")
+  fi
   if [[ -n $log_tail ]]; then
     fields+=("\"container_log_tail\": $(json_string "$log_tail")")
   fi
@@ -140,17 +191,18 @@ check_type() {
   checked+=("$1 ($2)")
   if [[ $h_status != 200 || $h_ctype != "$2" ]]; then
     problems+=("$1: status $h_status, type '${h_ctype:-none}' (want 200 and $2)")
+    queue_request "GET /$1 -> $h_status" "$work/headers.txt"
   fi
 }
 
-# probe_root [header...]: GET / and set root_status and root_base (the href of <base>).
+# probe_root [header...]: GET / and set root_status and root_base (the href of <base>); the headers are kept in $work/root.headers.
 probe_root() {
   local args=() header
   for header in "$@"; do
     args+=(-H "$header")
   done
-  rm -f "$work/root.html"
-  root_status=$(curl -s -o "$work/root.html" -w '%{http_code}' --max-time 20 "${args[@]}" "$base_url/")
+  rm -f "$work/root.html" "$work/root.headers"
+  root_status=$(curl -s -o "$work/root.html" -D "$work/root.headers" -w '%{http_code}' --max-time 20 "${args[@]}" "$base_url/")
   root_base=$(grep -o '<base href="[^"]*"' "$work/root.html" 2>/dev/null | head -n 1 | sed 's/^<base href="//; s/"$//')
 }
 
@@ -218,7 +270,7 @@ if ((healthy == 0)); then
   not_run="not run: the container never answered /healthz with 200 (item 1)"
   record 2 SKIP "base href follows X-Ingress-Path" "$not_run"
   record 3 SKIP "content types" "$not_run"
-  record 4 SKIP "no Set-Cookie on /" "$not_run"
+  record 4 SKIP "Set-Cookie on / (informational)" "$not_run"
 else
   # --- Item 2: <base href> -----------------------------------------------------------------------------------------
   title="base href follows X-Ingress-Path"
@@ -226,14 +278,17 @@ else
   probe_root
   if [[ $root_status != 200 || $root_base != "/" ]]; then
     problems+=("no header: status $root_status, base '$root_base' (want 200 and '/')")
+    queue_request "GET / without the header -> $root_status" "$work/root.headers"
   fi
   probe_root "X-Ingress-Path: /api/hassio_ingress/$ingress_token"
   if [[ $root_status != 200 || $root_base != "/api/hassio_ingress/$ingress_token/" ]]; then
     problems+=("with the header: status $root_status, base '$root_base' (want 200 and '/api/hassio_ingress/TOKEN/')")
+    queue_request "GET / with the header -> $root_status" "$work/root.headers"
   fi
   probe_root "X-Ingress-Path: api/hassio_ingress/$ingress_token"
   if [[ $root_status != 200 || $root_base != "/" ]]; then
     problems+=("invalid header (no leading slash): status $root_status, base '$root_base' (want 200 and '/', the value is ignored)")
+    queue_request "GET / with the invalid header -> $root_status" "$work/root.headers"
   fi
   if ((${#problems[@]} == 0)); then
     record 2 PASS "$title" "'/' without the header, '/api/hassio_ingress/TOKEN/' with it (a 43-character token), an invalid value ignored"
@@ -242,12 +297,26 @@ else
   fi
 
   # --- Item 3: content types ---------------------------------------------------------------------------------------
-  # blazor.web.js always. The S5 files and a font are checked as soon as they are in the image (S5 onward), so S5 does not
-  # have to edit this script; a file that is in the image but not served with the right type fails.
+  # blazor.web.js always, under the name the page advertises: .NET 10 serves it as a static web asset with a fingerprint in the
+  # name (_framework/blazor.web.<hash>.js) and a browser requests exactly the name the page carries. A page that still carries the
+  # plain _framework/blazor.web.js has no mapping for it, which is what a missing framework asset looks like (the 404 of S2 fix 1).
+  # The S5 files and a font are checked as soon as they are in the image (S5 onward), so S5 does not have to edit this script; a
+  # file that is in the image but not served with the right type fails.
   title="content types"
   problems=()
   checked=()
-  check_type _framework/blazor.web.js text/javascript
+  probe_root
+  script_path=$(grep -o 'src="[^"]*blazor\.web[^"]*\.js"' "$work/root.html" 2>/dev/null | head -n 1 | sed 's/^src="//; s/"$//')
+  script_path=${script_path#/}
+  if [[ -z $script_path || $script_path == *://* ]]; then
+    problems+=("GET / (status $root_status) has no relative <script src> for blazor.web.js")
+    queue_request "GET / -> $root_status" "$work/root.headers"
+    script_path=_framework/blazor.web.js
+  fi
+  check_type "$script_path" text/javascript
+  if ((${#problems[@]} > 0)); then
+    queue_block "the image's static web assets (what MapStaticAssets reads)" "$(asset_diag)"
+  fi
   for rel in lib/maplibre-gl/maplibre-gl.mjs lib/maplibre-gl/maplibre-gl-worker.mjs js/realmMap.js; do
     if docker exec "$container" test -f "/app/wwwroot/$rel" 2>/dev/null; then
       check_type "$rel" text/javascript
@@ -263,14 +332,17 @@ else
     record 3 FAIL "$title" "$(join_problems)"
   fi
 
-  # --- Item 4: no Set-Cookie on / ----------------------------------------------------------------------------------
-  title="no Set-Cookie on /"
+  # --- Item 4: Set-Cookie on / (informational) ---------------------------------------------------------------------
+  # D61: the antiforgery cookie of Blazor is expected and harmless behind Ingress, so this item reports and never fails. Only the
+  # cookie names are logged, never a value.
+  title="Set-Cookie on / (informational)"
   get_headers ""
-  cookie_names=$(tr -d '\r' <"$work/headers.txt" 2>/dev/null | grep -i '^set-cookie:' | cut -d= -f1 | head -n 3)
+  cookie_names=$(tr -d '\r' <"$work/headers.txt" 2>/dev/null | awk 'tolower($0) ~ /^set-cookie:/ { v = $0; sub(/^[^:]*:[ \t]*/, "", v); sub(/[=;].*$/, "", v); print v }' | sort -u | head -n 3 | tr '\n' ' ')
+  cookie_names=${cookie_names% }
   if [[ $h_status != 200 ]]; then
-    record 4 FAIL "$title" "GET / answered $h_status, so the headers prove nothing"
+    record 4 WARN "$title" "GET / answered $h_status, so the headers say nothing about cookies"
   elif [[ -n $cookie_names ]]; then
-    record 4 FAIL "$title" "GET / sets a cookie: $(echo "$cookie_names" | tr '\n' ' ')"
+    record 4 WARN "$title" "GET / sets a cookie: $cookie_names (D61: informational; the Blazor antiforgery cookie is expected)"
   else
     record 4 PASS "$title" "GET / answered 200 without Set-Cookie"
   fi

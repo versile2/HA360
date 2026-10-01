@@ -240,7 +240,9 @@ export function guardsSection(parsed) {
 // ---------------------------------------------------------------------------------------------
 // smoke.json: the flat { "name": number|string } map written by tools/ci/image-smoke.sh (03 section 7.8). Keys:
 //   image, image_size_bytes, app_layer_bytes, compressed_estimate_bytes, time_to_healthy_s,
-//   item<N>, item<N>_title, item<N>_detail (PASS, WARN, SKIP or FAIL), container_log_tail, error.
+//   item<N>, item<N>_title, item<N>_detail (PASS, WARN, SKIP or FAIL), failing_requests, container_log_tail, error.
+// failing_requests is free text: the response headers of the requests that failed an item, and what the image holds for static
+// web assets when the Blazor script was not served.
 // Items are read generically, so a slice that appends item 6 or 8 to the script needs no edit here.
 // ---------------------------------------------------------------------------------------------
 
@@ -259,7 +261,7 @@ function smokeNumber(data, key) {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
-// -> { data, items: [{ n, status, title, detail }], failed: [item], error, logTail, problem } or { unreadable } when the text is not a JSON object.
+// -> { data, items: [{ n, status, title, detail }], failed: [item], error, requests, logTail, problem } or { unreadable } when the text is not a JSON object.
 // `problem` is the one-line reason the run fails (null when the smoke is fine).
 export function parseSmoke(text) {
   let data;
@@ -285,12 +287,13 @@ export function parseSmoke(text) {
   items.sort((a, b) => a.n - b.n);
   const failed = items.filter((item) => !SMOKE_NON_FAILING.has(item.status));
   const error = typeof data.error === 'string' && data.error !== '' ? data.error : null;
+  const requests = typeof data.failing_requests === 'string' && data.failing_requests.trim() !== '' ? data.failing_requests : null;
   const logTail = typeof data.container_log_tail === 'string' && data.container_log_tail.trim() !== '' ? data.container_log_tail : null;
   let problem = null;
   if (error) problem = `docker smoke: ${error}`;
   else if (failed.length > 0) problem = `docker smoke failed: ${failed.length === 1 ? 'item' : 'items'} ${failed.map((item) => item.n).join(', ')}`;
   else if (items.length === 0) problem = 'docker smoke: smoke.json holds no item result (the script stopped before its first item)';
-  return { data, items, failed, error, logTail, problem };
+  return { data, items, failed, error, requests, logTail, problem };
 }
 
 function tableCell(text) {
@@ -332,6 +335,7 @@ export function smokeSection(smoke) {
     const count = (status) => smoke.items.filter((item) => item.status === status).length;
     parts.push(`Items: ${count('PASS')} PASS, ${count('WARN')} WARN, ${smoke.failed.length} FAIL, ${count('SKIP')} SKIP. Sizes are recorded against the table of 03 section 6.5; no item enforces them before item 8 (S16a).`);
   }
+  if (smoke.requests) parts.push(`Response headers of the failing requests, with what the image holds for static web assets:\n\n${fenced(smoke.requests.trimEnd())}`);
   if (smoke.logTail) parts.push(`Container log (last lines, kept because an item failed):\n\n${fenced(smoke.logTail.trimEnd())}`);
   return parts.join('\n\n');
 }
