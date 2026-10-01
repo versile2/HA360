@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 
-import { crashReport, distinctDiagnostics, normalizeDiagnostic, parseGuardsLog, parseTrx, reportLine } from '../../tools/ci/make-summary.mjs';
+import { crashReport, distinctDiagnostics, normalizeDiagnostic, parseGuardsLog, parseSmoke, parseTrx, reportLine, smokeSection } from '../../tools/ci/make-summary.mjs';
 import { cleanEnv, fixture, repoRoot, tempDir, tools, writeFile } from './helpers/ci-harness.mjs';
 
 const WORKSPACE = '/home/runner/work/ha360/ha360';
@@ -318,4 +318,181 @@ test('helpers: parseGuardsLog and reportLine on small inputs', () => {
   assert.equal(reportLine('c', ['AC-01 missing', 'AC-02 missing']), 'REPORT c: 2 AC ids missing (AC-01, AC-02)', 'a pair is listed');
   assert.equal(reportLine('c', ['AC-07 missing']), 'REPORT c: 1 AC id missing (AC-07)');
   assert.equal(reportLine('c', ['src/a.cs [AC-99] matches no row']), 'REPORT c: src/a.cs [AC-99] matches no row');
+});
+
+// ---------------------------------------------------------------------------------------------
+// Docker smoke: the "## Docker smoke" section from smoke.json (hand-made here; the real file is written by tools/ci/image-smoke.sh)
+// ---------------------------------------------------------------------------------------------
+
+const smokeData = (overrides = {}) => ({
+  image: 'realm:smoke',
+  image_size_bytes: 297400000,
+  app_layer_bytes: 31200000,
+  compressed_estimate_bytes: 112300000,
+  time_to_healthy_s: 1.842,
+  item1: 'PASS', item1_title: 'first /healthz 200', item1_detail: '1.842 s',
+  item2: 'PASS', item2_title: 'base href follows X-Ingress-Path', item2_detail: "'/' without the header, '/api/hassio_ingress/TOKEN/' with it, an invalid value ignored",
+  item3: 'PASS', item3_title: 'content types', item3_detail: '_framework/blazor.web.js (text/javascript)',
+  item4: 'PASS', item4_title: 'no Set-Cookie on /', item4_detail: 'GET / answered 200 without Set-Cookie',
+  item9: 'PASS', item9_title: 'image runs as root', item9_detail: 'id -u prints 0',
+  item10: 'PASS', item10_title: 'no forbidden path in the image', item10_detail: '412 entries checked',
+  ...overrides,
+});
+const smokeFile = (overrides) => ({ 'docker-smoke/smoke.json': JSON.stringify(smokeData(overrides)) });
+const smokeNeeds = (smoke, dotnet = 'success') => JSON.stringify({ guards: { result: 'success' }, dotnet: { result: dotnet }, 'docker-smoke': { result: smoke } });
+
+test('docker smoke: image size, time to healthy and every item are rendered; a passing smoke keeps the run green', () => {
+  const run = summarize({
+    files: { 'dotnet/errors.log': '', 'dotnet/restore.log': fixture('restore.ok.log'), ...smokeFile() },
+    needs: smokeNeeds('success'),
+  });
+  assert.equal(run.status, 0, run.stderr);
+  assert.match(run.summary, /^- result: success$/m);
+  assert.doesNotMatch(run.summary, /^- why:/m);
+  assert.match(run.summary, /\| docker-smoke \| success \|/);
+  const smoke = section(run.summary, 'Docker smoke');
+  assert.ok(smoke, 'a Docker smoke section exists');
+  const lines = smoke.split('\n');
+  assert.ok(lines.includes('- image: realm:smoke'));
+  assert.ok(lines.includes('- image size (uncompressed): 297.4 MB, within the target (6.5: target at most 330 MB, warn over 360 MB, fail over 450 MB)'));
+  assert.ok(lines.includes('- app layer (published output): 31.2 MB, within the target (6.5: target at most 35 MB, warn over 45 MB)'));
+  assert.ok(lines.includes('- compressed size (estimate: gzip of docker save): 112.3 MB, within the target (6.5: target at most 120 MB, warn over 130 MB, fail over 200 MB)'));
+  assert.ok(lines.includes('- time to healthy: 1.84 s (item 1: target at most 3 s, warn over 3 s, fail over 10 s)'));
+  assert.ok(lines.includes('| item | check | result | detail |'));
+  assert.ok(lines.includes('| 1 | first /healthz 200 | PASS | 1.842 s |'));
+  assert.ok(lines.includes("| 2 | base href follows X-Ingress-Path | PASS | '/' without the header, '/api/hassio_ingress/TOKEN/' with it, an invalid value ignored |"));
+  const order = lines.filter((l) => /^\| \d+ \|/.test(l)).map((l) => Number(/^\| (\d+) \|/.exec(l)[1]));
+  assert.deepEqual(order, [1, 2, 3, 4, 9, 10], 'items are listed by number, 10 after 9');
+  assert.match(smoke, /^Items: 6 PASS, 0 WARN, 0 FAIL, 0 SKIP\./m);
+  assert.doesNotMatch(smoke, /Container log/);
+  assert.ok(run.summary.indexOf('## Tests') < run.summary.indexOf('## Docker smoke'), 'after the test results');
+  assert.ok(run.summary.indexOf('## Docker smoke') < run.summary.indexOf('## Warnings'), 'before the warnings');
+});
+
+test('docker smoke: a FAIL item fails the run and is named in why; the job is not blamed on the raw log; the container log is shown', () => {
+  const run = summarize({
+    files: {
+      'dotnet/errors.log': '',
+      ...smokeFile({
+        item3: 'FAIL',
+        item3_detail: "_framework/blazor.web.js: status 200, type 'application/javascript' | want text/javascript",
+        item9: 'FAIL',
+        item9_detail: "id -u printed '1654'",
+        container_log_tail: 'info: Now listening on: http://[::]:8099\nfail: Unhandled exception. System.InvalidOperationException: boom\n',
+      }),
+    },
+    needs: smokeNeeds('failure'),
+  });
+  assert.match(run.summary, /^- result: failure$/m);
+  assert.match(run.summary, /^- why: docker smoke failed: items 3, 9$/m, 'one why entry, no "job docker-smoke: failure"');
+  assert.doesNotMatch(run.summary, /job docker-smoke|did not succeed|no compiler error and no failed test/i);
+  assert.match(run.summary, /\| docker-smoke \| failure \|/);
+  const smoke = section(run.summary, 'Docker smoke');
+  assert.ok(smoke.split('\n').includes("| 3 | content types | FAIL | _framework/blazor.web.js: status 200, type 'application/javascript' \\| want text/javascript |"), 'the pipe in a detail is escaped');
+  assert.ok(smoke.split('\n').includes("| 9 | image runs as root | FAIL | id -u printed '1654' |"));
+  assert.match(smoke, /^Items: 4 PASS, 0 WARN, 2 FAIL, 0 SKIP\./m);
+  assert.match(smoke, /Container log \(last lines[^\n]*\n\n```text\ninfo: Now listening on: http:\/\/\[::\]:8099\nfail: Unhandled exception\. System\.InvalidOperationException: boom\n```/);
+
+  const one = summarize({ files: { 'dotnet/errors.log': '', ...smokeFile({ item10: 'FAIL' }) }, needs: smokeNeeds('failure') });
+  assert.match(one.summary, /^- why: docker smoke failed: item 10$/m, 'a single item is "item N"');
+});
+
+test('docker smoke: a slow start (WARN) and sizes over the 6.5 lines are reported but never fail the run', () => {
+  const run = summarize({
+    files: {
+      'dotnet/errors.log': '',
+      ...smokeFile({
+        item1: 'WARN',
+        item1_detail: '4.173 s is over the 3 s target',
+        time_to_healthy_s: 4.173,
+        image_size_bytes: 451000000,
+        app_layer_bytes: 46000000,
+        compressed_estimate_bytes: 125000000,
+      }),
+    },
+    needs: smokeNeeds('success'),
+  });
+  assert.match(run.summary, /^- result: success$/m);
+  const smoke = section(run.summary, 'Docker smoke');
+  assert.ok(smoke.split('\n').includes('| 1 | first /healthz 200 | WARN | 4.173 s is over the 3 s target |'));
+  assert.match(smoke, /^Items: 5 PASS, 1 WARN, 0 FAIL, 0 SKIP\./m);
+  assert.match(smoke, /^- time to healthy: 4.17 s/m);
+  assert.match(smoke, /^- image size \(uncompressed\): 451\.0 MB, over the fail line /m);
+  assert.match(smoke, /^- app layer \(published output\): 46\.0 MB, over the warn line /m, 'the app layer row has no fail line');
+  assert.match(smoke, /^- compressed size \(estimate: gzip of docker save\): 125\.0 MB, above the target /m);
+});
+
+test('docker smoke: items that were skipped because the container never started are shown; item 1 fails the run', () => {
+  const run = summarize({
+    files: {
+      'dotnet/errors.log': '',
+      'docker-smoke/smoke.json': JSON.stringify({
+        image: 'realm:smoke',
+        image_size_bytes: 300000000,
+        item1: 'FAIL', item1_title: 'first /healthz 200', item1_detail: 'no 200 from /healthz within 30 s (last status 000)',
+        item2: 'SKIP', item2_title: 'not run', item2_detail: 'the container never answered /healthz with 200 (item 1)',
+        item9: 'PASS', item9_title: 'image runs as root', item9_detail: 'id -u prints 0',
+      }),
+    },
+    needs: smokeNeeds('failure'),
+  });
+  assert.match(run.summary, /^- why: docker smoke failed: item 1$/m, 'SKIP is not a failure by itself');
+  const smoke = section(run.summary, 'Docker smoke');
+  assert.match(smoke, /^- time to healthy: not measured/m);
+  assert.match(smoke, /^Items: 1 PASS, 0 WARN, 1 FAIL, 1 SKIP\./m);
+});
+
+test('docker smoke: no smoke.json. A failed or succeeded job is a failure with a pointer; a skipped job and a missing --needs give no section', () => {
+  const env = { GITHUB_SERVER_URL: 'https://github.com', GITHUB_REPOSITORY: 'Versile2/ha360', GITHUB_RUN_ID: '12' };
+  const failed = summarize({ files: { 'dotnet/errors.log': '' }, needs: smokeNeeds('failure'), env });
+  assert.match(failed.summary, /^- result: failure$/m);
+  assert.match(failed.summary, /^- why: job docker-smoke: failure$/m);
+  assert.match(section(failed.summary, 'Docker smoke'), /^No smoke\.json was found: the image build or the smoke script stopped before it wrote one\. The cause is in the raw job log of the workflow run \(https:\/\/github\.com\/Versile2\/ha360\/actions\/runs\/12\)\.$/m);
+
+  const succeeded = summarize({ files: { 'dotnet/errors.log': '' }, needs: smokeNeeds('success') });
+  assert.match(succeeded.summary, /^- why: job docker-smoke succeeded but left no smoke\.json$/m);
+  assert.match(succeeded.summary, /^- result: failure$/m);
+
+  const skipped = summarize({ files: { 'guards/guards.log': 'FAIL no-wallclock: src/A.cs:1 DateTime.Now\n' }, needs: JSON.stringify({ guards: { result: 'failure' }, dotnet: { result: 'skipped' }, 'docker-smoke': { result: 'skipped' } }) });
+  assert.equal(section(skipped.summary, 'Docker smoke'), null, 'the guards failed, the job never ran: nothing to say about it');
+  assert.match(skipped.summary, /^- why: guards failed: no-wallclock$/m);
+  assert.doesNotMatch(skipped.summary, /docker-smoke:/);
+
+  const noNeeds = summarize({ files: { 'dotnet/errors.log': '' } });
+  assert.equal(section(noNeeds.summary, 'Docker smoke'), null);
+});
+
+test('docker smoke: an unreadable smoke.json, an empty one and a script error fail the run, never pass silently', () => {
+  const broken = summarize({ files: { 'dotnet/errors.log': '', 'docker-smoke/smoke.json': '{ not json' }, needs: smokeNeeds('failure') });
+  assert.match(broken.summary, /^- why: docker smoke: smoke\.json is not valid JSON$/m);
+  assert.match(section(broken.summary, 'Docker smoke'), /^smoke\.json is not valid JSON \(/m);
+
+  const list = summarize({ files: { 'dotnet/errors.log': '', 'docker-smoke/smoke.json': '[]' }, needs: smokeNeeds('success') });
+  assert.match(list.summary, /^- why: docker smoke: smoke\.json is not a JSON object$/m);
+  assert.match(list.summary, /^- result: failure$/m);
+
+  const empty = summarize({ files: { 'dotnet/errors.log': '', 'docker-smoke/smoke.json': '{}' }, needs: smokeNeeds('success') });
+  assert.match(empty.summary, /^- why: docker smoke: smoke\.json holds no item result/m);
+
+  const early = summarize({
+    files: { 'dotnet/errors.log': '', 'docker-smoke/smoke.json': JSON.stringify({ error: "image 'realm:smoke' does not exist locally" }) },
+    needs: smokeNeeds('failure'),
+  });
+  assert.match(early.summary, /^- why: docker smoke: image 'realm:smoke' does not exist locally$/m);
+  assert.match(section(early.summary, 'Docker smoke'), /^The smoke script reported: image 'realm:smoke' does not exist locally$/m);
+  assert.doesNotMatch(early.summary, /did not succeed/);
+});
+
+test('helpers: parseSmoke reads items by number, tolerates case and gaps, and counts an unknown status as a failure', () => {
+  const parsed = parseSmoke(JSON.stringify({ item10: 'PASS', item2: 'pass', item1: 'BROKEN', item1_title: 'first', other: 3 }));
+  assert.deepEqual(parsed.items.map((i) => i.n), [1, 2, 10]);
+  assert.deepEqual(parsed.items.map((i) => i.status), ['BROKEN', 'PASS', 'PASS']);
+  assert.equal(parsed.items[1].title, '', 'a missing title or detail is empty');
+  assert.deepEqual(parsed.failed.map((i) => i.n), [1]);
+  assert.equal(parsed.problem, 'docker smoke failed: item 1');
+  assert.equal(parseSmoke('{"item1":"PASS"}').problem, null);
+  assert.match(parseSmoke('nope').unreadable, /not valid JSON/);
+  assert.match(smokeSection(parseSmoke('nope')), /^## Docker smoke\n\nsmoke\.json is not valid JSON/);
+  const long = smokeSection(parseSmoke(JSON.stringify({ item1: 'FAIL', item1_title: 't', item1_detail: `${'x'.repeat(600)}\nsecond line` })));
+  assert.match(long, /\| 1 \| t \| FAIL \| x{400}\.\.\. \|/, 'a long detail is cut and kept on one line');
 });
