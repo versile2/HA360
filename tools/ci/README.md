@@ -7,6 +7,7 @@ Nobody reads a console, so every run, pass or fail, ends in a readable summary o
 |---|---|
 | `make-summary.mjs` | Reads the downloaded job artifacts and writes `SUMMARY.md`, `errors.log`, `build.tail.log` and `tests/*.trx`. Node built-ins only. |
 | `guards.mjs` | The twelve guards of 03 section 7.3: one `PASS`/`FAIL`/`REPORT` line per finding, exit 1 on any `FAIL`. The `guards` job tees its whole output to `guards.log` (uploaded with the `guards` artifact, also when a guard fails). |
+| `image-smoke.sh` | Runs the built image the way the Supervisor does (Demo data, no Home Assistant) and checks items 1 to 4, 9 and 10 of 03 section 7.8; prints one `PASS`/`WARN`/`FAIL`/`SKIP` line per item and writes `ci-out/smoke.json` (sizes, time to healthy, one entry per item, and `failing_requests`: the response headers of a failed request, plus what the image holds for static web assets when the Blazor script is not served), which `make-summary.mjs` renders as `## Docker smoke`. Item 4 (`Set-Cookie` on `/`) is informational (D61): `WARN` with the cookie names, never `FAIL`. Needs Docker, so only the `docker-smoke` job runs it. |
 | `publish-ci-artifacts.sh` | Publishes that folder to `ci-artifacts` as one new orphan commit (the `publish-ci` job runs it). |
 | `wait-for-ci.sh` | Waits for the run of one pushed commit and prints its `SUMMARY.md`. |
 | `ci-common.sh` | Sourced by both scripts: `branch_slug` and `summary_field`. |

@@ -51,8 +51,27 @@ jobs:
         uses: actions/upload-artifact@v7
         with: { name: dotnet, path: ci-out, retention-days: 3 }
 
+  docker-smoke:                                   # 7.8, S2: the Dockerfile is built and exercised on every push, not only at release
+    needs: guards
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - name: Build the image on the runner (loaded into the local daemon, nothing is pushed anywhere)
+        uses: docker/build-push-action@v7
+        with: { context: ., load: true, push: false, tags: "realm:smoke", cache-from: "type=gha,scope=smoke", cache-to: "type=gha,scope=smoke,mode=max" }
+      - name: Image smoke (items 1 to 4, 9 and 10 of 03 section 7.8; Demo data, no Home Assistant; writes smoke.json)
+        run: |
+          set -o pipefail
+          mkdir -p ci-out
+          bash tools/ci/image-smoke.sh realm:smoke 2>&1 | tee ci-out/smoke.log
+      - if: always()
+        uses: actions/upload-artifact@v7
+        with: { name: docker-smoke, path: ci-out, retention-days: 3 }
+
   publish-ci:                                     # 7.4
-    needs: [guards, dotnet]
+    needs: [guards, dotnet, docker-smoke]
     if: ${{ always() && !cancelled() }}
     runs-on: ubuntu-latest
     permissions: { contents: write }
