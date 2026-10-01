@@ -8,17 +8,15 @@ namespace Realm.Demo;
 /// </summary>
 public sealed class DemoRealmSessionFactory : IRealmSessionFactory
 {
-    // The only variant that changes the clock; the others are pure transforms of the snapshot (S4b).
-    private const string HaDownVariant = "ha-down";
-
     /// <summary>
     /// A clock frozen at the anchor instant, or at <see cref="DemoUrlParams.Now"/>; under the ha-down variant it
-    /// advances in real time from there. Null means the mode's default, which in a Demo run is the plain fixture.
+    /// advances in real time from there. The variants are parsed by <see cref="DemoVariants.Parse"/>. Null means the
+    /// mode's default, which in a Demo run is the plain fixture.
     /// </summary>
     public IRealmSession Create(DemoUrlParams? demo)
     {
+        var variants = DemoVariants.Parse(demo?.Variants);
         var start = demo?.Now ?? DemoDataSource.Anchor;
-        var advancing = demo is not null && demo.Variants.Contains(HaDownVariant, StringComparer.Ordinal);
-        return new DemoRealmSession(new DemoDataSource(new DemoTimeProvider(start, advancing)));
+        return new DemoRealmSession(new DemoDataSource(new DemoTimeProvider(start, variants.HaDown), variants));
     }
 }
