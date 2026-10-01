@@ -1,0 +1,13 @@
+.git
+.github
+.private
+.scratch/
+docs
+tests
+tools
+node_modules
+ci-out
+**/bin
+**/obj
+*.db*
+realm/
