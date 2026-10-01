@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <!-- No package: supplies IServiceCollection for AddRealmDemo() (R3-006). -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Realm.Domain/Realm.Domain.csproj" />
+  </ItemGroup>
+
+</Project>

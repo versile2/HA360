@@ -1,0 +1,5 @@
+  Determining projects to restore...
+  Restored /home/runner/work/ha360/ha360/src/Realm.Domain/Realm.Domain.csproj (in 312 ms).
+/home/runner/work/ha360/ha360/src/Realm.Web/Realm.Web.csproj : warning NU1903: Package 'Some.Package' 1.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-xxxx-yyyy-zzzz
+/home/runner/work/ha360/ha360/src/Realm.Web/Realm.Web.csproj : warning NU1903: Package 'Some.Package' 1.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-xxxx-yyyy-zzzz
+  Restored /home/runner/work/ha360/ha360/src/Realm.Web/Realm.Web.csproj (in 1.1 sec).

@@ -1,0 +1,17 @@
+<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- D15: pinned to the MudBlazor version MudX 9.5.0 was built against. Moving it needs a decision (the 9.11.0 compat leg is deferred, section 15). -->
+    <PackageVersion Include="MudBlazor" Version="9.5.0" />
+    <PackageVersion Include="MudX.MudBlazor.Extension" Version="9.5.0" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.12" />
+    <!-- tests -->
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
+    <PackageVersion Include="xunit" Version="2.9.3" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
+    <PackageVersion Include="bunit" Version="2.11.3" />
+    <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.10.0" />
+  </ItemGroup>
+</Project>

@@ -7,3 +7,14 @@ node_modules/
 TestResults/
 playwright-report/
 test-results/
+*.db
+*.db-wal
+*.db-shm
+options.json
+.env
+ci-out/
+ci-in-dotnet/
+publish/
+tests/e2e/fixtures/demo-cast.json
+tests/contract/payloads/
+.scratch/
