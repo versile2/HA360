@@ -340,7 +340,8 @@ public class FusionTests
 
     // ---- 4.3 address ----------------------------------------------------------------------------------------
 
-    // The newest Life360 address within 250 m of the output position and no older than 30 minutes.
+    // The newest Life360 address within 250 m of the output position and no older than 30 minutes, the age measured
+    // from the winning fix and not from now (D54).
     [Fact]
     public void Address_comes_from_a_life360_fix_near_the_winner()
     {
@@ -361,17 +362,65 @@ public class FusionTests
         Assert.Equal(expectedAddress, Fused(companion, life360).Address);
     }
 
+    // The 30 minutes run from the winner's timestamp (inclusive): the Life360 fix is this many seconds older than it.
     [Theory]
     [InlineData(1500, "Street Name, Texas")]
     [InlineData(1800, "Street Name, Texas")]
     [InlineData(1801, null)]
     [InlineData(2520, null)]
-    public void Address_must_be_no_older_than_30_minutes(int life360AgeSeconds, string? expectedAddress)
+    public void Address_may_be_up_to_30_minutes_older_than_the_winning_fix(int secondsOlderThanWinner, string? expectedAddress)
     {
-        var companion = Fix(FixSource.Companion, 10, accuracyM: 12);
-        var life360 = Fix(FixSource.Life360, life360AgeSeconds, address: "Street Name, Texas");
+        const int winnerAgeSeconds = 10;
+        var companion = Fix(FixSource.Companion, winnerAgeSeconds, accuracyM: 12);
+        var life360 = Fix(FixSource.Life360, winnerAgeSeconds + secondsOlderThanWinner, address: "Street Name, Texas");
 
         Assert.Equal(expectedAddress, Fused(companion, life360).Address);
+    }
+
+    // D54: a Life360 fix 31 minutes older than the winner is too old for its street, however fresh the winner is.
+    [Fact]
+    public void An_address_fix_31_minutes_older_than_the_winner_is_dropped()
+    {
+        var companion = Fix(FixSource.Companion, 5 * 60, accuracyM: 12);
+        var life360 = Fix(FixSource.Life360, (5 + 31) * 60, address: "Street Name, Texas");
+
+        Assert.Null(Fused(companion, life360).Address);
+    }
+
+    // D54: exactly 30 minutes older than the winner is kept, although the fix itself is 35 minutes before now.
+    [Fact]
+    public void An_address_fix_exactly_30_minutes_older_than_the_winner_is_kept()
+    {
+        var companion = Fix(FixSource.Companion, 5 * 60, accuracyM: 12);
+        var life360 = Fix(FixSource.Life360, (5 + 30) * 60, address: "Street Name, Texas");
+
+        Assert.Equal("Street Name, Texas", Fused(companion, life360).Address);
+    }
+
+    // D54: a stale member keeps the street of their last fix: a winner 60 minutes before now still carries its own address.
+    [Fact]
+    public void A_stale_winner_keeps_its_own_address()
+    {
+        var fused = Fused(Fix(FixSource.Life360, 60 * 60, address: "Street Name, Texas"));
+
+        Assert.Equal(Now.AddMinutes(-60), fused.Ts);
+        Assert.Equal("Street Name, Texas", fused.Address);
+    }
+
+    // A Life360 fix a second newer than the winner (a tie the winner takes on accuracy) is never too old, but the
+    // 250 m rule still applies to it.
+    [Theory]
+    [InlineData(251.0)]
+    [InlineData(1000.0)]
+    public void An_address_fix_newer_than_the_winner_but_beyond_250_metres_is_ignored(double metresFromWinner)
+    {
+        var companion = Fix(FixSource.Companion, 10, accuracyM: 12);
+        var life360 = Fix(FixSource.Life360, 9, address: "Street Name, Texas", lat: NorthOfHome(metresFromWinner));
+
+        var fused = Fused(companion, life360);
+
+        Assert.Equal(FixSource.Companion, fused.WinnerSource);
+        Assert.Null(fused.Address);
     }
 
     // Only a Life360 fix carries an address, and an empty one is none.
@@ -460,11 +509,11 @@ public class FusionTests
         Assert.Equal(Freshness.Fresh, FreshnessOf(fused));
     }
 
-    // Cryptid: out, 10%, accuracy 35 m, fix age 42 min: Stale (42 is above the 40 minute threshold), in no zone.
-    // The street of the fixture ("Eastgate Avenue") cannot come out of the address rule at that age: a Life360
-    // address must be no older than 30 minutes (02 section 4.3), and this fix is 42 minutes old.
+    // Cryptid: out, 10%, accuracy 35 m, fix age 42 min: Stale (42 is above the 40 minute threshold), in no zone. The street
+    // of the fixture ("Eastgate Avenue") is kept: the Life360 address is 3 minutes older than the winning fix, and the
+    // 30 minutes of the address rule run from the winner, not from now (D54, 02 section 4.3).
     [Fact]
-    public void Fixture_cryptid_is_stale_and_out_and_the_address_rule_leaves_it_without_a_street()
+    public void Fixture_cryptid_is_stale_and_out_and_keeps_the_street_of_its_last_fix()
     {
         var companion = Fix(FixSource.Companion, 42 * 60, accuracyM: 35, battery: 10, charging: false, lat: 31.3382, lon: -94.7291);
         var life360 = Fix(FixSource.Life360, 45 * 60, address: "Eastgate Avenue, Pinebrook, TX", lat: 31.3382, lon: -94.7291);
@@ -476,7 +525,8 @@ public class FusionTests
         Assert.Equal(TimeSpan.FromMinutes(42), Now - fused.Ts);
         Assert.Equal(Freshness.Stale, FreshnessOf(fused));
         Assert.Null(PlaceOf(fused).PlaceId);
-        Assert.Null(fused.Address);
+        Assert.Equal("Eastgate Avenue, Pinebrook, TX", fused.Address);
+        Assert.Equal("Eastgate Avenue", AddressParser.Parse(fused.Address)?.Street);
     }
 
     // 02 section 9.3: only two zones are occupied at the frozen instant (home and the jester's hall); the pickup, 7.78 m

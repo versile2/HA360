@@ -71,7 +71,7 @@ public static class Fuse
             BatteryPct: battery?.Fix.BatteryPct,
             Charging: battery?.Fix.Charging,
             BatteryAsOfUtc: battery?.AsOf,
-            Address: ChooseAddress(latestFixes, winner, now),
+            Address: ChooseAddress(latestFixes, winner),
             Alts: alts);
     }
 
@@ -124,13 +124,15 @@ public static class Fuse
             .FirstOrDefault()?.SpeedMps;
     }
 
-    // The newest Life360 address within 250 m of the output position and no older than 30 minutes.
-    private static string? ChooseAddress(IReadOnlyCollection<RawFix> fixes, RawFix winner, DateTimeOffset now)
+    // The newest Life360 address within 250 m of the output position and no older than 30 minutes (D54: measured from
+    // the winning fix, not from now, so a stale member keeps the street of their last fix). A fix newer than the
+    // winner is never too old; the distance rule still applies to it.
+    private static string? ChooseAddress(IReadOnlyCollection<RawFix> fixes, RawFix winner)
     {
         return fixes
             .Where(f => f.Source == FixSource.Life360
                 && !string.IsNullOrWhiteSpace(f.Address)
-                && now - f.Ts <= AddressMaxAge
+                && winner.Ts - f.Ts <= AddressMaxAge
                 && Geo.DistanceM(winner.Lat, winner.Lon, f.Lat, f.Lon) <= AddressMaxDistanceM)
             .OrderByDescending(f => f.Ts)
             .FirstOrDefault()?.Address;
