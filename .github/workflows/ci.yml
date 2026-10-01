@@ -17,7 +17,11 @@ jobs:
       - uses: actions/setup-node@v7
         with: { node-version: 22, cache: npm }
       - run: npm ci --ignore-scripts
-      - run: mkdir -p ci-out && node tools/ci/guards.mjs 2>&1 | tee ci-out/guards.log
+      - name: Guards (the full output is kept in guards.log, also when a guard fails; make-summary.mjs prints it in SUMMARY.md)
+        run: |
+          set -o pipefail
+          mkdir -p ci-out
+          node tools/ci/guards.mjs 2>&1 | tee ci-out/guards.log
       - if: always()
         uses: actions/upload-artifact@v7
         with: { name: guards, path: ci-out, retention-days: 3 }

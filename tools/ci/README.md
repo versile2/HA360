@@ -6,6 +6,7 @@ Nobody reads a console, so every run, pass or fail, ends in a readable summary o
 | File | Role |
 |---|---|
 | `make-summary.mjs` | Reads the downloaded job artifacts and writes `SUMMARY.md`, `errors.log`, `build.tail.log` and `tests/*.trx`. Node built-ins only. |
+| `guards.mjs` | The twelve guards of 03 section 7.3: one `PASS`/`FAIL`/`REPORT` line per finding, exit 1 on any `FAIL`. The `guards` job tees its whole output to `guards.log` (uploaded with the `guards` artifact, also when a guard fails). |
 | `publish-ci-artifacts.sh` | Publishes that folder to `ci-artifacts` as one new orphan commit (the `publish-ci` job runs it). |
 | `wait-for-ci.sh` | Waits for the run of one pushed commit and prints its `SUMMARY.md`. |
 | `ci-common.sh` | Sourced by both scripts: `branch_slug` and `summary_field`. |
@@ -73,6 +74,10 @@ The header is a contract between the three tools: `- result:` (`success` or `fai
 compiler errors as `file(line,col): CODE message` (all of them in `errors.log`), failed tests with the first 15 lines of
 each message, and warnings. A run is a failure when any job did not succeed, or an error or failed test was found, or
 the run left no input at all.
+
+`## Guards` (after the job table, when a `guards.log` was downloaded) lists every `FAIL` line as written, one `REPORT` line per
+guard with id ranges compressed (`REPORT ac-coverage: 50 AC ids missing (AC-01 … AC-50)`) and the `PASS` count; when guards
+fail, `- why:` and the Notes say `guards failed: <guard names>` instead of the compiler or test-host wording.
 
 ## Authentication of the publish step
 

@@ -5,8 +5,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 
-import { crashReport, distinctDiagnostics, normalizeDiagnostic, parseTrx } from '../../tools/ci/make-summary.mjs';
-import { cleanEnv, fixture, tempDir, tools, writeFile } from './helpers/ci-harness.mjs';
+import { crashReport, distinctDiagnostics, normalizeDiagnostic, parseGuardsLog, parseTrx, reportLine } from '../../tools/ci/make-summary.mjs';
+import { cleanEnv, fixture, repoRoot, tempDir, tools, writeFile } from './helpers/ci-harness.mjs';
 
 const WORKSPACE = '/home/runner/work/ha360/ha360';
 
@@ -31,6 +31,9 @@ function summarize({ files = {}, needs, extraArgs = [], env = {}, createIn = tru
 
 const NEEDS_FAILED = JSON.stringify({ dotnet: { result: 'failure', outputs: {} } });
 const NEEDS_OK = JSON.stringify({ dotnet: { result: 'success', outputs: {} } });
+const guardsNeeds = (guards, dotnet) => JSON.stringify({ guards: { result: guards, outputs: {} }, dotnet: { result: dotnet, outputs: {} } });
+const section = (summary, heading) => new RegExp(`^## ${heading}\\n[\\s\\S]*?(?=^## |(?![\\s\\S]))`, 'm').exec(summary)?.[0] ?? null;
+const AC_LINES = Array.from({ length: 50 }, (_, i) => `REPORT ac-coverage: AC-${String(i + 1).padStart(2, '0')} missing`);
 
 test('compiler errors: deduplicated, workspace paths made relative, project suffix dropped', () => {
   const run = summarize({ files: { 'dotnet/errors.log': fixture('errors.sample.log') }, needs: NEEDS_FAILED });
@@ -200,4 +203,119 @@ test('helpers: normalizeDiagnostic and parseTrx on small inputs', () => {
   const selfClosing = parseTrx('<UnitTestResult testName="X.Y" outcome="Failed" />');
   assert.equal(selfClosing.failed, 1);
   assert.equal(selfClosing.failures[0].name, 'X.Y');
+});
+
+test('guards: FAIL lines are shown verbatim, first; the why line and the Notes name the guards, not the compiler', () => {
+  const log = [
+    'PASS config-name',
+    'FAIL no-wallclock: src/Realm.Web/Clock.cs:12 DateTime.UtcNow outside the clock adapter (use TimeProvider)',
+    ...AC_LINES.slice(0, 3),
+    'FAIL no-wallclock: src/Realm.Web/Other.cs:7 DateTime.Now outside the clock adapter (use TimeProvider)',
+    'FAIL package-pins: Directory.Packages.props:9 package \'Foo.Bar\' is not in tools/ci/packages.allow.txt (a new package needs a decision)',
+    'PASS no-static-files',
+    '',
+  ].join('\n');
+  const run = summarize({ files: { 'guards/guards.log': log }, needs: guardsNeeds('failure', 'skipped') });
+  assert.equal(run.status, 0, run.stderr);
+  assert.match(run.summary, /^- result: failure$/m);
+  assert.match(run.summary, /^- why: guards failed: no-wallclock, package-pins$/m, 'one why entry, guard names once each, no "job dotnet: skipped"');
+  const guards = section(run.summary, 'Guards');
+  assert.ok(guards, 'a Guards section exists');
+  const lines = guards.split('\n');
+  for (const fail of log.split('\n').filter((l) => l.startsWith('FAIL '))) assert.ok(lines.includes(fail), `shown verbatim: ${fail}`);
+  const indexOf = (prefix) => lines.findIndex((l) => l.startsWith(prefix));
+  assert.ok(indexOf('FAIL package-pins') < indexOf('REPORT ac-coverage'), 'FAIL lines come before REPORT lines');
+  assert.ok(lines.includes('REPORT ac-coverage: 3 AC ids missing (AC-01 \u2026 AC-03)'));
+  assert.match(guards, /^PASS: 2 of 5 guards\.$/m, 'config-name and no-static-files passed; no-wallclock, package-pins and ac-coverage did not');
+  assert.ok(run.summary.indexOf('## Jobs') < run.summary.indexOf('## Guards'), 'the section follows the job table');
+  assert.match(run.summary, /\| guards \| failure \|/);
+  assert.match(run.summary, /\| dotnet \| skipped \|/);
+  const notes = section(run.summary, 'Notes');
+  assert.match(notes, /guards failed: no-wallclock, package-pins\./);
+  assert.match(notes, /jobs behind the guards did not run \(dotnet\)/);
+  assert.doesNotMatch(run.summary, /test host|no compiler error and no failed test|job dotnet: skipped|job guards: failure/i);
+});
+
+test('guards: REPORT findings become one line per guard, with consecutive ids as ranges', () => {
+  const run = summarize({ files: { 'guards/guards.log': ['PASS config-name', ...AC_LINES, ''].join('\n') }, needs: guardsNeeds('success', 'success') });
+  const guards = section(run.summary, 'Guards');
+  assert.equal(guards.split('\n').filter((l) => l.startsWith('REPORT ')).length, 1, '50 findings, one line');
+  assert.ok(guards.includes('REPORT ac-coverage: 50 AC ids missing (AC-01 \u2026 AC-50)\n'));
+  assert.match(guards, /^PASS: 1 of 2 guards\.$/m);
+  assert.match(run.summary, /^- result: success$/m, 'REPORT never fails a run');
+  assert.doesNotMatch(run.summary, /^- why:/m);
+  assert.doesNotMatch(run.summary, /^## Notes/m);
+
+  // Gaps, a pair (listed, not a range), a single id, two statuses, and findings that are not ids.
+  const ids = (list, status) => list.map((n) => `REPORT ac-coverage: AC-${String(n).padStart(2, '0')} ${status}`);
+  const mixed = [
+    ...ids([1, 2, 3, 4, 7, 9, 10, 12, 13, 14, 50], 'missing'),
+    ...ids([8], 'unmatched'),
+    'REPORT testid-contract: data-testid \'a\' is not present in src/',
+    'REPORT testid-contract: data-testid \'b\' is not present in src/',
+    'REPORT testid-contract: data-testid \'c\' is not present in src/',
+    'REPORT testid-contract: data-testid \'d\' is not present in src/',
+    'REPORT testid-contract: data-testid \'a\' is not present in src/',
+  ].join('\n');
+  const out = summarize({ files: { 'guards/guards.log': mixed + '\n' }, needs: guardsNeeds('success', 'success') });
+  const lines = section(out.summary, 'Guards').split('\n');
+  assert.ok(lines.includes('REPORT ac-coverage: 11 AC ids missing (AC-01 \u2026 AC-04, AC-07, AC-09, AC-10, AC-12 \u2026 AC-14, AC-50); 1 AC id unmatched (AC-08)'));
+  assert.ok(lines.includes('REPORT testid-contract: 4 findings: data-testid \'a\' is not present in src/; data-testid \'b\' is not present in src/; data-testid \'c\' is not present in src/; ... and 1 more'));
+  assert.equal(lines.filter((l) => l.startsWith('REPORT ')).length, 2, 'one line per guard');
+});
+
+test('guards: the guards job failed without a FAIL line (crash, no log): the why line says so and the raw log is the pointer', () => {
+  const crashed = summarize({
+    files: { 'guards/guards.log': 'file:///w/tools/ci/guards.mjs:10\nTypeError: boom\n    at run (guards.mjs:10:3)\n' },
+    needs: guardsNeeds('failure', 'skipped'),
+    env: { GITHUB_SERVER_URL: 'https://github.com', GITHUB_REPOSITORY: 'Versile2/ha360', GITHUB_RUN_ID: '9' },
+  });
+  assert.match(crashed.summary, /^- why: guards failed: unknown \(guards\.log holds no FAIL line\)$/m);
+  assert.match(section(crashed.summary, 'Guards'), /TypeError: boom/, 'what the script printed is shown as it is');
+  assert.match(section(crashed.summary, 'Guards'), /^PASS: 0 of 0 guards\.$/m);
+  assert.match(section(crashed.summary, 'Notes'), /raw job log of the workflow run \(https:\/\/github\.com\/Versile2\/ha360\/actions\/runs\/9\)/);
+
+  const noLog = summarize({ needs: guardsNeeds('failure', 'skipped') });
+  assert.match(noLog.summary, /^- why: guards failed: unknown \(no guards\.log was found\)$/m);
+  assert.equal(section(noLog.summary, 'Guards'), null, 'no log, no section');
+  assert.doesNotMatch(noLog.summary, /test host|no compiler error and no failed test/i);
+});
+
+test('guards: no guards.log means no Guards section and no error; a passing log keeps the old verdict rules', () => {
+  const none = summarize({ files: { 'dotnet/errors.log': '' }, needs: NEEDS_OK });
+  assert.equal(none.status, 0, none.stderr);
+  assert.doesNotMatch(none.summary, /^## Guards/m);
+  assert.match(none.summary, /^- result: success$/m);
+
+  const pass = summarize({
+    files: { 'guards/guards.log': 'PASS config-name\nPASS addon-validate (nothing to check yet)\n', 'dotnet/errors.log': '' },
+    needs: guardsNeeds('success', 'failure'),
+  });
+  assert.match(section(pass.summary, 'Guards'), /^## Guards\n\nPASS: 2 of 2 guards\.\n+$/, 'nothing but the count when every guard passed');
+  assert.match(pass.summary, /^- why: job dotnet: failure$/m, 'a dotnet failure after passing guards keeps its own wording');
+  assert.match(pass.summary, /no compiler error and no failed test/i);
+});
+
+test('guards: the real output of tools/ci/guards.mjs is understood', () => {
+  const real = spawnSync('node', [path.join(repoRoot, 'tools', 'ci', 'guards.mjs')], { encoding: 'utf8', cwd: repoRoot });
+  assert.ok(real.status === 0 || real.status === 1, real.stderr);
+  const parsed = parseGuardsLog(real.stdout);
+  assert.deepEqual(parsed.other, [], 'every line of guards.mjs is a PASS, FAIL or REPORT line');
+  assert.equal(parsed.names.length, 12, 'twelve guards');
+  const run = summarize({ files: { 'guards/guards.log': real.stdout }, needs: guardsNeeds(real.status === 0 ? 'success' : 'failure', 'success') });
+  assert.match(section(run.summary, 'Guards'), /^PASS: \d+ of 12 guards\.$/m);
+});
+
+test('helpers: parseGuardsLog and reportLine on small inputs', () => {
+  const parsed = parseGuardsLog('PASS a (note)\r\nFAIL b: x/y.cs:3 bad\r\nREPORT c: C-1 open\n\nstray line\nFAIL allow-list: tools/ci/guards.allow.json entry 0 has no reason\n');
+  assert.deepEqual(parsed.passes, ['a']);
+  assert.deepEqual(parsed.fails.map((f) => f.name), ['b', 'allow-list']);
+  assert.equal(parsed.fails[0].line, 'FAIL b: x/y.cs:3 bad');
+  assert.deepEqual([...parsed.reports], [['c', ['C-1 open']]]);
+  assert.deepEqual(parsed.names, ['a', 'b', 'c', 'allow-list']);
+  assert.deepEqual(parsed.other, ['stray line']);
+  assert.equal(reportLine('c', ['AC-9 missing', 'AC-10 missing', 'AC-11 missing', 'AC-9 missing']), 'REPORT c: 3 AC ids missing (AC-9 \u2026 AC-11)', 'duplicates count once, numbers compare as numbers');
+  assert.equal(reportLine('c', ['AC-01 missing', 'AC-02 missing']), 'REPORT c: 2 AC ids missing (AC-01, AC-02)', 'a pair is listed');
+  assert.equal(reportLine('c', ['AC-07 missing']), 'REPORT c: 1 AC id missing (AC-07)');
+  assert.equal(reportLine('c', ['src/a.cs [AC-99] matches no row']), 'REPORT c: src/a.cs [AC-99] matches no row');
 });

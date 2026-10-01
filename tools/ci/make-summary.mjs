@@ -5,7 +5,7 @@
 //   node tools/ci/make-summary.mjs --in ci-in --out ci-out --needs '<toJSON(needs)>'
 //
 // --in     folder holding the downloaded artifacts (one sub-folder per job); it is searched
-//          recursively for errors.log, restore.log, build.log and *.trx. May be missing or empty.
+//          recursively for errors.log, restore.log, build.log, guards.log and *.trx. May be missing or empty.
 // --out    folder that receives the files above (default ci-out).
 // --needs  the JSON of the workflow's `needs` context: { "<job>": { "result": "success", ... } }.
 //          Without it the verdict comes from the logs alone.
@@ -26,6 +26,10 @@ export const MAX_WARNINGS = 20;
 export const MAX_MESSAGE_LINES = 15;
 export const RESTORE_TAIL_LINES = 40;
 export const BUILD_TAIL_LINES = 300;
+export const GUARDS_JOB = 'guards';
+export const MAX_REPORT_EXAMPLES = 3;
+export const MAX_OTHER_GUARD_LINES = 15;
+export const MIN_RANGE = 3;
 
 // ---------------------------------------------------------------------------------------------
 // Pure helpers (exported for tests/js/make-summary.test.mjs)
@@ -151,6 +155,87 @@ function fenced(text) {
 }
 
 // ---------------------------------------------------------------------------------------------
+// guards.log: `PASS name [(note)]`, `FAIL name: file:line message`, `REPORT name: finding` (tools/ci/guards.mjs)
+// ---------------------------------------------------------------------------------------------
+
+const GUARD_LINE_RE = /^(PASS|FAIL|REPORT)\s+([^\s:]+)(.*)$/;
+const REPORT_ID_RE = /^([A-Za-z][A-Za-z0-9]*)-(\d+)\s+(\S.*)$/;
+
+// -> { fails: [{ name, line }], reports: Map(name -> [finding]), passes: [name], names: [every guard name, in order], other: [line] }
+// `other` holds what is not a guard line (a stack trace when the script crashed, say); blank lines are dropped.
+export function parseGuardsLog(text) {
+  const parsed = { fails: [], reports: new Map(), passes: [], names: [], other: [] };
+  for (const raw of splitLines(text)) {
+    const line = raw.trimEnd();
+    if (line.trim() === '') continue;
+    const match = GUARD_LINE_RE.exec(line);
+    if (!match) {
+      parsed.other.push(line);
+      continue;
+    }
+    const [, kind, name, rest] = match;
+    if (!parsed.names.includes(name)) parsed.names.push(name);
+    if (kind === 'FAIL') {
+      parsed.fails.push({ name, line });
+    } else if (kind === 'REPORT') {
+      const finding = /^\s*:/.test(rest) ? rest.replace(/^\s*:\s*/, '') : rest.trim();
+      if (!parsed.reports.has(name)) parsed.reports.set(name, []);
+      parsed.reports.get(name).push(finding);
+    } else if (!parsed.passes.includes(name)) {
+      parsed.passes.push(name);
+    }
+  }
+  return parsed;
+}
+
+// One line per guard: findings of the form "<PREFIX>-<number> <status>" are grouped per status and their consecutive
+// numbers are written as ranges ("50 AC ids missing (AC-01 ... AC-50)"); any other finding is kept as written
+// (the first few, when there are many).
+export function reportLine(name, findings) {
+  const groups = new Map();
+  const loose = [];
+  for (const finding of findings) {
+    const match = REPORT_ID_RE.exec(finding);
+    if (!match) {
+      if (!loose.includes(finding)) loose.push(finding);
+      continue;
+    }
+    const key = `${match[1]}\u0000${match[3]}`;
+    if (!groups.has(key)) groups.set(key, { prefix: match[1], status: match[3], entries: new Map() });
+    groups.get(key).entries.set(Number(match[2]), `${match[1]}-${match[2]}`);
+  }
+  const parts = [];
+  for (const { prefix, status, entries } of groups.values()) {
+    const numbers = [...entries.keys()].sort((a, b) => a - b);
+    const ranges = [];
+    for (let i = 0; i < numbers.length; ) {
+      let end = i;
+      while (end + 1 < numbers.length && numbers[end + 1] === numbers[end] + 1) end += 1;
+      if (end - i + 1 >= MIN_RANGE) ranges.push(`${entries.get(numbers[i])} \u2026 ${entries.get(numbers[end])}`);
+      else for (let k = i; k <= end; k += 1) ranges.push(entries.get(numbers[k]));
+      i = end + 1;
+    }
+    parts.push(`${numbers.length} ${prefix} id${numbers.length === 1 ? '' : 's'} ${status} (${ranges.join(', ')})`);
+  }
+  if (loose.length === 1) {
+    parts.push(loose[0]);
+  } else if (loose.length > 1) {
+    const shown = loose.slice(0, MAX_REPORT_EXAMPLES).join('; ');
+    parts.push(`${loose.length} findings: ${shown}${loose.length > MAX_REPORT_EXAMPLES ? `; ... and ${loose.length - MAX_REPORT_EXAMPLES} more` : ''}`);
+  }
+  return `REPORT ${name}: ${parts.join('; ')}`;
+}
+
+// The "## Guards" section: every FAIL line as written, then one REPORT line per guard, then the PASS count.
+export function guardsSection(parsed) {
+  const lines = parsed.fails.map((f) => f.line);
+  for (const [name, findings] of parsed.reports) lines.push(reportLine(name, findings));
+  if (parsed.other.length > 0) lines.push(...firstLines(parsed.other.join('\n'), MAX_OTHER_GUARD_LINES).split('\n'));
+  const count = `PASS: ${parsed.passes.length} of ${parsed.names.length} guards.`;
+  return ['## Guards', ...(lines.length > 0 ? [fenced(lines.join('\n'))] : []), count].join('\n\n');
+}
+
+// ---------------------------------------------------------------------------------------------
 // Inputs
 // ---------------------------------------------------------------------------------------------
 
@@ -181,6 +266,7 @@ export function collectInputs(inDir) {
     errorLogs: named('errors.log'),
     restoreLogs: named('restore.log'),
     buildLogs: named('build.log'),
+    guardsLogs: named('guards.log'),
     trxFiles: files.filter((f) => f.toLowerCase().endsWith('.trx')),
     fileCount: files.length,
   };
@@ -239,6 +325,7 @@ export function buildReport({ inDir, needsText, root, meta }) {
   const buildTexts = inputs.buildLogs.map(readText);
   const errors = distinctDiagnostics(errorTexts, 'error', root);
   const warnings = distinctWarnings([...restoreTexts, ...buildTexts], root);
+  const guards = inputs.guardsLogs.length > 0 ? parseGuardsLog(inputs.guardsLogs.map(readText).join('\n')) : null;
 
   const trx = { passed: 0, failed: 0, skipped: 0, failures: [] };
   const trxMismatches = [];
@@ -253,9 +340,17 @@ export function buildReport({ inDir, needsText, root, meta }) {
     }
   }
 
-  // The verdict.
+  // The verdict. A guards failure explains the rest: the jobs behind it are skipped, so they are not listed again.
+  const guardNames = guards ? [...new Set(guards.fails.map((f) => f.name))] : [];
+  const guardsJob = needs.jobs.find((job) => job.name === GUARDS_JOB);
+  const guardsFailed = guardNames.length > 0 || (guardsJob !== undefined && guardsJob.result !== 'success');
+  const guardsWhy = guardNames.length > 0
+    ? `guards failed: ${guardNames.join(', ')}`
+    : `guards failed: unknown (${guards ? 'guards.log holds no FAIL line' : 'no guards.log was found'})`;
+  const hiddenByGuards = (job) => guardsFailed && (job.name === GUARDS_JOB || job.result === 'skipped');
   const why = [];
-  for (const job of needs.jobs) if (job.result !== 'success') why.push(`job ${job.name}: ${job.result}`);
+  if (guardsFailed) why.push(guardsWhy);
+  for (const job of needs.jobs) if (job.result !== 'success' && !hiddenByGuards(job)) why.push(`job ${job.name}: ${job.result}`);
   if (needs.error) why.push(`the --needs JSON could not be parsed (${needs.error})`);
   if (errors.length > 0) why.push(`${errors.length} distinct compiler error(s)`);
   if (trx.failed > 0) why.push(`${trx.failed} failed test(s)`);
@@ -272,6 +367,8 @@ export function buildReport({ inDir, needsText, root, meta }) {
       ['## Jobs', '', ...(needs.error ? [`The --needs JSON could not be parsed: ${needs.error}`, ''] : []), '| job | result |', '|---|---|', ...rows].join('\n'),
     );
   }
+
+  if (guards) sections.push(guardsSection(guards));
 
   let errorsLogOut = '';
   let compileSection;
@@ -316,7 +413,17 @@ export function buildReport({ inDir, needsText, root, meta }) {
     sections.push(`## Notes\n\n${trxMismatches.join('\n')}. The layout of the .trx differs from what make-summary.mjs expects; the file itself is published under tests/.`);
   }
 
-  const failedJobs = needs.jobs.filter((job) => job.result !== 'success');
+  if (guardsFailed) {
+    const where = meta.url ? ` (${meta.url})` : '';
+    const skipped = needs.jobs.filter((job) => job.result === 'skipped').map((job) => job.name);
+    const cause = guardNames.length > 0
+      ? 'The FAIL lines are in the Guards section above; fix them and push again.'
+      : `The cause is in the raw job log of the workflow run${where}: a failed step before the guards ran, or a guards script that crashed.`;
+    const behind = skipped.length > 0 ? ` The jobs behind the guards did not run (${skipped.join(', ')}), so this run has no build or test results.` : '';
+    sections.push(`## Notes\n\n${guardsWhy}. ${cause}${behind}`);
+  }
+
+  const failedJobs = needs.jobs.filter((job) => job.result !== 'success' && !hiddenByGuards(job));
   if (failedJobs.length > 0 && errors.length === 0 && trx.failed === 0 && trxMismatches.length === 0) {
     const where = meta.url ? ` (${meta.url})` : '';
     sections.push(
