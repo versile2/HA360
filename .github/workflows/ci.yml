@@ -10,7 +10,24 @@ env:
   DOTNET_CLI_TELEMETRY_OPTOUT: "true"
   NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
 jobs:
+  guards:                                         # 7.3: seconds; fails fast on policy violations, and the expensive jobs wait for it
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: 22, cache: npm }
+      - run: npm ci --ignore-scripts
+      - name: Guards (the full output is kept in guards.log, also when a guard fails; make-summary.mjs prints it in SUMMARY.md)
+        run: |
+          set -o pipefail
+          mkdir -p ci-out
+          node tools/ci/guards.mjs 2>&1 | tee ci-out/guards.log
+      - if: always()
+        uses: actions/upload-artifact@v7
+        with: { name: guards, path: ci-out, retention-days: 3 }
+
   dotnet:
+    needs: guards
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -35,11 +52,12 @@ jobs:
         with: { name: dotnet, path: ci-out, retention-days: 3 }
 
   publish-ci:                                     # 7.4
-    needs: [dotnet]
+    needs: [guards, dotnet]
     if: ${{ always() && !cancelled() }}
     runs-on: ubuntu-latest
     permissions: { contents: write }
-    concurrency: { group: ci-artifacts-publish, cancel-in-progress: false }
+    # No job-level concurrency here on purpose: GitHub keeps one running and ONE pending job per group and cancels the
+    # rest, so a third publisher would lose its SUMMARY. The script serializes itself (orphan commit, --force-with-lease, retries).
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7

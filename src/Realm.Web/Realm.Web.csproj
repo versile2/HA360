@@ -1,6 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <ItemGroup>
+    <PackageReference Include="MudBlazor" />
+    <PackageReference Include="MudX.MudBlazor.Extension" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="../Realm.Domain/Realm.Domain.csproj" />
     <ProjectReference Include="../Realm.Infrastructure/Realm.Infrastructure.csproj" />
     <ProjectReference Include="../Realm.Demo/Realm.Demo.csproj" />

@@ -9,7 +9,9 @@
 # Input: $CI_OUT (default ci-out) holding the SUMMARY.md written by make-summary.mjs. The branch,
 # sha, run number and result are read from its header ("- branch: ..." and so on).
 # Every publish is ONE new root (orphan) commit force-pushed with --force-with-lease against the
-# tip it just fetched, retried 3 times, so two runs finishing together cannot lose each other.
+# tip it just fetched, retried up to 6 times with a jittered, growing backoff, so several runs finishing together
+# (the lease makes the server accept exactly one push per tip; every loser fetches the new tip and tries again)
+# cannot lose each other. With N simultaneous publishers the last one needs at most N attempts.
 # The runs/ folders of other branches are kept; the folder of this branch is replaced.
 #
 # Environment:
@@ -17,9 +19,10 @@
 #   CI_REMOTE           remote name or URL to publish to (default origin)
 #   GH_TOKEN            when set and the remote is https://github.com/<owner>/<repo>, the script pushes
 #                       through https://x-access-token:$GH_TOKEN@github.com/<owner>/<repo>.git itself
-#   PUBLISH_BACKOFF_S   seconds to sleep between attempts (default 2)
+#   PUBLISH_BACKOFF_S   base of the backoff in seconds, integer or decimal (default 2): after failed attempt k the
+#                       script sleeps PUBLISH_BACKOFF_S * k * (0.5 .. 1.5), randomly; 0 means no sleeping (tests)
 #
-# Exit: 0 published, 1 push failed after 3 attempts, 64 usage or input error.
+# Exit: 0 published, 1 push failed after 6 attempts, 64 usage or input error.
 set -euo pipefail
 set +x # never trace: the token is in the push URL
 unset GIT_TRACE GIT_TRACE_CURL GIT_TRACE_PACKET GIT_CURL_VERBOSE
@@ -34,7 +37,7 @@ ci_out=${CI_OUT:-ci-out}
 remote=${CI_REMOTE:-origin}
 backoff_s=${PUBLISH_BACKOFF_S:-2}
 publish_branch=ci-artifacts
-max_attempts=3
+max_attempts=6
 git_name="github-actions[bot]"
 git_email="41898282+github-actions[bot]@users.noreply.github.com"
 
@@ -44,6 +47,8 @@ die() {
   echo "publish-ci-artifacts: $*" >&2
   exit "$code"
 }
+
+[[ $backoff_s =~ ^[0-9]+([.][0-9]+)?$ ]] || die 64 "PUBLISH_BACKOFF_S must be a number of seconds, got '$backoff_s'"
 
 # scrub <text>: print text with the token masked (the token must never reach a log).
 scrub() {
@@ -172,14 +177,21 @@ attempt_publish() {
   return "$rc"
 }
 
+# jittered_backoff <failed-attempt>: seconds to sleep before the next attempt, PUBLISH_BACKOFF_S * attempt * (0.5 .. 1.5).
+# The random factor keeps simultaneous publishers from retrying in lockstep and colliding again.
+jittered_backoff() {
+  awk -v base="$backoff_s" -v n="$1" -v seed="$((RANDOM + $$))" 'BEGIN { srand(seed); printf "%.3f", base * n * (0.5 + rand()) }'
+}
+
 attempt=1
 while ! attempt_publish; do
   if ((attempt >= max_attempts)); then
     die 1 "push to $publish_branch failed after $max_attempts attempts"
   fi
+  pause=$(jittered_backoff "$attempt")
   attempt=$((attempt + 1))
-  echo "publish-ci-artifacts: attempt failed (the branch moved or the push was refused); retrying, attempt $attempt of $max_attempts" >&2
-  sleep "$backoff_s"
+  echo "publish-ci-artifacts: attempt failed (the branch moved or the push was refused); retrying, attempt $attempt of $max_attempts, after ${pause}s" >&2
+  sleep "$pause"
 done
 
 echo "publish-ci-artifacts: published $run_dir ($result) to $publish_branch (attempt $attempt)"

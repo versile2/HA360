@@ -1,0 +1,8 @@
+{
+  "no-colour-literals": [
+    {
+      "file": "src/Realm.Web/wwwroot/js/mapStyles.js",
+      "reason": "The demo-offline map style is a MapLibre style object: it cannot use CSS variables, so its colours are literals (03 section 7.3)."
+    }
+  ]
+}

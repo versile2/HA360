@@ -1,0 +1,38 @@
+@implements IDisposable
+@inject NavigationManager Navigation
+
+<nav class="realm-nav" aria-label="Main">
+    <a class="realm-nav-link" href="./" data-testid="nav-location" aria-current="@(OnLocation ? "page" : null)">
+        <MudIcon Icon="@(OnLocation ? Icons.Material.Filled.LocationOn : Icons.Material.Outlined.LocationOn)" />
+        <span class="realm-nav-label">Location</span>
+    </a>
+    <a class="realm-nav-link" href="driving" data-testid="nav-driving" aria-current="@(OnDriving ? "page" : null)">
+        <MudIcon Icon="@(OnDriving ? Icons.Material.Filled.DirectionsCar : Icons.Material.Outlined.DirectionsCar)" />
+        <span class="realm-nav-label">Driving</span>
+    </a>
+</nav>
+
+@code {
+    private static readonly char[] QueryOrFragment = ['?', '#'];
+
+    // The path below the base URI, without a query or fragment: "" on Location, "driving" and "driving/{member}" on the Driving routes.
+    private string CurrentPath
+    {
+        get
+        {
+            var relative = Navigation.ToBaseRelativePath(Navigation.Uri);
+            var end = relative.IndexOfAny(QueryOrFragment);
+            return end < 0 ? relative : relative[..end];
+        }
+    }
+
+    private bool OnLocation => CurrentPath.Length == 0;
+
+    private bool OnDriving => CurrentPath is "driving" || CurrentPath.StartsWith("driving/", StringComparison.Ordinal);
+
+    protected override void OnInitialized() => Navigation.LocationChanged += OnLocationChanged;
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e) => _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Navigation.LocationChanged -= OnLocationChanged;
+}

@@ -1,0 +1,16 @@
+@inherits LayoutComponentBase
+
+<PageTitle>The Realm</PageTitle>
+
+<MudThemeProvider IsDarkMode="true" ObserveSystemDarkModeChange="false" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+<MudXProvider />
+
+<main id="realm-main" aria-label="The Realm">
+    @Body
+</main>
+
+<TopControls />
+<BottomNav />

@@ -1,0 +1,8 @@
+{
+  "name": "realm-dev-tools",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "yaml": "2.9.1"
+  }
+}

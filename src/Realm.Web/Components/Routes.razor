@@ -1,0 +1,11 @@
+<Router AppAssembly="typeof(Program).Assembly" NotFoundPage="typeof(Realm.Web.Pages.NotFound)">
+    <Found Context="routeData">
+        <RouteView RouteData="routeData" DefaultLayout="typeof(MainLayout)" />
+    </Found>
+</Router>
+
+@code {
+    /// <summary>The member slug of the viewer (for example <c>king</c>), or <c>null</c>. Resolved in the static SSR root; S8 cascades it into the UI state.</summary>
+    [Parameter]
+    public string? ViewerMemberId { get; set; }
+}
