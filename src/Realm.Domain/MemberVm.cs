@@ -10,6 +10,7 @@ namespace Realm.Domain;
 /// <param name="BatteryAsOfUtc">Timestamp of the reading that BatteryPct came from.</param>
 /// <param name="SpeedMps">The reported speed only, never an implied one.</param>
 /// <param name="Freshness">Decided by the data layer with the heartbeat-aware threshold.</param>
+/// <param name="StaticLabel">The text shown for a static pin (for example "Home · {town}"); null for live members.</param>
 public record MemberVm(
     string Id,
     string DisplayName,
@@ -33,4 +34,5 @@ public record MemberVm(
     DateTimeOffset? SinceUtc,
     DateTimeOffset? LastUpdateUtc,
     int SortOrder,
-    Freshness Freshness);
+    Freshness Freshness,
+    string? StaticLabel = null);
