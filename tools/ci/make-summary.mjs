@@ -5,7 +5,7 @@
 //   node tools/ci/make-summary.mjs --in ci-in --out ci-out --needs '<toJSON(needs)>'
 //
 // --in     folder holding the downloaded artifacts (one sub-folder per job); it is searched
-//          recursively for errors.log, restore.log, build.log, guards.log and *.trx. May be missing or empty.
+//          recursively for errors.log, restore.log, build.log, guards.log, smoke.json and *.trx. May be missing or empty.
 // --out    folder that receives the files above (default ci-out).
 // --needs  the JSON of the workflow's `needs` context: { "<job>": { "result": "success", ... } }.
 //          Without it the verdict comes from the logs alone.
@@ -27,6 +27,8 @@ export const MAX_MESSAGE_LINES = 15;
 export const RESTORE_TAIL_LINES = 40;
 export const BUILD_TAIL_LINES = 300;
 export const GUARDS_JOB = 'guards';
+export const DOCKER_SMOKE_JOB = 'docker-smoke';
+export const MAX_CELL_CHARS = 400;
 export const MAX_REPORT_EXAMPLES = 3;
 export const MAX_OTHER_GUARD_LINES = 15;
 export const MIN_RANGE = 3;
@@ -236,6 +238,109 @@ export function guardsSection(parsed) {
 }
 
 // ---------------------------------------------------------------------------------------------
+// smoke.json: the flat { "name": number|string } map written by tools/ci/image-smoke.sh (03 section 7.8). Keys:
+//   image, image_size_bytes, app_layer_bytes, compressed_estimate_bytes, time_to_healthy_s,
+//   item<N>, item<N>_title, item<N>_detail (PASS, WARN, SKIP or FAIL), failing_requests, container_log_tail, error.
+// failing_requests is free text: the response headers of the requests that failed an item, and what the image holds for static
+// web assets when the Blazor script was not served.
+// Items are read generically, so a slice that appends item 6 or 8 to the script needs no edit here.
+// ---------------------------------------------------------------------------------------------
+
+const SMOKE_NON_FAILING = new Set(['PASS', 'WARN', 'SKIP']);
+
+// The 03 section 6.5 table, in MB (10^6 bytes, the unit `docker images` prints). Shown next to each size; nothing enforces
+// them before item 8 (S16a), so a size over a line is reported, never a failure of the run.
+export const SMOKE_SIZE_ROWS = [
+  { key: 'image_size_bytes', label: 'image size (uncompressed)', target: 330, warn: 360, fail: 450 },
+  { key: 'app_layer_bytes', label: 'app layer (published output)', target: 35, warn: 45 },
+  { key: 'compressed_estimate_bytes', label: 'compressed size (estimate: gzip of docker save)', target: 120, warn: 130, fail: 200 },
+];
+
+function smokeNumber(data, key) {
+  const value = data[key];
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+// -> { data, items: [{ n, status, title, detail }], failed: [item], error, requests, logTail, problem } or { unreadable } when the text is not a JSON object.
+// `problem` is the one-line reason the run fails (null when the smoke is fine).
+export function parseSmoke(text) {
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch (err) {
+    return { unreadable: `smoke.json is not valid JSON (${err.message})`, problem: 'docker smoke: smoke.json is not valid JSON' };
+  }
+  if (data === null || typeof data !== 'object' || Array.isArray(data)) {
+    return { unreadable: 'smoke.json is not a JSON object', problem: 'docker smoke: smoke.json is not a JSON object' };
+  }
+  const items = [];
+  for (const key of Object.keys(data)) {
+    const match = /^item(\d+)$/.exec(key);
+    if (!match) continue;
+    items.push({
+      n: Number(match[1]),
+      status: String(data[key]).trim().toUpperCase(),
+      title: String(data[`item${match[1]}_title`] ?? ''),
+      detail: String(data[`item${match[1]}_detail`] ?? ''),
+    });
+  }
+  items.sort((a, b) => a.n - b.n);
+  const failed = items.filter((item) => !SMOKE_NON_FAILING.has(item.status));
+  const error = typeof data.error === 'string' && data.error !== '' ? data.error : null;
+  const requests = typeof data.failing_requests === 'string' && data.failing_requests.trim() !== '' ? data.failing_requests : null;
+  const logTail = typeof data.container_log_tail === 'string' && data.container_log_tail.trim() !== '' ? data.container_log_tail : null;
+  let problem = null;
+  if (error) problem = `docker smoke: ${error}`;
+  else if (failed.length > 0) problem = `docker smoke failed: ${failed.length === 1 ? 'item' : 'items'} ${failed.map((item) => item.n).join(', ')}`;
+  else if (items.length === 0) problem = 'docker smoke: smoke.json holds no item result (the script stopped before its first item)';
+  return { data, items, failed, error, requests, logTail, problem };
+}
+
+function tableCell(text) {
+  const flat = String(text).replace(/\r?\n/g, ' ').replace(/\|/g, '\\|').trim();
+  return flat.length > MAX_CELL_CHARS ? `${flat.slice(0, MAX_CELL_CHARS)}...` : flat;
+}
+
+function megabytes(bytes) {
+  return `${(bytes / 1e6).toFixed(1)} MB`;
+}
+
+function sizeLine(row, bytes) {
+  const mb = bytes / 1e6;
+  let verdict = 'within the target';
+  if (row.fail !== undefined && mb > row.fail) verdict = 'over the fail line';
+  else if (mb > row.warn) verdict = 'over the warn line';
+  else if (mb > row.target) verdict = 'above the target';
+  const lines = `target at most ${row.target} MB, warn over ${row.warn} MB${row.fail === undefined ? '' : `, fail over ${row.fail} MB`}`;
+  return `- ${row.label}: ${megabytes(bytes)}, ${verdict} (6.5: ${lines})`;
+}
+
+// The "## Docker smoke" section for a parsed smoke.json: sizes against the 6.5 table, time to healthy, one row per item.
+export function smokeSection(smoke) {
+  if (smoke.unreadable) return `## Docker smoke\n\n${smoke.unreadable}.`;
+  const { data } = smoke;
+  const lines = [];
+  if (typeof data.image === 'string') lines.push(`- image: ${data.image}`);
+  for (const row of SMOKE_SIZE_ROWS) {
+    const bytes = smokeNumber(data, row.key);
+    if (bytes !== null) lines.push(sizeLine(row, bytes));
+  }
+  const seconds = smokeNumber(data, 'time_to_healthy_s');
+  lines.push(seconds === null ? '- time to healthy: not measured (no 200 from /healthz)' : `- time to healthy: ${seconds.toFixed(2)} s (item 1: target at most 3 s, warn over 3 s, fail over 10 s)`);
+  const parts = ['## Docker smoke', lines.join('\n')];
+  if (smoke.error) parts.push(`The smoke script reported: ${smoke.error}`);
+  if (smoke.items.length > 0) {
+    const rows = smoke.items.map((item) => `| ${item.n} | ${tableCell(item.title)} | ${tableCell(item.status)} | ${tableCell(item.detail)} |`);
+    parts.push(['| item | check | result | detail |', '|---|---|---|---|', ...rows].join('\n'));
+    const count = (status) => smoke.items.filter((item) => item.status === status).length;
+    parts.push(`Items: ${count('PASS')} PASS, ${count('WARN')} WARN, ${smoke.failed.length} FAIL, ${count('SKIP')} SKIP. Sizes are recorded against the table of 03 section 6.5; no item enforces them before item 8 (S16a).`);
+  }
+  if (smoke.requests) parts.push(`Response headers of the failing requests, with what the image holds for static web assets:\n\n${fenced(smoke.requests.trimEnd())}`);
+  if (smoke.logTail) parts.push(`Container log (last lines, kept because an item failed):\n\n${fenced(smoke.logTail.trimEnd())}`);
+  return parts.join('\n\n');
+}
+
+// ---------------------------------------------------------------------------------------------
 // Inputs
 // ---------------------------------------------------------------------------------------------
 
@@ -267,6 +372,7 @@ export function collectInputs(inDir) {
     restoreLogs: named('restore.log'),
     buildLogs: named('build.log'),
     guardsLogs: named('guards.log'),
+    smokeJsons: named('smoke.json'),
     trxFiles: files.filter((f) => f.toLowerCase().endsWith('.trx')),
     fileCount: files.length,
   };
@@ -326,6 +432,7 @@ export function buildReport({ inDir, needsText, root, meta }) {
   const errors = distinctDiagnostics(errorTexts, 'error', root);
   const warnings = distinctWarnings([...restoreTexts, ...buildTexts], root);
   const guards = inputs.guardsLogs.length > 0 ? parseGuardsLog(inputs.guardsLogs.map(readText).join('\n')) : null;
+  const smoke = inputs.smokeJsons.length > 0 ? parseSmoke(readText(inputs.smokeJsons[0])) : null;
 
   const trx = { passed: 0, failed: 0, skipped: 0, failures: [] };
   const trxMismatches = [];
@@ -348,13 +455,19 @@ export function buildReport({ inDir, needsText, root, meta }) {
     ? `guards failed: ${guardNames.join(', ')}`
     : `guards failed: unknown (${guards ? 'guards.log holds no FAIL line' : 'no guards.log was found'})`;
   const hiddenByGuards = (job) => guardsFailed && (job.name === GUARDS_JOB || job.result === 'skipped');
+  // The Docker smoke section names its own failures, so the docker-smoke job is not listed a second time (nor blamed on the raw log).
+  const smokeJob = needs.jobs.find((job) => job.name === DOCKER_SMOKE_JOB);
+  const smokeMissing = smoke === null && smokeJob !== undefined && smokeJob.result !== 'skipped';
+  const explained = (job) => hiddenByGuards(job) || (smoke !== null && smoke.problem !== null && job.name === DOCKER_SMOKE_JOB);
   const why = [];
   if (guardsFailed) why.push(guardsWhy);
-  for (const job of needs.jobs) if (job.result !== 'success' && !hiddenByGuards(job)) why.push(`job ${job.name}: ${job.result}`);
+  for (const job of needs.jobs) if (job.result !== 'success' && !explained(job)) why.push(`job ${job.name}: ${job.result}`);
   if (needs.error) why.push(`the --needs JSON could not be parsed (${needs.error})`);
   if (errors.length > 0) why.push(`${errors.length} distinct compiler error(s)`);
   if (trx.failed > 0) why.push(`${trx.failed} failed test(s)`);
   for (const mismatch of trxMismatches) why.push(mismatch);
+  if (smoke !== null && smoke.problem !== null) why.push(smoke.problem);
+  if (smokeMissing && smokeJob.result === 'success') why.push('job docker-smoke succeeded but left no smoke.json');
   if (!needs.given && inputs.fileCount === 0) why.push('no CI inputs were found');
   const result = why.length > 0 ? 'failure' : 'success';
 
@@ -403,6 +516,13 @@ export function buildReport({ inDir, needsText, root, meta }) {
     }
   }
 
+  if (smoke !== null) {
+    sections.push(smokeSection(smoke));
+  } else if (smokeMissing) {
+    const where = meta.url ? ` (${meta.url})` : '';
+    sections.push(`## Docker smoke\n\nNo smoke.json was found: the image build or the smoke script stopped before it wrote one. The cause is in the raw job log of the workflow run${where}.`);
+  }
+
   if (warnings.length > 0) {
     const shown = warnings.slice(0, MAX_WARNINGS);
     const more = warnings.length > shown.length ? `\n... and ${warnings.length - shown.length} more` : '';
@@ -423,7 +543,7 @@ export function buildReport({ inDir, needsText, root, meta }) {
     sections.push(`## Notes\n\n${guardsWhy}. ${cause}${behind}`);
   }
 
-  const failedJobs = needs.jobs.filter((job) => job.result !== 'success' && !hiddenByGuards(job));
+  const failedJobs = needs.jobs.filter((job) => job.result !== 'success' && !explained(job));
   if (failedJobs.length > 0 && errors.length === 0 && trx.failed === 0 && trxMismatches.length === 0) {
     const where = meta.url ? ` (${meta.url})` : '';
     sections.push(
