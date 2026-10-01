@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "strict": true,
+    "module": "nodenext",
+    "target": "es2022",
+    "lib": ["es2022", "dom", "dom.iterable"],
+    "types": ["node"],
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["src/Realm.Web/wwwroot/js/**/*.js", "tests/**/*.ts"],
+  "exclude": [
+    "**/lib/**",
+    "**/node_modules/**",
+    "src/Realm.Web/wwwroot/js/theme-boot.js",
+    "src/Realm.Web/wwwroot/js/blazor-start.js",
+    "src/Realm.Web/wwwroot/js/reconnect-banner.js"
+  ]
+}

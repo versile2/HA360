@@ -1,0 +1,363 @@
+/*
+ * The map's own styling (03 sections 4.4 and 4.6; 01 sections 4.2 to 4.7): pins, rings, badges, the "Here for" chip, zone labels
+ * and the attribution control. Tokens only: every colour is a var(--realm-*) from css/tokens.css (or a colour-mix() of them), and
+ * the no-colour-literals guard fails the build on a literal here. MapLibre's own sheet (lib/maplibre-gl/maplibre-gl.css) loads
+ * before this one, so equal-specificity rules here win by order.
+ */
+
+.realm-map {
+  --realm-pin-outline-85: color-mix(in srgb, var(--realm-pin-outline) 85%, transparent);
+  position: relative;
+  background: var(--realm-bg);
+}
+
+/* Markers keep their own stacking context, so the highest pin (z-index 4) never paints over the attribution control (z-index 2). */
+.realm-map .maplibregl-canvas-container {
+  isolation: isolate;
+}
+
+/* ---- a pin: a button whose bottom centre is the true point (Marker anchor "bottom") --------------------------------------- */
+
+.realm-pin {
+  --realm-pin-size: 48px;
+  --realm-pin-ring-w: 4px;
+  --realm-pin-ring: var(--realm-text);
+  --realm-pin-member: var(--realm-surface-2);
+  display: block;
+  box-sizing: border-box;
+  width: var(--realm-pin-size);
+  height: calc(var(--realm-pin-size) + 8px);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--realm-text);
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  overflow: visible;
+}
+
+.realm-pin--selected {
+  --realm-pin-size: 60px;
+}
+
+.realm-pin--vehicle {
+  --realm-pin-size: 44px;
+  --realm-pin-ring-w: 3px;
+}
+
+/* The hit area is 56 x 56 centred on the body, never below the body itself (01 section 4.2). */
+.realm-pin::after {
+  content: "";
+  position: absolute;
+  top: calc(var(--realm-pin-size) / 2);
+  left: 50%;
+  width: max(56px, var(--realm-pin-size));
+  height: max(56px, var(--realm-pin-size));
+  transform: translate(-50%, -50%);
+}
+
+/* The ring is the border (inside the 48 px), the 2 px outline outside it is a shadow; the face sits in the padding box, so a
+   dashed ring shows the map through its gaps. */
+.realm-pin__disc {
+  position: absolute;
+  top: 0;
+  left: 0;
+  box-sizing: border-box;
+  width: var(--realm-pin-size);
+  height: var(--realm-pin-size);
+  border: var(--realm-pin-ring-w) solid var(--realm-pin-ring);
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--realm-pin-outline-85);
+}
+
+.realm-pin--dashed .realm-pin__disc {
+  border-style: dashed;
+}
+
+.realm-pin--selected .realm-pin__disc {
+  box-shadow:
+    0 0 0 2px var(--realm-pin-outline-85),
+    0 0 0 6px color-mix(in srgb, var(--realm-primary) 35%, transparent);
+}
+
+.realm-pin__face {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--realm-pin-member);
+  color: var(--realm-bg);
+  font-family: var(--realm-font-body);
+  font-size: calc(var(--realm-pin-size) * 0.38);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.realm-pin__initials {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.realm-pin__initials svg {
+  width: calc(var(--realm-pin-size) * 0.55);
+  height: calc(var(--realm-pin-size) * 0.55);
+  fill: currentcolor;
+}
+
+.realm-pin__photo {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Stale and offline avatars lose colour; offline also fades (01 section 4.3). */
+.realm-pin--stale .realm-pin__face,
+.realm-pin--offline .realm-pin__face {
+  filter: saturate(0.6);
+}
+
+.realm-pin--offline .realm-pin__face {
+  opacity: 0.8;
+}
+
+/* A vehicle: a rounded square on the surface colour with a gold glyph (01 section 4.7). */
+.realm-pin--vehicle .realm-pin__disc {
+  border-radius: 14px;
+}
+
+.realm-pin--vehicle .realm-pin__face {
+  border-radius: 11px;
+  background: var(--realm-surface);
+  color: var(--realm-primary);
+}
+
+.realm-pin__glyph {
+  display: flex;
+}
+
+.realm-pin__glyph svg {
+  width: 26px;
+  height: 26px;
+  fill: currentcolor;
+}
+
+/* The pointer: 12 x 8, the ring colour, with the same 2 px outline (a wide stroke painted under the fill). */
+.realm-pin__tip {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 12px;
+  height: 8px;
+  margin-left: -6px;
+  overflow: visible;
+  fill: var(--realm-pin-ring);
+  stroke: var(--realm-pin-outline-85);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+  paint-order: stroke;
+}
+
+/* ---- badges ------------------------------------------------------------------------------------------------------------------ */
+
+.realm-pin__badge {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  border-radius: 50%;
+  background: var(--realm-surface);
+  box-shadow: 0 0 0 1.5px var(--realm-pin-outline-85);
+  color: var(--realm-text);
+}
+
+.realm-pin__badge[hidden] {
+  display: none;
+}
+
+.realm-pin__badge svg {
+  fill: currentcolor;
+}
+
+.realm-pin__badge--status {
+  top: -4px;
+  right: -4px;
+  width: 20px;
+  height: 20px;
+}
+
+.realm-pin__badge--status svg {
+  width: 14px;
+  height: 14px;
+}
+
+.realm-pin__badge--driving {
+  color: var(--realm-info);
+}
+
+.realm-pin__badge--home {
+  color: var(--realm-primary);
+}
+
+/* Low battery: 18 px, BatteryAlert on the error colour (the pointer is 8 px, so the disc's corner is 8 px above the bottom). */
+.realm-pin__badge--battery {
+  bottom: 4px;
+  left: -4px;
+  width: 18px;
+  height: 18px;
+  background: var(--realm-error);
+  color: var(--realm-bg);
+}
+
+.realm-pin__badge--battery svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* ---- the driving pulse: the ring grows from 4 to 10 px and fades once every 2 s (01 section 4.2) ---------------------------- */
+
+.realm-pin__pulse {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: none;
+  width: var(--realm-pin-size);
+  height: var(--realm-pin-size);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.realm-pin--driving .realm-pin__pulse {
+  display: block;
+  animation: realm-pin-pulse 2s ease-out infinite;
+}
+
+@keyframes realm-pin-pulse {
+  from {
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--realm-pin-ring) 50%, transparent);
+  }
+
+  to {
+    box-shadow: 0 0 0 8px color-mix(in srgb, var(--realm-pin-ring) 0%, transparent);
+  }
+}
+
+.realm-map--reduced .realm-pin__pulse {
+  display: none;
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .realm-pin__pulse {
+    display: none;
+    animation: none;
+  }
+}
+
+/* ---- the chip: centred above the body with an 8 px gap, below the pointer when it would cross the top padding ------------- */
+
+.realm-chip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px 0 8px;
+  transform: translateX(-50%);
+  border: 1px solid var(--realm-line-strong);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--realm-surface-2) 96%, transparent);
+  box-shadow: 0 2px 6px var(--realm-scrim);
+  color: var(--realm-text);
+  font-family: var(--realm-font-body);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 20px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.realm-chip--below {
+  top: calc(100% + 8px);
+  bottom: auto;
+}
+
+.realm-chip svg {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  fill: var(--realm-primary);
+}
+
+/* ---- zone names (HTML, from zoom 14) ----------------------------------------------------------------------------------------- */
+
+.realm-zone-label {
+  color: var(--realm-text);
+  font-family: var(--realm-font-body);
+  font-size: 12px;
+  line-height: 16px;
+  white-space: nowrap;
+  pointer-events: none;
+  paint-order: stroke fill;
+  -webkit-text-stroke: 3px var(--realm-bg);
+}
+
+/* ---- attribution: a 48 x 48 target, its right edge 12 px from the viewport edge (03 section 4.4) ------------------------------ */
+
+.realm-map .maplibregl-ctrl-top-right .maplibregl-ctrl-attrib.maplibregl-compact {
+  position: relative;
+  box-sizing: border-box;
+  width: 48px;
+  min-height: 48px;
+  margin: 12px 12px 0 0;
+  padding: 0;
+  border-radius: 24px;
+  background: var(--realm-control-bg);
+  color: var(--realm-text);
+}
+
+.realm-map .maplibregl-ctrl-attrib.maplibregl-compact .maplibregl-ctrl-attrib-button {
+  top: 0;
+  right: 0;
+  bottom: auto;
+  left: auto;
+  width: 48px;
+  height: 48px;
+  border-radius: 24px;
+  background-color: transparent;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 28px 28px;
+  /* the stock glyph is dark on a light disc; inverted it reads as the text colour on the control background */
+  filter: invert(1);
+}
+
+/* Open: the credits read left of the button, on the same pill. */
+.realm-map .maplibregl-ctrl-top-right .maplibregl-ctrl-attrib.maplibregl-compact-show {
+  width: auto;
+  max-width: calc(100vw - 24px);
+  padding: 6px 56px 6px 16px;
+  border-radius: 24px;
+}
+
+.realm-map .maplibregl-ctrl-attrib a,
+.realm-map .maplibregl-ctrl-attrib a:hover {
+  color: var(--realm-text);
+}
+
+.realm-map .maplibregl-ctrl-attrib-inner {
+  font-family: var(--realm-font-body);
+  font-size: 12px;
+  line-height: 18px;
+}

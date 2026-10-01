@@ -51,6 +51,24 @@ jobs:
         uses: actions/upload-artifact@v7
         with: { name: dotnet, path: ci-out, retention-days: 3 }
 
+  js:                                             # 7.2, S5a: types and Node tests of wwwroot/js and tools/ci; no browser, no C#
+    needs: guards
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: 22, cache: npm }
+      - run: npm ci --ignore-scripts
+      - run: mkdir -p ci-out
+      - run: npm run typecheck 2>&1 | tee ci-out/tsc.log
+      - run: node --test --test-reporter=tap "tests/js/**/*.test.mjs" 2>&1 | tee ci-out/js-tests.tap
+      - name: Validate map styles (third-party fetch is soft)
+        continue-on-error: true
+        run: node tools/ci/validate-styles.mjs 2>&1 | tee ci-out/styles.log
+      - if: always()
+        uses: actions/upload-artifact@v7
+        with: { name: js, path: ci-out, retention-days: 3 }
+
   docker-smoke:                                   # 7.8, S2: the Dockerfile is built and exercised on every push, not only at release
     needs: guards
     runs-on: ubuntu-latest
@@ -71,7 +89,7 @@ jobs:
         with: { name: docker-smoke, path: ci-out, retention-days: 3 }
 
   publish-ci:                                     # 7.4
-    needs: [guards, dotnet, docker-smoke]
+    needs: [guards, dotnet, js, docker-smoke]
     if: ${{ always() && !cancelled() }}
     runs-on: ubuntu-latest
     permissions: { contents: write }
