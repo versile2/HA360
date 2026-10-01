@@ -1,4 +1,5 @@
 using Realm.Demo;
+using Realm.Infrastructure.Hosting;
 using Realm.Web;
 using Realm.Web.Components;
 using Realm.Web.Hosting;
@@ -19,8 +20,9 @@ if (args is ["export-demo-cast", ..])
 }
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Configuration.AddRealmOptionsFile();   // the add-on options on the 02 section 3.4 paths, just below the environment (03 section 2.1)
 var runtime = RuntimeOptions.Detect(builder.Configuration, builder.Environment);
-builder.Services.AddRealmApp(runtime);
+builder.Services.AddRealmApp(runtime, builder.Configuration);
 
 var app = builder.Build();
 app.UseRealmPipeline();
@@ -38,11 +40,24 @@ namespace Realm.Web
     /// </summary>
     public static class RealmAppServiceCollectionExtensions
     {
-        public static IServiceCollection AddRealmApp(this IServiceCollection services, RuntimeOptions runtime)
+        /// <param name="configuration">
+        /// The host's configuration, which the Live services read (<c>Realm:Ha:*</c>, <c>Realm:Db</c>, the token and the mapped options). Demo mode
+        /// reads nothing from it; Live mode cannot be composed without it.
+        /// </param>
+        public static IServiceCollection AddRealmApp(this IServiceCollection services, RuntimeOptions runtime, IConfiguration? configuration = null)
         {
             services.AddSingleton(runtime);   // RealmShell reads the mode to decide whether the Demo-only URL parameters apply (03 section 2.1)
             services.AddRealmWeb(runtime);
-            services.AddRealmDemo();   // until S13b wires the Live side, the Demo services are registered in every mode (R3-027)
+            if (runtime.Mode == RealmMode.Live)
+            {
+                ArgumentNullException.ThrowIfNull(configuration);
+                services.AddRealmLive(configuration, new DemoRealmSessionFactory());   // Demo sessions only for a circuit that asked (?demo=1 with allow_demo_param)
+            }
+            else
+            {
+                services.AddRealmDemo();
+            }
+
             return services;
         }
     }

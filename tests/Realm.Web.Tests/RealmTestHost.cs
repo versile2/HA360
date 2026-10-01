@@ -15,7 +15,8 @@ namespace Realm.Web.Tests;
 /// Starts the Realm pipeline on a real Kestrel host, composed with the same calls as <c>Program.cs</c> except <c>MapStaticAssets</c>
 /// (a hand-started host has no static-web-assets manifest). The services come from <c>AddRealmApp</c>, the method <c>Program.cs</c> uses
 /// too, so the two cannot drift apart. It adds two test-only endpoints: <c>echo</c> reports what the pipeline did to the request, and
-/// <c>boom</c> throws. A test that needs more endpoints, such as the Razor components, passes them in <c>mapEndpoints</c>.
+/// <c>boom</c> throws. A test that needs more endpoints, such as the Razor components, passes them in <c>mapEndpoints</c>, and one that needs
+/// to replace a service, such as the avatar source, passes <c>configureServices</c>, which runs after <c>AddRealmApp</c>.
 /// </summary>
 /// <remarks>
 /// Every host logs into an <see cref="InMemoryLogSink"/> (the one the test passes, or its own), with exceptions written out in full.
@@ -33,13 +34,23 @@ internal static class RealmTestHost
     public static async Task<KestrelHost> StartAsync(
         InMemoryLogSink? logs = null,
         IReadOnlyDictionary<string, string?>? settings = null,
-        Action<WebApplication>? mapEndpoints = null)
+        Action<WebApplication>? mapEndpoints = null,
+        Action<IServiceCollection>? configureServices = null)
     {
         var sink = logs ?? new InMemoryLogSink();
         var host = await KestrelHost.StartAsync(
             builder =>
             {
-                builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?> { ["Realm:OptionsPath"] = NoOptionsFile });
+                builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Realm:OptionsPath"] = NoOptionsFile,
+
+                    // A Live host (a test that sets a token) starts the data layer and the three HA services. Its database is a file of its own in the
+                    // temp directory, and Home Assistant is an address that refuses at once, so no test depends on /data or resolves "supervisor".
+                    ["Realm:Db"] = Path.Combine(Path.GetTempPath(), "realm-web-test-" + Guid.NewGuid().ToString("N") + ".db"),
+                    ["Realm:Ha:WebSocketUrl"] = "ws://127.0.0.1:1/websocket",
+                    ["Realm:Ha:RestBaseUrl"] = "http://127.0.0.1:1/api/",
+                });
                 if (settings is not null)
                 {
                     builder.Configuration.AddInMemoryCollection(settings);
@@ -48,7 +59,8 @@ internal static class RealmTestHost
                 builder.Logging.AddProvider(new ExceptionTextLogProvider(sink));
 
                 var runtime = RuntimeOptions.Detect(builder.Configuration, builder.Environment);
-                builder.Services.AddRealmApp(runtime);
+                builder.Services.AddRealmApp(runtime, builder.Configuration);
+                configureServices?.Invoke(builder.Services);
             },
             app =>
             {

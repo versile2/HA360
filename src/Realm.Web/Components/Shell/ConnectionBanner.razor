@@ -1,0 +1,122 @@
+@using Realm.Domain
+@implements IDisposable
+@inject ISnackbar Snackbar
+
+@* The two persistent banners and the recovery toast of 01 sections 8.6 and 9 (cases 2 and 4). It reads the circuit's session, so Demo and Live look alike.
+   Home Assistant wins when both are down: with no data coming in, the state of the Life360 trackers means nothing. The banner takes the position and the
+   look of the static reconnect banner of App.razor (class realm-reconnect, which holds the placement between the gear and the attribution control); the
+   inline style only swaps its surface and adds the status-coloured left border, with tokens, below the 1300 of that banner so the circuit's own
+   "Reconnecting to the court…" is never hidden behind it. Nothing is read in OnInitialized: the prerender pass creates a session and throws it away. *@
+@if (_banner is { } banner)
+{
+    <div class="realm-reconnect"
+         role="status"
+         data-testid="@banner.TestId"
+         style="z-index: 1290; justify-content: flex-start; text-align: start; background: var(--realm-surface-2); border-left: 4px solid var(--realm-warning);">
+        <MudIcon Icon="@banner.Icon" Size="Size.Small" Style="flex: none; color: var(--realm-warning);" />
+        <span>@banner.Text</span>
+    </div>
+}
+
+@code {
+    private static readonly BannerView HomeAssistantDown = new(
+        "banner-ha",
+        Icons.Material.Filled.CloudOff,
+        "The royal messengers can't reach Home Assistant. Retrying…");
+
+    private static readonly BannerView Life360Down = new(
+        "banner-life360",
+        Icons.Material.Filled.LocationOff,
+        "Life360 isn't answering. Showing what Home Assistant knows.");
+
+    private BannerView? _banner;
+    private bool _homeAssistantWasDown;
+    private bool _subscribed;
+    private bool _disposed;
+
+    /// <summary>The circuit's session, cascaded by <c>RealmShell</c>.</summary>
+    [CascadingParameter]
+    private IRealmSession Session { get; set; } = default!;
+
+    // Only the circuit runs this (prerender does not), so a subscription is made only where it will be disposed.
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        Session.Changed += OnChanged;
+        _subscribed = true;
+        Apply();
+        if (_banner is not null)
+        {
+            StateHasChanged();
+        }
+    }
+
+    // Raised off the UI thread: marshal, and never touch a disposed component.
+    private void OnChanged()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _ = InvokeAsync(() =>
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            Apply();
+            StateHasChanged();
+        });
+    }
+
+    // A banner stands while the connection is Unavailable: the first 15 s of an outage read Reconnecting and never show one (02 section 1.8), and the Life360
+    // entry turns Unavailable only after 5 minutes of every tracker being down (D29). The toast follows only a banner that was shown.
+    private void Apply()
+    {
+        var connections = Session.Current.Connections;
+        var homeAssistant = StateOf(connections, ConnectionNames.HomeAssistant);
+        if (homeAssistant == Realm.Domain.ConnectionState.Unavailable)
+        {
+            _homeAssistantWasDown = true;
+        }
+        else if (homeAssistant == Realm.Domain.ConnectionState.Connected && _homeAssistantWasDown)
+        {
+            _homeAssistantWasDown = false;
+            Snackbar.Add("The messengers are back.", Severity.Success, options => options.VisibleStateDuration = 3000);
+        }
+
+        _banner = homeAssistant == Realm.Domain.ConnectionState.Unavailable
+            ? HomeAssistantDown
+            : StateOf(connections, ConnectionNames.Life360Trackers) == Realm.Domain.ConnectionState.Unavailable ? Life360Down : null;
+    }
+
+    private static Realm.Domain.ConnectionState? StateOf(IReadOnlyList<ConnectionVm> connections, string name)
+    {
+        foreach (var connection in connections)
+        {
+            if (connection.Name == name)
+            {
+                return connection.State;
+            }
+        }
+
+        return null;
+    }
+
+    public void Dispose()
+    {
+        _disposed = true;
+        if (_subscribed)
+        {
+            Session.Changed -= OnChanged;
+        }
+    }
+
+    private sealed record BannerView(string TestId, string Icon, string Text);
+}
