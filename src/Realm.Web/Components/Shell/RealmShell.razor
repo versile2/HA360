@@ -1,0 +1,7 @@
+@* The per-circuit root of the UI (03 section 3.2): MainLayout renders the page and the controls inside it. It renders no element of its own;
+   its code-behind creates the circuit's session from the page URL and cascades it with the Demo UI overrides. *@
+<CascadingValue Value="Session" IsFixed="true">
+    <CascadingValue Value="Overrides" IsFixed="true">
+        @ChildContent
+    </CascadingValue>
+</CascadingValue>

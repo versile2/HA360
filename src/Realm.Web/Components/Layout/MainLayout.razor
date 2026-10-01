@@ -8,9 +8,12 @@
 <MudSnackbarProvider />
 <MudXProvider />
 
-<main id="realm-main" aria-label="The Realm">
-    @Body
-</main>
+@* The providers come first (03 section 3.2); everything the user sees lives inside the shell, which owns the circuit's session. *@
+<RealmShell>
+    <main id="realm-main" aria-label="The Realm">
+        @Body
+    </main>
 
-<TopControls />
-<BottomNav />
+    <TopControls />
+    <BottomNav />
+</RealmShell>

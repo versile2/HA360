@@ -66,7 +66,7 @@ public sealed class AppBaseHrefTests
         }
 
         using var response = await client.SendAsync(request);
-        response.EnsureSuccessStatusCode();
+        await RealmTestHost.EnsureSuccessAsync(host, response);   // a 500 reports the server-side exception, not just the status code
         return await response.Content.ReadAsStringAsync();
     }
 
