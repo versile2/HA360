@@ -61,7 +61,8 @@ public sealed class SchemaBootstrap : IHostedService
         try
         {
             using var connection = RealmDb.OpenConnection(_path, pooling: false);
-            if (SchemaRunner.ReadUserVersion(connection) > 0 && WasUncleanShutdown(connection))
+            var existingVersion = SchemaRunner.ReadUserVersion(connection);
+            if (existingVersion > 0 && WasUncleanShutdown(connection))
             {
                 _logger.LogWarning("clean_shutdown = 0 found at start; running quick_check");
                 if (!QuickCheckPasses(connection))
@@ -72,6 +73,13 @@ public sealed class SchemaBootstrap : IHostedService
             }
 
             var version = SchemaRunner.Apply(connection, _logger);
+            if (existingVersion == 0)
+            {
+                // D58: this class owns meta.created_utc and writes it once, when it creates the database.
+                var created = _time.GetUtcNow().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture);
+                SchemaRunner.Execute(connection, $"INSERT OR IGNORE INTO meta(key, value) VALUES ('created_utc', '{created}')");
+            }
+
             SchemaRunner.Execute(connection, "INSERT OR REPLACE INTO meta(key, value) VALUES ('clean_shutdown', '0')");
             return version;
         }
