@@ -79,7 +79,7 @@ public sealed class DiagnosticsEndpointTests
     [Fact]
     public async Task TheFile_HoldsNoLocationNoAddressNoNameAndNoToken()
     {
-        using var host = await RealmTestHost.StartAsync();
+        await using var host = await RealmTestHost.StartAsync();
         using var client = host.CreateClient();
 
         using var response = await client.GetAsync("diagnostics.json");
