@@ -30,10 +30,31 @@ test.describe('ingress platform tests', () => {
     const blazor = await page.evaluate(() => document.querySelector('script[src*="blazor.web"]')?.getAttribute('src') ?? null);
     expect(blazor, 'the page advertises a relative blazor.web script').toMatch(/^(?:\.\/)?_framework\/blazor\.web[\w.-]*\.js$/);
     const origin = new URL(page.url()).origin;
-    for (const asset of [blazor as string, 'css/app.css', 'lib/maplibre-gl/maplibre-gl.mjs', '_content/MudX.MudBlazor.Extension/mudx.min.css']) {
+    for (const asset of [
+      blazor as string,
+      'css/app.css',
+      'css/realm-map.css',
+      'lib/maplibre-gl/maplibre-gl.css',
+      'lib/maplibre-gl/maplibre-gl.mjs',
+      '_content/MudX.MudBlazor.Extension/mudx.min.css',
+    ]) {
       const response = await request.get(asset);
       expect(response.status(), `GET ${asset}`).toBe(200);
       expect(response.url(), `GET ${asset}`).toBe(new URL(asset, `${origin}${BASE_HREF}`).href);
+    }
+
+    // The page links the map's two stylesheets, in the order that lets realm-map.css win over MapLibre's own sheet, and the browser applied both (D74: until
+    // S6b fix 1 neither was linked, so every marker was static and the attribution control spanned the screen, and nothing else caught it).
+    const sheets = await page.evaluate(() => ({
+      linked: [...document.querySelectorAll('link[rel="stylesheet"]')].map((link) => link.getAttribute('href') ?? ''),
+      applied: [...document.styleSheets].map((sheet) => ({ href: sheet.href ?? '', rules: sheet.cssRules.length })),
+    }));
+    const order = ['lib/maplibre-gl/maplibre-gl.css', 'css/tokens.css', 'css/app.css', 'css/realm-map.css'].map((href) => sheets.linked.indexOf(href));
+    expect(order, `the stylesheets MapLibre, tokens, app and map are linked (linked: ${sheets.linked.join(', ')})`).not.toContain(-1);
+    expect(order, 'they are linked in that order').toEqual([...order].sort((a, b) => a - b));
+    for (const href of ['lib/maplibre-gl/maplibre-gl.css', 'css/realm-map.css']) {
+      const applied = sheets.applied.find((sheet) => new URL(sheet.href, 'http://x').pathname.endsWith(`/${href}`));
+      expect(applied?.rules ?? 0, `${href} is applied and has rules`).toBeGreaterThan(0);
     }
 
     // The circuit's websocket upgraded with 101 and went through the prefix.

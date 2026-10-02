@@ -6,8 +6,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <base href="@BaseHref" />
     <link rel="stylesheet" href="@Assets["_content/MudBlazor/MudBlazor.min.css"]" />
+    @* MapLibre's own sheet (markers, the attribution control) loads before ours; realm-map.css loads last so its equal-specificity rules win by order. *@
+    <link rel="stylesheet" href="lib/maplibre-gl/maplibre-gl.css" />
     <link rel="stylesheet" href="css/tokens.css" />
     <link rel="stylesheet" href="css/app.css" />
+    <link rel="stylesheet" href="css/realm-map.css" />
     <script src="js/theme-boot.js"></script>
     <ImportMap />
     <HeadOutlet @rendermode="InteractiveServer" />
