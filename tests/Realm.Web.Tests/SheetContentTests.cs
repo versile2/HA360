@@ -254,7 +254,12 @@ public sealed class SheetContentTests : ComponentTestBase
             .Add(p => p.Summary, "4 in the Realm · 1 driving")
             .Add(p => p.ShowSummary, true));
 
-        Assert.Equal(sheet.Find("[data-testid='sheet-list']").OuterHtml, panel.Find("[data-testid='sheet-list']").OuterHtml);
+        // Compared as markup, not as strings: bUnit writes every event handler as blazor:onclick="<id>" and the renderer hands out new ids on each render, so the same rows
+        // rendered twice differ in those ids alone. MarkupMatches leaves the blazor: attributes out and holds everything else (elements, classes, text) to equal.
+        var sheetRows = sheet.FindAll("[data-testid='sheet-list'] > li");
+        Assert.NotEmpty(sheetRows);
+        Assert.Equal(sheetRows.Count, panel.FindAll("[data-testid='sheet-list'] > li").Count);
+        sheet.Find("[data-testid='sheet-list']").MarkupMatches(panel.Find("[data-testid='sheet-list']").OuterHtml);
         Assert.Empty(sheet.FindAll("[data-testid='sheet-summary']"));
         Assert.Single(panel.FindAll("[data-testid='sheet-summary']"));
     }
