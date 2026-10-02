@@ -210,6 +210,27 @@ internal sealed class StoreRig : IAsyncDisposable
         command.ExecuteNonQuery();
     }
 
+    /// <summary>
+    /// A connection of its own, outside every pool, that stays open (and idle: it has run only its PRAGMAs, so it holds no read transaction and cannot hold up
+    /// <c>wal_checkpoint(TRUNCATE)</c>) until the caller disposes it. SQLite deletes the <c>-wal</c> file when the last connection to the database closes, and the
+    /// pooled connections of this rig close whenever any other rig in the process clears the pools; while this one is open the file stays where it is, so a test
+    /// can measure the log with <see cref="LogBytes"/> whenever it likes. The caller disposes it before the rig.
+    /// </summary>
+    public SqliteConnection HoldLogOpen() => RealmDb.OpenConnection(FilePath, pooling: false);
+
+    /// <summary>The size of the write-ahead log in bytes. A log that has no file is an empty log (SQLite removes it when the database is closed), so that is 0, not an error.</summary>
+    public long LogBytes()
+    {
+        try
+        {
+            return new FileInfo(FilePath + "-wal").Length;
+        }
+        catch (FileNotFoundException)
+        {
+            return 0;
+        }
+    }
+
     private (RealmState, ChangeNotifier, DiscoveryState, RealmStateHydrator, StatsService, IngestionPipeline, RecordingLogger<IngestionPipeline>) NewProcess()
     {
         var state = RealmState.CreateInitial(Options, Time);

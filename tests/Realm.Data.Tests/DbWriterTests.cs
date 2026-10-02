@@ -331,8 +331,7 @@ public class DbWriterTests
 
         await rig.StopAsync(); // no clock tick: the drain, not the timer, writes them
 
-        var wal = rig.FilePath + "-wal";
-        Assert.True(!File.Exists(wal) || new FileInfo(wal).Length == 0);
+        Assert.Equal(0, LogBytes(rig.FilePath));   // wal_checkpoint(TRUNCATE) left the log empty (or SQLite already removed the file)
         Assert.Equal(5, rig.RowCount("fixes"));
         Assert.Equal(1, rig.RowCount("vehicle_samples"));
         Assert.Equal(1, rig.RowCount("signals"));
@@ -451,6 +450,20 @@ public class DbWriterTests
         Assert.Equal(
             "3",
             TestSql.Text(rig.FilePath, $"SELECT algo_version FROM trips WHERE member_id = 'king' AND start_ts = {TestData.Start.ToUnixTimeMilliseconds()}"));
+    }
+
+    // The size of the write-ahead log in bytes. A log without a file is an empty one: SQLite removes the file when the last connection closes, which another
+    // test clearing the pools can cause at any moment. One stat, so the file cannot vanish between a check for it and a read of its length.
+    private static long LogBytes(string databasePath)
+    {
+        try
+        {
+            return new FileInfo(databasePath + "-wal").Length;
+        }
+        catch (FileNotFoundException)
+        {
+            return 0;
+        }
     }
 
     private static int SeenCount(List<int> seen)
