@@ -23,6 +23,9 @@ RUN dotnet publish src/Realm.Web/Realm.Web.csproj -c Release -o /out --no-restor
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
 WORKDIR /app
 COPY --from=build /out .
+# The licence of this project, the third-party notices and the licence texts they point to ship in the image (tools/ci/image-smoke.sh item 12).
+COPY LICENSE THIRD-PARTY-NOTICES.md /app/
+COPY LICENSES/ /app/LICENSES/
 ARG VERSION=0.0.0-dev
 ARG REVISION=unknown
 ENV ASPNETCORE_HTTP_PORTS=8099 \
@@ -31,13 +34,13 @@ ENV ASPNETCORE_HTTP_PORTS=8099 \
     DOTNET_TieredPGO=0 \
     DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=0
 LABEL org.opencontainers.image.title="The Realm" \
-      org.opencontainers.image.description="Life360-style family map for Home Assistant" \
+      org.opencontainers.image.description="Map-first family map and weekly driving reports for Home Assistant" \
       org.opencontainers.image.source="https://github.com/Versile2/ha360" \
-      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.licenses="MIT AND BSD-3-Clause AND Apache-2.0 AND OFL-1.1" \
       org.opencontainers.image.version="${VERSION}" \
       org.opencontainers.image.revision="${REVISION}" \
       io.hass.type="addon" io.hass.name="The Realm" io.hass.version="${VERSION}" \
-      io.hass.description="Life360-style family map for Home Assistant" \
+      io.hass.description="Map-first family map and weekly driving reports for Home Assistant" \
       io.hass.url="https://github.com/Versile2/ha360"
 EXPOSE 8099
 ENTRYPOINT ["dotnet", "Realm.Web.dll"]

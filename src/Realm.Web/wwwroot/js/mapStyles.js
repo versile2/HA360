@@ -58,6 +58,63 @@ export function appearanceOf(styleId) {
   return isStyleId(styleId) ? STYLES[styleId].appearance : 'dark';
 }
 
+// ---- the map credits (D81, the OSMF Attribution Guidelines) --------------------------------------------------------------
+
+/** How long the credits of a style with third-party data stay open once the map has loaded, when nobody touches the map first. */
+export const ATTRIBUTION_FOLD_MS = 5000;
+
+/**
+ * Whether the map credits start expanded. Every style that draws third-party data (OpenFreeMap with OpenStreetMap, USGS) shows them open
+ * when the map opens; only demo-offline, which draws none, starts as the (i) button (D81). An unknown id counts as third-party data: showing
+ * the credits is the safe side.
+ * @param {string} styleId
+ * @returns {boolean}
+ */
+export function attributionStartsExpanded(styleId) {
+  return styleId !== 'demo-offline';
+}
+
+/**
+ * The one-way fold of the credits from open to the (i) button, driven by its caller and by a timer the caller supplies (so Node can test it
+ * with a fake clock; this file never reads the wall clock). `arm()` starts the countdown, `fold()` is the first map interaction, `release()`
+ * is the person using the (i) button themselves and `dispose()` is the map going away. Whichever comes first ends it: after that every call
+ * does nothing, so the countdown can never close credits the person has opened again.
+ * @param {{ schedule: (callback: () => void, delayMs: number) => unknown, cancel: (handle: unknown) => void, collapse: () => void, delayMs?: number }} deps
+ * @returns {{ arm: () => void, fold: () => void, release: () => void, dispose: () => void, isDone: () => boolean }}
+ */
+export function createAttributionFold({ schedule, cancel, collapse, delayMs = ATTRIBUTION_FOLD_MS }) {
+  /** @type {unknown} */
+  let handle = null;
+  let done = false;
+
+  /** Ends the fold without collapsing anything: the countdown is cancelled and nothing else will run. */
+  function finish() {
+    done = true;
+    if (handle !== null) cancel(handle);
+    handle = null;
+  }
+
+  return {
+    arm() {
+      if (done || handle !== null) return;
+      handle = schedule(() => {
+        if (done) return; // a callback that was already queued when the fold ended some other way
+        handle = null; // fired: nothing left to cancel
+        finish();
+        collapse();
+      }, delayMs);
+    },
+    fold() {
+      if (done) return;
+      finish();
+      collapse();
+    },
+    release: finish,
+    dispose: finish,
+    isDone: () => done,
+  };
+}
+
 // ---- demo-offline: no network at all ------------------------------------------------------------------------------------
 
 const DEMO_PAPER = '#F1ECE0';
