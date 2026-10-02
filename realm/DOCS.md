@@ -1,6 +1,6 @@
-# The Realm
+# HA Cartographer
 
-The Realm is a map-first family tracker that runs inside Home Assistant. It shows where everyone is on a full-screen
+HA Cartographer is a map-first family tracker that runs inside Home Assistant. It shows where everyone is on a full-screen
 map with a bottom sheet (Drivers, Vehicles, Places) and keeps its own history, so it can show weekly driving reports
 that go back further than Home Assistant's recorder does. It opens from the Home Assistant sidebar, so Home Assistant's
 own login is the only login.
@@ -9,10 +9,10 @@ own login is the only login.
 
 1. In Home Assistant open **Settings -> Apps -> Install app**, open the menu (three dots) and choose **Repositories**,
    and add `https://github.com/Versile2/ha360`.
-2. Install **The Realm** and press **Start**.
+2. Install **HA Cartographer** and press **Start**.
 3. Switch on **Show in sidebar** on the app's page. Home Assistant keeps this as a per-install setting, so the app
    cannot turn it on by itself. Optionally switch on **Watchdog** too.
-4. Open **The Realm** from the sidebar. With no options set, everyone found through Home Assistant appears with a plain
+4. Open **HA Cartographer** from the sidebar. With no options set, everyone found through Home Assistant appears with a plain
    name.
 5. To name people, vehicles and places, open the **Configuration** tab. Members, vehicles and places are lists:
    each member has an `id` (a short lower-case slug) and a `display_name`, and can have a `lore_title` (a secondary
@@ -92,6 +92,6 @@ address opens a demo session while the app runs on real data.
 
 ## Trademarks
 
-The Realm is an independent, unofficial project. It is not affiliated with, endorsed by or sponsored by Life360, Inc.,
+HA Cartographer is an independent, unofficial project. It is not affiliated with, endorsed by or sponsored by Life360, Inc.,
 the Open Home Foundation or Nabu Casa. Life360 is a trademark of Life360, Inc. Home Assistant names and logos belong
 to their owners. These names are used only to say what the app works with.

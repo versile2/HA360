@@ -1,4 +1,4 @@
-# HA360 — The Realm
+# HA Cartographer
 
 A map-first family locator that runs as a Home Assistant add-on. It works with Home Assistant's Life360 integration
 and the Home Assistant companion app.
@@ -26,19 +26,19 @@ so no real person, place or map data appears in them.
 
 ## Install
 
-The Realm is a Home Assistant add-on (newer releases of Home Assistant call add-ons apps), so it needs an installation
+HA Cartographer is a Home Assistant add-on (newer releases of Home Assistant call add-ons apps), so it needs an installation
 that has the Supervisor (Home Assistant OS or Supervised) on an amd64 machine.
 
 1. **Add the repository.** In Home Assistant open **Settings -> Apps -> Install app**, open the menu (three dots),
    choose **Repositories**, paste `https://github.com/Versile2/ha360` exactly and press **Add**. Close the dialog and
    reload the page if the store does not list the app yet.
-2. **Install.** Open **The Realm** in the store and press **Install**. The Supervisor pulls the image
+2. **Install.** Open **HA Cartographer** in the store and press **Install**. The Supervisor pulls the image
    `ghcr.io/versile2/ha360` (see the registry note below).
 3. **Choose Demo mode first.** Before the first start open the app's **Configuration** tab, switch on **Demo mode**
    (`demo_mode: true` if you edit as YAML) and save. Nothing else needs to be filled in: the member, vehicle and place
    lists ship empty.
 4. **Start and open it.** Press **Start**, switch on **Show in sidebar** (Home Assistant keeps this as a per-install
-   setting, so the app cannot do it for you; **Watchdog** is optional) and open **The Realm** from the sidebar, the
+   setting, so the app cannot do it for you; **Watchdog** is optional) and open **HA Cartographer** from the sidebar, the
    entry with the crown icon. It also opens in the Home Assistant companion app. You should see the invented family on
    the map and a Driving report; that confirms the install works before any real data is involved.
 5. **Switch to your own household.** Turn **Demo mode** off. Then fill in the **Household members**, vehicles and places
@@ -66,12 +66,12 @@ name and a token that may read packages).
 
 ## Licence
 
-The Realm is released under the MIT licence ([LICENSE](LICENSE)). The components it bundles or fetches, and the
+HA Cartographer is released under the MIT licence ([LICENSE](LICENSE)). The components it bundles or fetches, and the
 licences and credits they ask for, are listed in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md). The image carries
 both files in `/app`.
 
 ## Trademarks
 
-The Realm is an independent, unofficial project. It is not affiliated with, endorsed by or sponsored by Life360, Inc.,
+HA Cartographer is an independent, unofficial project. It is not affiliated with, endorsed by or sponsored by Life360, Inc.,
 the Open Home Foundation or Nabu Casa. Life360 is a trademark of Life360, Inc. Home Assistant names and logos belong
 to their owners. These names are used only to say what the app works with.
