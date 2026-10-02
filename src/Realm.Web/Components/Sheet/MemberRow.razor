@@ -1,0 +1,91 @@
+@using Realm.Web.Map
+@using Realm.Web.Sheet
+
+@* One person's row (01 section 5.1; 03 section 3.4): the whole row is one button, 84 px at the least, so nothing shifts when data arrives. A 56 px rounded-square avatar (the
+   photo over the initial on the member colour) with the battery pill hanging over its lower edge; then the name and lore title, the status line, and the time line; then the chevron.
+   Every string is final in the MemberRowVm (VmFactory), so the same row reads the same in the bottom sheet and in the left panel. Stale and offline rows are dimmed by class (72 and 60 percent).
+   The button's name is the pin's accessible name plus "Double tap to show on map." (01 section 10.3), so the avatar, the pill and the lines inside are not read twice. *@
+<button type="button"
+        class="@RowClass"
+        data-testid="@Row.TestId"
+        aria-label="@AriaLabel"
+        aria-current="@(Selected ? "true" : null)"
+        @onclick="OnClick">
+    <span class="realm-row-avatar-wrap">
+        <span class="realm-row-avatar" style="@ColorStyle">
+            <span class="realm-row-initial" aria-hidden="true">@Row.Initial</span>
+            @if (Row.AvatarUrl is { } photo)
+            {
+                <img class="realm-row-photo" src="@photo" alt="" loading="lazy" />
+            }
+        </span>
+        @if (Row.Battery is { } battery)
+        {
+            <span class="@BatteryClass(battery)"
+                  role="img"
+                  aria-label="@battery.AccessibleName"
+                  data-charging="@(battery.Charging ? "true" : null)"
+                  data-low="@(battery.Low ? "true" : null)">
+                <MudIcon Icon="@BatteryIcon(battery)" Class="realm-battery-icon" />
+                <span class="realm-battery-text">@battery.Text</span>
+            </span>
+        }
+    </span>
+    <span class="realm-row-body">
+        <span class="realm-row-title">
+            <span class="realm-row-name">@Row.Name</span>
+            @if (Row.Lore is { } lore)
+            {
+                <span class="realm-row-lore">@lore</span>
+            }
+        </span>
+        <span class="realm-row-line realm-row-status">@Row.StatusLine</span>
+        <span class="@DetailClass">
+            @if (Row.DetailTone == LineTone.Warning)
+            {
+                <MudIcon Icon="@Icons.Material.Filled.Schedule" Class="realm-row-clock" />
+            }
+            <span class="realm-row-detail-text">@Row.DetailLine</span>
+        </span>
+    </span>
+    <MudIcon Icon="@Icons.Material.Filled.ChevronRight" Class="realm-row-chevron" />
+</button>
+
+@code {
+    /// <summary>The row to draw, from <c>VmFactory.Member</c>.</summary>
+    [Parameter, EditorRequired]
+    public MemberRowVm Row { get; set; } = default!;
+
+    /// <summary>The row is the selected one (<c>aria-current</c>, the surface colour). Under D45 only for the collapse after a tap.</summary>
+    [Parameter]
+    public bool Selected { get; set; }
+
+    /// <summary>The row was tapped. The selection itself belongs to the page (S8).</summary>
+    [Parameter]
+    public EventCallback OnClick { get; set; }
+
+    private string AriaLabel => Row.AccessibleName + " Double tap to show on map.";
+
+    private string? ColorStyle => Row.Color is { } color ? "--realm-row-color:" + color : null;
+
+    private string RowClass => "realm-row realm-row--member" + StatusClass(Row.Status) + (Selected ? " realm-row--selected" : string.Empty);
+
+    private string DetailClass => "realm-row-line realm-row-detail" + RowClasses.Tone(Row.DetailTone);
+
+    // Stale rows are drawn at 72 percent and offline rows at 60 (01 section 5.1).
+    private static string StatusClass(MemberStatus status) =>
+        status switch
+        {
+            MemberStatus.Stale => " realm-row--stale",
+            MemberStatus.Offline => " realm-row--offline",
+            _ => string.Empty,
+        };
+
+    private static string BatteryClass(BatteryBadgeVm battery) => battery.Low ? "realm-battery-pill realm-battery-pill--low" : "realm-battery-pill";
+
+    // Charging shows the bolt; low shows the alert; otherwise the full cell (01 section 7.7).
+    private static string BatteryIcon(BatteryBadgeVm battery) =>
+        battery.Charging ? Icons.Material.Filled.BatteryChargingFull
+        : battery.Low ? Icons.Material.Filled.BatteryAlert
+        : Icons.Material.Filled.BatteryFull;
+}

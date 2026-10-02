@@ -12,7 +12,7 @@ namespace Realm.Web.Tests;
 
 /// <summary>
 /// The pieces of the sheet that do not depend on MudX: the handle button (<see cref="SheetHandle"/>), the three-tab control (<see cref="SheetSegments"/>), the list
-/// body (<see cref="SheetContent"/>, built from the Demo cast) and the right button stack (<see cref="RightButtonStack"/>). They render in plain bUnit with the
+/// body (<see cref="SheetContent"/>: its frame here, its rows in <c>SheetContentTests</c>) and the right button stack (<see cref="RightButtonStack"/>). They render in plain bUnit with the
 /// canonical setup; what they look like on screen belongs to the Playwright specs.
 /// </summary>
 public sealed class SheetPartsTests : ComponentTestBase
@@ -203,38 +203,6 @@ public sealed class SheetPartsTests : ComponentTestBase
     }
 
     // ---- the list body, from the Demo cast -------------------------------------------------------------------------------------------------
-
-    [Fact]
-    public void Content_Drivers_ListsThePeopleInOrder_WithTheTestIdsOfAppendixB()
-    {
-        var cut = Content(Section.Drivers);
-
-        var rows = cut.FindAll("[data-testid='sheet-list'] li");
-        Assert.Equal(Demo.Members.Select(member => $"row-member-{member.Id}"), rows.Select(row => row.GetAttribute("data-testid")));
-        Assert.Equal(Demo.Members.Select(member => member.DisplayName), rows.Select(row => row.TextContent));
-        Assert.Equal(5, rows.Count);
-    }
-
-    [Fact]
-    public void Content_Vehicles_ListsTheVehicles()
-    {
-        var cut = Content(Section.Vehicles);
-
-        var rows = cut.FindAll("[data-testid='sheet-list'] li");
-        Assert.Equal(Demo.Vehicles.Select(vehicle => $"row-vehicle-{vehicle.Id}"), rows.Select(row => row.GetAttribute("data-testid")));
-        Assert.Equal(Demo.Vehicles.Select(vehicle => vehicle.Name), rows.Select(row => row.TextContent));
-        Assert.Equal(2, rows.Count);
-    }
-
-    [Fact]
-    public void Content_Places_ListsThePlaces()
-    {
-        var cut = Content(Section.Places);
-
-        var rows = cut.FindAll("[data-testid='sheet-list'] li");
-        Assert.Equal(Demo.Places.Select(place => $"row-place-{place.Id}"), rows.Select(row => row.GetAttribute("data-testid")));
-        Assert.Equal(14, rows.Count);
-    }
 
     [Theory]
     [InlineData(Section.Drivers, "realm-tab-drivers")]
