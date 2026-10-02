@@ -5,7 +5,16 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="../Realm.Domain/Realm.Domain.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 02 section 7.1, R-070: the schema scripts are embedded under a stable logical name ("Sql/0001_init.sql"), whatever the root namespace or folder is. -->
+    <EmbeddedResource Include="Data/Sql/*.sql" LogicalName="Sql/%(Filename)%(Extension)" />
   </ItemGroup>
 
 </Project>
