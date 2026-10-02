@@ -1,0 +1,6 @@
+PASS styles satellite (built in JavaScript, with the overlay)
+FAIL styles demo-offline: base style: layers[2].paint.line-width: number expected, string found
+FAIL styles demo-offline: with overlay: layers[2].paint.line-width: number expected, string found
+WARN styles night: https://tiles.openfreemap.org/styles/dark answered 403
+WARN styles day: https://tiles.openfreemap.org/styles/positron answered 403
+WARN styles streets: https://tiles.openfreemap.org/styles/liberty answered 403

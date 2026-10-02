@@ -1,6 +1,7 @@
 // Tests for tests/contract/payloadShape.mjs: the checker for the 03 section 4.5 payloads, on hand-written JSON (the demo cast is
 // fictional, 02 section 9.3). When tests/contract/payloads/ exists (the `e2e` job downloads the folder that PayloadContractTests
-// writes, S5b and S6a) every golden file in it must also pass; in the sandbox the folder is absent and that test is skipped.
+// writes, S5b and S6a) every golden file in it must also pass. Without golden files the golden test is skipped on a developer machine (no .NET
+// here) and FAILS in CI (CI=true or GITHUB_ACTIONS=true): a lost dotnet artifact must not turn the contract step green (R1-16).
 //
 //   node --test "tests/contract/**/*.test.mjs"
 import assert from 'node:assert/strict';
@@ -277,14 +278,26 @@ test('command line: PASS and FAIL lines, exit codes', () => {
 
 const GOLDEN = path.join(import.meta.dirname, 'payloads');
 const golden = fs.existsSync(GOLDEN) ? fs.readdirSync(GOLDEN).filter((name) => name.endsWith('.json')).sort() : [];
+// GitHub Actions sets both; the check is strict on purpose (a value such as 1 counts), so a CI that sets either can never skip.
+const inCi = ['CI', 'GITHUB_ACTIONS'].some((name) => /^(true|1)$/i.test(process.env[name] ?? ''));
+const noGolden = golden.length === 0;
 
-test('golden payloads: every file of tests/contract/payloads matches its shape', { skip: golden.length === 0 && 'no tests/contract/payloads folder (it comes from the dotnet job artifact)' }, async (t) => {
-  for (const file of golden) {
-    await t.test(file, () => {
-      const shape = shapeNameForFile(file);
-      assert.ok(shape, `no payload shape matches the file name '${file}'; name golden files after the shape (members.json, zones.json, default-targets.json, ...)`);
-      const errors = checkShape(shape, JSON.parse(fs.readFileSync(path.join(GOLDEN, file), 'utf8')));
-      assert.deepEqual(errors, []);
-    });
-  }
-});
+const MISSING = 'no golden payload file in tests/contract/payloads (the folder is missing or holds no .json file)';
+const WHY_IT_MATTERS = 'PayloadContractTests writes the files, the dotnet job uploads the folder and the e2e job copies it next to this test; without them the contract between C# and the script would pass on nothing';
+
+// In CI a missing golden file is a failure with its cause; on a developer machine without .NET the test is skipped, saying so.
+test(
+  'golden payloads: every file of tests/contract/payloads matches its shape',
+  { skip: noGolden && !inCi && `${MISSING}: skipped here, but this fails in CI (CI=true); run the dotnet tests first to write them` },
+  async (t) => {
+    assert.ok(!noGolden, `${MISSING}. ${WHY_IT_MATTERS}. A lost or empty dotnet artifact fails the contract step, it is not skipped.`);
+    for (const file of golden) {
+      await t.test(file, () => {
+        const shape = shapeNameForFile(file);
+        assert.ok(shape, `no payload shape matches the file name '${file}'; name golden files after the shape (members.json, zones.json, default-targets.json, ...)`);
+        const errors = checkShape(shape, JSON.parse(fs.readFileSync(path.join(GOLDEN, file), 'utf8')));
+        assert.deepEqual(errors, []);
+      });
+    }
+  },
+);

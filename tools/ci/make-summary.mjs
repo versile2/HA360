@@ -6,7 +6,7 @@
 //
 // --in     folder holding the downloaded artifacts (one sub-folder per job); it is searched
 //          recursively for errors.log, restore.log, build.log, guards.log, smoke.json, *.trx, results.json (Playwright), js-tests.tap,
-//          tsc.log, contract.tap, app.log, and the PNGs under a folder named shots. May be missing or empty.
+//          tsc.log, styles.log, contract.tap, app.log, and the PNGs under a folder named shots. May be missing or empty.
 // --out    folder that receives the files above (default ci-out).
 // --needs  the JSON of the workflow's `needs` context: { "<job>": { "result": "success", ... } }.
 //          Without it the verdict comes from the logs alone.
@@ -44,7 +44,10 @@ export const MAX_JS_DETAIL_LINES = 40; // lines of the YAML block shown per fail
 export const MAX_JS_FAILURES = 50; // failing JS tests shown in SUMMARY.md (the rest are in js/js-tests.tap)
 export const MAX_TYPE_ERRORS = 50;
 export const TSC_TAIL_LINES = 20;
-export const JS_KEPT_BYTES = 400 * 1024; // js/js-tests.tap and js/tsc.log are published cut to their last 400 KB
+export const JS_KEPT_BYTES = 400 * 1024; // js/js-tests.tap, js/tsc.log and js/styles.log are published cut to their last 400 KB
+export const MAX_STYLE_FAILS = 40; // FAIL lines of styles.log shown in SUMMARY.md (the rest are in js/styles.log)
+export const MAX_STYLE_WARNINGS = 5; // WARN lines of styles.log shown in SUMMARY.md, "listed briefly"
+export const MAX_PARTIAL_LISTED = 20; // skipped tests listed under the AC matrix
 
 // ---------------------------------------------------------------------------------------------
 // Pure helpers (exported for tests/js/make-summary.test.mjs)
@@ -358,13 +361,13 @@ export function smokeSection(smoke) {
 }
 
 // ---------------------------------------------------------------------------------------------
-// The AC matrix (D68, 04 card S6a): AC-01..AC-50, each passed / failed / skipped / flaky / missing, from every test title that
+// The AC matrix (D68, 04 card S6a): AC-01..AC-50, each passed / partial / failed / skipped / flaky / missing, from every test title that
 // carries [AC-nn] (a suffix such as [AC-49a] counts for AC-49): the .trx files (dotnet), Playwright's results.json (e2e) and the node TAP
 // of the js job. Report-only until S15 (D50): it never changes the verdict.
 // ---------------------------------------------------------------------------------------------
 
 const AC_TOKEN_RE = /\[AC-(\d{2})([a-z]?)\]/g;
-const AC_STATUS_ORDER = ['failed', 'flaky', 'passed', 'skipped']; // when a criterion has several tests, the first status present wins
+export const AC_STATUSES = ['passed', 'partial', 'failed', 'skipped', 'flaky', 'missing'];
 const acLabel = (n) => `AC-${String(n).padStart(2, '0')}`;
 
 // "[AC-13a] [AC-16a] pins" -> [{ n: 13, part: '13a' }, { n: 16, part: '16a' }]; ids outside AC-01..AC-50 are not criteria and are ignored
@@ -540,36 +543,60 @@ export function parsePlaywright(text) {
   return { tests, errors };
 }
 
-// tests: [{ title, status, source }] -> one row per criterion: { n, id, status, found, parts }.
+// The status of a criterion from the statuses of its tests (R3-05). Precedence: failed > flaky > partial > passed.
+//  - a failed test fails the criterion, a flaky one makes it flaky, whatever else passed;
+//  - a test that was skipped, fixme'd, TODO or expected to fail (`test.fail`) proves nothing: next to a passing test it makes the criterion
+//    `partial` (never `passed`: one clause of it is not verified); with nothing passing beside it the criterion is `skipped`;
+//  - no test at all is `missing`.
+export function acStatus(statuses) {
+  if (statuses.has('failed')) return 'failed';
+  if (statuses.has('flaky')) return 'flaky';
+  if (statuses.has('skipped')) return statuses.has('passed') ? 'partial' : 'skipped';
+  if (statuses.has('passed')) return 'passed';
+  return 'missing';
+}
+
+// tests: [{ title, status, source }] -> one row per criterion: { n, id, status, found, parts, skipped }. `skipped` lists the skipped tests of the
+// criterion as "<source>: <title>" (each once, however many projects ran it), so a partial row can say what is not verified.
 export function buildAcMatrix(tests) {
-  const rows = Array.from({ length: AC_COUNT }, (_, i) => ({ n: i + 1, id: acLabel(i + 1), statuses: new Set(), sources: new Map(), parts: new Set() }));
+  const rows = Array.from({ length: AC_COUNT }, (_, i) => ({ n: i + 1, id: acLabel(i + 1), statuses: new Set(), sources: new Map(), parts: new Set(), skipped: new Set() }));
   for (const test of tests) {
     for (const { n, part } of acTokens(test.title)) {
       const row = rows[n - 1];
       row.statuses.add(test.status);
       row.sources.set(test.source, (row.sources.get(test.source) ?? 0) + 1);
       if (part.length > 2) row.parts.add(part);
+      if (test.status === 'skipped') row.skipped.add(`${test.source}: ${test.title}`);
     }
   }
   return rows.map((row) => ({
     n: row.n,
     id: row.id,
-    status: AC_STATUS_ORDER.find((status) => row.statuses.has(status)) ?? 'missing',
+    status: acStatus(row.statuses),
     found: [...row.sources].map(([source, count]) => `${source} ${count}`).join(', '),
     parts: [...row.parts].sort(),
+    skipped: [...row.skipped],
   }));
 }
 
 // The "## Acceptance criteria" section. Report-only: no verdict is derived from it.
 export function acSection(rows) {
-  const counts = Object.fromEntries(['passed', 'failed', 'skipped', 'flaky', 'missing'].map((status) => [status, rows.filter((row) => row.status === status).length]));
+  const counts = Object.fromEntries(AC_STATUSES.map((status) => [status, rows.filter((row) => row.status === status).length]));
   const lines = rows.map((row) => `| ${row.id} | ${row.status} | ${row.found === '' ? '—' : `${row.found}${row.parts.length > 0 ? ` (${row.parts.join(', ')})` : ''}`} |`);
-  return [
+  const parts = [
     '## Acceptance criteria',
-    'Report-only until S15 (D50): this table never changes the verdict. A criterion is read from the test titles that carry `[AC-nn]` (a suffix such as `[AC-49a]` counts for AC-49) in the .trx files (dotnet), Playwright\'s `e2e/results.json` (e2e) and the node TAP of the js job (node); one with no such test is missing. When it has several, failed beats flaky beats passed beats skipped.',
-    `${rows.length} criteria: ${counts.passed} passed, ${counts.failed} failed, ${counts.skipped} skipped, ${counts.flaky} flaky, ${counts.missing} missing.`,
+    'Report-only until S15 (D50): this table never changes the verdict. A criterion is read from the test titles that carry `[AC-nn]` (a suffix such as `[AC-49a]` counts for AC-49) in the .trx files (dotnet), Playwright\'s `e2e/results.json` (e2e) and the node TAP of the js job (node); one with no such test is missing. When it has several, failed beats flaky beats partial beats passed. `partial` means a test of the criterion passed and another was skipped, fixme\'d or expected to fail: part of the criterion is not verified, so it is never read as `passed`; when every test of it is skipped it is `skipped`.',
+    `${rows.length} criteria: ${counts.passed} passed, ${counts.partial} partial, ${counts.failed} failed, ${counts.skipped} skipped, ${counts.flaky} flaky, ${counts.missing} missing.`,
     ['| AC | status | found in |', '|---|---|---|', ...lines].join('\n'),
-  ].join('\n\n');
+  ];
+  // What is not verified, so a partial row is not a mystery: the skipped tests of the partial criteria, each criterion once.
+  const unverified = rows.filter((row) => row.status === 'partial').flatMap((row) => row.skipped.map((entry) => `- ${row.id}, skipped: ${tableCell(entry)}`));
+  if (unverified.length > 0) {
+    const shown = unverified.slice(0, MAX_PARTIAL_LISTED);
+    const more = unverified.length > shown.length ? `\n... and ${unverified.length - shown.length} more skipped tests of partial criteria` : '';
+    parts.push(`Skipped tests of the partial criteria (${unverified.length}):\n\n${shown.join('\n')}${more}`);
+  }
+  return parts.join('\n\n');
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -672,9 +699,10 @@ export function parseTsc(text, root) {
 
 // The sections for the js job and what makes the run fail. `tap` is parseTap's value for js-tests.tap (null: none was found), `tsc` the text of
 // tsc.log (null: none), `jobResult` the js job's result from --needs (or undefined). The js job result alone adds nothing to `problems` (the
-// "job js: ..." reason is written by the caller); a js job that failed with nothing to show for it is said in the section.
+// "job js: ..." reason is written by the caller); a js job that failed with nothing to show for it is said in the section, unless `stylesFailed`
+// (stylesReport found a FAIL line) explains it.
 // Returns { sections: [markdown], problems: [one-line reasons: empty when the js results are clean] }.
-export function jsReport({ tap, tsc, jobResult, root = '' }) {
+export function jsReport({ tap, tsc, jobResult, root = '', stylesFailed = false }) {
   const problems = [];
   const summary = [];
   const details = [];
@@ -730,10 +758,65 @@ export function jsReport({ tap, tsc, jobResult, root = '' }) {
       if (tsc !== null && tsc.trim() !== '') summary.push(`Last lines of tsc.log:\n\n${fenced(stripRootText(tailLines(tsc, TSC_TAIL_LINES).join('\n'), root))}`);
     }
   } else if (failedJob && problems.length === 0) {
-    summary.push(`The js job ${verb} but js-tests.tap has no failing test; ${seeTsc}.`);
+    summary.push(stylesFailed ? `The js job ${verb} on the map styles step: see the Map styles section.` : `The js job ${verb} but js-tests.tap has no failing test; ${seeTsc}.`);
   }
 
   return { sections: [['## JS', ...summary].join('\n\n'), ...details], problems };
+}
+
+// ---------------------------------------------------------------------------------------------
+// The js job's styles.log (tools/ci/validate-styles.mjs, R3-02): `PASS styles <id> (...)`, `WARN styles <id>: ...`, `FAIL styles <id>: ...`.
+// A FAIL is a spec error in a style we build or ship (our own satellite and demo-offline styles, or our overlay on a fetched one) and fails the
+// run, like the exit code of the script fails the js job (03 section 4.9). A WARN is a third-party style that was not fetched, was refused or has
+// its own problems: listed, never a failure.
+// ---------------------------------------------------------------------------------------------
+
+const STYLE_LINE_RE = /^(PASS|WARN|FAIL)\s+styles(?=\s|:|$)(?:\s+([^\s:]+))?(.*)$/;
+
+// -> { fails: [{ id, detail, line }], warns: [...], passes: [...], other: [line] }. `id` is null for a line without one (the script crashed);
+// `detail` is the text after "<id>:". `other` holds what is not a result line (a stack trace when the script crashed); blank lines are dropped.
+export function parseStylesLog(text) {
+  const parsed = { fails: [], warns: [], passes: [], other: [] };
+  for (const raw of splitLines(stripAnsi(text))) {
+    const line = raw.trimEnd();
+    if (line.trim() === '') continue;
+    const match = STYLE_LINE_RE.exec(line);
+    if (!match) {
+      parsed.other.push(line);
+      continue;
+    }
+    const entry = { id: match[2] ?? null, detail: match[3].replace(/^\s*:\s*/, '').trim(), line };
+    (match[1] === 'FAIL' ? parsed.fails : match[1] === 'WARN' ? parsed.warns : parsed.passes).push(entry);
+  }
+  return parsed;
+}
+
+// The "## Map styles" section and what makes the run fail. `log` is the text of styles.log (null: none was found).
+// Returns { sections: [markdown], problems: [one-line reasons: empty when no style we build or ship failed], failed: boolean }.
+export function stylesReport({ log }) {
+  if (log === null) return { sections: [], problems: [], failed: false };
+  const parsed = parseStylesLog(log);
+  const problems = [];
+  const parts = ['## Map styles'];
+  const hasResult = parsed.fails.length + parsed.warns.length + parsed.passes.length > 0;
+  if (parsed.fails.length > 0) {
+    const names = [...new Set(parsed.fails.map((fail) => fail.id ?? 'validate-styles'))];
+    problems.push(`map styles failed: ${names.join(', ')}`);
+    const shown = parsed.fails.slice(0, MAX_STYLE_FAILS).map((fail) => fail.line);
+    const more = parsed.fails.length > shown.length ? [`... and ${parsed.fails.length - shown.length} more FAIL lines (all of them are in js/styles.log)`] : [];
+    parts.push(`FAIL: ${parsed.fails.length} spec error${parsed.fails.length === 1 ? '' : 's'} in a style we build or ship (03 section 4.9: this breaks the build). Fix the style and push again.`, fenced([...shown, ...more].join('\n')));
+  } else if (!hasResult) {
+    problems.push('map styles: styles.log holds no result line (validate-styles.mjs stopped before it printed one)');
+    parts.push('FAIL: styles.log holds no `PASS`, `WARN` or `FAIL` line, so the styles were not validated: validate-styles.mjs stopped before it printed a result.');
+  }
+  if (parsed.other.length > 0 && (parsed.fails.length > 0 || !hasResult)) parts.push(`Other output of the script:\n\n${fenced(firstLines(parsed.other.join('\n'), MAX_OTHER_GUARD_LINES))}`);
+  if (parsed.warns.length > 0) {
+    const shown = parsed.warns.slice(0, MAX_STYLE_WARNINGS).map((warn) => warn.line);
+    const more = parsed.warns.length > shown.length ? [`... and ${parsed.warns.length - shown.length} more WARN lines`] : [];
+    parts.push(`WARN: ${parsed.warns.length} line${parsed.warns.length === 1 ? '' : 's'} about third-party styles (not fetched, refused, or a problem of the published style); a warning never fails the run.\n\n${fenced([...shown, ...more].join('\n'))}`);
+  }
+  if (parsed.passes.length > 0) parts.push(`PASS: ${parsed.passes.length} (${parsed.passes.map((pass) => pass.id ?? 'styles').join(', ')}).`);
+  return { sections: [parts.join('\n\n')], problems, failed: parsed.fails.length > 0 };
 }
 
 // Screenshots: the gallery (PNGs under a folder named shots, S6b) is copied to shots/<project>/<scene>.png, and the first MAX_FAILURE_SHOTS
@@ -829,6 +912,7 @@ export function collectInputs(inDir) {
     resultsJsons: named('results.json'),
     jsTaps: named('js-tests.tap'),
     tscLogs: named('tsc.log'),
+    stylesLogs: named('styles.log'),
     contractTaps: named('contract.tap'),
     appLogs: named('app.log'),
     pngs: files.filter((f) => f.toLowerCase().endsWith('.png')),
@@ -914,7 +998,8 @@ export function buildReport({ inDir, needsText, root, meta }) {
   const contract = inputs.contractTaps.length > 0 ? parseTap(inputs.contractTaps.map(readText).join('\n')) : null;
   const jsTap = inputs.jsTaps.length > 0 ? parseTap(inputs.jsTaps.map(readText).join('\n'), { detailLines: MAX_JS_DETAIL_LINES }) : null;
   const jsJob = needs.jobs.find((job) => job.name === JS_JOB);
-  const js = jsReport({ tap: jsTap, tsc: inputs.tscLogs.length > 0 ? inputs.tscLogs.map(readText).join('\n') : null, jobResult: jsJob?.result, root });
+  const styles = stylesReport({ log: inputs.stylesLogs.length > 0 ? inputs.stylesLogs.map(readText).join('\n') : null });
+  const js = jsReport({ tap: jsTap, tsc: inputs.tscLogs.length > 0 ? inputs.tscLogs.map(readText).join('\n') : null, jobResult: jsJob?.result, root, stylesFailed: styles.failed });
   const appLog = inputs.appLogs.length > 0 ? readText(inputs.appLogs[0]) : null;
   const e2e = e2eReport({ results: e2eResults, contract, appLog, jobResult: e2eJob?.result });
   const e2eMissing = e2eResults === null && e2eJob !== undefined && e2eJob.result === 'success';
@@ -943,6 +1028,7 @@ export function buildReport({ inDir, needsText, root, meta }) {
   if (trx.failed > 0) why.push(`${trx.failed} failed test(s)`);
   for (const mismatch of trxMismatches) why.push(mismatch);
   why.push(...js.problems);
+  why.push(...styles.problems);
   if (smoke !== null && smoke.problem !== null) why.push(smoke.problem);
   if (smokeMissing && smokeJob.result === 'success') why.push('job docker-smoke succeeded but left no smoke.json');
   why.push(...e2e.problems);
@@ -996,6 +1082,7 @@ export function buildReport({ inDir, needsText, root, meta }) {
   }
 
   sections.push(...js.sections);
+  sections.push(...styles.sections);
   sections.push(...e2e.sections);
   if (e2e.flaky.length > 0) {
     sections.push(`## Flaky tests (${e2e.flaky.length}, passed on retry)\n\nA flaky test is investigated at once; two flaky runs in three consecutive runs block the merge (04 section 1.6).\n\n${fenced(e2e.flaky.join('\n'))}`);
@@ -1029,8 +1116,8 @@ export function buildReport({ inDir, needsText, root, meta }) {
     sections.push(`## Notes\n\n${guardsWhy}. ${cause}${behind}`);
   }
 
-  // A js job that failed with failing JS tests or type errors is explained by the JS sections, which name them.
-  const failedJobs = needs.jobs.filter((job) => job.result !== 'success' && !explained(job) && !(job.name === JS_JOB && js.problems.length > 0));
+  // A js job that failed with failing JS tests, type errors or a style of ours that does not validate is explained by the sections that name them.
+  const failedJobs = needs.jobs.filter((job) => job.result !== 'success' && !explained(job) && !(job.name === JS_JOB && (js.problems.length > 0 || styles.problems.length > 0)));
   if (failedJobs.length > 0 && errors.length === 0 && trx.failed === 0 && trxMismatches.length === 0 && e2e.problems.length === 0) {
     const where = meta.url ? ` (${meta.url})` : '';
     sections.push(
@@ -1039,14 +1126,14 @@ export function buildReport({ inDir, needsText, root, meta }) {
   }
 
   // Small files the orchestrator reads over git, published beside SUMMARY.md (03 section 7.4): the Playwright JSON, the contract TAP, the app
-  // log, the js job's js-tests.tap and tsc.log under js/, the gallery under shots/ and the first screenshots of failing tests under failures/.
+  // log, the js job's js-tests.tap, tsc.log and styles.log under js/, the gallery under shots/ and the first screenshots of failing tests under failures/.
   const copies = [];
   const writes = [];
   if (inputs.resultsJsons.length > 0) copies.push({ from: inputs.resultsJsons[0], to: 'e2e/results.json' });
   if (inputs.contractTaps.length > 0) copies.push({ from: inputs.contractTaps[0], to: 'e2e/contract.tap' });
   if (appLog !== null) writes.push({ to: 'e2e/app.log', text: tailLines(appLog, APP_LOG_KEPT_LINES).join('\n') + '\n' });
   // A file over JS_KEPT_BYTES is published as its last part (the report above was read from the whole file).
-  for (const [files, to] of [[inputs.jsTaps, 'js/js-tests.tap'], [inputs.tscLogs, 'js/tsc.log']]) {
+  for (const [files, to] of [[inputs.jsTaps, 'js/js-tests.tap'], [inputs.tscLogs, 'js/tsc.log'], [inputs.stylesLogs, 'js/styles.log']]) {
     if (files.length === 0) continue;
     const kept = keepTail(files[0], JS_KEPT_BYTES);
     if (kept === null) copies.push({ from: files[0], to });

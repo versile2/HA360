@@ -7,6 +7,7 @@ import path from 'node:path';
 import { test } from 'node:test';
 
 import {
+  acStatus,
   acTokens,
   buildAcMatrix,
   crashReport,
@@ -18,6 +19,7 @@ import {
   parseGuardsLog,
   parsePlaywright,
   parseSmoke,
+  parseStylesLog,
   parseTap,
   parseTrx,
   parseTrxAcTests,
@@ -25,6 +27,7 @@ import {
   reportLine,
   screenshotCopies,
   smokeSection,
+  stylesReport,
 } from '../../tools/ci/make-summary.mjs';
 import { cleanEnv, fixture, repoRoot, tempDir, tools, writeFile } from './helpers/ci-harness.mjs';
 
@@ -680,7 +683,7 @@ test('helpers: parsePlaywright maps passed, failed, flaky and skipped, joins the
   assert.match(parsePlaywright('[]').unreadable, /no "suites"/);
 });
 
-test('helpers: buildAcMatrix gives every criterion one row; failed beats flaky beats passed beats skipped; a suffix counts for its criterion', () => {
+test('helpers: buildAcMatrix gives every criterion one row; failed beats flaky beats partial beats passed; a suffix counts for its criterion', () => {
   const rows = buildAcMatrix([
     { title: '[AC-01] a', status: 'passed', source: 'dotnet' },
     { title: '[AC-02] a', status: 'passed', source: 'dotnet' },
@@ -700,11 +703,13 @@ test('helpers: buildAcMatrix gives every criterion one row; failed beats flaky b
   assert.equal(status('AC-01'), 'passed');
   assert.equal(status('AC-02'), 'failed');
   assert.equal(status('AC-03'), 'flaky');
-  assert.equal(status('AC-04'), 'passed');
-  assert.equal(status('AC-05'), 'skipped');
+  assert.equal(status('AC-04'), 'partial', 'a passed test next to a skipped one is partial, not passed (R3-05)');
+  assert.equal(status('AC-05'), 'skipped', 'every test skipped: skipped');
   assert.equal(status('AC-06'), 'missing');
   assert.equal(status('AC-49'), 'passed');
   assert.equal(status('AC-50'), 'passed');
+  assert.deepEqual(rows.find((r) => r.id === 'AC-04').skipped, ['e2e: [AC-04] a'], 'the skipped test is named');
+  assert.deepEqual(rows.find((r) => r.id === 'AC-01').skipped, []);
   assert.equal(rows.find((r) => r.id === 'AC-02').found, 'dotnet 1, e2e 1');
   assert.deepEqual(rows.find((r) => r.id === 'AC-49').parts, ['49a', '49b']);
   assert.equal(rows.filter((r) => r.status === 'missing').length, 43);
@@ -736,7 +741,7 @@ test('AC matrix: 50 rows built from the .trx, results.json and the js TAP; repor
   const matrix = section(run.summary, 'Acceptance criteria');
   assert.ok(matrix, 'the section exists');
   assert.match(matrix, /Report-only until S15 \(D50\)/);
-  assert.match(matrix, /^50 criteria: 4 passed, 0 failed, 1 skipped, 1 flaky, 44 missing\.$/m);
+  assert.match(matrix, /^50 criteria: 4 passed, 0 partial, 0 failed, 1 skipped, 1 flaky, 44 missing\.$/m);
   const rows = acRows(run.summary);
   assert.equal(rows.size, 50, 'one row per criterion');
   assert.deepEqual([...rows.keys()].slice(0, 3), ['AC-01', 'AC-02', 'AC-03']);
@@ -759,13 +764,100 @@ test('AC matrix: a failed test turns its criterion red and nothing else; a run w
   assert.equal(rows.get('AC-07').status, 'failed');
   assert.equal(rows.get('AC-08').status, 'passed');
   assert.match(run.summary, /^- result: failure$/m, 'the failed test fails the run through the existing rule, not through the matrix');
-  assert.match(run.summary, /^50 criteria: 1 passed, 1 failed, 0 skipped, 0 flaky, 48 missing\.$/m);
+  assert.match(run.summary, /^50 criteria: 1 passed, 0 partial, 1 failed, 0 skipped, 0 flaky, 48 missing\.$/m);
 
   const none = summarize({ files: { 'dotnet/errors.log': '' }, needs: NEEDS_OK });
   assert.doesNotMatch(none.summary, /^## Acceptance criteria/m, 'no test source, no matrix');
   const noTests = summarize({ files: { 'dotnet/errors.log': '', 'dotnet/trx/r.trx': fixture('results.passed.trx') }, needs: NEEDS_OK });
   assert.equal(acRows(noTests.summary).size, 50, 'a .trx without tokens still gives the matrix, all missing');
-  assert.match(noTests.summary, /^50 criteria: 0 passed, 0 failed, 0 skipped, 0 flaky, 50 missing\.$/m);
+  assert.match(noTests.summary, /^50 criteria: 0 passed, 0 partial, 0 failed, 0 skipped, 0 flaky, 50 missing\.$/m);
+});
+
+test('helpers: acStatus precedence is failed > flaky > partial > passed, a lone skipped is skipped, nothing is missing', () => {
+  const status = (...list) => acStatus(new Set(list));
+  assert.equal(status('failed', 'flaky', 'skipped', 'passed'), 'failed');
+  assert.equal(status('flaky', 'skipped', 'passed'), 'flaky', 'flaky beats partial');
+  assert.equal(status('flaky', 'skipped'), 'flaky');
+  assert.equal(status('failed', 'skipped'), 'failed');
+  assert.equal(status('skipped', 'passed'), 'partial');
+  assert.equal(status('passed', 'skipped'), 'partial', 'the order of the tests does not matter');
+  assert.equal(status('skipped'), 'skipped');
+  assert.equal(status('passed'), 'passed');
+  assert.equal(status(), 'missing');
+});
+
+test('AC matrix: a passing test next to a skipped or fixme\'d one is partial, in the table, in the totals and with the skipped tests named; [X-13] is not a criterion', () => {
+  const run = summarize({
+    files: {
+      'dotnet/trx/r.trx': trxOf([
+        ['Realm.Web.Tests.Driving.[AC-32] gear', 'Passed'],
+        ['Realm.Web.Tests.Driving.[AC-32] settings opens', 'NotExecuted'],
+        ['Realm.Web.Tests.Shell.[AC-03] gear', 'Passed'],
+      ]),
+      'e2e/results.json': playwrightOf([
+        { title: '[AC-38] popup opens', status: 'expected' },
+        { title: '[AC-38] Back closes the popup', status: 'skipped' },
+        { title: '[AC-15] header of Dara', status: 'skipped' },
+        { title: '[AC-15] header of the King', status: 'expected' },
+        { title: '[AC-15] header of the King', status: 'expected', project: 'unfolded' },
+        { title: '[AC-20] flaky next to skipped', status: 'flaky' },
+        { title: '[AC-20] skipped', status: 'skipped' },
+        { title: '[AC-21] failed next to skipped', status: 'unexpected' },
+        { title: '[AC-21] skipped', status: 'skipped' },
+        { title: '[AC-22] only skipped', status: 'skipped' },
+        { title: '[X-13] the focus trap, a declared expected failure', status: 'expected', expectedStatus: 'failed', attempts: ['failed'] },
+      ]),
+    },
+    needs: e2eNeeds('success'),
+  });
+  assert.equal(run.status, 0, run.stderr);
+  const rows = acRows(run.summary);
+  assert.equal(rows.get('AC-32').status, 'partial');
+  assert.equal(rows.get('AC-38').status, 'partial');
+  assert.equal(rows.get('AC-15').status, 'partial');
+  assert.equal(rows.get('AC-03').status, 'passed', 'a criterion with no skipped test is still passed');
+  assert.equal(rows.get('AC-20').status, 'flaky');
+  assert.equal(rows.get('AC-21').status, 'failed');
+  assert.equal(rows.get('AC-22').status, 'skipped');
+  assert.deepEqual(rows.get('AC-38'), { status: 'partial', found: 'e2e 2' });
+  const matrix = section(run.summary, 'Acceptance criteria');
+  assert.match(matrix, /^50 criteria: 1 passed, 3 partial, 1 failed, 1 skipped, 1 flaky, 43 missing\.$/m);
+  assert.match(matrix, /failed beats flaky beats partial beats passed/);
+  assert.match(matrix, /`partial` means a test of the criterion passed and another was skipped, fixme'd or expected to fail/);
+  assert.doesNotMatch(matrix, /beats passed beats skipped/, 'the old precedence is gone from the explanation');
+  const listed = matrix.split('Skipped tests of the partial criteria (3):\n\n')[1];
+  assert.ok(listed, 'the skipped tests of the partial criteria are listed');
+  assert.deepEqual(listed.trimEnd().split('\n'), [
+    '- AC-15, skipped: e2e: demo group › [AC-15] header of Dara',
+    '- AC-32, skipped: dotnet: Realm.Web.Tests.Driving.[AC-32] settings opens',
+    '- AC-38, skipped: e2e: demo group › [AC-38] Back closes the popup',
+  ]);
+  assert.ok(!matrix.includes('X-13'), '[X-13] is not a criterion and does not appear');
+  assert.match(run.summary, /^- why: 1 failed E2E test\(s\)$/m, 'only the failed test fails the run (AC-21); the partial criteria add nothing to the verdict');
+});
+
+test('AC matrix: partial criteria alone do not fail the run (report-only until S15)', () => {
+  const run = summarize({
+    files: { 'e2e/results.json': playwrightOf([{ title: '[AC-38] opens', status: 'expected' }, { title: '[AC-38] Back closes', status: 'skipped' }]) },
+    needs: e2eNeeds('success'),
+  });
+  assert.match(run.summary, /^- result: success$/m);
+  assert.equal(acRows(run.summary).get('AC-38').status, 'partial');
+  assert.match(run.summary, /^50 criteria: 0 passed, 1 partial, 0 failed, 0 skipped, 0 flaky, 49 missing\.$/m);
+});
+
+test('AC matrix: [X-13] (test.fail by design) is not an AC id, so it changes no row; a Playwright test.fail with an AC id would read as skipped', () => {
+  const noAc = summarize({
+    files: { 'e2e/results.json': playwrightOf([{ title: '[AC-01] fine', status: 'expected' }, { title: '[X-13] the focus trap', status: 'expected', expectedStatus: 'failed', attempts: ['failed'] }]) },
+    needs: e2eNeeds('success'),
+  });
+  assert.match(noAc.summary, /^50 criteria: 1 passed, 0 partial, 0 failed, 0 skipped, 0 flaky, 49 missing\.$/m);
+  assert.equal(section(noAc.summary, 'Acceptance criteria').includes('Skipped tests of the partial criteria'), false);
+  const withAc = buildAcMatrix([
+    { title: '[AC-01] a', status: 'passed', source: 'e2e' },
+    { title: '[AC-01] b (test.fail)', status: 'skipped', source: 'e2e' },
+  ]);
+  assert.equal(withAc[0].status, 'partial');
 });
 
 test('AC matrix: the grouped ac-coverage guards line is kept as it was', () => {
@@ -1219,4 +1311,147 @@ test('helpers: keepTail returns null for a file that fits and never cuts a chara
     assert.ok(!kept.includes('�'), `limit ${limit}: no broken character`);
     assert.ok(Buffer.byteLength(kept) <= limit, `limit ${limit}: ${Buffer.byteLength(kept)} bytes`);
   }
+});
+
+// ---------------------------------------------------------------------------------------------
+// FX5 (R3-02): styles.log of the js job in SUMMARY.md
+// ---------------------------------------------------------------------------------------------
+
+test('helpers: parseStylesLog reads PASS, WARN and FAIL lines with their style id, and keeps a crash trace apart', () => {
+  const parsed = parseStylesLog(fixture('styles.failed.log'));
+  assert.deepEqual(parsed.fails.map((f) => [f.id, f.detail]), [
+    ['demo-offline', 'base style: layers[2].paint.line-width: number expected, string found'],
+    ['demo-offline', 'with overlay: layers[2].paint.line-width: number expected, string found'],
+  ]);
+  assert.deepEqual(parsed.warns.map((w) => w.id), ['night', 'day', 'streets']);
+  assert.equal(parsed.warns[0].detail, 'https://tiles.openfreemap.org/styles/dark answered 403');
+  assert.deepEqual(parsed.passes.map((p) => p.id), ['satellite']);
+  assert.deepEqual(parsed.other, []);
+
+  const crash = parseStylesLog('FAIL styles: validate-styles.mjs crashed: boom\nError: boom\n    at file:///w/tools/ci/validate-styles.mjs:95:32\n\n\u001b[31mPASS styles x\u001b[39m\n');
+  assert.deepEqual(crash.fails.map((f) => [f.id, f.detail]), [[null, 'validate-styles.mjs crashed: boom']]);
+  assert.deepEqual(crash.other, ['Error: boom', '    at file:///w/tools/ci/validate-styles.mjs:95:32']);
+  assert.deepEqual(crash.passes.map((p) => p.id), ['x'], 'colour codes are removed');
+  assert.deepEqual(parseStylesLog('PASS stylesheet ok\nFAILED styles x').other.length, 2, 'only "styles" as a whole word is a result line');
+  assert.deepEqual(parseStylesLog('PASS styles openfreemap (skipped: --offline)').passes.map((p) => [p.id, p.detail]), [['openfreemap', '(skipped: --offline)']]);
+});
+
+test('helpers: stylesReport has nothing to say without a styles.log, lists WARN lines briefly and fails only on FAIL', () => {
+  assert.deepEqual(stylesReport({ log: null }), { sections: [], problems: [], failed: false });
+
+  const warned = stylesReport({ log: fixture('styles.warned.log') });
+  assert.deepEqual(warned.problems, []);
+  assert.equal(warned.failed, false);
+  assert.match(warned.sections[0], /^## Map styles\n\nWARN: 3 lines about third-party styles .* a warning never fails the run\.\n\n```text\nWARN styles night: https:\/\/tiles\.openfreemap\.org\/styles\/dark answered 403\nWARN styles day: /);
+  assert.match(warned.sections[0], /\n\nPASS: 2 \(satellite, demo-offline\)\.$/);
+  assert.doesNotMatch(warned.sections[0], /FAIL/);
+
+  const failed = stylesReport({ log: fixture('styles.failed.log') });
+  assert.deepEqual(failed.problems, ['map styles failed: demo-offline'], 'one reason, the style named once');
+  assert.equal(failed.failed, true);
+  assert.match(failed.sections[0], /^## Map styles\n\nFAIL: 2 spec errors in a style we build or ship \(03 section 4\.9: this breaks the build\)\. Fix the style and push again\.\n\n```text\nFAIL styles demo-offline: base style: layers\[2\]\.paint\.line-width: number expected, string found\nFAIL styles demo-offline: with overlay: /);
+  assert.match(failed.sections[0], /\n\nWARN: 3 lines about third-party styles/, 'the warnings stay visible next to a failure');
+
+  const two = stylesReport({ log: 'FAIL styles satellite: a\nFAIL styles demo-offline: b\nFAIL styles satellite: c\n' });
+  assert.deepEqual(two.problems, ['map styles failed: satellite, demo-offline']);
+  assert.match(two.sections[0], /FAIL: 3 spec errors in a style/);
+});
+
+test('helpers: stylesReport cuts long lists (5 WARN lines, 40 FAIL lines) but counts all of them, and a log without a result line is a failure', () => {
+  const warns = Array.from({ length: 8 }, (_, i) => `WARN styles night: published style: layers[${i}]: odd`).join('\n');
+  const many = stylesReport({ log: `PASS styles satellite (x)\n${warns}\n` });
+  assert.match(many.sections[0], /WARN: 8 lines about third-party styles/);
+  assert.equal(many.sections[0].split('\n').filter((l) => l.startsWith('WARN styles night')).length, 5);
+  assert.match(many.sections[0], /\n\.\.\. and 3 more WARN lines\n```/);
+  assert.deepEqual(many.problems, []);
+
+  const fails = Array.from({ length: 45 }, (_, i) => `FAIL styles satellite: layers[${i}]: bad`).join('\n');
+  const lots = stylesReport({ log: fails });
+  assert.match(lots.sections[0], /FAIL: 45 spec errors/);
+  assert.equal(lots.sections[0].split('\n').filter((l) => l.startsWith('FAIL styles satellite')).length, 40);
+  assert.match(lots.sections[0], /\n\.\.\. and 5 more FAIL lines \(all of them are in js\/styles\.log\)\n```/);
+
+  for (const log of ['', '\n\n', 'node:internal/modules/esm/resolve:275\n    throw new ERR_MODULE_NOT_FOUND\n']) {
+    const none = stylesReport({ log });
+    assert.deepEqual(none.problems, ['map styles: styles.log holds no result line (validate-styles.mjs stopped before it printed one)'], JSON.stringify(log));
+    assert.match(none.sections[0], /^FAIL: styles\.log holds no `PASS`, `WARN` or `FAIL` line, so the styles were not validated/m);
+  }
+  assert.match(stylesReport({ log: 'node:internal/modules/esm/resolve:275\n    throw new ERR_MODULE_NOT_FOUND\n' }).sections[0], /Other output of the script:\n\n```text\nnode:internal\/modules\/esm\/resolve:275\n {4}throw new ERR_MODULE_NOT_FOUND\n```/);
+});
+
+test('styles: a FAIL line fails the run, is named in the why line and in "## Map styles", and the failed js job is explained by it', () => {
+  const run = summarize({
+    files: { 'js/js-tests.tap': PASSING_TAP, 'js/tsc.log': TSC_CLEAN, 'js/styles.log': fixture('styles.failed.log') },
+    needs: jsNeeds('failure'),
+  });
+  assert.equal(run.status, 0, run.stderr);
+  assert.match(run.summary, /^- result: failure$/m);
+  assert.match(run.summary, /^- why: job js: failure; map styles failed: demo-offline$/m);
+  const styles = section(run.summary, 'Map styles');
+  assert.ok(styles, 'the section exists');
+  assert.match(styles, /^FAIL: 2 spec errors in a style we build or ship/m);
+  assert.match(styles, /^FAIL styles demo-offline: base style: layers\[2\]\.paint\.line-width: number expected, string found$/m);
+  assert.match(styles, /^WARN styles night: https:\/\/tiles\.openfreemap\.org\/styles\/dark answered 403$/m);
+  assert.match(section(run.summary, 'JS'), /^The js job failed on the map styles step: see the Map styles section\.$/m);
+  assert.doesNotMatch(run.summary, /^The js job failed but js-tests\.tap has no failing test/m, 'the styles explain the failed job');
+  assert.doesNotMatch(run.summary, /Job js did not succeed, yet no compiler error/, 'the generic note is for jobs nothing explains');
+  const at = (heading) => run.summary.indexOf(`\n## ${heading}`);
+  assert.ok(at('JS') > 0 && at('JS') < at('Map styles'), 'Map styles follows the JS section');
+  assert.equal(fs.readFileSync(path.join(run.outDir, 'js', 'styles.log'), 'utf8'), fixture('styles.failed.log'), 'styles.log is published beside the other js files');
+});
+
+test('styles: WARN lines alone (a third-party fetch that failed) are listed and never fail the run', () => {
+  const run = summarize({
+    files: { 'js/js-tests.tap': PASSING_TAP, 'js/tsc.log': TSC_CLEAN, 'js/styles.log': fixture('styles.warned.log') },
+    needs: jsNeeds('success'),
+  });
+  assert.match(run.summary, /^- result: success$/m);
+  assert.doesNotMatch(run.summary, /^- why:/m);
+  const styles = section(run.summary, 'Map styles');
+  assert.match(styles, /^WARN: 3 lines about third-party styles/m);
+  assert.match(styles, /^WARN styles streets: https:\/\/tiles\.openfreemap\.org\/styles\/liberty answered 403$/m);
+  assert.match(styles, /^PASS: 2 \(satellite, demo-offline\)\.$/m);
+  assert.doesNotMatch(styles, /FAIL/);
+  assert.ok(fs.existsSync(path.join(run.outDir, 'js', 'styles.log')));
+});
+
+test('styles: without --needs a FAIL line still fails the run; a crash or an empty styles.log is a failure with the output shown; no styles.log, no section', () => {
+  const failed = summarize({ files: { 'js/styles.log': fixture('styles.failed.log') } });
+  assert.match(failed.summary, /^- result: failure$/m);
+  assert.match(failed.summary, /^- why: map styles failed: demo-offline$/m);
+
+  const crash = summarize({ files: { 'js/styles.log': 'FAIL styles: validate-styles.mjs crashed: boom\nError: boom\n    at file:///w/validate-styles.mjs:95:32\n' }, needs: jsNeeds('failure') });
+  assert.match(crash.summary, /^- why: job js: failure; map styles failed: validate-styles$/m);
+  assert.match(section(crash.summary, 'Map styles'), /Other output of the script:\n\n```text\nError: boom\n {4}at file:\/\/\/w\/validate-styles\.mjs:95:32\n```/);
+
+  const empty = summarize({ files: { 'js/styles.log': '' }, needs: jsNeeds('failure') });
+  assert.match(empty.summary, /^- why: job js: failure; map styles: styles\.log holds no result line/m);
+
+  const absent = summarize({ files: { 'js/js-tests.tap': PASSING_TAP, 'js/tsc.log': TSC_CLEAN }, needs: jsNeeds('success') });
+  assert.equal(section(absent.summary, 'Map styles'), null);
+  assert.match(absent.summary, /^- result: success$/m);
+});
+
+test('styles: what validate-styles.mjs really prints is understood (a spec error of ours fails the run, a refused fetch only warns)', async () => {
+  const { buildStyle } = await import('../../src/Realm.Web/wwwroot/js/mapStyles.js');
+  const { main: validateStyles } = await import('../../tools/ci/validate-styles.mjs');
+  const refused = async () => new Response('', { status: 403 });
+  const broken = (id, options) => {
+    const style = buildStyle(id, options);
+    if (id === 'satellite') style.layers[0].type = 'nonsense';
+    return style;
+  };
+  const clean = [];
+  assert.equal(await validateStyles([], (line) => clean.push(line), { fetchImpl: refused }), 0);
+  const bad = [];
+  assert.equal(await validateStyles([], (line) => bad.push(line), { built: { build: broken }, fetchImpl: refused }), 1);
+
+  const ok = stylesReport({ log: clean.join('\n') });
+  assert.deepEqual(ok.problems, []);
+  assert.equal(parseStylesLog(clean.join('\n')).warns.length, 3);
+  const ko = stylesReport({ log: bad.join('\n') });
+  assert.equal(ko.failed, true);
+  assert.deepEqual(ko.problems, ['map styles failed: satellite']);
+  assert.equal(parseStylesLog(bad.join('\n')).fails.length, bad.filter((line) => line.startsWith('FAIL ')).length, 'every FAIL line the script prints is read');
+  assert.equal(parseStylesLog(bad.join('\n')).other.length, 0, 'and nothing it prints is left unread');
 });
