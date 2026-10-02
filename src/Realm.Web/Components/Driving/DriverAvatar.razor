@@ -1,0 +1,56 @@
+@* A member's avatar (01 section 7.5): the photo from the app's avatar proxy, or, with no photo or when it fails to load, the first letter of the display name on the
+   member colour. Decorative (alt is empty): the name is always next to it, in the card or in the accessible name of the control that holds it. The colour is
+   data from the member view model, handed to the stylesheet as a custom property, so no colour literal lives here. *@
+<span class="realm-avatar @(Ring ? "realm-avatar--ring" : null)"
+      style="--realm-avatar-size:@(Diameter.ToString(CultureInfo.InvariantCulture))px;@ColorStyle"
+      aria-hidden="true">
+    @if (ShowPhoto)
+    {
+        <img src="@AvatarUrl" alt="" @onerror="OnPhotoError" />
+    }
+    else
+    {
+        <span class="realm-avatar__initial">@DrivingFormatter.Initial(Name)</span>
+    }
+</span>
+
+@code {
+    private bool _photoFailed;
+    private string? _photoOf;
+
+    /// <summary>The display name; its first letter is the fallback.</summary>
+    [Parameter]
+    public string? Name { get; set; }
+
+    /// <summary>The member colour (<c>MemberVm.Color</c>), used for the fallback background and the ring; null falls back to the plum surface.</summary>
+    [Parameter]
+    public string? MemberColor { get; set; }
+
+    /// <summary>The photo URL from the avatar proxy (<c>MemberVm.AvatarUrl</c>); null in Demo, which draws initials.</summary>
+    [Parameter]
+    public string? AvatarUrl { get; set; }
+
+    /// <summary>The diameter in px: 56 on a driver card, 40 on the Top Speed card and in the popup bars.</summary>
+    [Parameter]
+    public int Diameter { get; set; } = 40;
+
+    /// <summary>A 3 px ring in the member colour (the driver card).</summary>
+    [Parameter]
+    public bool Ring { get; set; }
+
+    private bool ShowPhoto => !string.IsNullOrEmpty(AvatarUrl) && !_photoFailed;
+
+    private string ColorStyle => string.IsNullOrWhiteSpace(MemberColor) ? string.Empty : "--realm-member-color:" + MemberColor + ";";
+
+    // A new photo URL gets a fresh chance; a failed one stays on initials until then.
+    protected override void OnParametersSet()
+    {
+        if (!string.Equals(_photoOf, AvatarUrl, StringComparison.Ordinal))
+        {
+            _photoOf = AvatarUrl;
+            _photoFailed = false;
+        }
+    }
+
+    private void OnPhotoError() => _photoFailed = true;
+}

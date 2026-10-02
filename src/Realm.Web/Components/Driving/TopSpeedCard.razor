@@ -1,0 +1,50 @@
+@* The Top Speed card (01 section 6.4): the driver who set the week's top speed (ties go to the earlier time, the data layer's call) and the speed in mph. A button that
+   opens the popup (S11b). With no speed the avatar becomes a Speed glyph, the value is "—" and the info icon and tooltip say why, as on an unavailable chip. *@
+<MudTooltip Text="@(Known ? null : StatNameFormatter.UnavailableTooltip)" Placement="Placement.Bottom" Inline="false" RootClass="realm-card-root">
+    <button type="button"
+            class="realm-card realm-card--topspeed"
+            data-testid="card-topspeed"
+            aria-label="@DrivingFormatter.TopSpeedAccessibleName(TopSpeed, Driver?.DisplayName)"
+            @onclick="OpenAsync">
+        @if (Known)
+        {
+            <DriverAvatar Name="@(Driver?.DisplayName ?? TopSpeed?.MemberId)" MemberColor="@Driver?.Color" AvatarUrl="@Driver?.AvatarUrl" Diameter="40" />
+        }
+        else
+        {
+            <span class="realm-card__glyph" aria-hidden="true">
+                <MudIcon Icon="@Icons.Material.Filled.Speed" />
+            </span>
+        }
+        <span class="realm-card__text">
+            <span class="realm-card__label">@StatNameFormatter.Label(StatNameFormatter.TopSpeedKey)</span>
+            <span class="realm-card__value">
+                <span class="realm-card__number">@DrivingFormatter.TopSpeedValue(TopSpeed)</span>
+                @if (!Known)
+                {
+                    <span class="realm-stat-chip__info" aria-hidden="true">
+                        <MudIcon Icon="@Icons.Material.Outlined.Info" />
+                    </span>
+                }
+            </span>
+        </span>
+    </button>
+</MudTooltip>
+
+@code {
+    /// <summary>The week's top speed; null when no driver has a speed that week.</summary>
+    [Parameter]
+    public TopSpeedStat? TopSpeed { get; set; }
+
+    /// <summary>The member who set it (for the avatar and the name); null when unknown. The page looks it up by <see cref="TopSpeedStat.MemberId"/>.</summary>
+    [Parameter]
+    public MemberVm? Driver { get; set; }
+
+    /// <summary>The card was activated: the page opens the Top Speed popup (S11b).</summary>
+    [Parameter]
+    public EventCallback OnOpen { get; set; }
+
+    private bool Known => TopSpeed is not null;
+
+    private Task OpenAsync() => OnOpen.InvokeAsync();
+}

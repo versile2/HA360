@@ -1,0 +1,105 @@
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
+
+@* The four week chips (01 section 6.2; 03 section 3.4): This week, Last week, then the two earlier weeks as date ranges. One radio group, so one tab stop (the selected
+   chip) and the arrow keys move the selection, as in SheetSegments. The row scrolls sideways with scroll snap, and the selected chip is scrolled into view after the
+   render that selected it. The component only reports a choice; the page owns the selection (it is the ?week= query, D69). *@
+<div class="realm-week-chips" role="radiogroup" aria-label="Week" data-testid="week-chips">
+    @foreach (var week in Weeks)
+    {
+        var selected = week.Offset == Selected;
+        <button @key="week.Offset"
+                @ref="_chips[week.Offset]"
+                type="button"
+                role="radio"
+                class="realm-week-chip"
+                data-testid="@("week-chip-" + week.Offset.ToString(CultureInfo.InvariantCulture))"
+                aria-checked="@(selected ? "true" : "false")"
+                aria-label="@DrivingFormatter.ChipAccessibleName(week)"
+                tabindex="@(selected ? 0 : -1)"
+                @onclick="() => SelectAsync(week.Offset)"
+                @onkeydown="args => KeyDownAsync(args, week.Offset)">@DrivingFormatter.ChipLabel(week)</button>
+    }
+</div>
+
+@code {
+    private readonly ElementReference[] _chips = new ElementReference[WeekMath.ChipCount];
+    private int _scrolledTo = -1;
+
+    /// <summary>The four chips, this week first (<c>WeekMath.Chips</c>).</summary>
+    [Parameter]
+    public IReadOnlyList<WeekRef> Weeks { get; set; } = [];
+
+    /// <summary>The selected offset, 0 to 3.</summary>
+    [Parameter]
+    public int Selected { get; set; }
+
+    /// <summary>A chip was chosen, by tap or by the arrow keys.</summary>
+    [Parameter]
+    public EventCallback<int> SelectedChanged { get; set; }
+
+    private Task SelectAsync(int offset) => SelectedChanged.InvokeAsync(offset);
+
+    // Left and Right move to the neighbour (wrapping), Home and End to the ends. Focus moves with the key press itself: the selection is the ?week= query, which only
+    // arrives with the navigation that follows, so waiting for the next render would focus the chip that was selected before.
+    private async Task KeyDownAsync(KeyboardEventArgs args, int from)
+    {
+        var count = Math.Min(Weeks.Count, _chips.Length);
+        if (count == 0)
+        {
+            return;
+        }
+
+        var target = args.Key switch
+        {
+            "ArrowRight" or "ArrowDown" => (from + 1) % count,
+            "ArrowLeft" or "ArrowUp" => (from + count - 1) % count,
+            "Home" => 0,
+            "End" => count - 1,
+            _ => -1,
+        };
+        if (target < 0)
+        {
+            return;
+        }
+
+        await FocusAsync(target);
+        await SelectedChanged.InvokeAsync(target);
+    }
+
+    private async Task FocusAsync(int offset)
+    {
+        try
+        {
+            await _chips[offset].FocusAsync();
+        }
+        catch (Exception exception) when (exception is JSException or JSDisconnectedException or InvalidOperationException or TaskCanceledException)
+        {
+            // A circuit that is gone: the selection below is still reported.
+        }
+    }
+
+    // Interop is allowed only after the first render (prerendering has no browser). Element.prototype.scrollIntoView.call(element, options) is the browser's own
+    // function reached through the JS runtime, so no script file is needed; the row scrolls, the page does not ("nearest" on the block axis).
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (Selected < 0 || Selected >= _chips.Length)
+        {
+            return;
+        }
+
+        try
+        {
+            if (_scrolledTo != Selected)
+            {
+                _scrolledTo = Selected;
+                await JS.InvokeVoidAsync("Element.prototype.scrollIntoView.call", _chips[Selected], new { block = "nearest", inline = "center" });
+            }
+        }
+        catch (Exception exception) when (exception is JSException or JSDisconnectedException or InvalidOperationException or TaskCanceledException)
+        {
+            // A chip that is already in view, a circuit that is gone or a browser without the function: the selection is right either way.
+        }
+    }
+}

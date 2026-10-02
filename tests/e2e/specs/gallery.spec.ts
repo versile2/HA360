@@ -157,3 +157,35 @@ test.describe('[GAL] screenshot gallery', () => {
     expectViewportPng(file, page, testInfo.project.name);
   });
 });
+
+// ---- S11a: SC10-driving (03 section 8.5: `/driving`, This week) ---------------------------------------------------------------------------------
+// Self-contained: its own describe block and its own PNG check, so the block merges next to the scenes of the other slices without touching them. The Driving page
+// has no map and so no `window.__realm`: demo() does not wait for hooks on a path other than Location, and the scene waits for what it shows instead (the chips of the
+// report), then saveShot() takes the shot after the fonts are ready. The checklist for the reader (03 section 8.5): Cinzel H1, the chip grid, the arrow colours.
+const drivingPngSize = (file: string): { width: number; height: number } | null => {
+  const head = fs.readFileSync(file).subarray(0, 24);
+  const signature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  if (head.length < 24 || !head.subarray(0, 8).equals(signature)) return null;
+  return { width: head.readUInt32BE(16), height: head.readUInt32BE(20) };
+};
+
+test.describe('[GAL] screenshot gallery: Driving', () => {
+  test('[GAL] SC10-driving', { tag: ['@phone', '@unfolded'] }, async ({ page }, testInfo) => {
+    await demo(page, { path: 'driving' });
+
+    // The scene is in the state it is named for: This week, the report loaded (the four chips and the two cards of the default fixture), and nothing mid-load.
+    await expect(page.getByRole('heading', { level: 1 }), 'the title').toHaveText('Weekly Driving Report');
+    await expect(page.getByTestId('week-chip-0'), 'This week is selected').toHaveAttribute('aria-checked', 'true');
+    await expect(page.getByTestId('stat-speeding'), 'the Speeding chip of the default fixture').toHaveText(/^\s*56\s*Speeding\s*$/);
+    await expect(page.getByTestId('card-topspeed'), 'the Top Speed card').toContainText('96 mph');
+    await expect(page.locator('[data-testid^="driver-card-"]'), 'the four driver cards').toHaveCount(4);
+    await expect(page.getByText('Sep 28 – Oct 4 · so far', { exact: true }), 'the range line at the frozen clock').toBeVisible();
+
+    const file = await saveShot(page, testInfo, 'SC10-driving');
+
+    // The file exists, is a PNG and has the viewport's size (one device pixel per CSS pixel).
+    const viewport = page.viewportSize();
+    expect(viewport, `the ${testInfo.project.name} project has a viewport`).not.toBeNull();
+    expect(drivingPngSize(file), `${file} is a PNG of the viewport's size`).toEqual(viewport);
+  });
+});

@@ -1,0 +1,33 @@
+@* The Drives card (01 section 6.4): two rows, "Drives" with the total drive count and "Total mi" with the total distance in whole miles (the exact metres are summed
+   first and rounded once, so the card and the popup agree). A button that opens the popup (S11b). With no totals (a week nobody was recorded in) both values read "—",
+   never 0: nothing was counted, which is not the same as no drives. *@
+<MudTooltip Text="@(Known ? null : StatNameFormatter.UnavailableTooltip)" Placement="Placement.Bottom" Inline="false" RootClass="realm-card-root">
+    <button type="button"
+            class="realm-card realm-card--drives"
+            data-testid="card-drives"
+            aria-label="@DrivingFormatter.DrivesAccessibleName(Totals)"
+            @onclick="OpenAsync">
+        <span class="realm-card__row">
+            <span class="realm-card__label">@StatNameFormatter.Label(StatNameFormatter.DrivesKey)</span>
+            <span class="realm-card__number">@(Totals is { } totals ? DrivingFormatter.Count(totals.Drives) : DrivingFormatter.Dash)</span>
+        </span>
+        <span class="realm-card__row">
+            <span class="realm-card__label">Total mi</span>
+            <span class="realm-card__number">@(Totals is { } sum ? DrivingFormatter.TotalMiles(sum.Meters) : DrivingFormatter.Dash)</span>
+        </span>
+    </button>
+</MudTooltip>
+
+@code {
+    /// <summary>The week's totals; null when the week was not recorded.</summary>
+    [Parameter]
+    public WeekTotals? Totals { get; set; }
+
+    /// <summary>The card was activated: the page opens the Drives popup (S11b).</summary>
+    [Parameter]
+    public EventCallback OnOpen { get; set; }
+
+    private bool Known => Totals is not null;
+
+    private Task OpenAsync() => OnOpen.InvokeAsync();
+}
