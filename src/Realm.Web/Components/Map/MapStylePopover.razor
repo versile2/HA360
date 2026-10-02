@@ -61,6 +61,8 @@
         </button>
     </div>
 </MudPopover>
+@* The click-away layer: transparent, over the map, the sheet (1201) and the navigation bar (1210), under the panel. The panel's own z-index is 1260 in realm-map.css and carries !important,
+   because MudBlazor's placePopover writes an inline z-index (1201) on every placement; without that the overlay would sit above the panel and take every tap inside it. *@
 <MudOverlay Visible="@Open" Modal="true" AutoClose="true" OnClosed="CloseAsync" LockScroll="false" ZIndex="1250" />
 
 @code {

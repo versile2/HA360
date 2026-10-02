@@ -620,9 +620,11 @@
 }
 
 /* The popover opens to the left of the button and upward (the transform origin is its bottom right corner, set on the component); the 8 px gap is a negative left margin because the
-   script places it by its left edge. Above the 1250 overlay of MapStylePopover, the sheet (about 1200) and the navigation bar (1210). */
+   script places it by its left edge. Above the 1250 click-away overlay of MapStylePopover, the sheet (1201) and the navigation bar (1210), below dialogs (1400).
+   The z-index carries !important, like the sheet's geometry (R-031): MudBlazor's placePopover writes an inline z-index on every placement (the popover layer plus one, 1201, because
+   the Layers button's ancestors are at 10), which beats a plain stylesheet rule, left the panel under its own overlay, and let the overlay swallow every tap inside it (AC-21, 01 section 4.12). */
 .mud-popover.realm-style-popover {
-  z-index: 1260;
+  z-index: 1260 !important;
   box-sizing: border-box;
   width: 296px;
   margin-left: -8px;
