@@ -37,7 +37,7 @@
         <p class="realm-error-text">Something went sideways in the castle. Try again.</p>
         <button type="button" class="reload realm-error-reload">Reload</button>
     </div>
-    <Routes @rendermode="InteractiveServer" ViewerMemberId="@MeId" />
+    <Routes @rendermode="InteractiveServer" ViewerMemberId="@_viewerMemberId" />
     <script src="@Assets["_content/MudBlazor/MudBlazor.min.js"]"></script>
     <script src="@Assets["_framework/blazor.web.js"]" autostart="false"></script>
     <script src="js/reconnect-banner.js"></script>
@@ -47,12 +47,25 @@
 </html>
 
 @code {
+    /// <summary>The Ingress header that carries the Home Assistant user id (02 section 2.5). Only the SSR request reads it, and only to resolve "me".</summary>
+    private const string UserIdHeader = "X-Remote-User-Id";
+
+    private string? _viewerMemberId;
+
     [CascadingParameter]
     private HttpContext? HttpContext { get; set; }
+
+    [Inject]
+    private Realm.Domain.IViewerResolver Viewers { get; set; } = default!;
 
     // The ingress prefix with one trailing slash ("" becomes "/"); every URL in the page resolves against it (03 section 5.4).
     private string BaseHref => (HttpContext?.Request.PathBase.Value ?? string.Empty) + "/";
 
-    // S8 resolves the viewer from the SSR request headers (03 section 3.1) and returns the member slug here; until then nobody is "me".
-    private static string? MeId => null;
+    // "Me", resolved once per page load in static SSR (03 section 5.5, R-082, D38). The Home Assistant user id is a local of this method: it goes into the resolver and nowhere else, so
+    // it is never a field, a component parameter, a marker or a log line, and only the member slug (for example "king") is handed to Routes.
+    protected override void OnInitialized()
+    {
+        var haUserId = HttpContext?.Request.Headers[UserIdHeader].FirstOrDefault();
+        _viewerMemberId = Viewers.Resolve(haUserId).MemberId;
+    }
 }

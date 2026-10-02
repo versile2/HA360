@@ -1,7 +1,7 @@
 // @ts-check
 // realmShell.js: the entry module of ShellInterop (03 section 4.8), everything in the browser that is not the map. S7a owns the viewport
-// reports, the layout attribute and the sheet metrics; the preferences, history tokens, Escape handling, HA bridge and
-// clipboard exports of 4.8 arrive with the slices that own them, in the commented region at the end of this file.
+// reports, the layout attribute and the sheet metrics; S10a the preferences; S8c the history depth tokens and the global Escape handler (below);
+// the HA bridge and clipboard exports of 4.8 arrive with the slices that own them, in the commented region before the preferences.
 //
 // Contract in brief: `init` is idempotent (a repeated call tears the previous state down first) and never rejects; every export catches its own
 // errors and never rethrows into Blazor; nothing touches `window` or `document` when the module is imported (the node tests import it).
@@ -405,7 +405,304 @@ export function readSheet() {
   return describeSheet(element?.getAttribute('data-state'), metrics, element !== null);
 }
 
-// ---- S7b (selection header focus), S8a (history and Escape), S15 (preferences, HA bridge) add their exports and state below this line ----------
+// ---- S7b (selection header focus), S15 (HA bridge, clipboard) add their exports and state below this line ---------------------------------------
+
+// ---- S8c: history depth tokens and Escape (03 sections 3.7 and 4.8, 01 sections 2.2 and 5.7) -----------------------------------------------------
+// One history entry per level of depth (`#r1`, `#r2`), so the Android Back gesture steps through the sheet and the overlays instead of leaving the app. C# decides the
+// depth and calls `history.setDepth(n)`; the script pushes the missing entries or goes back by the surplus, and tells C# about a Back (or Forward) it did not cause itself.
+// The controller below knows nothing of the browser: it works on a small environment, so the node tests run it against a fake history. `attachHistory` is its own entry,
+// apart from `init`: `init` tears the viewport state down on every call and belongs to the Location page, while the Driving page needs the history too.
+// This module declares `history` as an export (the contract of 4.8), so the browser's own is always written `window.history` here.
+
+/** The deepest history the script will build; far above any real depth (a selection, the Tall size and a few overlays). */
+export const MAX_HISTORY_DEPTH = 99;
+/** How long `setDepth` waits for the popstate of its own `history.go` before it gives up and reads where the browser is. */
+export const HISTORY_SETTLE_MS = 1500;
+/** The dialog layer MudBlazor draws and closes by itself on Escape (`CloseOnEscapeKey`). */
+export const DIALOG_LAYER_SELECTOR = '.mud-dialog-container';
+/** An open popover that is not ours: the sheet itself is a MudPopover, our own style popover handles its Escape in its own markup, a tooltip is not a layer. */
+export const FOREIGN_POPOVER_SELECTOR = '.mud-popover-open:not(.mud-sheet-popover):not(.realm-style-popover):not(.mud-tooltip)';
+/** The style popover: an Escape pressed inside it is its own (it closes itself), so the global handler stays out of the way. */
+export const OWN_POPOVER_SELECTOR = '.realm-style-popover';
+
+/**
+ * @typedef {object} HistoryEnv the browser, as far as the depth tokens need it
+ * @property {() => unknown} getState `history.state` of the current entry
+ * @property {() => string} getHash `location.hash` of the current entry
+ * @property {(state: { realmDepth: number }, depth: number) => void} push pushes the entry of `depth`
+ * @property {(delta: number) => void} go `history.go`
+ * @property {(handler: () => void) => (() => void)} onPopState adds a popstate listener and returns the remover
+ * @property {(callback: () => void, ms: number) => unknown} setTimer
+ * @property {(handle: unknown) => void} clearTimer
+ */
+
+/**
+ * @typedef {object} HistoryController
+ * @property {(depth: number) => Promise<void>} setDepth
+ * @property {() => number} getDepth
+ * @property {() => void} dispose
+ */
+
+/**
+ * The depth an entry stands for: the `realmDepth` of its state, else the `#r<n>` of its URL. The state alone is not enough: Blazor's own `replaceState` (a week chip, a
+ * replacing navigation) swaps the state object for its own and keeps the URL, fragment included. Anything else (the base entry, a foreign fragment) is 0.
+ * @param {unknown} state
+ * @param {unknown} hash
+ * @returns {number}
+ */
+export function depthOfEntry(state, hash) {
+  if (state !== null && typeof state === 'object') {
+    const depth = /** @type {{ realmDepth?: unknown }} */ (state).realmDepth;
+    if (typeof depth === 'number' && Number.isInteger(depth) && depth > 0 && depth <= MAX_HISTORY_DEPTH) return depth;
+  }
+  const match = typeof hash === 'string' ? /^#r([1-9][0-9]?)$/.exec(hash) : null;
+  return match ? Number(match[1]) : 0;
+}
+
+/**
+ * The URL a token entry is pushed with. It is the page's own path and query with only the fragment changed, built from the location and not from a bare `#r1`: a relative
+ * reference resolves against `<base href>`, which is the app's root (D62), so `#r1` alone would move the address bar from `driving` to the root.
+ * @param {string} pathname
+ * @param {string} search
+ * @param {number} depth
+ * @returns {string}
+ */
+export function tokenUrl(pathname, search, depth) {
+  return `${pathname}${search}#r${depth}`;
+}
+
+/**
+ * The depth tokens of 03 section 3.7 over an environment. `setDepth(n)` pushes `#r<k>` entries for each missing level, or goes back by the surplus with the resulting popstate
+ * swallowed (it is ours), and resolves once the browser has settled; calls run one after the other, because `history.go` is asynchronous. A popstate that is not ours is a
+ * Back or a Forward the person made: it is reported through `onUserBack` with the depth the browser is at. With `tokens` false, `setDepth` only records the depth: nothing is
+ * pushed, nothing is popped, nothing is reported (the Android Back then simply leaves the app).
+ * @param {HistoryEnv} env
+ * @param {{ tokens?: boolean, onUserBack: (depth: number) => void }} options
+ * @returns {HistoryController}
+ */
+export function createHistoryController(env, options) {
+  const tokens = options.tokens !== false;
+  let depth = depthOfEntry(env.getState(), env.getHash());
+  /** @type {{ resolve: () => void, timer: unknown } | null} */
+  let waiting = null;
+  let queue = Promise.resolve();
+  let disposed = false;
+
+  // The popstate of our own history.go (or the timer that gave up waiting for it): reads where the browser landed and lets setDepth return.
+  const settle = () => {
+    const pending = waiting;
+    if (!pending) return false;
+    waiting = null;
+    env.clearTimer(pending.timer);
+    depth = depthOfEntry(env.getState(), env.getHash());
+    pending.resolve();
+    return true;
+  };
+
+  const removeListener = env.onPopState(() => {
+    if (disposed || settle() || !tokens) return;
+    depth = depthOfEntry(env.getState(), env.getHash());
+    options.onUserBack(depth);
+  });
+
+  /** @param {number} requested */
+  const apply = async (requested) => {
+    const target = Number.isFinite(requested) ? Math.max(0, Math.min(MAX_HISTORY_DEPTH, Math.trunc(requested))) : 0;
+    if (!tokens) {
+      depth = target;
+      return;
+    }
+    if (target > depth) {
+      for (let level = depth + 1; level <= target; level++) env.push({ realmDepth: level }, level);
+      depth = target;
+      return;
+    }
+    if (target < depth) {
+      /** @type {Promise<void>} */
+      const settled = new Promise((resolve) => {
+        const timer = env.setTimer(() => {
+          if (waiting?.resolve === resolve) settle();
+        }, HISTORY_SETTLE_MS);
+        waiting = { resolve, timer };
+      });
+      env.go(target - depth);
+      await settled;
+    }
+  };
+
+  return {
+    setDepth(requested) {
+      if (disposed) return Promise.resolve();
+      const run = queue.then(() => apply(requested)).catch((error) => {
+        console.warn('[realmShell] history.setDepth failed', error);
+      });
+      queue = run;
+      return run;
+    },
+    getDepth() {
+      return depth;
+    },
+    dispose() {
+      disposed = true;
+      removeListener();
+      const pending = waiting;
+      waiting = null;
+      if (pending) {
+        env.clearTimer(pending.timer);
+        pending.resolve();
+      }
+    },
+  };
+}
+
+/**
+ * @param {unknown} target the element the key was pressed in
+ * @returns {boolean} whether it is a text field, a select or contenteditable: the keys are the field's own
+ */
+function isTextEntry(target) {
+  if (target === null || typeof target !== 'object') return false;
+  const element = /** @type {{ tagName?: unknown, isContentEditable?: unknown }} */ (target);
+  const tag = typeof element.tagName === 'string' ? element.tagName.toUpperCase() : '';
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || element.isContentEditable === true;
+}
+
+/**
+ * @param {unknown} target
+ * @returns {boolean} whether the key was pressed inside our own style popover, which closes itself on Escape
+ */
+function insideOwnPopover(target) {
+  if (target === null || typeof target !== 'object') return false;
+  const element = /** @type {{ closest?: unknown }} */ (target);
+  return typeof element.closest === 'function' && element.closest(OWN_POPOVER_SELECTOR) !== null;
+}
+
+/**
+ * Whether MudBlazor has a layer open that closes itself on Escape: a dialog (it takes the key first, through Blazor's own delegated keydown, and its container is still there when
+ * this handler runs), or a popover that is neither the sheet nor our own.
+ * @param {{ querySelector: (selector: string) => unknown }} root
+ * @returns {boolean}
+ */
+export function foreignLayerOpen(root) {
+  return root.querySelector(DIALOG_LAYER_SELECTOR) !== null || root.querySelector(FOREIGN_POPOVER_SELECTOR) !== null;
+}
+
+/**
+ * Whether an Escape keydown is ours (03 section 4.8): it is the Escape key, nothing default-prevented it, it was not typed into a field or a composition, it was not pressed inside
+ * our own popover, and MudBlazor has no layer of its own open that already closes on it. C# then closes our topmost overlay, or runs Back steps 2 and 3.
+ * @param {{ key?: string, defaultPrevented?: boolean, isComposing?: boolean, target?: unknown }} event
+ * @param {{ querySelector: (selector: string) => unknown }} root
+ * @returns {boolean}
+ */
+export function shouldHandleEscape(event, root) {
+  if (event.key !== 'Escape' && event.key !== 'Esc') return false;
+  if (event.defaultPrevented === true || event.isComposing === true) return false;
+  if (isTextEntry(event.target) || insideOwnPopover(event.target)) return false;
+  return !foreignLayerOpen(root);
+}
+
+/** The real history as a HistoryEnv. @returns {HistoryEnv} */
+function browserHistoryEnv() {
+  return {
+    getState: () => window.history.state,
+    getHash: () => window.location.hash,
+    push: (state, depth) => window.history.pushState(state, '', tokenUrl(window.location.pathname, window.location.search, depth)),
+    go: (delta) => window.history.go(delta),
+    onPopState: (handler) => {
+      window.addEventListener('popstate', handler);
+      return () => window.removeEventListener('popstate', handler);
+    },
+    setTimer: (callback, ms) => window.setTimeout(callback, ms),
+    clearTimer: (handle) => window.clearTimeout(/** @type {number} */ (handle)),
+  };
+}
+
+/**
+ * @typedef {object} HistoryAttachment
+ * @property {number} token tells this attachment from a later one
+ * @property {HistoryController} controller
+ * @property {Array<() => void>} cleanups
+ */
+/** @type {HistoryAttachment | null} */
+let attachment = null;
+let attachments = 0;
+
+/**
+ * One call into .NET for the history or Escape. A disposed reference or a dropped circuit is not an error here (03 section 4.7): a late event must never throw.
+ * @param {DotNetRef} dotnet
+ * @param {string} name
+ * @param {...unknown} args
+ */
+function notifyHistory(dotnet, name, ...args) {
+  try {
+    void Promise.resolve(dotnet.invokeMethodAsync(name, ...args)).catch(() => {});
+  } catch {
+    // the reference was disposed
+  }
+}
+
+function teardownHistory() {
+  const current = attachment;
+  attachment = null;
+  if (!current) return;
+  current.controller.dispose();
+  for (const cleanup of current.cleanups) cleanup();
+}
+
+/**
+ * Starts the depth tokens and the Escape handler for the page on screen (one attachment per document: a later call replaces the earlier one). Never throws.
+ * @param {DotNetRef} dotnet the DotNetObjectReference of HistoryCallbacks: `OnHistoryBack(int)` and `OnEscape()`
+ * @param {{ historyTokens?: boolean } | null} [options] `historyTokens` false is the kill switch `Realm:Ui:HistoryTokens` (D47): the depth is recorded and the history is never touched
+ * @returns {number} the token `detachHistory` takes; 0 when the attach failed
+ */
+export function attachHistory(dotnet, options = null) {
+  try {
+    teardownHistory();
+    const controller = createHistoryController(browserHistoryEnv(), {
+      tokens: options?.historyTokens !== false,
+      onUserBack: (depth) => notifyHistory(dotnet, 'OnHistoryBack', depth),
+    });
+    /** @param {KeyboardEvent} event */
+    const onKeyDown = (event) => {
+      if (shouldHandleEscape(event, document)) notifyHistory(dotnet, 'OnEscape');
+    };
+    document.addEventListener('keydown', onKeyDown);
+    attachments += 1;
+    attachment = { token: attachments, controller, cleanups: [() => document.removeEventListener('keydown', onKeyDown)] };
+    return attachment.token;
+  } catch (error) {
+    console.warn('[realmShell] attachHistory failed', error);
+    return 0;
+  }
+}
+
+/**
+ * Stops the listeners of an attachment. A token that is not the current one (the page that attached was replaced by the next page) does nothing; no token detaches the current one.
+ * The entries already pushed stay: the tab navigation takes them back with `history.setDepth(0)` before it leaves.
+ * @param {number} [token]
+ */
+export function detachHistory(token) {
+  try {
+    if (attachment && (token === undefined || token === attachment.token)) teardownHistory();
+  } catch (error) {
+    console.warn('[realmShell] detachHistory failed', error);
+  }
+}
+
+/** The history helpers of 4.8: `setDepth(n)` (resolves when the browser has settled) and `getDepth()`; both do nothing while no page is attached. */
+export const history = {
+  /**
+   * @param {number} depth
+   * @returns {Promise<void>}
+   */
+  setDepth(depth) {
+    return attachment ? attachment.controller.setDepth(depth) : Promise.resolve();
+  },
+  /** @returns {number} */
+  getDepth() {
+    return attachment ? attachment.controller.getDepth() : 0;
+  },
+};
+
 
 // ---- S10a: device preferences (01 section 7.9, 03 section 4.8) -----------------------------------------------------------------------------
 // localStorage is read and written only from here, and only after the first render (the circuit exists then; prerendering has no browser). Every access is in

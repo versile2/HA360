@@ -1,17 +1,25 @@
 @page "/driving"
 @implements IAsyncDisposable
+@using Microsoft.JSInterop
 @using Realm.Domain
 @using Realm.Web.Components.Driving
 @using Realm.Web.Formatting
+@using Realm.Web.State
 @inject NavigationManager Navigation
 @inject IDialogService Dialogs
 @inject ILogger<DrivingPage> Logger
+@inject IJSRuntime JS
+@inject RealmUiState Ui
+@inject HistorySync History
 
 @* The Weekly Driving Report (01 section 6; 03 section 3.4): a full page, no map and no sheet. The session is RealmShell's cascading value. The selected week is the
    ?week= query (D69), read on every navigation through SupplyParameterFromQuery and written back with NavigationManager (a chip is a replace, so Back from Driving still
    leaves for Location), never taken from the Demo overrides. The report comes from IRealmSession.GetWeekReportAsync(week, snapshot.WeekStart); the page renders it and
    decides nothing: every figure, arrow, asterisk of 01 section 6.3 is the data layer's, built into strings by the formatters. The report is fetched again, in place, when
-   the snapshot's StatsVersion moves (never polled). The six openers raise OnOpen and the page opens StatPopup with IDialogService (01 section 6.7). *@
+   the snapshot's StatsVersion moves (never polled). The six openers raise OnOpen and the page opens StatPopup with IDialogService (01 section 6.7).
+
+   The browser history (03 section 3.7): the page pushes one sentinel entry when it mounts and each open popup is one more layer (StatPopup registers it). A Back that pops the sentinel with
+   no popup open goes to Location (01 section 2.2) with a replace, so Back never exits the app from here; a Back with a popup open closes the popup. *@
 <section class="realm-driving" aria-busy="@(_loading ? "true" : "false")">
     <div class="realm-driving__column">
         <header class="realm-driving__header">
@@ -103,6 +111,7 @@
     private bool _failed;
     private bool _subscribed;
     private bool _disposed;
+    private IAsyncDisposable? _history;
 
     /// <summary>The circuit's session, cascaded by <c>RealmShell</c>.</summary>
     [CascadingParameter]
@@ -138,6 +147,7 @@
         RefreshChips();
         var week = DrivingFormatter.ParseWeek(WeekQuery);
         _week = week;
+        Ui.SelectedWeek = week;
         if (week == _loadedWeek)
         {
             return;
@@ -150,8 +160,8 @@
         await LoadAsync(week, blank: true);
     }
 
-    // The circuit exists from the first render on: only now can the page listen for the snapshot's StatsVersion.
-    protected override void OnAfterRender(bool firstRender)
+    // The circuit exists from the first render on: only now can the page listen for the snapshot's StatsVersion and attach the browser history.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender || _subscribed || _disposed)
         {
@@ -163,7 +173,32 @@
 
         // A trip may have been closed between the load and the subscription.
         OnSessionChanged();
+
+        await AttachHistoryAsync();
     }
+
+    // The Driving surface of HistorySync: one sentinel entry above the page, and the way out when the person goes Back past it. A browser or circuit that refuses leaves the page without it.
+    private async Task AttachHistoryAsync()
+    {
+        try
+        {
+            var lease = await HistoryInterop.AttachAsync(History, JS, HistorySurface.Driving, LeaveAsync);
+            if (_disposed)
+            {
+                await lease.DisposeAsync();
+                return;
+            }
+
+            _history = lease;
+        }
+        catch (Exception exception) when (exception is JSException or JSDisconnectedException or OperationCanceledException)
+        {
+            Logger.LogWarning(exception, "The Driving page could not attach the browser history.");
+        }
+    }
+
+    // Back from the root of Driving goes to Location, never out of the app: the sentinel is already popped, so the entry the page sits on is replaced.
+    private Task LeaveAsync() => _disposed ? Task.CompletedTask : InvokeAsync(() => Navigation.NavigateTo("./", replace: true));
 
     private void RefreshChips()
     {
@@ -277,6 +312,6 @@
         _lifetime.Cancel();
         _load?.Dispose();
         _lifetime.Dispose();
-        return ValueTask.CompletedTask;
+        return _history is { } history ? history.DisposeAsync() : ValueTask.CompletedTask;
     }
 }

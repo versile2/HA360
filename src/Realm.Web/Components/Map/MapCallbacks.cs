@@ -30,6 +30,9 @@ public sealed class MapCallbacks
     public Task OnCameraChanged(CameraState camera) => _handler.CameraChangedAsync(camera);
 
     [JSInvokable]
+    public Task OnFollowEnded() => _handler.FollowEndedAsync();
+
+    [JSInvokable]
     public Task OnStyleResult(StyleResult result) => _handler.StyleResultAsync(result);
 
     [JSInvokable]

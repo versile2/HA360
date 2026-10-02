@@ -1,4 +1,7 @@
+@implements IDisposable
 @using Realm.Web.Map
+@using Realm.Web.State
+@inject RealmUiState Ui
 
 @* The map style switcher (01 section 4.12): a MudBlazor popover anchored to its parent element, which is the Layers button's wrapper in RightButtonStack, opening to the left of
    the button and upward. 296 wide, a "Map style" title, a 2-column grid of four 128 x 96 tiles (a static SVG swatch in the palette's tokens, never a live map, and a 32 px
@@ -8,7 +11,8 @@
    parameters of MapView, so realmMap.js is untouched) and stores them (DevicePrefs). A tile applies at once and the popover closes CloseDelayMs later, which shows the ring
    on the new tile first and stays well inside the 200 ms of AC-21; the style change starts at the same moment as the delay, not after it. Esc (while the focus is in the
    popover, where it moves when it opens), a tap anywhere outside (a transparent modal overlay, which also keeps that tap from reaching the map) and the owner's own handling of
-   the layers button close it through OnClose. The owner moves the focus back to the Layers button. *@
+   the layers button close it through OnClose. The owner moves the focus back to the Layers button. While it is open it is one history layer (03 section 3.7, R3-03): the Android
+   Back and the global Esc close it through the same OnClose, and however it closes its layer leaves the stack. *@
 <MudPopover Open="@Open"
             Class="realm-style-popover"
             AnchorOrigin="Origin.BottomLeft"
@@ -77,9 +81,13 @@
         (MapStyleIds.Satellite, "Satellite"),
     ];
 
+    // One layer of the history depth while the popover is open (03 section 3.7).
+    private static readonly OverlayLayer Layer = new(OverlayKind.Popover, "map-style");
+
     private ElementReference _panel;
     private bool _wasOpen;
     private bool _closing;
+    private bool _layerOpen;
 
     /// <summary>Whether the popover is shown.</summary>
     [Parameter]
@@ -104,6 +112,39 @@
     /// <summary>The popover asks to close: Esc, a tap outside, or the delay after a tile.</summary>
     [Parameter]
     public EventCallback OnClose { get; set; }
+
+    // The layer follows the Open parameter: it joins the stack when the popover opens and leaves when it closes, however that happens (a tile, a tap outside, Esc, or the owner).
+    protected override void OnParametersSet()
+    {
+        if (Open && !_layerOpen)
+        {
+            _layerOpen = true;
+            Ui.OpenOverlay(Layer, CloseFromBack);
+        }
+        else if (!Open && _layerOpen)
+        {
+            _layerOpen = false;
+            Ui.CloseOverlay(Layer);
+        }
+    }
+
+    // The Android Back or Esc took the layer off the stack: the owner closes the popover (OnClose). It arrives off the renderer's context, so it marshals. The next parameters find the layer
+    // gone already, and a Back that arrives after the owner closed the popover finds no layer to close.
+    private void CloseFromBack()
+    {
+        _layerOpen = false;
+        _ = InvokeAsync(() => OnClose.InvokeAsync());
+    }
+
+    /// <summary>A popover that is still open when its owner goes takes its layer with it.</summary>
+    public void Dispose()
+    {
+        if (_layerOpen)
+        {
+            _layerOpen = false;
+            Ui.CloseOverlay(Layer);
+        }
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {

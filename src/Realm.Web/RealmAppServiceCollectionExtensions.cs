@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Components.Server.Circuits;
 using Realm.Demo;
+using Realm.Domain;
 using Realm.Infrastructure.Hosting;
 using Realm.Web.Hosting;
 using Realm.Web.State;
@@ -23,6 +24,8 @@ public static class RealmAppServiceCollectionExtensions
         services.AddSingleton<RealmCircuitHandler>();   // counts circuits for diagnostics.json (03 section 5.6)
         services.AddSingleton<CircuitHandler>(provider => provider.GetRequiredService<RealmCircuitHandler>());
         services.AddScoped<DevicePrefs>();   // the four device preferences of 01 section 7.9, one set per circuit (03 section 3.6)
+        services.AddRealmUiState(configuration);   // the circuit's selection, sheet and overlays, and the history that follows them (03 sections 3.6 and 3.7, R2-03)
+        services.AddScoped<IViewerResolver, ViewerResolver>();   // "me" in static SSR: only the member slug leaves it (03 section 5.5, D38)
         if (runtime.Mode == RealmMode.Live)
         {
             ArgumentNullException.ThrowIfNull(configuration);

@@ -3,6 +3,7 @@
 @using Microsoft.JSInterop
 @using Realm.Demo
 @using Realm.Domain
+@using Realm.Web.Components
 @using Realm.Web.Components.Map
 @using Realm.Web.Components.Shell
 @using Realm.Web.Components.Sheet
@@ -17,6 +18,8 @@
 @inject ILogger<LocationPage> Logger
 @inject DevicePrefs Prefs
 @inject ISnackbar Snackbar
+@inject RealmUiState Ui
+@inject HistorySync History
 
 @* The Location screen (01 section 3): the map fills the canvas, the sheet (a bottom sheet, or the left panel from 840 x 560) draws over it, and the right button
    stack floats above the sheet. The session comes from RealmShell's cascading value and its snapshot is read at render: the page re-renders on
@@ -27,21 +30,22 @@
    placeholder reserving the Peek band is drawn; the map and the sheet start together with the real layout, so the map's first default camera already uses the
    right padding.
 
-   The sheet's state (section, selection, size) is a RealmUiState (03 section 3.6) and every change goes through its reducer: a row, the handle, the header, the back arrow and the
-   segments raise events and the sheet shows RealmUiState.Body (list, selection header or detail, D45). S8c registers the state for the circuit and adds the history tokens, Esc
-   and the pin and map taps; until then this page owns one. The single-bubble tap (D84) is dispatched to this state and the map's Selection is read from it, so nothing else holds
-   a selection. A tap on the selection header and a tap on the handle are the same event (D46). The floating pill of the hidden Expanded panel (01 section 3.6) is drawn here when
-   the layout says the panel is hidden, which nothing sets yet. *@
+   The sheet's state (section, selection, size) is the circuit's RealmUiState (03 section 3.6, scoped, so it outlives this page and a trip to Driving finds the selection where it was,
+   R2-03) and every change goes through its reducer: a row, a pin, a zone, a bubble, the empty map, the handle, the header, the back arrow and the segments raise events and the sheet shows
+   RealmUiState.Body (list, selection header or detail, D45). The map's Selection is read from it, so nothing else holds a selection; a tap on the entity that is already selected changes
+   nothing there and MapView flies to it again by itself (D89). A tap on the selection header and a tap on the handle are the same event (D46). HistorySync keeps the browser history at the
+   state's depth (03 section 3.7): the Android Back and Esc come back here as reductions of the same state, and the page only re-renders. The floating pill of the hidden Expanded panel
+   (01 section 3.6) is drawn here when the layout says the panel is hidden, which nothing sets yet. *@
 <section class="realm-location">
     @if (_viewport is { } viewport)
     {
         var members = Snapshot.Members;
         var vehicles = Snapshot.Vehicles;
         var places = Snapshot.Places;
-        var summary = HandleSummaryFormatter.Format(_ui.Section, members, vehicles, places, Session.Time.GetUtcNow());
+        var summary = HandleSummaryFormatter.Format(Ui.Section, members, vehicles, places, Session.Time.GetUtcNow());
         var panel = _mode == LayoutMode.Expanded;
-        var pill = panel && _ui.Layout.PanelHidden && _ui.Selection is { } selected
-            ? SelectionHeaderFormatter.For(selected, members, vehicles, places, RowFacts.Create(members, places, null, Session.Time.GetUtcNow(), Session.Zone))
+        var pill = panel && Ui.Layout.PanelHidden && Ui.Selection is { } selected
+            ? SelectionHeaderFormatter.For(selected, members, vehicles, places, RowFacts.Create(members, places, Ui.MeId, Session.Time.GetUtcNow(), Session.Zone))
             : null;
 
         <MapView Members="@members"
@@ -55,19 +59,27 @@
                  Layout="@_mapLayout"
                  ReducedMotion="@viewport.ReducedMotion"
                  TestHooks="@TestHooks"
-                 Selection="@_ui.Selection"
-                 OnBubbleTap="OnBubbleTapAsync" />
+                 MeId="@Ui.MeId"
+                 Selection="@Ui.Selection"
+                 RestoreCamera="@_restoreCamera"
+                 OnPinTap="OnPinTapAsync"
+                 OnBubbleTap="OnBubbleTapAsync"
+                 OnMapTap="OnMapTapAsync"
+                 OnCameraChanged="OnCameraChangedAsync"
+                 OnFollowEnded="OnFollowEndedAsync" />
 
         <RealmSheetHost Mode="@_mode"
-                        Size="@_ui.SheetSize"
+                        Size="@Ui.SheetSize"
                         ViewportWidth="@viewport.Width"
                         Summary="@summary"
-                        OnSizeChanged="OnSizeChangedAsync">
+                        OnSizeChanged="OnSizeChangedAsync"
+                        OnToggle="OnToggleAsync">
             <SheetContent Members="@members"
                           Vehicles="@vehicles"
                           Places="@places"
-                          Section="@_ui.Section"
-                          Body="@_ui.Body"
+                          Section="@Ui.Section"
+                          Body="@Ui.Body"
+                          MeId="@Ui.MeId"
                           FocusDetail="@_focusDetail"
                           OnSection="OnSectionAsync"
                           OnSelect="OnSelectAsync"
@@ -106,8 +118,9 @@
     private ViewportInfo? _viewport;
     private LayoutMode _mode = LayoutMode.Unknown;
     private LayoutOverride _layoutOverride;
-    private readonly RealmUiState _ui = new();
     private bool _focusDetail;
+    private CameraState? _restoreCamera;
+    private IAsyncDisposable? _history;
     private MapLayout _mapLayout = MapLayout.Compact;
     private bool _started;
     private bool _disposed;
@@ -124,6 +137,10 @@
     /// <summary>The Appendix-B overrides of this circuit (<c>style</c>, <c>sheet</c> and <c>layout</c> here), cascaded by <c>RealmShell</c>.</summary>
     [CascadingParameter]
     public DemoUiOverrides? Overrides { get; set; }
+
+    /// <summary>The viewer's member slug, resolved in static SSR and cascaded by <c>Routes</c> (03 section 5.5); null when there is none. Never a Home Assistant user id.</summary>
+    [CascadingParameter(Name = Routes.ViewerMemberIdName)]
+    public string? ViewerMemberId { get; set; }
 
     private RealmSnapshot Snapshot => Session.Current;
 
@@ -146,14 +163,24 @@
             _ => "Night",
         };
 
-    // Prerendering runs this twice (the prerender scope, then the circuit); both only read the overrides.
+    // Prerendering runs this twice (the prerender scope, then the circuit); each has its own RealmUiState. The state outlives this page (it is the circuit's), so what belongs to the
+    // first start of the circuit happens once: "me" from SSR is set when nobody set it, and the Demo sheet override applies only at the first start, not again on the way back from Driving,
+    // when the sheet is the person's own.
     protected override void OnInitialized()
     {
         _layoutOverride = LayoutResolver.ParseOverride(Overrides?.Layout ?? Prefs.Layout);
-        if (Overrides?.Sheet == "80")
+        if (Ui.MeId is null && ViewerMemberId is not null)
         {
-            _ui.Apply(new SheetEvent.HandleSet(SheetSize.Tall));
+            Ui.MeId = ViewerMemberId;
         }
+
+        if (Ui.TryBeginStartup() && Overrides?.Sheet == "80")
+        {
+            Ui.Apply(new SheetEvent.HandleSet(SheetSize.Tall));
+        }
+
+        // R1-12: the camera the person left, when they are back within ten minutes; null runs the default camera.
+        _restoreCamera = Ui.CameraToRestore(Session.Time.GetUtcNow());
     }
 
     // The circuit exists from the first render on: only now can the page subscribe, tick and talk to the browser.
@@ -166,6 +193,7 @@
 
         _started = true;
         Session.Changed += OnSessionChanged;
+        Ui.Changed += OnUiChanged;
         _ticker = new MinuteTicker(Session.Time);
         _ticker.Tick += OnMinute;
         _ticker.Start();
@@ -181,18 +209,57 @@
 
             _shell = await ShellInterop.CreateAsync(JS, new ShellCallbacks(OnViewportAsync));
             var info = await _shell.InitAsync();
-            if (info is null || _disposed)
+            if (info is not null && !_disposed)
             {
-                return;
+                await ApplyViewportAsync(info.Viewport);
+                await _shell.ObserveSheetAsync(ShellInterop.SheetSelector);
             }
-
-            await ApplyViewportAsync(info.Viewport);
-            await _shell.ObserveSheetAsync(ShellInterop.SheetSelector);
         }
         catch (Exception exception) when (exception is JSException or JSDisconnectedException or OperationCanceledException)
         {
             // Without the viewport the placeholder stays; the page never takes the circuit down with it.
             Logger.LogError(exception, "The Location page could not start its browser shell.");
+        }
+
+        // After the shell, so the map is not kept waiting for the history; the viewport and the state are known by now.
+        if (!_disposed)
+        {
+            await AttachHistoryAsync();
+        }
+    }
+
+    // The Android Back and Esc arrive here as changes of the state (HistorySync reduces it off the renderer's context), so the page renders them; so does every other change of it.
+    private void OnUiChanged()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _ = InvokeAsync(() =>
+        {
+            RefreshMapLayout();
+            StateHasChanged();
+        });
+    }
+
+    // The history tokens (03 section 3.7): from here the browser history follows the depth of the state. A browser or circuit that refuses leaves the page without them; it still works.
+    private async Task AttachHistoryAsync()
+    {
+        try
+        {
+            var lease = await HistoryInterop.AttachAsync(History, JS, HistorySurface.Location);
+            if (_disposed)
+            {
+                await lease.DisposeAsync();
+                return;
+            }
+
+            _history = lease;
+        }
+        catch (Exception exception) when (exception is JSException or JSDisconnectedException or OperationCanceledException)
+        {
+            Logger.LogWarning(exception, "The Location page could not attach the browser history.");
         }
     }
 
@@ -210,7 +277,7 @@
 
         _viewport = viewport;
         _mode = mode;
-        _ui.Layout = new LayoutSnapshot(mode, PanelHidden: false, viewport.Width, viewport.Height, viewport.Safe);
+        Ui.Layout = new LayoutSnapshot(mode, PanelHidden: false, viewport.Width, viewport.Height, viewport.Safe);
         RefreshMapLayout();
         StateHasChanged();
     }
@@ -220,16 +287,14 @@
         _mapLayout = new MapLayout(
             _mode == LayoutMode.Expanded ? MapLayoutMode.Expanded : MapLayoutMode.Compact,
             PanelHidden: false,
-            StackVisible: !(_mode == LayoutMode.Compact && _ui.SheetSize == SheetSize.Tall),
+            StackVisible: !(_mode == LayoutMode.Compact && Ui.SheetSize == SheetSize.Tall),
             _viewport?.Safe ?? new Padding(0, 0, 0, 0));
 
-    // Every sheet event goes through the reducer (RealmUiState.Apply, 01 section 5.7). The focus moves to the detail's back button only when the user just opened the detail with the
-    // handle or the header (01 section 10.2); a detail that appears because a pin was tapped in the panel leaves the focus where it is.
+    // Every sheet event takes the one path of SheetDispatch (the reducer, the Follow mirror, the focus rule; 01 section 5.7). The focus moves to the detail's back button only when the user just
+    // opened the detail with the handle or the header (01 section 10.2).
     private Task ApplyAsync(SheetEvent sheetEvent)
     {
-        var before = _ui.Body;
-        _ui.Apply(sheetEvent);
-        _focusDetail = sheetEvent is (SheetEvent.HandleToggle or SheetEvent.HandleSet) && before is not SheetBody.Detail && _ui.Body is SheetBody.Detail;
+        _focusDetail = SheetDispatch.Apply(Ui, sheetEvent, Snapshot.Members);
         RefreshMapLayout();
         return Task.CompletedTask;
     }
@@ -248,18 +313,38 @@
 
     private Task OnClearAsync() => ApplyAsync(new SheetEvent.ClearTap());
 
+    // A member pin, a vehicle pin or a zone was tapped (D45, 01 section 4.13): the same reducer as a row. The entity that is already selected changes nothing (MapView flies to it again).
+    private Task OnPinTapAsync(EntityRef entity) => ApplyAsync(new SheetEvent.PinTap(entity));
+
+    // The empty map was tapped: at 80 percent the sheet collapses with the selection kept, at Peek the selection clears, in the panel it always clears (01 section 4.13).
+    private Task OnMapTapAsync() => ApplyAsync(new SheetEvent.MapTap());
+
+    // A camera move settled: kept for the way back from Driving (R1-12). Nothing renders it, so nothing re-renders.
+    private Task OnCameraChangedAsync(CameraState camera)
+    {
+        Ui.RecordCamera(camera, Session.Time.GetUtcNow());
+        return Task.CompletedTask;
+    }
+
+    // The script ended Follow (a gesture, a bubble tap, a recentre, or the member stopped driving).
+    private Task OnFollowEndedAsync()
+    {
+        Ui.FollowMemberId = null;
+        return Task.CompletedTask;
+    }
+
     // An edge bubble was tapped (D45, D84): the same reducer as a row, the handle and the header. One member id selects that member exactly like a pin tap (the selection is set and the
     // sheet is left at Peek); a cluster (two or more ids) changes nothing here, its camera fit was the script's. MapView then sends setSelection and the flight with the target Peek
     // padding because it reads Selection from this one state.
     private Task OnBubbleTapAsync(IReadOnlyList<string> ids) => ApplyAsync(new SheetEvent.BubbleTap(ids));
 
-    // The detail's back arrow is the Android Back from a detail (BackStep.Detail): Peek, the selection kept; in the panel the selection is cleared. The history entries are S8c's.
-    private Task OnBackAsync()
+    // The detail's back arrow is the Android Back from a detail (BackStep.Detail): Peek, the selection kept; in the panel the selection is cleared. It runs through HistorySync so that the
+    // history entry of the detail is taken back with it (one entry, D46, R2-04), as the Android Back itself would.
+    private async Task OnBackAsync()
     {
-        _ui.Back();
         _focusDetail = false;
+        await History.BackAsync();
         RefreshMapLayout();
-        return Task.CompletedTask;
     }
 
     // S10a: a tile of the Layers popover. The page applies the style at once (MapView sends it through the existing setStyle) and DevicePrefs stores it.
@@ -334,6 +419,13 @@
         if (_started)
         {
             Session.Changed -= OnSessionChanged;
+            Ui.Changed -= OnUiChanged;
+
+            // R1-12: the ten minutes count from the moment the page goes away, not from the last camera move, so the camera is stamped again now.
+            if (Ui.LastCamera is { } camera)
+            {
+                Ui.RecordCamera(camera, Session.Time.GetUtcNow());
+            }
         }
 
         if (_prefsSubscribed)
@@ -345,6 +437,11 @@
         {
             _ticker.Tick -= OnMinute;
             _ticker.Dispose();
+        }
+
+        if (_history is not null)
+        {
+            await _history.DisposeAsync();
         }
 
         if (_shell is not null)

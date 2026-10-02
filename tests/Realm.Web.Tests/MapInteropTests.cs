@@ -193,12 +193,13 @@ public sealed class MapInteropTests
         await callbacks.OnBubbleTap(["king"]);
         await callbacks.OnBubbleTap(["king", "queen"]);
         await callbacks.OnCameraChanged(camera);
+        await callbacks.OnFollowEnded();
         await callbacks.OnStyleResult(new StyleResult(MapStyleIds.Day, false, "offline"));
         await callbacks.OnWebGlUnavailable();
         await callbacks.OnError("setZones", "boom");
 
         Assert.Equal(
-            ["ready 1", "pinTap member king", "mapTap", "bubbleTap king", "bubbleTap king queen", "camera 12 Away True", "style day False offline", "webGlUnavailable", "error setZones boom"],
+            ["ready 1", "pinTap member king", "mapTap", "bubbleTap king", "bubbleTap king queen", "camera 12 Away True", "followEnded", "style day False offline", "webGlUnavailable", "error setZones boom"],
             handler.Events);
     }
 
@@ -218,7 +219,7 @@ public sealed class MapInteropTests
             Assert.Null(entry.Attribute.Identifier);   // the C# method name is the name the script uses
         });
         Assert.Equal(
-            ["OnBubbleTap", "OnCameraChanged", "OnError", "OnMapTap", "OnPinTap", "OnReady", "OnStyleResult", "OnWebGlUnavailable"],
+            ["OnBubbleTap", "OnCameraChanged", "OnError", "OnFollowEnded", "OnMapTap", "OnPinTap", "OnReady", "OnStyleResult", "OnWebGlUnavailable"],
             invokable.Select(entry => entry.Method.Name).Order(StringComparer.Ordinal));
         Assert.Empty(called.Except(invokable.Select(entry => entry.Method.Name)));
         Assert.Contains("OnReady", called);
@@ -299,6 +300,8 @@ public sealed class MapInteropTests
         public Task BubbleTapAsync(IReadOnlyList<string> ids) => Record($"bubbleTap {string.Join(' ', ids)}");
 
         public Task CameraChangedAsync(CameraState camera) => Record($"camera {camera.Zoom} {camera.Recenter} {camera.UserInitiated}");
+
+        public Task FollowEndedAsync() => Record("followEnded");
 
         public Task StyleResultAsync(StyleResult result) => Record($"style {result.StyleId} {result.Ok} {result.Error}");
 

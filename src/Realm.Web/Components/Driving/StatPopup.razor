@@ -1,3 +1,6 @@
+@implements IDisposable
+@using Realm.Web.State
+@inject RealmUiState Ui
 @* The popup of the six headline items (01 sections 6.7 and 6.7.1; 03 section 3.4): one anatomy for the four stat chips, the Top Speed card and the Drives card, opened
    with IDialogService.ShowAsync<StatPopup>. Top to bottom: the icon circle and the title in the dialog's header (the dialog is labelled by it, so its name is the title
    alone), the lore line, the one-sentence summary, the Drives | Miles toggle (Drives popup only), the bars, the footnote and the full-width "Got it". The Close button is
@@ -5,7 +8,8 @@
    by StatNameFormatter from the week report, so the popup does no arithmetic of its own: a null count is a "—" row, never 0. The footnote always begins "Source: The Realm's
    own records" (D26); the phone popup adds the Android Auto information button (D36) and the speeding footnote says the count is sampled (D39). Esc, the scrim, the
    Close button and "Got it" close it (the options and the dialog's own handlers); MudBlazor saves the focused opener when the focus trap first renders and focuses it
-   again when the popup goes, so focus returns to the chip or card. *@
+   again when the popup goes, so focus returns to the chip or card. The open popup is one history layer (03 section 3.7, R3-03): the Android Back closes it, and so does anything
+   else that closes it, which then takes the layer's history entry back. *@
 <MudDialog Class="realm-popup"
            TitleClass="realm-popup__head"
            ContentClass="realm-popup__body"
@@ -84,7 +88,11 @@
 </MudDialog>
 
 @code {
+    // One layer of the history depth while the popup is open (03 section 3.7).
+    private static readonly OverlayLayer Layer = new(OverlayKind.Dialog, "stat-popup");
+
     private bool _miles;
+    private bool _closed;
 
     /// <summary>The dialog this popup is the content of, cascaded by MudBlazor.</summary>
     [CascadingParameter]
@@ -123,5 +131,31 @@
 
     private void ShowMiles() => _miles = true;
 
+    protected override void OnInitialized() => Ui.OpenOverlay(Layer, CloseFromBack);
+
     private void Close() => MudDialog.Close();
+
+    // The Android Back or Esc took the layer off the stack: close the dialog too. It arrives off the renderer's context, so it marshals; a dialog that is closing already is left alone.
+    private void CloseFromBack()
+    {
+        if (_closed)
+        {
+            return;
+        }
+
+        _ = InvokeAsync(() =>
+        {
+            if (!_closed)
+            {
+                MudDialog.Close();
+            }
+        });
+    }
+
+    /// <summary>The popup is gone, whoever closed it (Esc, the scrim, a button or Back): its layer leaves the stack and the history entry goes with it.</summary>
+    public void Dispose()
+    {
+        _closed = true;
+        Ui.CloseOverlay(Layer);
+    }
 }

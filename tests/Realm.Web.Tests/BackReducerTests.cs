@@ -7,8 +7,9 @@ namespace Realm.Web.Tests;
 
 /// <summary>
 /// <see cref="BackReducer"/> and <see cref="SheetState.Depth"/> (01 section 5.7 Back chain, 03 sections 3.6, 3.7 and 8.3, AC-24, D45, D46): every row of the chain, Esc,
-/// the Expanded chain, and the two properties over every reachable state and overlay count 0 to 2 with the history tokens on and off. Pure: no browser, no component.
-/// The history is a test-local model of the <c>setDepth</c> contract of 03 section 3.7 (<see cref="FakeHistory"/>); the real helper arrives with the shell script.
+/// the Expanded chain, and the two properties over every reachable state and overlay count 0 to 2 with the history tokens on and off. No browser, no component. The rows that
+/// involve the browser history run against the real <see cref="HistorySync"/> and <see cref="RealmUiState"/> and fake only the JavaScript port (<see cref="FakeHistoryPort"/>,
+/// R2-11), so the sync is the one that ships.
 /// </summary>
 public sealed class BackReducerTests
 {
@@ -205,38 +206,38 @@ public sealed class BackReducerTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public void Back_AHeaderOpenedDetail_HasDepth2_AndBackReturnsToDepth1WithTheSelectionKept(bool historyTokens)
+    public async Task Back_AHeaderOpenedDetail_HasDepth2_AndBackReturnsToDepth1WithTheSelectionKept(bool historyTokens)
     {
-        var history = new FakeHistory(historyTokens);
+        var (ui, sync, port) = await AttachedAsync(historyTokens);
 
-        var header = SheetStateMachine.Reduce(SheetState.Initial, new SheetEvent.PinTap(Jester), LayoutMode.Compact);
-        history.SetDepth(header.Depth(LayoutMode.Compact));
-        Assert.Equal(1, history.Recorded);
+        ui.Apply(new SheetEvent.PinTap(Jester));
+        Assert.Equal(1, port.Recorded);
 
         // A tap on the Peek header body raises the same event as the handle (D46).
-        var detail = SheetStateMachine.Reduce(header, new SheetEvent.HandleToggle(), LayoutMode.Compact);
-        history.SetDepth(detail.Depth(LayoutMode.Compact));
-        Assert.Equal(new SheetBody.Detail(Jester), SheetBody.BodyOf(detail, LayoutMode.Compact));
-        Assert.Equal(2, detail.Depth(LayoutMode.Compact));
-        Assert.Equal(historyTokens ? 2 : 0, history.Entries);
+        ui.Apply(new SheetEvent.HandleToggle());
+        Assert.Equal(new SheetBody.Detail(Jester), ui.Body);
+        Assert.Equal(2, ui.Depth);
+        Assert.Equal(2, port.Recorded);
+        Assert.Equal(historyTokens ? 2 : 0, port.Entries);
 
+        BackStep? step;
         if (historyTokens)
         {
-            history.UserPop();   // the Android Back popped the entry of the detail
+            step = await sync.HandleBackAsync(port.UserPop());   // the Android Back popped the entry of the detail
+        }
+        else
+        {
+            step = await sync.BackAsync();   // with the tokens off the Android Back leaves; the back arrow still runs the reducer
         }
 
-        var (back, step) = BackReducer.Reduce(detail, LayoutMode.Compact);
-        var callsBefore = history.Calls;
-        history.SetDepth(back.Depth(LayoutMode.Compact));
-
         Assert.Equal(BackStep.Detail, step);
-        Assert.Equal(1, back.Depth(LayoutMode.Compact));
-        Assert.Equal(Jester, back.Selection);
-        Assert.Equal(SheetSize.Peek, back.Size);
-        Assert.Equal(new SheetBody.Header(Jester), SheetBody.BodyOf(back, LayoutMode.Compact));
-        Assert.Equal(callsBefore, history.Calls);   // the popped entry already matches: the sync pushes and pops nothing more
-        Assert.Equal(1, history.Recorded);
-        Assert.Equal(historyTokens ? 1 : 0, history.Entries);
+        Assert.Equal(1, ui.Depth);
+        Assert.Equal(Jester, ui.Selection);
+        Assert.Equal(SheetSize.Peek, ui.SheetSize);
+        Assert.Equal(new SheetBody.Header(Jester), ui.Body);
+        Assert.Equal(1, port.Recorded);
+        Assert.Equal(historyTokens ? 1 : 0, port.Entries);
+        Assert.Equal(historyTokens ? 2 : 0, port.Calls);   // two pushes, and the popped entry already matched: the sync pushed and popped nothing more
     }
 
     // ---- depth (03 section 3.7) ----------------------------------------------------------------------------------------------------------------------------------------
@@ -259,39 +260,47 @@ public sealed class BackReducerTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public void Back_LowersDepthByExactlyOne(bool historyTokens)
+    public async Task Back_LowersDepthByExactlyOne(bool historyTokens)
     {
         var checkedStates = 0;
-        foreach (var (state, mode) in SheetWalk.Run().States)
+        foreach (var ((state, mode), path) in Paths())
         {
             for (var overlays = 0; overlays <= 2; overlays++)
             {
-                var before = state.Depth(mode, overlays);
-                var history = new FakeHistory(historyTokens);
-                history.SetDepth(before);
-                var leaves = before == 0;
-                if (historyTokens && !leaves)
+                var ui = Replay(path, state, mode);
+                for (var i = 0; i < overlays; i++)
                 {
-                    history.UserPop();   // one Back gesture pops one entry; at depth 0 the browser leaves instead
+                    ui.OpenOverlay(new OverlayLayer(OverlayKind.Dialog, $"dialog-{i}"));
                 }
 
-                var (next, step) = BackReducer.Reduce(state, mode, overlays);
-                var afterOverlays = step == BackStep.Overlay ? overlays - 1 : overlays;
-                var after = next.Depth(mode, afterOverlays);
-                var callsBefore = history.Calls;
-                history.SetDepth(after);
+                var (sync, port) = await AttachAsync(ui, historyTokens);
+                var before = ui.Depth;
+                Assert.Equal(before, port.Recorded);
+                var leaves = before == 0;
+                var callsBefore = port.Calls;
 
+                BackStep? step;
+                if (historyTokens && !leaves)
+                {
+                    step = await sync.HandleBackAsync(port.UserPop());   // one Back gesture pops one entry; at depth 0 the browser leaves instead
+                }
+                else
+                {
+                    step = await sync.BackAsync();   // the back arrow, and the Leave that changes nothing
+                }
+
+                var after = ui.Depth;
                 var where = $"{state} {mode} overlays {overlays}";
                 Assert.Equal(leaves, step == BackStep.Leave);   // Leave exactly at depth 0
                 Assert.Equal(leaves ? before : before - 1, after);   // every step except Leave lowers it by exactly 1
                 if (leaves)
                 {
-                    Assert.Equal(state, next);
+                    Assert.Equal(state, ui.Sheet);
                 }
 
-                Assert.True(callsBefore == history.Calls, $"the sync after Back pushed or popped again: {where}");
-                Assert.Equal(after, history.Recorded);
-                Assert.Equal(historyTokens ? after : 0, history.Entries);
+                Assert.True(callsBefore == port.Calls, $"the sync after Back pushed or popped again: {where}");
+                Assert.Equal(after, port.Recorded);
+                Assert.Equal(historyTokens ? after : 0, port.Entries);
                 checkedStates++;
             }
         }
@@ -367,7 +376,7 @@ public sealed class BackReducerTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public void RowTapAtTall_KeepsDepth(bool historyTokens)
+    public async Task RowTapAtTall_KeepsDepth(bool historyTokens)
     {
         // A row (or a pin) tapped while the list is at Tall: the selection adds one level, the collapse removes one, so depth 1 stays 1 and nothing is pushed or popped.
         foreach (var entity in new[] { Jester, Wagon, Hall })
@@ -376,21 +385,30 @@ public sealed class BackReducerTests
             {
                 for (var overlays = 0; overlays <= 2; overlays++)
                 {
-                    var list = At(null, SheetSize.Tall, Section.Places);
-                    var history = new FakeHistory(historyTokens);
-                    history.SetDepth(list.Depth(LayoutMode.Compact, overlays));
-                    var callsBefore = history.Calls;
+                    var ui = Compact();
+                    ui.Apply(new SheetEvent.SegmentTap(Section.Places));
+                    ui.Apply(new SheetEvent.HandleSet(SheetSize.Tall));
+                    for (var i = 0; i < overlays; i++)
+                    {
+                        ui.OpenOverlay(new OverlayLayer(OverlayKind.Dialog, $"dialog-{i}"));
+                    }
 
-                    var header = SheetStateMachine.Reduce(list, select, LayoutMode.Compact);
-                    history.SetDepth(header.Depth(LayoutMode.Compact, overlays));
+                    var (_, port) = await AttachAsync(ui, historyTokens);
+                    Assert.Equal(1 + overlays, ui.Depth);
+                    Assert.Equal(1 + overlays, port.Recorded);
+                    var callsBefore = port.Calls;
+                    var requestsBefore = port.Requests;
 
-                    Assert.Equal(1 + overlays, list.Depth(LayoutMode.Compact, overlays));
-                    Assert.Equal(list.Depth(LayoutMode.Compact, overlays), header.Depth(LayoutMode.Compact, overlays));
-                    Assert.Equal(callsBefore, history.Calls);
-                    Assert.Equal(1 + overlays, history.Recorded);
-                    Assert.Equal(historyTokens ? 1 + overlays : 0, history.Entries);
+                    ui.Apply(select);
 
-                    var (cleared, step) = BackReducer.Reduce(header, LayoutMode.Compact, 0);   // the next Back still clears the selection
+                    Assert.Equal(new SheetBody.Header(entity), ui.Body);
+                    Assert.Equal(1 + overlays, ui.Depth);
+                    Assert.Equal(callsBefore, port.Calls);
+                    Assert.Equal(requestsBefore, port.Requests);   // the depth did not change, so the port was not even asked
+                    Assert.Equal(1 + overlays, port.Recorded);
+                    Assert.Equal(historyTokens ? 1 + overlays : 0, port.Entries);
+
+                    var (cleared, step) = BackReducer.Reduce(ui.Sheet, LayoutMode.Compact, 0);   // the next Back still clears the selection
                     if (overlays == 0)
                     {
                         Assert.Equal(BackStep.Selection, step);
@@ -416,9 +434,76 @@ public sealed class BackReducerTests
 
     // ---- RealmUiState: the overlay stack in front of the reducer --------------------------------------------------------------------------------------------------------
 
-    private static RealmUiState Compact()
+    private static RealmUiState Compact() => WithLayout(LayoutMode.Compact);
+
+    private static RealmUiState WithLayout(LayoutMode mode) =>
+        new() { Layout = new LayoutSnapshot(mode, false, mode == LayoutMode.Compact ? 412 : 900, 915, new Realm.Web.Map.Padding(0, 0, 0, 0)) };
+
+    // The real sync on the real state, with only the browser's end faked.
+    private static async Task<(HistorySync Sync, FakeHistoryPort Port)> AttachAsync(RealmUiState ui, bool historyTokens)
     {
-        var ui = new RealmUiState { Layout = new LayoutSnapshot(LayoutMode.Compact, false, 412, 915, new Realm.Web.Map.Padding(0, 0, 0, 0)) };
+        var sync = new HistorySync(ui, new HistoryOptions(historyTokens));
+        var port = new FakeHistoryPort(historyTokens);
+        await sync.AttachAsync(port, HistorySurface.Location);
+        return (sync, port);
+    }
+
+    private static async Task<(RealmUiState Ui, HistorySync Sync, FakeHistoryPort Port)> AttachedAsync(bool historyTokens)
+    {
+        var ui = Compact();
+        var (sync, port) = await AttachAsync(ui, historyTokens);
+        return (ui, sync, port);
+    }
+
+    // The shortest path (events, and layout changes as a LayoutMode) from the opening state to every reachable (state, layout) pair, so that a real RealmUiState can be brought to it.
+    private static Dictionary<(SheetState State, LayoutMode Mode), List<object>> Paths()
+    {
+        var paths = new Dictionary<(SheetState, LayoutMode), List<object>>
+        {
+            [(SheetState.Initial, LayoutMode.Compact)] = [],
+            [(SheetState.Initial, LayoutMode.Expanded)] = [LayoutMode.Expanded],
+        };
+        var queue = new Queue<(SheetState State, LayoutMode Mode)>(paths.Keys);
+        while (queue.Count > 0)
+        {
+            var (state, mode) = queue.Dequeue();
+            var path = paths[(state, mode)];
+            var other = mode == LayoutMode.Compact ? LayoutMode.Expanded : LayoutMode.Compact;
+            if (paths.TryAdd((state, other), [.. path, other]))
+            {
+                queue.Enqueue((state, other));
+            }
+
+            foreach (var sheetEvent in SheetWalk.Events)
+            {
+                var next = SheetStateMachine.Reduce(state, sheetEvent, mode);
+                if (paths.TryAdd((next, mode), [.. path, sheetEvent]))
+                {
+                    queue.Enqueue((next, mode));
+                }
+            }
+        }
+
+        return paths;
+    }
+
+    private static RealmUiState Replay(List<object> path, SheetState expected, LayoutMode mode)
+    {
+        var ui = Compact();
+        foreach (var step in path)
+        {
+            if (step is SheetEvent sheetEvent)
+            {
+                ui.Apply(sheetEvent);
+            }
+            else
+            {
+                ui.Layout = WithLayout((LayoutMode)step).Layout;
+            }
+        }
+
+        Assert.Equal(expected, ui.Sheet);
+        Assert.Equal(mode, ui.Layout.Mode);
         return ui;
     }
 
@@ -482,46 +567,5 @@ public sealed class BackReducerTests
         Assert.Equal(new[] { popover }, ui.Overlays);
         Assert.False(ui.CloseOverlay(settings));
         Assert.Equal(1, ui.Depth);
-    }
-}
-
-/// <summary>
-/// A model of the <c>setDepth(n)</c> contract of 03 section 3.7: with the history tokens on it pushes the missing entries or goes back by the surplus; with
-/// <c>HistoryTokens = false</c> it only records the target and never touches the history, so the Android Back simply leaves the app. <see cref="Calls"/> counts every
-/// push and every go, so a test can assert that a transition pushed or popped nothing.
-/// </summary>
-internal sealed class FakeHistory(bool tokens)
-{
-    /// <summary>The entries this document has pushed above its base entry.</summary>
-    public int Entries { get; private set; }
-
-    /// <summary>The depth the last <see cref="SetDepth"/> recorded.</summary>
-    public int Recorded { get; private set; }
-
-    /// <summary>The number of <c>pushState</c> and <c>history.go</c> calls so far.</summary>
-    public int Calls { get; private set; }
-
-    public void SetDepth(int depth)
-    {
-        if (tokens && depth > Entries)
-        {
-            Calls += depth - Entries;
-            Entries = depth;
-        }
-        else if (tokens && depth < Entries)
-        {
-            Calls++;
-            Entries = depth;
-        }
-
-        Recorded = depth;
-    }
-
-    /// <summary>The Back gesture popped one entry (only with the tokens on; without them nothing was pushed to pop).</summary>
-    public void UserPop()
-    {
-        Assert.True(tokens);
-        Assert.True(Entries > 0);
-        Entries--;
     }
 }
