@@ -434,6 +434,7 @@ interface BarGeometry {
   fill: Rect;
   avatar: Rect;
   pill: Rect;
+  value: Rect;
 }
 
 async function barGeometry(dialog: Locator, memberId: string): Promise<BarGeometry> {
@@ -443,24 +444,38 @@ async function barGeometry(dialog: Locator, memberId: string): Promise<BarGeomet
     fill: await boxOf(row.locator('.realm-bar__fill'), `bar-${memberId} fill`),
     avatar: await boxOf(row.locator('.realm-avatar'), `bar-${memberId} avatar`),
     pill: await boxOf(row.locator('.realm-bar__pill'), `bar-${memberId} pill`),
+    value: await boxOf(row.locator('.realm-bar__value'), `bar-${memberId} value`),
   };
 }
 
+/** True when the text of a pill is inside the pill: nothing overflows it (a long value such as "366.0 mi" widens the pill past its minimum instead of spilling out). */
+async function pillTextFits(dialog: Locator, memberId: string): Promise<{ fits: boolean; scroll: number; client: number }> {
+  return dialog
+    .getByTestId(`bar-${memberId}`)
+    .locator('.realm-bar__pill')
+    .evaluate((pill) => ({ fits: pill.scrollWidth <= pill.clientWidth + 1, scroll: pill.scrollWidth, client: pill.clientWidth }));
+}
+
 /**
- * 01 section 6.7.1 and AC-39: rows of 56 px; the fill is value over the largest value of the room left of the pill (track minus pill minus 8 px), never under 56 px, so the
- * largest bar is at 100 % of that room and every other one is within 2 % of its proportion of it; the avatar sits at the right end of its fill, inset 8 px; and the pill is
- * 56 px wide, 72 px for miles and mph.
+ * 01 section 6.7.1 and AC-39: rows of 56 px; the pill is "min-width 56 (72 for miles and mph values)", a MINIMUM: it grows with its text (the "366.0 mi" pill is wider than 72 px),
+ * so what is asserted is that it is at least `pillMin` wide, that its text fits inside it and that it is no wider than that text needs; the fill is value over the largest value
+ * of the room left of the pill as it is drawn (track minus pill minus 8 px, so the pill's own width), never under 56 px, so the largest bar is at 100 % of that room and every
+ * other one is within 2 % of its proportion of it; the avatar sits at the right end of its fill, inset 8 px, and the fill ends before its pill.
  */
-async function expectBars(dialog: Locator, rows: ReadonlyArray<{ id: string; value: number }>, pillWidth: 56 | 72): Promise<void> {
+async function expectBars(dialog: Locator, rows: ReadonlyArray<{ id: string; value: number }>, pillMin: 56 | 72): Promise<void> {
   const largest = Math.max(...rows.map((row) => row.value));
+  const largestId = (rows.find((row) => row.value === largest) as { id: string }).id;
   const geometry = new Map<string, BarGeometry>();
   for (const row of rows) geometry.set(row.id, await barGeometry(dialog, row.id));
-  const widest = (geometry.get((rows.find((row) => row.value === largest) as { id: string }).id) as BarGeometry).fill.width;
+  const widest = (geometry.get(largestId) as BarGeometry).fill.width;
   for (const row of rows) {
-    const { track, fill, avatar, pill } = geometry.get(row.id) as BarGeometry;
-    const room = track.width - pillWidth - 8;
+    const { track, fill, avatar, pill, value } = geometry.get(row.id) as BarGeometry;
+    const room = track.width - pill.width - 8;
     expectApprox(track.height, 56, TOLERANCE_PX, `${row.id} row height`);
-    expectApprox(pill.width, pillWidth, TOLERANCE_PX, `${row.id} pill width`);
+    expect.soft(pill.width, `${row.id} pill is at least ${pillMin} px wide (min-width)`).toBeGreaterThanOrEqual(pillMin - 0.5);
+    expect.soft(pill.width, `${row.id} pill is no wider than its text needs, or ${pillMin} px`).toBeLessThanOrEqual(Math.max(pillMin, value.width + 16) + TOLERANCE_PX);
+    const { fits, scroll, client } = await pillTextFits(dialog, row.id);
+    expect.soft(fits, `${row.id} pill text fits (scrollWidth ${scroll}, clientWidth ${client})`).toBe(true);
     expectApprox(fill.width, Math.max(56, (row.value / largest) * room), Math.max(TOLERANCE_PX, 0.02 * room), `${row.id} fill width`);
     expect.soft(fill.width, `${row.id} fill is never under 56 px`).toBeGreaterThanOrEqual(56 - 1);
     if ((row.value / largest) * room > 56) expect.soft(Math.abs(fill.width / widest - row.value / largest), `${row.id} fill is proportional to its value (within 2 %)`).toBeLessThanOrEqual(0.02);
@@ -468,7 +483,8 @@ async function expectBars(dialog: Locator, rows: ReadonlyArray<{ id: string; val
     expectApprox(avatar.width, 40, TOLERANCE_PX, `${row.id} avatar diameter`);
     expect.soft(fill.x + fill.width, `${row.id} fill ends before its pill`).toBeLessThanOrEqual(pill.x + TOLERANCE_PX);
   }
-  expectApprox(widest, (geometry.get(rows[0]?.id ?? '') as BarGeometry).track.width - pillWidth - 8, TOLERANCE_PX, 'the largest bar takes all the room left of the pill (100 %)');
+  const top = geometry.get(largestId) as BarGeometry;
+  expectApprox(widest, top.track.width - top.pill.width - 8, TOLERANCE_PX, 'the largest bar takes all the room left of its pill (100 %)');
 }
 
 /** The test ids and texts of the pills, in the order drawn. */
@@ -700,7 +716,8 @@ test.describe('acceptance D: driving popups and the driver week', () => {
     expect(await pillTexts(dialog)).toEqual(['60', DASH, DASH, DASH]);
 
     const alden = await barGeometry(dialog, 'king');
-    expectApprox(alden.fill.width, alden.track.width - 56 - 8, TOLERANCE_PX, "Alden's bar takes all the room (100 %)");
+    expect.soft(alden.pill.width, "Alden's pill is at least 56 px wide (min-width)").toBeGreaterThanOrEqual(56 - 0.5);
+    expectApprox(alden.fill.width, alden.track.width - alden.pill.width - 8, TOLERANCE_PX, "Alden's bar takes all the room left of his pill (100 %)");
     for (const id of ['jester', 'cryptid', 'queen'] as const) {
       const row = dialog.getByTestId(`bar-${id}`);
       const geometry = await barGeometry(dialog, id);
@@ -809,7 +826,8 @@ test.describe('acceptance D: driving popups and the driver week', () => {
     expect.soft(captionBox.y, 'the caption is below the last drive').toBeGreaterThanOrEqual(lastRow.y + lastRow.height - TOLERANCE_PX);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow, 'no horizontal page scroll').toBeLessThanOrEqual(0);
-    await expect(page.locator('main, body')).not.toContainText('Life360');
+    // R-001 / D26: the page never names Life360. One element, the page's own region (`main` and `body` together would be two, and body also holds the hidden error and reconnect texts).
+    await expect(page.locator('#realm-main'), 'the driver week never names Life360').not.toContainText('Life360');
   });
 
   test('[AC-41] the driver week follows the week of the URL, and a week without a record says so', async ({ page }) => {

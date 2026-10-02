@@ -456,10 +456,13 @@ public sealed class StatPopupTests : ComponentTestBase
     private static string[] PressedStates(IRenderedComponent<MudDialogProvider> cut) =>
         cut.FindAll(".realm-popup__toggle-chip").Select(chip => chip.GetAttribute("aria-pressed")!).ToArray();
 
-    // The share of the largest bar that each fill takes, as the stylesheet reads it from --realm-bar-fraction (the largest is 1, so it is drawn at 100 %).
+    // The share of the largest bar that each fill takes, as the stylesheet reads it from --realm-bar-fraction (the largest is 1, so it is drawn at 100 %). The markup
+    // carries four decimals ("0.4545" for 10 / 22), so a comparison to the exact quotient needs a tolerance: rounding both to three places flips at a midpoint (0.4545
+    // rounds to 0.454, 0.45454 to 0.455). The error of four decimals is at most 0.00005, far inside the 2 % (0.02) that AC-39 allows.
     private static void AssertFractions(double[] expected, IRenderedComponent<MudDialogProvider> cut)
     {
         const string Property = "--realm-bar-fraction:";
+        const double Tolerance = 0.0001;
         var actual = cut.FindAll(".realm-bar__fill")
             .Select(fill => fill.GetAttribute("style")!)
             .Select(style => double.Parse(style[(style.IndexOf(Property, StringComparison.Ordinal) + Property.Length)..].TrimEnd(';'), CultureInfo.InvariantCulture))
@@ -467,7 +470,7 @@ public sealed class StatPopupTests : ComponentTestBase
         Assert.Equal(expected.Length, actual.Length);
         for (var i = 0; i < expected.Length; i++)
         {
-            Assert.Equal(expected[i], actual[i], precision: 3);
+            Assert.InRange(actual[i], expected[i] - Tolerance, expected[i] + Tolerance);
         }
     }
 }

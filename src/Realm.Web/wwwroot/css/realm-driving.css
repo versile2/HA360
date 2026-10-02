@@ -694,8 +694,9 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-/* ---- the bars (01 section 6.7.1): rows of 56 px with 8 px gaps. The fill is value / maximum of the room left of the pill (track - pill - 8 px), floored at 56 px so the avatar
-   always fits; an unavailable row sits at the floor too, with no colour. The pill is 56 px wide, 72 px for miles and mph. ---- */
+/* ---- the bars (01 section 6.7.1): rows of 56 px with 8 px gaps. The pill's width is a minimum (56 px, 72 px for miles and mph) and grows with its text ("366.0 mi" is wider than
+   72 px), so the row is a grid of the room and the pill: the fill is value / maximum of the room left of the pill as it is drawn (track - pill - 8 px, the 8 px being the pill's inset
+   from the track's right edge), floored at 56 px so the avatar always fits, and it can never run under the pill. An unavailable row sits at the floor too, with no colour. ---- */
 
 .realm-bars {
   --realm-bar-pill: 56px;
@@ -712,7 +713,11 @@
 .realm-bar {
   position: relative;
   box-sizing: border-box;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
   height: 56px;
+  padding: 0 8px 0 0;
   overflow: hidden;
   border-radius: 28px;
   background: var(--realm-bar-track);
@@ -723,7 +728,7 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  width: max(56px, calc(var(--realm-bar-fraction, 0) * (100% - var(--realm-bar-pill) - 8px)));
+  width: max(56px, calc(var(--realm-bar-fraction, 0) * 100%));
   height: 100%;
   padding: 0 8px;
   overflow: hidden;
@@ -747,9 +752,6 @@
 }
 
 .realm-bar__pill {
-  position: absolute;
-  top: 8px;
-  right: 8px;
   box-sizing: border-box;
   display: inline-flex;
   align-items: center;
