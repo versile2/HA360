@@ -8,7 +8,7 @@
 // `saveShot`, the Demo's frozen clock (21:25 CDT, the default of `demo()`; the chip text below proves it), the hidden `demo-offline` style (no tiles, no
 // fonts), `settled()` and `document.fonts.ready` before the capture. Only SwiftShader's anti-aliasing can still differ between runs.
 //
-// S6b writes SC01. S7b appends SC02 to SC05 (the lists of the sheet). Later slices append theirs (SC06 and SC07 at S8, SC08 and SC09 at S10, ...).
+// S6b writes SC01. S7b appends SC02 to SC05 (the lists of the sheet). S9b appends SC15 at the end. Later slices append theirs (SC06 and SC07 at S8, SC08 and SC09 at S10, ...).
 import fs from 'node:fs';
 
 import type { Locator, Page } from '@playwright/test';
@@ -301,5 +301,26 @@ test.describe('[GAL] screenshot gallery: Driving popups, the driver week and the
 
     const partial = await saveShot(page, testInfo, 'SC17-variant-fresh-install-partial');
     expectViewportPng(partial, page, testInfo.project.name);
+  });
+});
+
+// ---- S9b: SC15 (03 section 8.5, row SC15: Location with `?variant=poor-accuracy`, the accuracy halo) ----------------------------------------------
+// Appended as a block of its own at the end. The halo is a map layer under the Jester's pin: its radius (800 m) is asserted from pixels by [AC-16b] in ac-b-map.spec.ts, and this scene
+// is the picture. The checklist for the reader (03 section 8.5, SC15): a soft disc of the member colour under the Jester's pin with a dashed edge, a radius of about 22 px at the default
+// view, the pin and its ring drawn over it, the two bubbles on their edges, and nothing else different from SC01.
+test.describe('[GAL] screenshot gallery: the accuracy halo', () => {
+  test('[GAL] SC15-variant-poor-accuracy', { tag: ['@phone', '@unfolded'] }, async ({ page }, testInfo) => {
+    await demo(page, { variant: 'poor-accuracy' });
+    await mapReady(page);
+
+    // The scene is in the state it is named for: the default view, still, with the same four pins on screen as SC01, the two far members on their edges, and the Jester's pin there.
+    expect(await readHook(page, 'styleId'), 'the Demo style').toBe('demo-offline');
+    expect((await readHook(page, 'camera')).animated, 'no camera animation at capture').toBe(false);
+    expect(await onScreenPinTestIds(page), 'pins on screen').toEqual(['pin-member-jester', 'pin-member-king', 'pin-member-queen', 'pin-vehicle-wagon']);
+    expect((await readHook(page, 'bubbles')).map((bubble) => bubble.id).sort(), 'the bubbles on the edges').toEqual(['cryptid', 'prince']);
+    await expect(page.getByTestId('pin-member-jester'), "the Jester's pin, over the halo").toBeVisible();
+
+    const file = await saveShot(page, testInfo, 'SC15-variant-poor-accuracy');
+    expectViewportPng(file, page, testInfo.project.name);
   });
 });

@@ -771,6 +771,98 @@ public sealed class FormatterTests
         Assert.Equal("P", row.Avatars[0].Initial);
     }
 
+    // ---- edge bubbles: 01 sections 4.10 and 10.3 ------------------------------------------------------------------------------------------
+
+    // The legs are the ones 01 Appendix A.1 states for the two members behind the bubbles: Dara 155 miles east of Alden, Elio 681 miles north-west (metres here).
+    private const double CryptidMeters = 249_790;
+    private const double PrinceMeters = 1_095_947;
+
+    [Fact]
+    public void BubbleLabel_IsTheNameTheDistanceInWordsAndTheCompassWord()
+    {
+        Assert.Equal(
+            $"{DemoCast.Cryptid.Name}, 155 miles east, off screen. Double tap to include on the map.",
+            BubbleTextFormatter.Label(DemoCast.Cryptid.Name, (CryptidMeters, 90)));
+        Assert.Equal(
+            $"{DemoCast.Prince.Name}, 681 miles north-west, off screen. Double tap to include on the map.",
+            BubbleTextFormatter.Label(DemoCast.Prince.Name, (PrinceMeters, 315)));
+    }
+
+    [Fact]
+    public void BubbleTooltip_IsTheNameTheShortDistanceAndTheCompassWord()
+    {
+        Assert.Equal(
+            $"{DemoCast.Cryptid.Name} · 155 mi east · tap to include on the map",
+            BubbleTextFormatter.Tooltip(DemoCast.Cryptid.Name, (CryptidMeters, 90)));
+        Assert.Equal(
+            $"{DemoCast.Prince.Name} · 681 mi north-west · tap to include on the map",
+            BubbleTextFormatter.Tooltip(DemoCast.Prince.Name, (PrinceMeters, 315)));
+    }
+
+    [Fact]
+    public void BubbleText_WithoutAReferencePoint_LeavesTheDistanceOut()
+    {
+        // The viewer's own bubble, and any bubble when there is no "me" to measure from.
+        Assert.Equal($"{DemoCast.King.Name}, off screen. Double tap to include on the map.", BubbleTextFormatter.Label(DemoCast.King.Name, null));
+        Assert.Equal($"{DemoCast.King.Name} · tap to include on the map", BubbleTextFormatter.Tooltip(DemoCast.King.Name, null));
+    }
+
+    [Theory]
+    [InlineData(97.5, "320 feet", "320 ft")]                                // the three bands of UnitFormatter, in words and short
+    [InlineData(1609.344, "1.0 mile", "1.0 mi")]                            // singular at exactly one
+    [InlineData(1700, "1.1 miles", "1.1 mi")]
+    [InlineData(16093, "10 miles", "10 mi")]
+    public void BubbleText_UsesTheDistanceBandsOfUnitFormatter(double meters, string words, string brief)
+    {
+        Assert.Equal($"{DemoCast.Jester.Name}, {words} north, off screen. Double tap to include on the map.", BubbleTextFormatter.Label(DemoCast.Jester.Name, (meters, 0)));
+        Assert.Equal($"{DemoCast.Jester.Name} · {brief} north · tap to include on the map", BubbleTextFormatter.Tooltip(DemoCast.Jester.Name, (meters, 0)));
+    }
+
+    [Theory]
+    [InlineData(0, "north")]
+    [InlineData(45, "north-east")]
+    [InlineData(90, "east")]
+    [InlineData(135, "south-east")]
+    [InlineData(180, "south")]
+    [InlineData(225, "south-west")]
+    [InlineData(270, "west")]
+    [InlineData(315, "north-west")]
+    [InlineData(22.4, "north")]                                             // the nearest of eight, a half step rounding clockwise
+    [InlineData(22.5, "north-east")]
+    [InlineData(337.4, "north-west")]
+    [InlineData(337.5, "north")]
+    [InlineData(359, "north")]
+    [InlineData(360, "north")]
+    [InlineData(405, "north-east")]                                         // a bearing outside 0 to 360 wraps
+    [InlineData(-45, "north-west")]
+    public void CompassWord_IsTheNearestOfEightDirections(double bearingDeg, string expected) =>
+        Assert.Equal(expected, BubbleTextFormatter.CompassWord(bearingDeg));
+
+    [Fact]
+    public void ClusterText_CountsThePeopleAndListsTheNamesInTheOrderOfTheBubble()
+    {
+        string[] two = [DemoCast.Cryptid.Name, DemoCast.Prince.Name];
+        string[] three = [DemoCast.Queen.Name, DemoCast.King.Name, DemoCast.Jester.Name];
+
+        Assert.Equal($"2 people off screen: {two[0]}, {two[1]}. Double tap to include them on the map.", BubbleTextFormatter.ClusterLabel(two));
+        Assert.Equal($"3 people off screen: {three[0]}, {three[1]}, {three[2]}. Double tap to include them on the map.", BubbleTextFormatter.ClusterLabel(three));
+        Assert.Equal($"{two[0]}, {two[1]} · tap to include them on the map", BubbleTextFormatter.ClusterTooltip(two));
+    }
+
+    [Fact]
+    public void ClusterText_IsWhatTheTemplatesOfTheMapStringsGiveWhenTheScriptFillsThem()
+    {
+        // realmMap.js never builds a string: it fills {n} and {names} of MapStrings. The two sources must not drift apart.
+        string[] names = [DemoCast.Cryptid.Name, DemoCast.Prince.Name, DemoCast.King.Name];
+        var strings = Realm.Web.Components.Map.MapStrings.Default;
+        var joined = string.Join(", ", names);
+
+        Assert.Equal(
+            BubbleTextFormatter.ClusterLabel(names),
+            strings.ClusterName.Replace("{n}", "3", StringComparison.Ordinal).Replace("{names}", joined, StringComparison.Ordinal));
+        Assert.Equal(BubbleTextFormatter.ClusterTooltip(names), strings.ClusterTooltip.Replace("{names}", joined, StringComparison.Ordinal));
+    }
+
     // ---- helpers ---------------------------------------------------------------------------------------------------------------------------
 
     // The Demo session owns a clock and the line is computed at its instant (the frozen Demo anchor), never at the wall clock; the session is never started,

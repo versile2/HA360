@@ -1,5 +1,6 @@
 using Realm.Demo;
 using Realm.Domain;
+using Realm.Web.Formatting;
 using Realm.Web.Map;
 using Xunit;
 
@@ -304,6 +305,35 @@ public sealed class MapPayloadFactoryTests
         Assert.Equal($"{DemoCast.Cryptid.Name} · 155 mi east · tap to include on the map", members[DemoCast.Cryptid.Id].BubbleTooltip);
         Assert.Equal($"{DemoCast.Prince.Name}, 681 miles north-west, off screen. Double tap to include on the map.", members[DemoCast.Prince.Id].BubbleLabel);
         Assert.Equal($"{DemoCast.King.Name}, off screen. Double tap to include on the map.", members[DemoCast.King.Id].BubbleLabel);
+    }
+
+    [Fact]
+    public void Demo_BubbleStrings_AreTheBubbleTextFormatters()
+    {
+        // The payload carries the strings of BubbleTextFormatter (S9b): the same legs as the row above, 155 miles east and 681 miles north-west.
+        var members = DemoMembers();
+
+        Assert.Equal(BubbleTextFormatter.Label(DemoCast.Cryptid.Name, (249_790, 90)), members[DemoCast.Cryptid.Id].BubbleLabel);
+        Assert.Equal(BubbleTextFormatter.Tooltip(DemoCast.Cryptid.Name, (249_790, 90)), members[DemoCast.Cryptid.Id].BubbleTooltip);
+        Assert.Equal(BubbleTextFormatter.Label(DemoCast.Prince.Name, (1_095_947, 315)), members[DemoCast.Prince.Id].BubbleLabel);
+        Assert.Equal(BubbleTextFormatter.Tooltip(DemoCast.Prince.Name, (1_095_947, 315)), members[DemoCast.Prince.Id].BubbleTooltip);
+        Assert.Equal(BubbleTextFormatter.Label(DemoCast.King.Name, null), members[DemoCast.King.Id].BubbleLabel);
+        Assert.Equal(BubbleTextFormatter.Tooltip(DemoCast.King.Name, null), members[DemoCast.King.Id].BubbleTooltip);
+    }
+
+    [Fact]
+    public void Demo_BubbleFacts_AreInThePayload_ForTheScriptThatCannotKnowThem()
+    {
+        // 03 section 4.6: C# contributes the facts layoutBubbles cannot know: who is far away, who is me, who is the static member with the Home badge.
+        var members = DemoMembers();
+
+        Assert.Equal([DemoCast.Cryptid.Id, DemoCast.Prince.Id], members.Values.Where(item => item.Far).Select(item => item.Id).Order(StringComparer.Ordinal));
+        Assert.True(members[DemoCast.King.Id].IsMe);
+        Assert.Equal([DemoCast.King.Id], members.Values.Where(item => item.IsMe).Select(item => item.Id));
+        Assert.True(members[DemoCast.Prince.Id].IsStatic);
+        Assert.Equal(PinBadge.Home, members[DemoCast.Prince.Id].Badge);
+        Assert.All(members.Values, item => Assert.Contains("off screen", item.BubbleLabel, StringComparison.Ordinal));
+        Assert.All(members.Values, item => Assert.EndsWith("tap to include on the map", item.BubbleTooltip, StringComparison.Ordinal));
     }
 
     [Theory]

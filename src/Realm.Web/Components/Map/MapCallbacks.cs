@@ -24,6 +24,9 @@ public sealed class MapCallbacks
     public Task OnMapTap() => _handler.MapTapAsync();
 
     [JSInvokable]
+    public Task OnBubbleTap(string[] ids) => _handler.BubbleTapAsync(ids);
+
+    [JSInvokable]
     public Task OnCameraChanged(CameraState camera) => _handler.CameraChangedAsync(camera);
 
     [JSInvokable]

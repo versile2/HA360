@@ -29,7 +29,7 @@
 // rethrowing into Blazor. Per-frame traffic to .NET is zero. S5a creates the thirteen exports below; S8a adds the selection ones and
 // S9 the bubbles in the commented region at the end of this file, leaving the code above untouched (04 section 1.8).
 
-import { circlePolygon, metersPerPixel } from './geo.js';
+import { boundsOf, circlePolygon, metersPerPixel } from './geo.js';
 import {
   DEFAULT_LAYOUT,
   PIN_BODY_ALLOWANCE_PX,
@@ -64,7 +64,26 @@ import {
   overlaySpec,
   transformStyle,
 } from './mapStyles.js';
-import { installTestHooks, removeTestHooks } from './testHooks.js';
+import { fanOut } from './fanout.js';
+import { layoutBubbles } from './bubbleLayout.js';
+import {
+  BUBBLE_FADE_MS,
+  BUBBLE_HIT_PX,
+  BUBBLE_SLIDE_MS,
+  CLUSTER_FIT_MAX_ZOOM,
+  CLUSTER_FIT_MS,
+  bubbleAnchors,
+  bubbleKey,
+  bubbleRect,
+  bubbleTexts,
+  clusterFitPoints,
+  describeBubbles,
+  fanItems,
+  installTestHooks,
+  isOwnBubble,
+  keepOutRects,
+  removeTestHooks,
+} from './testHooks.js';
 import { readSheet, sheetHeightForPadding, sheetMetrics } from './realmShell.js';
 
 /**
@@ -261,7 +280,7 @@ const PIN_TEMPLATE =
  * @property {string} ring
  * @property {boolean} dashed
  * @property {string | null} badge
- * @property {number} dx the fan-out shift in px (S9; always 0 until then)
+ * @property {number} dx the fan-out shift in px (S9b: 0, or 48 for each pin that overlaps a higher-priority one)
  * @property {HTMLElement | null} chipEl
  * @property {boolean} chipBelow
  */
@@ -658,6 +677,7 @@ function reconcilePins(r, kind) {
   const seen = new Set();
   for (const item of items) {
     if (typeof item.lat !== 'number' || typeof item.lon !== 'number') continue;
+    if (kind === 'member' && isBubbled(r, item.id)) continue; // S9b: an off-screen member has a bubble and no pin (AC-13)
     const key = `${kind}:${item.id}`;
     seen.add(key);
     let pin = r.pins.get(key);
@@ -1048,7 +1068,7 @@ function scheduleRender() {
 /** @param {Runtime} r @returns {boolean} */
 function hasPendingWork(r) {
   const d = r.dirty;
-  return d.resize || d.members || d.vehicles || d.zones || d.halos || r.wantFit !== null || r.raf !== 0 || selectionPending(r); // S8a: the re-centre is armed
+  return d.resize || d.members || d.vehicles || d.zones || d.halos || r.wantFit !== null || r.raf !== 0 || selectionPending(r) || bubblesPending(r); // S8a: the re-centre is armed; S9b: a bubble is still fading or sliding
 }
 
 /** One coalesced frame: applies whatever the setters retained, in a fixed order. @param {number} timestamp */
@@ -1065,6 +1085,7 @@ function renderFrame(timestamp) {
       const { animate } = r.wantFit;
       if (fitNow(r, animate)) r.wantFit = null;
     }
+    layoutBubblesFrame(r); // S9b (01 section 4.10): which members are off screen, and the bubbles; before the pins are reconciled
     if (r.dirty.members) {
       r.dirty.members = false;
       reconcilePins(r, 'member');
@@ -1075,6 +1096,7 @@ function renderFrame(timestamp) {
       reconcilePins(r, 'vehicle');
     }
     gliding = advanceGlides(r, timestamp);
+    fanOutFrame(r); // S9b (01 section 4.8): the pins' 48 px shifts, from where the glides left them
     if (r.styleReady) {
       if (r.dirty.halos) {
         r.dirty.halos = false;
@@ -1321,6 +1343,7 @@ function bindMap(r) {
   });
 
   bindSelection(r); // S8a: gestures end Follow and leave the default view; a flight's end releases the padding
+  bindBubbles(r); // S9b: the state of the bubbles and the observer of their keep-out elements
 
   r.resizeObserver = new ResizeObserver(() => {
     r.dirty.resize = true;
@@ -1345,6 +1368,7 @@ function teardown() {
   if (r.cameraTimer !== null) clearTimeout(r.cameraTimer);
   if (r.pending) clearTimeout(r.pending.timer);
   releaseSelection(r); // S8a
+  releaseBubbles(r); // S9b
   r.resizeObserver?.disconnect();
   document.removeEventListener('visibilitychange', r.onVisibility);
   for (const pin of r.pins.values()) pin.marker.remove();
@@ -2017,3 +2041,435 @@ export function recenter() {
     }) ?? 'away'
   );
 }
+
+// ---- S9b: the edge bubbles, the cluster tap and the pin fan-out (03 sections 4.6 and 4.7, 01 sections 4.8 and 4.10; D45, D75, D84) ---------------------------
+// One coalesced frame (scheduleRender, then renderFrame) does all of it: it projects the members, computes R, calls layoutBubbles, decides which member pins
+// exist (a member outside R has a bubble and no pin, AC-13), writes the bubble DOM, and after the glides fans the pins out. Per-frame traffic to .NET is zero; a
+// tap sends OnBubbleTap once. The state of this region lives in a WeakMap like S8a's, and the S5a functions reach it through the one-line hooks marked `S9b:`
+// (reconcilePins, hasPendingWork, renderFrame, bindMap, teardown). The arithmetic and the strings are in testHooks.js (bubbleRect, bubbleAnchors, bubbleTexts, ...)
+// and bubbleLayout.js / fanout.js, all of them tested in Node.
+
+/**
+ * @typedef {object} BubbleEl
+ * @property {string} key the member id, or `id1-id2` for a cluster: the suffix of the test id
+ * @property {HTMLButtonElement} el
+ * @property {string[]} ids the members the bubble stands for
+ * @property {Record<string, unknown>} last the values last written, per aspect (so an unchanged frame touches nothing)
+ * @property {ReturnType<typeof setTimeout> | null} leaving the removal timer while the bubble fades out
+ */
+/**
+ * @typedef {object} BubbleRuntime
+ * @property {HTMLElement | null} host the `.realm-bubbles` container that EdgeBubbles.razor renders
+ * @property {Map<string, boolean>} known last frame's verdict by member id (true: off screen), the hysteresis memory of layoutBubbles
+ * @property {Set<string>} off the members that are off screen now: they have a bubble and no pin
+ * @property {Map<string, BubbleEl>} els the bubble elements, the ones that are fading out included
+ * @property {import('./bubbleLayout.js').Bubble[]} bubbles the last layout (the `bubbles` hook)
+ * @property {number} busyUntil `settled()` waits until then: a bubble is fading or sliding
+ * @property {ResizeObserver | null} observer watches the keep-out elements, so a change of their size draws a frame
+ * @property {WeakSet<Element>} observed
+ */
+
+/** @type {WeakMap<Runtime, BubbleRuntime>} */
+const bubbleRuntimes = new WeakMap();
+
+/** Static markup only. The pointer points east and is turned by `--realm-bubble-angle` on its own element, so the avatar stays upright (03 section 4.6). */
+const BUBBLE_TEMPLATE =
+  '<span class="realm-bubble__body">' +
+  '<span class="realm-bubble__pointer"><svg viewBox="0 0 8 10" width="8" height="10" focusable="false" aria-hidden="true"><path d="M0 0L8 5L0 10Z"/></svg></span>' +
+  '<span class="realm-bubble__disc"><span class="realm-bubble__face"></span></span>' +
+  `<span class="realm-bubble__badge realm-bubble__badge--home" hidden>${icon('home')}</span>` +
+  '<span class="realm-bubble__badge realm-bubble__badge--count" hidden></span>' +
+  '</span>';
+
+/** @param {Runtime} r @returns {BubbleRuntime} */
+function bubbleState(r) {
+  let state = bubbleRuntimes.get(r);
+  if (!state) {
+    state = { host: null, known: new Map(), off: new Set(), els: new Map(), bubbles: [], busyUntil: 0, observer: null, observed: new WeakSet() };
+    bubbleRuntimes.set(r, state);
+  }
+  return state;
+}
+
+/** Hook of bindMap. @param {Runtime} r */
+function bindBubbles(r) {
+  const state = bubbleState(r);
+  state.observer = new ResizeObserver(() => {
+    if (rt === r) scheduleRender();
+  });
+}
+
+/** Hook of teardown. @param {Runtime} r */
+function releaseBubbles(r) {
+  const state = bubbleRuntimes.get(r);
+  if (!state) return;
+  state.observer?.disconnect();
+  for (const rec of state.els.values()) {
+    if (rec.leaving !== null) clearTimeout(rec.leaving);
+    rec.el.remove();
+  }
+  state.els.clear();
+  bubbleRuntimes.delete(r);
+}
+
+/** Hook of reconcilePins: the member is off screen, so its pin does not exist. @param {Runtime} r @param {string} id @returns {boolean} */
+function isBubbled(r, id) {
+  return bubbleRuntimes.get(r)?.off.has(id) === true;
+}
+
+/** Hook of hasPendingWork: `settled()` waits for a bubble that is still fading or sliding. @param {Runtime} r @returns {boolean} */
+function bubblesPending(r) {
+  const state = bubbleRuntimes.get(r);
+  return state !== undefined && performance.now() < state.busyUntil;
+}
+
+/**
+ * The id of the selected member or vehicle, or null.
+ * @param {Runtime} r
+ * @param {'member' | 'vehicle'} kind
+ * @returns {string | null}
+ */
+function selectedId(r, kind) {
+  const selection = /** @type {{ kind?: string, id?: string } | null} */ (r.selection);
+  return selection !== null && selection.kind === kind && typeof selection.id === 'string' ? selection.id : null;
+}
+
+/**
+ * @param {Runtime} r
+ * @param {BubbleRuntime} state
+ * @returns {HTMLElement | null} the bubbles' container, or null when the page has none (the bubbles then stay off and every member keeps its pin)
+ */
+function bubbleHost(r, state) {
+  if (state.host?.isConnected) return state.host;
+  const found = document.querySelector('.realm-bubbles');
+  state.host = found instanceof HTMLElement ? found : null;
+  return state.host;
+}
+
+/**
+ * The elements a bubble must keep clear of (01 section 4.10 step 4): the gear, the attribution control (the (i) button, or the whole credits while it is open, so
+ * a bubble never hides them) and the right stack while it is visible. Their boxes are read each frame (the stack follows the sheet's own transition, which no
+ * map event announces); a resize of any of them also draws a frame.
+ * @param {Runtime} r
+ * @param {BubbleRuntime} state
+ * @returns {import('./layoutMath.js').Rect[]} container pixels
+ */
+function measureKeepOuts(r, state) {
+  const gear = document.querySelector('[data-testid="btn-settings"]');
+  const attribution = r.container.querySelector('.maplibregl-ctrl-attrib');
+  const stack = document.querySelector('.realm-right-stack');
+  /** @type {Array<{ left: number, top: number, right: number, bottom: number } | null>} */
+  const boxes = [];
+  for (const el of [gear, attribution, stack]) {
+    if (!el) {
+      boxes.push(null);
+      continue;
+    }
+    if (state.observer && !state.observed.has(el)) {
+      state.observer.observe(el);
+      state.observed.add(el);
+    }
+    boxes.push(el === stack && getComputedStyle(el).visibility === 'hidden' ? null : el.getBoundingClientRect());
+  }
+  return keepOutRects(boxes, r.container.getBoundingClientRect());
+}
+
+/**
+ * Hook of renderFrame, after the camera commands and before the pins are reconciled: projects the members, lays the bubbles out in R, remembers who is off screen
+ * (asking for a pin reconcile when that changed) and writes the bubble DOM. A member with no fix has neither pin nor bubble; vehicles never get a bubble.
+ * @param {Runtime} r
+ */
+function layoutBubblesFrame(r) {
+  const state = bubbleState(r);
+  const size = containerSize(r);
+  const host = r.opts.features?.bubbles === false || size.width <= 0 || size.height <= 0 ? null : bubbleHost(r, state);
+  const members = r.members?.members ?? [];
+  /** @type {import('./bubbleLayout.js').BubbleResult} */
+  let result = { bubbles: [], onScreen: [], offScreen: [] };
+  if (host) {
+    const anchors = bubbleAnchors(
+      members,
+      (member) => {
+        if (typeof member.lat !== 'number' || typeof member.lon !== 'number') return null;
+        const shown = r.pins.get(`member:${member.id}`)?.shown;
+        const at = r.map.project(shown ?? [member.lon, member.lat]);
+        return { x: at.x, y: at.y };
+      },
+      state.known,
+      selectedId(r, 'member'),
+    );
+    result = layoutBubbles(bubbleRect(size, r.layout, r.appliedPadding), measureKeepOuts(r, state), anchors);
+  }
+  const off = new Set(result.offScreen);
+  let flipped = off.size !== state.off.size;
+  for (const id of off) if (!state.off.has(id)) flipped = true;
+  state.off = off;
+  state.known = new Map();
+  for (const id of result.offScreen) state.known.set(id, true);
+  for (const id of result.onScreen) state.known.set(id, false);
+  state.bubbles = result.bubbles;
+  if (flipped) r.dirty.members = true; // the pins of members that left or entered R are removed or created in this same frame
+  writeBubbles(r, state, host, result.bubbles, members);
+}
+
+/**
+ * Makes the bubble elements match the layout: create (fade in), move (slide), remove (fade out), keep the DOM order the layout gave (clockwise from the top left,
+ * the focus order of 01 section 10.2).
+ * @param {Runtime} r
+ * @param {BubbleRuntime} state
+ * @param {HTMLElement | null} host
+ * @param {import('./bubbleLayout.js').Bubble[]} bubbles
+ * @param {MemberPayloadItem[]} members
+ */
+function writeBubbles(r, state, host, bubbles, members) {
+  if (host) host.classList.toggle('realm-bubbles--reduced', r.reducedMotion);
+  const byId = new Map(members.map((member) => [member.id, member]));
+  const selected = selectedId(r, 'member');
+  let moving = false;
+  /** @type {Set<string>} */
+  const wanted = new Set();
+  /** @type {Element[]} */
+  const order = [];
+  for (const bubble of host ? bubbles : []) {
+    const key = bubbleKey(bubble.ids);
+    wanted.add(key);
+    let rec = state.els.get(key);
+    if (!rec) {
+      rec = createBubble(r, key, bubble.ids);
+      state.els.set(key, rec);
+      applyBubble(r, rec, bubble, byId, selected); // before it is in the page: the first position is not a slide
+      host?.appendChild(rec.el);
+      void rec.el.offsetWidth; // the entering state is painted once, so removing the class below runs the fade-in
+      rec.el.classList.remove('realm-bubble--enter');
+      moving = true;
+    } else {
+      if (rec.leaving !== null) {
+        clearTimeout(rec.leaving);
+        rec.leaving = null;
+        rec.el.classList.remove('realm-bubble--leave');
+        rec.el.tabIndex = 0;
+        moving = true;
+      }
+      if (applyBubble(r, rec, bubble, byId, selected)) moving = true;
+    }
+    order.push(rec.el);
+  }
+  for (const rec of [...state.els.values()]) {
+    if (wanted.has(rec.key) || rec.leaving !== null) continue;
+    leaveBubble(r, state, rec);
+    moving = true;
+  }
+  if (host && order.length > 0) {
+    const live = [...host.children].filter((child) => order.includes(child));
+    if (live.length !== order.length || live.some((child, index) => child !== order[index])) for (const el of order) host.appendChild(el);
+  }
+  if (moving && !r.reducedMotion) state.busyUntil = performance.now() + Math.max(BUBBLE_FADE_MS, BUBBLE_SLIDE_MS) + 40;
+}
+
+/**
+ * @param {Runtime} r
+ * @param {string} key
+ * @param {string[]} ids
+ * @returns {BubbleEl}
+ */
+function createBubble(r, key, ids) {
+  const el = document.createElement('button');
+  el.type = 'button';
+  el.className = 'realm-bubble realm-ui realm-bubble--enter';
+  el.tabIndex = 0;
+  el.setAttribute('data-testid', `bubble-${key}`);
+  el.innerHTML = BUBBLE_TEMPLATE;
+  const taps = [...ids];
+  el.addEventListener('click', (event) => {
+    event.stopPropagation();
+    tapBubble(r, taps);
+  });
+  return { key, el, ids: taps, last: {}, leaving: null };
+}
+
+/**
+ * @param {BubbleEl} rec
+ * @param {string} key
+ * @param {unknown} value
+ * @returns {boolean} true when the value differs from the one last written (and records it)
+ */
+function bubbleChanged(rec, key, value) {
+  if (rec.last[key] === value) return false;
+  rec.last[key] = value;
+  return true;
+}
+
+/**
+ * Writes one bubble: position, pointer angle, the first member's avatar and ring, the gold glow of the selected member, the Home badge of the static one, the count
+ * of a cluster, and the accessible name and tooltip.
+ * @param {Runtime} r
+ * @param {BubbleEl} rec
+ * @param {import('./bubbleLayout.js').Bubble} bubble
+ * @param {Map<string, MemberPayloadItem>} byId
+ * @param {string | null} selected
+ * @returns {boolean} true when the bubble's position changed (a slide)
+ */
+function applyBubble(r, rec, bubble, byId, selected) {
+  const el = rec.el;
+  const single = bubble.ids.length === 1;
+  const x = Math.round(bubble.x * 100) / 100 - BUBBLE_HIT_PX / 2;
+  const y = Math.round(bubble.y * 100) / 100 - BUBBLE_HIT_PX / 2;
+  const place = `translate(${x}px, ${y}px)`;
+  const moved = bubbleChanged(rec, 'place', place);
+  if (moved) el.style.transform = place;
+  const angle = `${Math.round(bubble.angleDeg * 10) / 10}deg`;
+  if (bubbleChanged(rec, 'angle', angle)) el.style.setProperty('--realm-bubble-angle', angle);
+
+  const first = byId.get(bubble.ids[0]);
+  if (first) {
+    if (bubbleChanged(rec, 'ring', first.ring.color)) el.style.setProperty('--realm-bubble-ring', first.ring.color);
+    if (bubbleChanged(rec, 'dashed', first.ring.dashed)) toggle(el, 'realm-bubble--dashed', first.ring.dashed);
+    if (bubbleChanged(rec, 'color', first.color)) el.style.setProperty('--realm-bubble-member', first.color);
+    if (bubbleChanged(rec, 'status', first.status)) for (const status of ['stale', 'offline']) toggle(el, `realm-bubble--${status}`, status === first.status);
+    applyBubbleFace(rec, first);
+    const home = /** @type {HTMLElement} */ (el.querySelector('.realm-bubble__badge--home'));
+    const showHome = single && first.isStatic;
+    if (bubbleChanged(rec, 'home', showHome)) home.hidden = !showHome;
+  }
+  const glow = single && selected === bubble.ids[0];
+  if (bubbleChanged(rec, 'selected', glow)) toggle(el, 'realm-bubble--selected', glow);
+  const count = bubble.cluster > 1 ? String(bubble.cluster) : '';
+  if (bubbleChanged(rec, 'count', count)) {
+    const badge = /** @type {HTMLElement} */ (el.querySelector('.realm-bubble__badge--count'));
+    badge.hidden = count === '';
+    badge.textContent = count;
+  }
+  const texts = bubbleTexts(bubble.ids, byId, r.opts.strings);
+  if (bubbleChanged(rec, 'label', texts.label)) el.setAttribute('aria-label', texts.label);
+  if (bubbleChanged(rec, 'tooltip', texts.tooltip)) el.title = texts.tooltip;
+  return moved;
+}
+
+/**
+ * The avatar of a bubble: the photo over the initials on the member colour; a failed photo removes itself; the static prince without a photo shows the Home glyph.
+ * @param {BubbleEl} rec
+ * @param {MemberPayloadItem} item
+ */
+function applyBubbleFace(rec, item) {
+  const url = item.avatarUrl ? new URL(item.avatarUrl, document.baseURI).href : null;
+  if (!bubbleChanged(rec, 'face', `${url}|${item.initial}|${item.isStatic}`)) return;
+  const face = /** @type {HTMLElement} */ (rec.el.querySelector('.realm-bubble__face'));
+  face.replaceChildren();
+  const initials = document.createElement('span');
+  initials.className = 'realm-bubble__initials';
+  if (item.isStatic) initials.innerHTML = icon('home');
+  else initials.textContent = item.initial;
+  face.appendChild(initials);
+  if (url) {
+    const photo = document.createElement('img');
+    photo.className = 'realm-bubble__photo';
+    photo.alt = '';
+    photo.decoding = 'async';
+    photo.addEventListener('error', () => photo.remove(), { once: true });
+    photo.src = url;
+    face.appendChild(photo);
+  }
+}
+
+/**
+ * The bubble's member is on screen again, or the bubbles merged differently: it fades and scales out over 150 ms and goes (at once under reduced motion).
+ * @param {Runtime} r
+ * @param {BubbleRuntime} state
+ * @param {BubbleEl} rec
+ */
+function leaveBubble(r, state, rec) {
+  if (r.reducedMotion) {
+    rec.el.remove();
+    state.els.delete(rec.key);
+    return;
+  }
+  rec.el.classList.add('realm-bubble--leave');
+  rec.el.tabIndex = -1;
+  rec.leaving = setTimeout(() => {
+    rec.leaving = null;
+    rec.el.remove();
+    if (state.els.get(rec.key) === rec) state.els.delete(rec.key);
+  }, BUBBLE_FADE_MS);
+}
+
+/**
+ * A tap on a bubble (03 section 4.6, D45). One member: the select path is C#'s, so JavaScript only reports it (`OnBubbleTap([id])`, routed like a pin tap) and does
+ * not move the camera. A cluster cannot choose one member: JavaScript runs the cluster fit and selects nothing, and reports the ids so that C# can announce it. The
+ * viewer's own bubble is Recenter and is never reported. Every tap ends Follow (01 section 4.14).
+ * @param {Runtime} r
+ * @param {string[]} ids
+ */
+function tapBubble(r, ids) {
+  call('onBubbleTap', () => {
+    if (rt !== r) return;
+    endFollow(r);
+    if (isOwnBubble(ids, r.members?.meId ?? '')) {
+      recenter();
+      return;
+    }
+    if (ids.length >= 2) fitCluster(r, ids);
+    notify('OnBubbleTap', ids);
+  });
+}
+
+/**
+ * The cluster fit (01 section 4.10 step 6): the viewer's member and the tapped members into the map padding (the transform holds it), plus the 56 px of the pin
+ * bodies on top like every `fitBounds` (03 section 4.3), `maxZoom` 15, 700 ms (0 under reduced motion). The selection and the sheet are not touched.
+ * @param {Runtime} r
+ * @param {string[]} ids
+ */
+function fitCluster(r, ids) {
+  flushLayout(r);
+  const bounds = boundsOf(clusterFitPoints(r.members?.members ?? [], r.members?.meId ?? '', ids));
+  if (!bounds) return;
+  const duration = r.reducedMotion ? 0 : CLUSTER_FIT_MS;
+  r.cam.lastDurationMs = duration;
+  selectionState(r).atDefault = false;
+  r.map.fitBounds(bounds, {
+    padding: { top: PIN_BODY_ALLOWANCE_PX, right: 0, bottom: 0, left: 0 },
+    maxZoom: CLUSTER_FIT_MAX_ZOOM,
+    duration,
+    linear: true,
+    essential: true,
+  });
+  scheduleRender();
+}
+
+/**
+ * Hook of renderFrame, after the glides (01 section 4.8, 03 section 4.6): two pins whose true points are less than 36 px apart are spread, the higher-priority one
+ * stays and each other one moves 48 px to the right (another 48 px for each further one), through the marker's offset. Recomputed every frame, so the shift goes
+ * when the true points are 36 px or more apart. No leader line (D35, C-10).
+ * @param {Runtime} r
+ */
+function fanOutFrame(r) {
+  /** @type {Array<{ kind: 'member' | 'vehicle', id: string, x: number, y: number, driving: boolean }>} */
+  const entries = [];
+  if (r.opts.features?.fanout !== false) {
+    for (const pin of r.pins.values()) {
+      if (!pin.shown) continue;
+      const at = r.map.project(pin.shown);
+      const member = pin.kind === 'member' ? r.members?.members.find((item) => item.id === pin.id) : undefined;
+      entries.push({ kind: pin.kind, id: pin.id, x: at.x, y: at.y, driving: member?.status === 'driving' });
+    }
+  }
+  const memberId = selectedId(r, 'member');
+  const vehicleId = selectedId(r, 'vehicle');
+  const selectedKey = memberId !== null ? `member:${memberId}` : vehicleId !== null ? `vehicle:${vehicleId}` : null;
+  /** @type {Map<string, number>} */
+  const shifts = new Map();
+  for (const result of fanOut(fanItems(entries, selectedKey))) shifts.set(result.id, result.dx);
+  for (const pin of r.pins.values()) {
+    const dx = shifts.get(`${pin.kind}:${pin.id}`) ?? 0;
+    if (pin.dx === dx) continue;
+    pin.dx = dx;
+    pin.marker.setOffset([dx, 0]);
+  }
+}
+
+// The two hooks of this region (01 Appendix B): `bubbles()` lists what is laid out (cluster is the member count), `layoutBubbles` is the pure function itself.
+extraHooks.bubbles = () => {
+  const r = rt;
+  if (!r) throw new Error('the map is not initialised');
+  return describeBubbles(bubbleState(r).bubbles);
+};
+extraHooks.layoutBubbles = layoutBubbles;

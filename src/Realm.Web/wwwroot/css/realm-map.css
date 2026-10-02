@@ -399,3 +399,211 @@
   font-size: 12px;
   line-height: 18px;
 }
+
+/* ---- edge bubbles (01 section 4.10, 03 section 4.6): a member outside the visible rectangle, on its edge, pointing at them --------------- */
+
+/* The container (EdgeBubbles.razor): the whole viewport above the map and below the gear and the right stack (10) and the sheet (1200); it takes no
+   pointer events, so the map stays draggable under it, and only the bubbles do. realmMap.js creates and moves the bubbles. */
+.realm-bubbles {
+  --realm-bubble-outline: color-mix(in srgb, var(--realm-pin-outline) 85%, transparent);
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+}
+
+/* A bubble is a 48 x 48 hit area centred on its avatar; realmMap.js sets its transform (the slide between positions is the 120 ms transition) and
+   --realm-bubble-angle, the ring colour and the member colour. The fade and scale of appearing and disappearing run on the body inside it. */
+.realm-bubble {
+  --realm-bubble-ring: var(--realm-text);
+  --realm-bubble-member: var(--realm-surface-2);
+  --realm-bubble-angle: 0deg;
+  position: absolute;
+  top: 0;
+  left: 0;
+  box-sizing: border-box;
+  width: 48px;
+  height: 48px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--realm-text);
+  font: inherit;
+  cursor: pointer;
+  pointer-events: auto;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 120ms ease-out;
+}
+
+.realm-bubble__body {
+  position: absolute;
+  inset: 0;
+  display: block;
+  transition:
+    opacity 150ms ease-out,
+    transform 150ms ease-out;
+}
+
+.realm-bubble--enter .realm-bubble__body,
+.realm-bubble--leave .realm-bubble__body {
+  opacity: 0;
+  transform: scale(0.6);
+}
+
+.realm-bubble--leave {
+  pointer-events: none;
+}
+
+/* The 40 px avatar with its 2 px status ring and the 2 px outline of the pins. */
+.realm-bubble__disc {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  box-sizing: border-box;
+  width: 40px;
+  height: 40px;
+  border: 2px solid var(--realm-bubble-ring);
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--realm-bubble-outline);
+}
+
+.realm-bubble--dashed .realm-bubble__disc {
+  border-style: dashed;
+}
+
+/* The selected member's bubble has the gold glow of the selected pin. */
+.realm-bubble--selected .realm-bubble__disc {
+  box-shadow:
+    0 0 0 2px var(--realm-bubble-outline),
+    0 0 0 6px color-mix(in srgb, var(--realm-primary) 35%, transparent);
+}
+
+.realm-bubble__face {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--realm-bubble-member);
+  color: var(--realm-bg);
+  font-family: var(--realm-font-body);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.realm-bubble--stale .realm-bubble__face,
+.realm-bubble--offline .realm-bubble__face {
+  filter: saturate(0.6);
+}
+
+.realm-bubble--offline .realm-bubble__face {
+  opacity: 0.8;
+}
+
+.realm-bubble__initials {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.realm-bubble__initials svg {
+  width: 22px;
+  height: 22px;
+  fill: currentcolor;
+}
+
+.realm-bubble__photo {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* The pointer chevron, 10 wide and 8 deep, just outside the circle: drawn pointing east and turned by --realm-bubble-angle on this element alone, so the avatar stays upright. */
+.realm-bubble__pointer {
+  position: absolute;
+  inset: 0;
+  transform: rotate(var(--realm-bubble-angle));
+  pointer-events: none;
+}
+
+.realm-bubble__pointer svg {
+  position: absolute;
+  top: 50%;
+  left: calc(50% + 22px);
+  width: 8px;
+  height: 10px;
+  margin-top: -5px;
+  overflow: visible;
+  fill: var(--realm-bubble-ring);
+  stroke: var(--realm-bubble-outline);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+  paint-order: stroke;
+}
+
+.realm-bubble__badge {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  background: var(--realm-surface);
+  box-shadow: 0 0 0 1.5px var(--realm-bubble-outline);
+  color: var(--realm-text);
+}
+
+.realm-bubble__badge[hidden] {
+  display: none;
+}
+
+/* The gold Home badge of the static member. */
+.realm-bubble__badge--home {
+  top: -2px;
+  right: -2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  color: var(--realm-primary);
+}
+
+.realm-bubble__badge--home svg {
+  width: 14px;
+  height: 14px;
+  fill: currentcolor;
+}
+
+/* A cluster shows its first avatar and a 20 px pill with the member count at the bottom right (01 section 4.10 step 5). */
+.realm-bubble__badge--count {
+  right: -4px;
+  bottom: -2px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: var(--realm-primary);
+  color: var(--realm-on-primary);
+  font-family: var(--realm-font-body);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* Reduced motion: bubbles appear, move and go at once. */
+.realm-bubbles--reduced .realm-bubble,
+.realm-bubbles--reduced .realm-bubble__body {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .realm-bubble,
+  .realm-bubble__body {
+    transition: none;
+  }
+}

@@ -162,8 +162,8 @@ public static class MapPayloadFactory
             ChipMinute: minute,
             AriaLabel: MapText.MemberPinName(member, status, place, poorAccuracy, lowBattery),
             Tooltip: MapText.Title(member.DisplayName, member.LoreTitle),
-            BubbleLabel: MapText.BubbleLabel(member.DisplayName, fromMe),
-            BubbleTooltip: MapText.BubbleTooltip(member.DisplayName, fromMe));
+            BubbleLabel: BubbleTextFormatter.Label(member.DisplayName, fromMe),
+            BubbleTooltip: BubbleTextFormatter.Tooltip(member.DisplayName, fromMe));
     }
 
     // 01 section 4.3: the first matching row wins. "At a place" means inside a zone the map draws.

@@ -10,6 +10,7 @@
 @using Realm.Web.Layout
 @using Realm.Web.Map
 @using Realm.Web.Shell
+@using Realm.Web.State
 @inject IConfiguration Configuration
 @inject IJSRuntime JS
 @inject ILogger<LocationPage> Logger
@@ -38,7 +39,9 @@
                  StyleId="@StyleId"
                  Layout="@_mapLayout"
                  ReducedMotion="@viewport.ReducedMotion"
-                 TestHooks="@TestHooks" />
+                 TestHooks="@TestHooks"
+                 Selection="@_selection"
+                 OnBubbleTap="OnBubbleTapAsync" />
 
         <RealmSheetHost Mode="@_mode"
                         Size="@_size"
@@ -71,6 +74,7 @@
     private LayoutMode _mode = LayoutMode.Unknown;
     private LayoutOverride _layoutOverride;
     private SheetSize _size;
+    private EntityRef? _selection;
     private Section _section = Section.Drivers;
     private MapLayout _mapLayout = MapLayout.Compact;
     private bool _started;
@@ -173,6 +177,17 @@
     private Task OnSizeChangedAsync(SheetSize size)
     {
         _size = size;
+        RefreshMapLayout();
+        return Task.CompletedTask;
+    }
+
+    // An edge bubble was tapped (D45, D84). One member id selects that member exactly like a pin tap: the reducer sets the selection and leaves the sheet at Peek, and
+    // MapView then sends setSelection and the flight with the Peek padding. A cluster (two or more ids) changes nothing here: the camera fit was the script's.
+    private Task OnBubbleTapAsync(IReadOnlyList<string> ids)
+    {
+        var next = SheetStateMachine.Reduce(new SheetState(_section, _selection, _size), new SheetEvent.BubbleTap(ids), _mode);
+        _selection = next.Selection;
+        _size = next.Size;
         RefreshMapLayout();
         return Task.CompletedTask;
     }

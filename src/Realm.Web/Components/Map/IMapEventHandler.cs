@@ -17,6 +17,9 @@ public interface IMapEventHandler
     /// <summary>The empty map was tapped.</summary>
     Task MapTapAsync();
 
+    /// <summary>An edge bubble was tapped (not the viewer's own, which is the recenter): one member id for a single-member bubble, two or more for a cluster, whose camera fit the script has already run (03 section 4.6).</summary>
+    Task BubbleTapAsync(IReadOnlyList<string> ids);
+
     /// <summary>A camera move settled.</summary>
     Task CameraChangedAsync(CameraState camera);
 

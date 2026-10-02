@@ -1,6 +1,6 @@
 // Platform tests: what the Ingress hosting decisions of 03 section 5 promise, and no acceptance criterion covers (03 section 7.5).
 // Every test runs through the ingress proxy (harness/ingressProxy.mjs). [X-02] and [X-06] are retired by D41 and their numbers are not reused;
-// [X-04], [X-09] and [X-11] to [X-14] belong to later slices ([X-14] lives in appendix-c.spec.ts); [X-07] and [X-08] are S7a's.
+// [X-04], [X-09] and [X-12] to [X-14] belong to later slices ([X-14] lives in appendix-c.spec.ts); [X-07] and [X-08] are S7a's; [X-11] is S9b's (G-6).
 import { APP_ORIGIN, INGRESS_PREFIX, demo, expect, readHook, settled, test } from '../fixtures.js';
 
 const BASE_HREF = `${INGRESS_PREFIX}/`;
@@ -214,5 +214,40 @@ test.describe('ingress platform tests', () => {
     expect(found.nested, `the contract element is inside the popover: ${report}`).toBe(true);
     expect(found.firstIsPopover, `the first match of the selector list is the popover: ${report}`).toBe(true);
     expect(found.state, `the contract element carries data-state: ${report}`).toMatch(/^(peek|80|panel)$/);
+  });
+
+  // [X-11] (03 section 7.5; threat T7 of the security table): in a Demo session `window.__realm` exists and holds the ten hooks of 03 section 4.10 and 01 Appendix B, and nothing
+  // else (O-10). The object is frozen and the property is not writable, so a page script cannot swap a hook. This is the Demo half only: no test claims a Live-mode check (R2-028).
+  test('[X-11] window.__realm exists in Demo and exposes exactly the ten hooks of 4.10', async ({ page }) => {
+    await demo(page);
+
+    const found = await page.evaluate(() => {
+      const hooks = (window as Window & { __realm?: Record<string, unknown> }).__realm;
+      if (hooks === undefined) return null;
+      return {
+        names: Object.keys(hooks).sort(),
+        notFunctions: Object.entries(hooks).filter(([, value]) => typeof value !== 'function').map(([name]) => name),
+        frozen: Object.isFrozen(hooks),
+        writable: Object.getOwnPropertyDescriptor(window, '__realm')?.writable ?? null,
+      };
+    });
+    expect(found, 'window.__realm exists in a Demo session').not.toBeNull();
+    if (found === null) return;
+    expect(found.names, 'the hooks, and no other name').toEqual(['bubbles', 'camera', 'layoutBubbles', 'mapPadding', 'pins', 'settled', 'sheet', 'stats', 'styleId', 'zones']);
+    expect(found.notFunctions, 'every hook is a function').toEqual([]);
+    expect(found.frozen, 'window.__realm is frozen').toBe(true);
+    expect(found.writable, 'the window property is not writable').toBe(false);
+
+    // Each observer answers with data (none throws or returns nothing), and `layoutBubbles` is the pure function of 4.6: an empty scene has no bubbles.
+    expect(await readHook(page, 'mapPadding'), 'mapPadding()').toEqual({ top: expect.any(Number), right: expect.any(Number), bottom: expect.any(Number), left: expect.any(Number) });
+    expect((await readHook(page, 'camera')).zoom, 'camera().zoom').toEqual(expect.any(Number));
+    expect((await readHook(page, 'sheet')).state, 'sheet().state').toMatch(/^(peek|80|panel)$/);
+    expect(Array.isArray(await readHook(page, 'pins')), 'pins() is a list').toBe(true);
+    expect(Array.isArray(await readHook(page, 'bubbles')), 'bubbles() is a list').toBe(true);
+    expect(Array.isArray(await readHook(page, 'zones')), 'zones() is a list').toBe(true);
+    expect(await readHook(page, 'styleId'), 'styleId()').toBe('demo-offline');
+    expect(await readHook(page, 'stats'), 'stats()').toEqual({ frames: expect.any(Number), setterCalls: expect.any(Number), callbacksSent: expect.any(Number) });
+    const empty = await page.evaluate(() => (window as Window & { __realm?: { layoutBubbles?: (...args: unknown[]) => unknown } }).__realm?.layoutBubbles?.({ left: 8, top: 8, right: 404, bottom: 725 }, [], []));
+    expect(empty, 'layoutBubbles(rect, [], []) of an empty scene').toEqual({ bubbles: [], onScreen: [], offScreen: [] });
   });
 });
