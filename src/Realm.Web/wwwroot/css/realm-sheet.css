@@ -302,12 +302,391 @@ div[mudsheet] .mud-sheet-container[data-testid="sheet"] .mud-sheet-content > con
   list-style: none;
 }
 
-.realm-sheet-row {
-  box-sizing: border-box;
-  min-height: 48px;
-  padding: 12px 16px;
+/* ---- the rows (01 sections 5.1 to 5.3): one button each, drawn the same in the bottom sheet and in the left panel. Heights are minimums so nothing shifts when data arrives:
+   84 px a person (three lines), 96 px a vehicle (four), 72 px a place. MudIcon draws an svg sized by font-size, so the icon rules below set font-size, not width. ---- */
+
+.realm-sheet-item {
+  position: relative;
   border-top: 1px solid var(--realm-line);
+}
+
+.realm-row {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 84px;
+  margin: 0;
+  padding: 12px 16px;
+  border: 0;
+  background: none;
   color: var(--realm-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.realm-row--vehicle {
+  min-height: 96px;
+}
+
+.realm-row--place {
+  min-height: 72px;
+}
+
+.realm-row:active {
+  background: color-mix(in srgb, var(--realm-text) 8%, transparent);
+}
+
+/* Under D45 a selected row shows only for the collapse after the tap. */
+.realm-row--selected {
+  background: var(--realm-surface-2);
+}
+
+.realm-row--selected .realm-row-avatar {
+  box-shadow: 0 0 0 3px var(--realm-primary);
+}
+
+/* A stale fix is dimmed to 72 percent and an offline one to 60 (01 section 5.1). */
+.realm-row--stale {
+  opacity: 0.72;
+}
+
+.realm-row--offline {
+  opacity: 0.6;
+}
+
+.realm-row:focus-visible,
+.realm-row-info:focus-visible {
+  outline: 3px solid var(--realm-focus);
+  outline-offset: -3px;
+}
+
+/* The avatar: a rounded square holding the initial on the member colour (a validated hex in --realm-row-color) with the photo laid over it. A photo that
+   fails to load draws nothing (its alt is empty), so the initial shows through. */
+.realm-row-avatar-wrap {
+  position: relative;
+  flex: 0 0 auto;
+  width: 56px;
+  height: 56px;
+}
+
+.realm-row-avatar-wrap--place {
+  width: 48px;
+  height: 48px;
+}
+
+.realm-row-avatar {
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 18px;
+  background: var(--realm-row-color, var(--realm-surface-2));
+  color: var(--realm-bg);
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.realm-row-avatar--vehicle,
+.realm-row-avatar--place {
+  background: var(--realm-plum);
+  color: var(--realm-primary);
+}
+
+.realm-row-avatar--place {
+  border-radius: 16px;
+}
+
+.realm-row-photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.realm-row .realm-row-glyph.mud-icon-root {
+  font-size: 28px;
+}
+
+.realm-row-avatar--place .realm-row-glyph.mud-icon-root {
+  font-size: 24px;
+}
+
+/* The placeholder vehicle: a dashed avatar outline, 70 percent, no chevron, and a tap that does nothing. */
+.realm-row--placeholder {
+  padding-right: 64px;
+  opacity: 0.7;
+  cursor: default;
+}
+
+.realm-row--placeholder .realm-row-avatar {
+  border: 2px dashed var(--realm-primary);
+}
+
+/* The battery pill hangs over the avatar's lower edge, centred, 8 px below it: 24 px tall, 14 px icon and the percentage in 12/700. Red-tinted when low. */
+.realm-battery-pill {
+  position: absolute;
+  bottom: -8px;
+  left: 50%;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 24px;
+  padding: 0 8px 0 4px;
+  transform: translateX(-50%);
+  border: 1px solid var(--realm-line-strong);
+  border-radius: 12px;
+  background: var(--realm-surface-2);
+  color: var(--realm-text);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.realm-battery-pill--low {
+  border-color: var(--realm-error);
+  background: color-mix(in srgb, var(--realm-error) 24%, var(--realm-surface-2));
+}
+
+.realm-battery-pill .realm-battery-icon.mud-icon-root {
+  font-size: 14px;
+}
+
+.realm-battery-pill--low .realm-battery-icon.mud-icon-root {
+  color: var(--realm-error);
+}
+
+/* The text column: L1 the name with the lore after it (the lore gives way first), then the status line and the detail line. */
+.realm-row-body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.realm-row-title {
+  display: flex;
+  align-items: baseline;
+  min-width: 0;
+  height: 22px;
+  font-size: 1rem;
+  line-height: 22px;
+}
+
+.realm-row-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.realm-row-lore {
+  flex: 0 1000 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--realm-text-2);
+  font-size: 0.8125rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The " · " is drawn, not in the markup: the lore's own text stays the bare title. */
+.realm-row-lore::before {
+  content: "\00a0·\00a0";
+}
+
+.realm-row-line {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.realm-row-status {
+  min-height: 20px;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  line-height: 20px;
+}
+
+.realm-row-detail {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 18px;
+  color: var(--realm-text-2);
+  font-size: 0.8125rem;
+  line-height: 18px;
+}
+
+.realm-row-detail-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.realm-row-detail--warning {
+  color: var(--realm-warning);
+}
+
+.realm-row-detail--stale {
+  color: var(--realm-stale);
+}
+
+.realm-row .realm-row-clock.mud-icon-root {
+  flex: 0 0 auto;
+  font-size: 14px;
+}
+
+.realm-row-parts {
+  gap: 12px;
+}
+
+.realm-row-part {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.realm-row-part--low {
+  color: var(--realm-error);
+}
+
+.realm-row .realm-row-part-icon.mud-icon-root {
+  flex: 0 0 auto;
+  font-size: 14px;
+}
+
+/* The placeholder's note is its L2: secondary colour, and it wraps (the row is 96 px, room for two lines). */
+.realm-row-note {
+  min-height: 20px;
+  overflow: visible;
+  color: var(--realm-text-2);
+  font-size: 0.9375rem;
+  line-height: 20px;
+  white-space: normal;
+}
+
+.realm-row-subtitle {
+  min-height: 18px;
+  color: var(--realm-text-2);
+  font-size: 0.8125rem;
+  line-height: 18px;
+}
+
+.realm-row .realm-row-chevron.mud-icon-root {
+  flex: 0 0 auto;
+  color: var(--realm-text-2);
+  font-size: 24px;
+}
+
+/* A place row's trailing edge: the people inside as overlapping 24 px circles (-8 px) and the count; "Empty" is dimmed. */
+.realm-row-trailing {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.realm-minis {
+  display: flex;
+  padding-left: 8px;
+}
+
+.realm-mini {
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin-left: -8px;
+  overflow: hidden;
+  border: 2px solid var(--realm-surface);
+  border-radius: 50%;
+  background: var(--realm-row-color, var(--realm-surface-2));
+  color: var(--realm-bg);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.realm-mini--more {
+  background: var(--realm-surface-2);
+  color: var(--realm-text);
+}
+
+.realm-row-count {
+  color: var(--realm-text-2);
+  font-size: 0.8125rem;
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+.realm-row-count--empty {
+  color: var(--realm-text-disabled);
+}
+
+/* The placeholder's info button (48 px) sits over the row's trailing edge, and its note over the row's text. */
+.realm-row-info {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  margin: 0;
+  padding: 0;
+  transform: translateY(-50%);
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--realm-text-2);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.realm-row-popover {
+  position: absolute;
+  top: 4px;
+  right: 60px;
+  bottom: 4px;
+  left: 12px;
+  z-index: 1;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  overflow-y: auto;
+  border: 1px solid var(--realm-line-strong);
+  border-radius: 12px;
+  background: var(--realm-surface-2);
+  color: var(--realm-text);
+  font-size: 0.8125rem;
+  line-height: 18px;
 }
 
 .realm-sr-only {

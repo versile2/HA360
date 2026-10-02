@@ -1,10 +1,15 @@
 @using Realm.Domain
+@using Realm.Web.Sheet
 
 @* The body of the sheet (03 section 3.4): the three-tab control and the list of the section that shows. Container-agnostic: the same markup fills the MudX
    bottom sheet, the MudX left panel and the aside fallback, and nothing here knows about MudX. In the bottom sheet the summary line lives in the handle;
    in the panel, which has no handle, ShowSummary puts it here as the panel's header (01 section 3.6). The surface is drawn by the contract element
-   (css/realm-sheet.css), not by this root. S7a builds the list body only: the rows are plain names; S7b replaces them with MemberRow, VehicleRow and
-   PlaceRow, and S8 adds the selection header and the detail views. At Peek the list is under the navigation bar and the CSS hides it. *@
+   (css/realm-sheet.css), not by this root. The rows are MemberRow, VehicleRow and PlaceRow, identical in both layouts: their strings come from VmFactory, built
+   here once per render from the lists and the session's clock and zone (never the browser's). A tap raises OnSelect with the entity; S8 turns it into the selection.
+   S8 also adds the selection header and the detail views. At Peek the list is under the navigation bar and the CSS hides it. *@
+@{
+    var facts = RowFacts.Create(Members, Places, MeId, Moment, Zone ?? Session?.Zone ?? TimeZoneInfo.Utc);
+}
 <div class="realm-sheet-content" data-testid="sheet-content">
     @if (ShowSummary)
     {
@@ -15,9 +20,32 @@
 
     <div class="realm-sheet-list-wrap" id="@SheetSegments.PanelId" role="tabpanel" aria-labelledby="@SheetSegments.TabId(Section)">
         <ul class="realm-sheet-list" data-testid="sheet-list">
-            @foreach (var row in Rows)
+            @if (Section == Section.Vehicles)
             {
-                <li @key="row.TestId" class="realm-sheet-row" data-testid="@row.TestId">@row.Name</li>
+                foreach (var row in VmFactory.VehicleRows(Vehicles, facts))
+                {
+                    <li @key="row.Id" class="realm-sheet-item">
+                        <VehicleRow Row="row" OnClick="() => SelectAsync(EntityKind.Vehicle, row.Id)" />
+                    </li>
+                }
+            }
+            else if (Section == Section.Places)
+            {
+                foreach (var row in VmFactory.PlaceRows(Places, facts))
+                {
+                    <li @key="row.Id" class="realm-sheet-item">
+                        <PlaceRow Row="row" OnClick="() => SelectAsync(EntityKind.Place, row.Id)" />
+                    </li>
+                }
+            }
+            else
+            {
+                foreach (var row in VmFactory.MemberRows(Members, facts))
+                {
+                    <li @key="row.Id" class="realm-sheet-item">
+                        <MemberRow Row="row" OnClick="() => SelectAsync(EntityKind.Member, row.Id)" />
+                    </li>
+                }
             }
         </ul>
     </div>
@@ -32,7 +60,7 @@
     [Parameter]
     public IReadOnlyList<VehicleVm> Vehicles { get; set; } = [];
 
-    /// <summary>The places, in sort order.</summary>
+    /// <summary>The places; the list shows them occupied first (01 section 5.3).</summary>
     [Parameter]
     public IReadOnlyList<PlaceVm> Places { get; set; } = [];
 
@@ -44,6 +72,10 @@
     [Parameter]
     public EventCallback<Section> OnSection { get; set; }
 
+    /// <summary>A row was tapped: the person, vehicle or place it stands for. The selection is S8's; until then nothing handles it. The chariot placeholder never raises it.</summary>
+    [Parameter]
+    public EventCallback<EntityRef> OnSelect { get; set; }
+
     /// <summary>The summary line of 01 section 8.2, shown here only when <see cref="ShowSummary"/> is true.</summary>
     [Parameter]
     public string Summary { get; set; } = string.Empty;
@@ -52,14 +84,26 @@
     [Parameter]
     public bool ShowSummary { get; set; }
 
+    /// <summary>The instant the rows are written at. Default: the session's clock, so Demo's frozen time reaches every string.</summary>
+    [Parameter]
+    public DateTimeOffset? Now { get; set; }
+
+    /// <summary>The zone clock times are shown in. Default: the session's zone.</summary>
+    [Parameter]
+    public TimeZoneInfo? Zone { get; set; }
+
+    /// <summary>The viewer's member id (distances on a row are measured from them); null for the first live member, as the map resolves it.</summary>
+    [Parameter]
+    public string? MeId { get; set; }
+
+    /// <summary>The circuit's session, cascaded by <c>RealmShell</c> (it reaches the popover the sheet is drawn in). Absent in a bare component test.</summary>
+    [CascadingParameter]
+    public IRealmSession? Session { get; set; }
+
     private SheetSegments.SegmentCounts Counts => new(Members.Count, Vehicles.Count, Places.Count);
 
-    // The test ids are those of 01 Appendix B (row-member-{id}, row-vehicle-{id}, row-place-{id}), so S7b's real rows keep them.
-    private IEnumerable<(string TestId, string Name)> Rows =>
-        Section switch
-        {
-            Section.Vehicles => Vehicles.Select(vehicle => ($"row-vehicle-{vehicle.Id}", vehicle.Name)),
-            Section.Places => Places.Select(place => ($"row-place-{place.Id}", place.DisplayName)),
-            _ => Members.Select(member => ($"row-member-{member.Id}", member.DisplayName)),
-        };
+    // The session's own clock, never the wall clock. Only a render with neither an explicit Now nor a session (a bare component test) falls back to the system clock.
+    private DateTimeOffset Moment => Now ?? Session?.Time.GetUtcNow() ?? TimeProvider.System.GetUtcNow();
+
+    private Task SelectAsync(EntityKind kind, string id) => OnSelect.InvokeAsync(new EntityRef(kind, id));
 }

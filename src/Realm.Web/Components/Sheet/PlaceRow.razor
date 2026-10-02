@@ -1,0 +1,82 @@
+@using Realm.Domain
+@using Realm.Web.Sheet
+
+@* One place's row (01 section 5.3; 03 section 3.4): 72 px at the least. A 48 px rounded-square icon avatar by the zone's kind, the name and the subtitle, and at the trailing edge the
+   people inside as overlapping 24 px avatars (three at most, then "+N") with "1 here", or a dimmed "Empty". People only (R2-009): a parked vehicle adds nothing. The mini avatars are
+   decorative; the button's name lists who is here. *@
+<button type="button"
+        class="@(Selected ? "realm-row realm-row--place realm-row--selected" : "realm-row realm-row--place")"
+        data-testid="@Row.TestId"
+        aria-label="@AriaLabel"
+        aria-current="@(Selected ? "true" : null)"
+        @onclick="OnClick">
+    <span class="realm-row-avatar-wrap realm-row-avatar-wrap--place">
+        <span class="realm-row-avatar realm-row-avatar--place">
+            <MudIcon Icon="@IconOf(Row.Kind)" Class="realm-row-glyph" />
+        </span>
+    </span>
+    <span class="realm-row-body">
+        <span class="realm-row-title">
+            <span class="realm-row-name">@Row.Name</span>
+        </span>
+        <span class="realm-row-line realm-row-subtitle">@Row.Subtitle</span>
+    </span>
+    <span class="realm-row-trailing">
+        @if (Row.People > 0)
+        {
+            <span class="realm-minis" aria-hidden="true">
+                @foreach (var person in Row.Avatars)
+                {
+                    <span class="realm-mini" style="@ColorStyle(person)">
+                        <span class="realm-mini-initial">@person.Initial</span>
+                        @if (person.AvatarUrl is { } photo)
+                        {
+                            <img class="realm-row-photo" src="@photo" alt="" loading="lazy" />
+                        }
+                    </span>
+                }
+                @if (Row.More > 0)
+                {
+                    <span class="realm-mini realm-mini--more">@("+" + Row.More)</span>
+                }
+            </span>
+            <span class="realm-row-count">@Row.CountText</span>
+        }
+        else
+        {
+            <span class="realm-row-count realm-row-count--empty">@Row.CountText</span>
+        }
+    </span>
+</button>
+
+@code {
+    /// <summary>The row to draw, from <c>VmFactory.Place</c>.</summary>
+    [Parameter, EditorRequired]
+    public PlaceRowVm Row { get; set; } = default!;
+
+    /// <summary>The row is the selected one (<c>aria-current</c>, the surface colour).</summary>
+    [Parameter]
+    public bool Selected { get; set; }
+
+    /// <summary>The row was tapped. The selection itself belongs to the page (S8).</summary>
+    [Parameter]
+    public EventCallback OnClick { get; set; }
+
+    private string AriaLabel => Row.AccessibleName + " Double tap to show on map.";
+
+    private static string? ColorStyle(MiniAvatarVm person) => person.Color is { } color ? "--realm-row-color:" + color : null;
+
+    // 01 section 5.3: home, work, family, fun, park, vet, cemetery; anything else is a pin.
+    private static string IconOf(PlaceKind kind) =>
+        kind switch
+        {
+            PlaceKind.Home => Icons.Material.Filled.Home,
+            PlaceKind.Work => Icons.Material.Filled.Work,
+            PlaceKind.Family => Icons.Material.Filled.Cottage,
+            PlaceKind.Fun => Icons.Material.Filled.RollerSkating,
+            PlaceKind.Park => Icons.Material.Filled.Park,
+            PlaceKind.Vet => Icons.Material.Filled.Pets,
+            PlaceKind.Cemetery => Icons.Material.Filled.Church,
+            _ => Icons.Material.Filled.Place,
+        };
+}
