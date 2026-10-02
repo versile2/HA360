@@ -33,7 +33,7 @@ public class ConstantsTests
         Color: "#7EE0A5",
         Kind: MemberKind.Static,
         Lat: 38.8339,
-        Lon: -104.8214,
+        Lon: -92.8214,
         AccuracyM: null,
         BatteryPct: null,
         Charging: null,

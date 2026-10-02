@@ -11,7 +11,7 @@ internal static class TripFixtures
 {
     public const string PhoneEntity = "device_tracker.alden_phone";
     public const double OriginLat = 31.1000;
-    public const double OriginLon = -97.3400;
+    public const double OriginLon = -85.3400;
 
     private const double EarthRadiusM = 6_371_008.8;
     private const double MetresPerDegreeOfLatitude = EarthRadiusM * Math.PI / 180;

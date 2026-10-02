@@ -28,20 +28,20 @@ public sealed class DemoDataSource
 
     // The static pin of the prince (02 section 9.3); the fixture has no street address for it (D24).
     private const double PrinceLat = 38.8339;
-    private const double PrinceLon = -104.8214;
+    private const double PrinceLon = -92.8214;
 
     // The pickup: 7.78 m from the king, inside home, ignition off, 71% fuel, 18 432 mi on the clock, last update 21:05.
     private const double WagonLat = 31.09907;
-    private const double WagonLon = -97.34100;
+    private const double WagonLon = -85.34100;
     private const int WagonFuelPct = 71;
     private const double WagonOdometerMiles = 18_432;
     private const double MetresPerMile = 1609.344;
 
     // The all-near variant (02 section 9.5): the cryptid 3.07 km and the prince 3.48 km from the king.
     private const double NearCryptidLat = 31.1250;
-    private const double NearCryptidLon = -97.3300;
+    private const double NearCryptidLon = -85.3300;
     private const double NearPrinceLat = 31.0800;
-    private const double NearPrinceLon = -97.3700;
+    private const double NearPrinceLon = -85.3700;
 
     // The poor-accuracy variant: the jester's accuracy in metres.
     private const double PoorAccuracyM = 800;
@@ -168,10 +168,10 @@ public sealed class DemoDataSource
         // 02 section 9.3: positions, accuracies, batteries and fix ages are Appendix A.1 verbatim; "since" is the local time of the table.
         MemberVm[] members =
         [
-            Live(DemoCast.King, Companion(DemoCast.King, ageSeconds: 0, 31.0990, -97.3410, accuracyM: 18, battery: 19, charging: true), Local(17, 52), driving: false),
-            Live(DemoCast.Queen, Companion(DemoCast.Queen, ageSeconds: 60, 31.0560, -97.4647, accuracyM: 12, battery: 62, charging: false, speedMps: 24.1), Local(21, 12), driving: true),
-            Live(DemoCast.Jester, Companion(DemoCast.Jester, ageSeconds: 3 * 60, 31.1040, -97.3560, accuracyM: 22, battery: 12, charging: false), Local(21, 6), driving: false),
-            Live(DemoCast.Cryptid, Companion(DemoCast.Cryptid, ageSeconds: 42 * 60, 31.3382, -94.7291, accuracyM: 35, battery: 10, charging: false), Local(20, 10), driving: false),
+            Live(DemoCast.King, Companion(DemoCast.King, ageSeconds: 0, 31.0990, -85.3410, accuracyM: 18, battery: 19, charging: true), Local(17, 52), driving: false),
+            Live(DemoCast.Queen, Companion(DemoCast.Queen, ageSeconds: 60, 31.0560, -85.4647, accuracyM: 12, battery: 62, charging: false, speedMps: 24.1), Local(21, 12), driving: true),
+            Live(DemoCast.Jester, Companion(DemoCast.Jester, ageSeconds: 3 * 60, 31.1040, -85.3560, accuracyM: 22, battery: 12, charging: false), Local(21, 6), driving: false),
+            Live(DemoCast.Cryptid, Companion(DemoCast.Cryptid, ageSeconds: 42 * 60, 31.3382, -82.7291, accuracyM: 35, battery: 10, charging: false), Local(20, 10), driving: false),
             Static(DemoCast.Prince, PrinceLat, PrinceLon),
         ];
         members = [.. members.Select(ApplyMemberVariants)];

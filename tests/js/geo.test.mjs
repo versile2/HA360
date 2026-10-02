@@ -6,10 +6,10 @@ import { EARTH_RADIUS_M, TILE_SIZE_PX, boundsOf, circlePolygon, growBounds, mete
 import { haversine } from '../../src/Realm.Web/wwwroot/js/layoutMath.js';
 
 // The demo cast of 02 section 9.3 (fictional): [lon, lat].
-const KING = [-97.341, 31.099];
-const QUEEN = [-97.4647, 31.056];
-const CRYPTID = [-94.7291, 31.3382];
-const PRINCE = [-104.8214, 38.8339];
+const KING = [-85.341, 31.099];
+const QUEEN = [-85.4647, 31.056];
+const CRYPTID = [-82.7291, 31.3382];
+const PRINCE = [-92.8214, 38.8339];
 
 const closeTo = (actual, expected, tolerance, message) => assert.ok(Math.abs(actual - expected) <= tolerance, `${message ?? 'value'}: ${actual} is not within ${tolerance} of ${expected}`);
 
@@ -65,7 +65,7 @@ test('circlePolygon: longitudes stay in [-180, 180) across the antimeridian', ()
 test('boundsOf: the box of the points in [[west, south], [east, north]] order; null without points', () => {
   assert.equal(boundsOf([]), null);
   assert.deepEqual(boundsOf([KING]), [KING, KING]);
-  assert.deepEqual(boundsOf([KING, QUEEN, CRYPTID]), [[-97.4647, 31.056], [-94.7291, 31.3382]]);
+  assert.deepEqual(boundsOf([KING, QUEEN, CRYPTID]), [[-85.4647, 31.056], [-82.7291, 31.3382]]);
   assert.deepEqual(boundsOf([[-1, 5], [3, -4], [2, 9]]), [[-1, -4], [3, 9]]);
 });
 

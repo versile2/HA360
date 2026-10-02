@@ -135,19 +135,19 @@ test('visibleRect and rectCenter: the part of the container the padding leaves, 
 });
 
 test('haversine: great-circle metres on the sphere MapLibre uses', () => {
-  assert.equal(haversine([-97.341, 31.099], [-97.341, 31.099]), 0);
+  assert.equal(haversine([-85.341, 31.099], [-85.341, 31.099]), 0);
   const oneDegree = (EARTH_RADIUS_M * Math.PI) / 180;
   assert.ok(Math.abs(haversine([0, 0], [0, 1]) - oneDegree) < 1e-6);
   assert.ok(Math.abs(haversine([0, 0], [1, 0]) - oneDegree) < 1e-6);
   assert.ok(Math.abs(haversine([179.5, 0], [-179.5, 0]) - oneDegree) < 1e-6, 'across the antimeridian');
-  assert.equal(haversine([-97.341, 31.099], [-94.7291, 31.3382]), haversine([-94.7291, 31.3382], [-97.341, 31.099]));
+  assert.equal(haversine([-85.341, 31.099], [-82.7291, 31.3382]), haversine([-82.7291, 31.3382], [-85.341, 31.099]));
 });
 
 // A point `meters` due north of `center`.
 const north = (center, meters) => [center[0], center[1] + ((meters / EARTH_RADIUS_M) * 180) / Math.PI];
 
 test('isAtDefault: within 40 m and 0.3 zoom of the target', () => {
-  const target = { center: [-97.341, 31.099], zoom: 15 };
+  const target = { center: [-85.341, 31.099], zoom: 15 };
   assert.equal(AT_DEFAULT_METERS, 40);
   assert.equal(AT_DEFAULT_ZOOM, 0.3);
   assert.equal(isAtDefault(target, target), true);
@@ -160,7 +160,7 @@ test('isAtDefault: within 40 m and 0.3 zoom of the target', () => {
 });
 
 test('isAtDefault: false without a target; the tolerances can be overridden', () => {
-  const camera = { center: [-97.341, 31.099], zoom: 15 };
+  const camera = { center: [-85.341, 31.099], zoom: 15 };
   assert.equal(isAtDefault(camera, null), false);
   assert.equal(isAtDefault(camera, undefined), false);
   const target = { center: north(camera.center, 100), zoom: 15.5 };
@@ -268,29 +268,29 @@ test('fitCircle: the circle grown 20 percent fills the shorter side of the Peek 
   assert.equal(PLACE_FIT_MAX_ZOOM, 16);
   const rect = visibleRect(PHONE, selectionPadding(PHONE, compact())); // 324 wide, 653 high less 56 = 597
   const lat = 31.099;
-  const pose = fitCircle([-97.341, lat], 300, rect);
+  const pose = fitCircle([-85.341, lat], 300, rect);
   assert.ok(Math.abs((2 * 300 * 1.2) / metersPerPixel(pose.zoom, lat) - 324) < 1e-6, 'the width (324) is the shorter side');
   // a wide, low rectangle is limited by its height less the allowance
   const low = { left: 0, top: 0, right: 800, bottom: 256 };
-  const lowPose = fitCircle([-97.341, lat], 300, low);
+  const lowPose = fitCircle([-85.341, lat], 300, low);
   assert.ok(Math.abs((2 * 300 * 1.2) / metersPerPixel(lowPose.zoom, lat) - 200) < 1e-6, '256 less 56 is 200');
   // the grow option
-  const bigger = fitCircle([-97.341, lat], 300, rect, { growth: 0.5 });
+  const bigger = fitCircle([-85.341, lat], 300, rect, { growth: 0.5 });
   assert.ok(bigger.zoom < pose.zoom);
   assert.ok(Math.abs((2 * 300 * 1.5) / metersPerPixel(bigger.zoom, lat) - 324) < 1e-6);
 });
 
 test('fitCircle: never zooms in past 16, and never out past the minimum zoom', () => {
   const rect = visibleRect(PHONE, selectionPadding(PHONE, compact()));
-  assert.equal(fitCircle([-97.341, 31.099], 10, rect).zoom, 16);
-  assert.equal(fitCircle([-97.341, 31.099], 0, rect).zoom, 16);
-  assert.equal(fitCircle([-97.341, 31.099], 10, rect, { maxZoom: 14 }).zoom, 14);
-  assert.equal(fitCircle([-97.341, 31.099], 4_000_000, rect, { minZoom: 3 }).zoom, 3);
+  assert.equal(fitCircle([-85.341, 31.099], 10, rect).zoom, 16);
+  assert.equal(fitCircle([-85.341, 31.099], 0, rect).zoom, 16);
+  assert.equal(fitCircle([-85.341, 31.099], 10, rect, { maxZoom: 14 }).zoom, 14);
+  assert.equal(fitCircle([-85.341, 31.099], 4_000_000, rect, { minZoom: 3 }).zoom, 3);
 });
 
 test('fitCircle: the camera centre sits 28 px (half the allowance) above the circle centre, on the same meridian', () => {
   const rect = visibleRect(PHONE, selectionPadding(PHONE, compact()));
-  const centre = [-97.341, 31.099];
+  const centre = [-85.341, 31.099];
   const pose = fitCircle(centre, 300, rect);
   assert.equal(pose.center[0], centre[0]);
   assert.ok(pose.center[1] > centre[1], 'north of the circle');

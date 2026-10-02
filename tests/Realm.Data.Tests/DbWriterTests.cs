@@ -131,7 +131,7 @@ public class DbWriterTests
         var timeMs = at.ToUnixTimeMilliseconds();
 
         Assert.True(rig.Writer.EnqueueVehicleSample(new VehicleSample("wagon", at, OdometerM: 100_000.5, Ignition: "off")));
-        Assert.True(rig.Writer.EnqueueVehicleSample(new VehicleSample("wagon", at, FuelPct: 55, Lat: 38.5, Lon: -98.5)));
+        Assert.True(rig.Writer.EnqueueVehicleSample(new VehicleSample("wagon", at, FuelPct: 55, Lat: 38.5, Lon: -86.5)));
         await rig.Writer.FlushAsync();
 
         Assert.Equal(1, rig.RowCount("vehicle_samples"));

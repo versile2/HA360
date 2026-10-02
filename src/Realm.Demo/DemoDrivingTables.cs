@@ -13,7 +13,7 @@ internal static class DemoDrivingTables
     public const double TenthMileMetres = 160.9344;
 
     /// <summary>The street string of the king's week-0 top speed (02 section 6.6 and 9.4 (d)).</summary>
-    public const string TopSpeedStreet = "I-35";
+    public const string TopSpeedStreet = "I-65";
 
     /// <summary>Minutes in a week; drives of weeks 1 to 3 end before Sunday 23:59 local (02 section 9.4 (f)).</summary>
     public const int WeekEndMin = (7 * 24 * 60) - 1;

@@ -14,7 +14,7 @@ internal static class TestData
             Source: source,
             Ts: Start.AddSeconds(second),
             Lat: lat,
-            Lon: -98.5,
+            Lon: -86.5,
             AccuracyM: 12.5,
             SpeedMps: 3.5,
             HeadingDeg: 90,
@@ -34,9 +34,9 @@ internal static class TestData
             EndUtc: start.AddMinutes(20),
             DurationS: 1200,
             StartLat: 38.5,
-            StartLon: -98.5,
+            StartLon: -86.5,
             EndLat: 38.6,
-            EndLon: -98.4,
+            EndLon: -86.4,
             StartPlaceId: "home",
             EndPlaceId: null,
             StartStreet: "Example Rd",
@@ -52,7 +52,7 @@ internal static class TestData
             EndedBy: TripEndedBy.Stop,
             SourceMask: "companion,life360",
             Track: [],
-            SpeedingEpisodes: [new SpeedingEpisode(start.AddMinutes(8), start.AddMinutes(10), 36.5, 38.55, -98.45)],
+            SpeedingEpisodes: [new SpeedingEpisode(start.AddMinutes(8), start.AddMinutes(10), 36.5, 38.55, -86.45)],
             PhoneEvents: [new PhoneUseEvent(start.AddMinutes(3), start.AddMinutes(4), 42)]);
     }
 }

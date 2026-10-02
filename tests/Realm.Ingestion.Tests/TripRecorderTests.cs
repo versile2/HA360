@@ -106,7 +106,7 @@ public sealed class TripRecorderTests
         Assert.Equal(Wednesday.ToUnixTimeMilliseconds(), rig.Long("SELECT start_ts FROM trips"));
         var error = Assert.Single(log.Messages(LogLevel.Error));
         Assert.DoesNotContain("33.1", error, StringComparison.Ordinal);   // nothing that is logged carries a position
-        Assert.DoesNotContain("96.7", error, StringComparison.Ordinal);
+        Assert.DoesNotContain("84.7", error, StringComparison.Ordinal);
         Assert.False(recorder.Health.IsFaulted);
     }
 

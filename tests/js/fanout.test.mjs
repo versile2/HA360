@@ -7,8 +7,8 @@ import { FAN_DEFAULTS, FAN_PRIORITY, fanOut } from '../../src/Realm.Web/wwwroot/
 import { metersPerPixel } from '../../src/Realm.Web/wwwroot/js/geo.js';
 import { haversine } from '../../src/Realm.Web/wwwroot/js/layoutMath.js';
 
-const KING = [-97.341, 31.099]; // 01 Appendix A.1
-const WAGON = [-97.341, 31.09907]; // 02 section 9.3: 7.78 m from the king, inside Hearth Haven
+const KING = [-85.341, 31.099]; // 01 Appendix A.1
+const WAGON = [-85.341, 31.09907]; // 02 section 9.3: 7.78 m from the king, inside Hearth Haven
 
 const item = (id, x, y, priority) => ({ id, x, y, priority });
 const dxOf = (results, id) => results.find((r) => r.id === id)?.dx;
