@@ -20,6 +20,12 @@ internal abstract record WriteCommand
 
     internal sealed record Signal(string MemberId, PhoneSignal Value) : WriteCommand;
 
+    /// <summary>A <c>meta</c> row: rare and tiny, so like a trip close it is never refused for lack of room.</summary>
+    internal sealed record Meta(string Key, string Value) : WriteCommand
+    {
+        public override bool MustAccept => true;
+    }
+
     internal sealed record Trip(
         string MemberId,
         DetectedTrip Value,

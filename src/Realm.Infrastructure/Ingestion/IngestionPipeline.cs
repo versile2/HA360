@@ -4,9 +4,11 @@ using System.Threading.Channels;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Realm.Domain;
+using Realm.Infrastructure.Data;
 using Realm.Infrastructure.Ha;
 using Realm.Infrastructure.Hosting;
 using Realm.Infrastructure.Options;
+using Realm.Infrastructure.Stats;
 
 namespace Realm.Infrastructure.Ingestion;
 
@@ -19,9 +21,10 @@ namespace Realm.Infrastructure.Ingestion;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Not done here, left to S14b: persisting a closed trip (<see cref="TripClosed"/> is the seam, raised after the snapshot is published; the algorithm version,
-/// the derive hash, phone-use events and the <see cref="RealmSnapshot.StatsVersion"/> bump belong with the stats service), the backfill batch with its replay
-/// mode, and seeding the detector from the last 30 minutes of stored fixes (only the latest stored fix and the fix times of each source are read at start).
+/// Not done here: persisting a closed trip. <see cref="TripClosed"/> is the seam, raised after the snapshot is published; <see cref="TripRecorder"/> subscribes
+/// and <see cref="StatsService"/> writes the trip (phone-use count, algorithm version, derive hash, <see cref="RealmSnapshot.StatsVersion"/>). The backfill is
+/// <see cref="Backfill.BackfillService"/>. A new member is hydrated from the database by <see cref="RealmStateHydrator"/>: the latest stored fixes, the fix
+/// times of the last 24 hours and a replay of the last 30 minutes through its detector.
 /// </para>
 /// <para>
 /// All state is guarded by one lock, held for a few microseconds per item and never across I/O; <see cref="ProcessAsync"/> is what the consumer loop calls and
@@ -45,8 +48,8 @@ public sealed class IngestionPipeline : BackgroundService
     private readonly TimeProvider _time;
     private readonly ILogger _logger;
     private readonly ResilientLoop _loop;
-    private readonly TripOptions _tripOptions;
-    private readonly DrivingOptions _drivingOptions;
+    private readonly DetectionSettings _detection;
+    private readonly RealmStateHydrator _hydrator;
     private readonly Channel<IngestItem> _channel = Channel.CreateBounded<IngestItem>(new BoundedChannelOptions(QueueCapacity)
     {
         FullMode = BoundedChannelFullMode.Wait,
@@ -68,6 +71,7 @@ public sealed class IngestionPipeline : BackgroundService
     private IReadOnlyList<RawPlace> _drawn = [];
     private HashSet<string>? _watched;
     private string _zoneId = "UTC";
+    private string? _zoneMetaQueued;
     private HaConnectionStatus _connection;
     private ConnectionState[] _lastConnections = [];
     private bool _dirty;
@@ -83,7 +87,8 @@ public sealed class IngestionPipeline : BackgroundService
         IRealmWriter writer,
         IRealmQueries queries,
         TimeProvider time,
-        ILogger<IngestionPipeline> logger)
+        ILogger<IngestionPipeline> logger,
+        RealmStateHydrator? hydrator = null)
     {
         _options = options;
         _state = state;
@@ -93,15 +98,8 @@ public sealed class IngestionPipeline : BackgroundService
         _time = time;
         _logger = logger;
         _loop = new ResilientLoop(nameof(IngestionPipeline), logger, time);
-        _tripOptions = new TripOptions(
-            StartSpeedMps: options.TripsStartSpeedMps,
-            StopMergeS: options.TripsStopMergeSeconds,
-            MinDistanceM: options.TripsMinDistanceM,
-            MinDurationS: options.TripsMinDurationSeconds);
-        _drivingOptions = new DrivingOptions(
-            SpeedingMps: options.DrivingSpeedingMps,
-            SpeedingMinS: options.DrivingSpeedingMinSeconds,
-            PhoneMinS: options.DrivingPhoneMinSeconds);
+        _hydrator = hydrator ?? new RealmStateHydrator(queries);
+        _detection = new DetectionSettings(options);
 
         // Until the websocket says otherwise Home Assistant is being reached for the first time: Reconnecting for 15 s, then Unavailable.
         _connection = new HaConnectionStatus(HaConnectionState.Connecting, time.GetUtcNow(), null, 0, null);
@@ -110,7 +108,8 @@ public sealed class IngestionPipeline : BackgroundService
 
     /// <summary>
     /// A trip closed (a drive that is valid by 02 section 5.5), raised on the thread that processed the item, after the snapshot that follows it was
-    /// published. Persisting it is S14b's job. A subscriber that throws is logged and skipped.
+    /// published. It is raised for the trips a start-up replay finds too. A subscriber must hand the trip off at once (<see cref="TripRecorder"/> queues it
+    /// for its own loop): this runs on the pipeline's consumer. A subscriber that throws is logged and skipped.
     /// </summary>
     public event Action<string, DetectedTrip>? TripClosed;
 
@@ -306,6 +305,7 @@ public sealed class IngestionPipeline : BackgroundService
     private List<MemberRuntime> ApplyDiscovery(HaDiscoveryResult result)
     {
         _zoneId = result.TimeZone;
+        QueueZoneMeta(result.TimeZone);
         _watched = new HashSet<string>(result.WatchList, StringComparer.Ordinal);
         _zones = result.Zones.ToDictionary(z => z.Id, StringComparer.Ordinal);
         RebuildPlaces();
@@ -316,7 +316,7 @@ public sealed class IngestionPipeline : BackgroundService
         {
             if (!_members.TryGetValue(plan.Id, out var runtime))
             {
-                runtime = new MemberRuntime(plan, plan.Kind == MemberKind.Live ? new TripDetector(_tripOptions, _drivingOptions) { Zones = _drawn } : null);
+                runtime = new MemberRuntime(plan, plan.Kind == MemberKind.Live ? new TripDetector(_detection.Trips, _detection.Driving) { Zones = _drawn } : null);
                 added.Add(runtime);
             }
 
@@ -393,8 +393,27 @@ public sealed class IngestionPipeline : BackgroundService
         }
     }
 
-    // 02 section 1.6 rule F0 and 7.5: after a start the latest stored fix of each source is the pointer a companion echo is compared with, and the stored
-    // fix times of the last 24 hours give the heartbeat at once. A database that cannot answer only costs the seed, never the live stream.
+    // D58, D66: HA's time zone is kept in meta.ha_time_zone. It is queued when it is new to this run, and again if the queue refused it.
+    private void QueueZoneMeta(string zone)
+    {
+        if (string.Equals(_zoneMetaQueued, zone, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _writes.Add(writer =>
+        {
+            if (writer.EnqueueMeta(MetaKeys.HaTimeZone, zone))
+            {
+                _zoneMetaQueued = zone;
+            }
+        });
+    }
+
+    // 02 section 1.6 rule F0, 5.4 and 7.5: a new member is hydrated from the database (RealmStateHydrator): the latest stored fix of each source is the pointer
+    // a companion echo is compared with, the stored fix times of the last 24 hours give the heartbeat at once, and the stored fixes of the last 30 minutes are
+    // replayed through the detector, so a drive in progress is picked up and a trip that closed without being written is written. The database is read outside
+    // the lock; the replay is the detector's own and runs inside it. A database that cannot answer only costs the hydration, never the live stream.
     private async Task SeedAsync(IReadOnlyList<MemberRuntime> added, CancellationToken cancellationToken)
     {
         var now = _time.GetUtcNow();
@@ -402,21 +421,20 @@ public sealed class IngestionPipeline : BackgroundService
         {
             try
             {
-                var life360 = await _queries.GetLatestFixAsync(runtime.Plan.Id, FixSource.Life360, cancellationToken);
-                var companion = await _queries.GetLatestFixAsync(runtime.Plan.Id, FixSource.Companion, cancellationToken);
-                var life360Times = await _queries.GetFixTimesAsync(runtime.Plan.Id, FixSource.Life360, now - FixHistory, now, cancellationToken);
-                var companionTimes = await _queries.GetFixTimesAsync(runtime.Plan.Id, FixSource.Companion, now - FixHistory, now, cancellationToken);
+                var data = await _hydrator.ReadAsync(runtime.Plan.Id, now, cancellationToken);
                 lock (_gate)
                 {
-                    runtime.Life360 ??= life360;
-                    runtime.Companion ??= companion;
-                    runtime.FixTimes[FixSource.Life360] = [.. life360Times];
-                    runtime.FixTimes[FixSource.Companion] = [.. companionTimes];
+                    runtime.Life360 ??= data.Life360;
+                    runtime.Companion ??= data.Companion;
+                    runtime.FixTimes[FixSource.Life360] = [.. data.Life360Times];
+                    runtime.FixTimes[FixSource.Companion] = [.. data.CompanionTimes];
                     PruneAndMeasureHeartbeat(runtime, now);
+                    CollectClosed(runtime, runtime.Detector!.Replay(data.ReplayFixes, now));
                 }
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
+                _hydrator.Abandon(runtime.Plan.Id, now);
                 _logger.LogWarning("The stored fixes of member {MemberId} could not be read at start ({ErrorType}); starting without them", runtime.Plan.Id, ex.GetType().Name);
             }
         }

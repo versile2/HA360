@@ -259,9 +259,9 @@ public class TripDetectorTests
     }
 
     [Theory]
-    [InlineData(6.69, false)]
-    [InlineData(6.7, true)]
-    public void A_start_needs_two_fixes_at_6_7_m_s_and_the_reported_speed_wins_over_the_implied_one(double mps, bool starts)
+    [InlineData(6.7, false)]                    // just under 15 mph
+    [InlineData(15 * FixParser.MphToMps, true)] // 15 mph is 6.7056 m/s: converted exactly, not rounded to 6.7 (D70)
+    public void A_start_needs_two_fixes_at_15_mph_and_the_reported_speed_wins_over_the_implied_one(double mps, bool starts)
     {
         // The positions imply 16.7 m/s in both cases; the reported speed decides.
         var detector = Fed(Idle(-252, 0));
@@ -312,9 +312,9 @@ public class TripDetectorTests
     }
 
     [Fact]
-    public void A_slow_trip_started_by_the_flag_is_discarded_for_its_top_speed_below_6_7_m_s()
+    public void A_slow_trip_started_by_the_flag_is_discarded_for_its_top_speed_below_15_mph()
     {
-        // 450 m out at 3 m/s with the flag on, then 3 m/s for 7 more minutes: long and far enough, but never 6.7 m/s.
+        // 450 m out at 3 m/s with the flag on, then 3 m/s for 7 more minutes: long and far enough, but never 15 mph.
         var fixes = Idle(-252, 0);
         fixes.Add(Fix(42, 450, mps: 3, driving: true));
         for (var k = 1; k <= 10; k++)
@@ -327,7 +327,7 @@ public class TripDetectorTests
 
         Assert.Empty(result.Closed);
         var discarded = Assert.Single(result.Discarded);
-        Assert.True(discarded.DistanceGpsM >= 483);
+        Assert.True(discarded.DistanceGpsM >= 0.3 * 1609.344);
         Assert.True((discarded.EndUtc - discarded.StartUtc).TotalSeconds >= 120);
         Assert.Equal(3.0, discarded.TopSpeedMps);
     }
@@ -858,6 +858,47 @@ public class TripDetectorTests
         Assert.Equal(At(lastT), trip.EndUtc);
     }
 
+    [Fact]
+    public void Fixes_rejected_for_accuracy_do_not_keep_a_trip_open_past_600_s()
+    {
+        // CR1-011: a phone in a tunnel still reports every 30 s, but only 1 km accuracy fixes. There is no usable position, so no fix.
+        var (before, lastT, lastNorth) = DriveThenSilence(speedAtLastFix: 20);
+        var detector = Fed(before);
+
+        for (var k = 1; k <= 19; k++)
+        {
+            var decision = Assert.Single(detector.Process(Fix(lastT + (30 * k), lastNorth + (600.0 * k), mps: 20, accuracy: 1000)).Decisions);
+            Assert.Equal(TrackReason.Accuracy, decision.Reason);
+        }
+
+        Assert.Equal(TripState.Driving, detector.State);
+
+        detector.Process(Fix(lastT + 600, lastNorth + 12_000, mps: 20, accuracy: 1000));
+
+        Assert.Equal(TripState.Idle, detector.State);
+        var trip = Assert.Single(detector.Tick(At(lastT + 901)).Closed);
+        Assert.Equal(TripEndedBy.NoFix, trip.EndedBy);
+        Assert.Equal(At(lastT), trip.EndUtc);
+    }
+
+    [Fact]
+    public void A_fix_outranked_by_a_better_source_still_counts_as_a_fix_for_the_no_fix_close()
+    {
+        // 02 5.3 says "no fix at all": Life360 fixes dropped for Priority show the phone is alive, so they extend the 600 s.
+        var fixes = Leave(0);
+        fixes.AddRange(Cruise(24, 276, 20, 6, 18, source: FixSource.Companion));
+        var (lastT, lastNorth) = (132.0, 276 + (20.0 * 108));
+        var detector = Fed(fixes);
+
+        var outranked = Assert.Single(detector.Process(Fix(lastT + 100, lastNorth + 2000, mps: 20)).Decisions);
+        Assert.Equal(TrackReason.Priority, outranked.Reason);
+
+        Assert.Empty(detector.Tick(At(lastT + 650)).Closed);
+        Assert.Equal(TripState.Driving, detector.State);
+        detector.Tick(At(lastT + 700));
+        Assert.Equal(TripState.Idle, detector.State);
+    }
+
     // A drive that goes silent while moving: Leave, 18 cruise fixes, then a last fix doing speedAtLastFix.
     private static (List<RawFix> Fixes, double LastT, double LastNorth) DriveThenSilence(double speedAtLastFix)
     {
@@ -910,11 +951,11 @@ public class TripDetectorTests
     }
 
     [Theory]
-    [InlineData(482, 130, false)]   // 0.3 mi is 483 m
-    [InlineData(484, 130, true)]
-    [InlineData(700, 119, false)]   // and 2 minutes
+    [InlineData(482.8, 130, false)]   // 0.3 mi is 482.8032 m (D70: converted exactly, not rounded to 483)
+    [InlineData(482.81, 130, true)]
+    [InlineData(700, 119, false)]     // and 2 minutes
     [InlineData(700, 121, true)]
-    public void A_trip_is_valid_from_483_m_and_120_s(double metres, double seconds, bool valid)
+    public void A_trip_is_valid_from_0_3_mi_and_120_s(double metres, double seconds, bool valid)
     {
         var result = Hop(metres, seconds);
 
@@ -1013,26 +1054,75 @@ public class TripDetectorTests
     [Fact]
     public void The_better_source_feeds_the_track_and_the_next_one_takes_over_after_120_s()
     {
-        // Rank: an Android companion (reports a speed), then Life360, then an iPhone companion (no speed).
+        // Rank for an Android phone: its companion (reports a speed), then Life360.
         var detector = new TripDetector();
-        (RawFix Fix, bool InTrack)[] expected =
+        (RawFix Fix, TrackReason? Reason)[] expected =
         [
-            (Fix(0, 0, source: FixSource.Companion, mps: 0), true),      // Android
-            (Fix(27, 0, source: FixSource.Companion, mps: 0), true),
-            (Fix(30, 0, mps: 0), false),                                 // Life360 while Android is alive
-            (Fix(140, 0, mps: 0), false),                                // 113 s after Android's last fix: still within 120 s
-            (Fix(150, 0, mps: 0), true),                                 // 123 s: Android went quiet, Life360 takes over
-            (Fix(160, 0, source: FixSource.Companion, mps: 0), true),    // Android is back and takes back
-            (Fix(170, 0, mps: 0), false),
-            (Fix(175, 0, source: FixSource.Companion), false),           // iPhone: both better sources are live
-            (Fix(400, 0, source: FixSource.Companion), true),            // iPhone: the others have been quiet for 230 s
+            (Fix(0, 0, source: FixSource.Companion, mps: 0), null),
+            (Fix(27, 0, source: FixSource.Companion, mps: 0), null),
+            (Fix(30, 0, mps: 0), TrackReason.Priority),                                 // Life360 while the companion is alive
+            (Fix(140, 0, mps: 0), TrackReason.Priority),                                // 113 s after the companion's last fix: still within 120 s
+            (Fix(150, 0, mps: 0), null),                                 // 123 s: the companion went quiet, Life360 takes over
+            (Fix(160, 0, source: FixSource.Companion, mps: 0), null),    // the companion is back and takes back
+            (Fix(170, 0, mps: 0), TrackReason.Priority),
         ];
 
-        foreach (var (fix, inTrack) in expected)
+        AssertDecisions(detector, expected);
+    }
+
+    [Fact]
+    public void An_iphone_companion_without_a_speed_ranks_below_life360()
+    {
+        var detector = new TripDetector();
+        (RawFix Fix, TrackReason? Reason)[] expected =
+        [
+            (Fix(0, 0, mps: 0), null),                                   // Life360
+            (Fix(30, 0, source: FixSource.Companion), TrackReason.Priority),            // the companion never reports a speed: Life360 is live
+            (Fix(100, 0, source: FixSource.Companion), TrackReason.Priority),           // 100 s after Life360's last fix
+            (Fix(130, 0, source: FixSource.Companion), null),            // 130 s: Life360 went quiet, the companion feeds the track
+            (Fix(140, 0, mps: 0), null),                                 // Life360 is back (nothing better is live)
+        ];
+
+        AssertDecisions(detector, expected);
+    }
+
+    [Fact]
+    public void An_android_companion_fix_without_a_speed_still_ranks_with_its_source_not_with_the_fix()
+    {
+        // CR1-005: the rank belongs to the source. This companion has reported a speed, so a fix that lacks one is not an iPhone's.
+        var detector = new TripDetector();
+        (RawFix Fix, TrackReason? Reason)[] expected =
+        [
+            (Fix(0, 0, source: FixSource.Companion, mps: 0), null),
+            (Fix(27, 0, source: FixSource.Companion), null),             // no speed attribute this time: still first rank
+            (Fix(30, 0, mps: 0), TrackReason.Priority),                                 // Life360 is outranked by it
+        ];
+
+        AssertDecisions(detector, expected);
+    }
+
+    [Fact]
+    public void A_fix_rejected_from_the_track_does_not_silence_the_sources_below_it()
+    {
+        // CR1-005: a better source's fix that is rejected (here for accuracy) never fed the track, so Life360 is not held back by it.
+        var detector = new TripDetector();
+        (RawFix Fix, TrackReason? Reason)[] expected =
+        [
+            (Fix(0, 0, source: FixSource.Companion, mps: 0), null),
+            (Fix(50, 0, source: FixSource.Companion, mps: 0, accuracy: 500), TrackReason.Accuracy),
+            (Fix(130, 0, mps: 0), null),                                 // 130 s after the last companion fix that counted
+        ];
+
+        AssertDecisions(detector, expected);
+    }
+
+    private static void AssertDecisions(TripDetector detector, IEnumerable<(RawFix Fix, TrackReason? Reason)> expected)
+    {
+        foreach (var (fix, reason) in expected)
         {
             var decision = Assert.Single(detector.Process(fix).Decisions);
-            Assert.Equal(inTrack, decision.InTrack);
-            Assert.Equal(inTrack ? null : TrackReason.Priority, decision.Reason);
+            Assert.Equal(reason is null, decision.InTrack);
+            Assert.Equal(reason, decision.Reason);
         }
     }
 

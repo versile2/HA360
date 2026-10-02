@@ -11,7 +11,7 @@ namespace Realm.Infrastructure.Data;
 /// <summary>
 /// The single database writer (02 section 7.3, 03 sections 2.4, 2.12 and 2.13). Producers queue rows through <see cref="IRealmWriter"/>; one consumer commits
 /// the queue in one transaction whenever 100 rows are waiting or 2 s have passed, so a crash loses at most 2 s of fixes (the HA history gap-fill restores
-/// them). Fixes and signals are <c>INSERT OR IGNORE</c>, vehicle samples merge with <c>ON CONFLICT DO UPDATE ... COALESCE</c>. The queue holds
+/// them). Fixes and signals are <c>INSERT OR IGNORE</c>, vehicle samples merge with <c>ON CONFLICT DO UPDATE ... COALESCE</c>, meta rows replace. The queue holds
 /// <see cref="QueueCapacity"/> rows and drops <c>track = 0</c> diagnostic rows first when it is full. A trip close is written on its own, after the flush
 /// that holds everything queued before it. On a graceful stop the queue is drained, <c>meta.clean_shutdown</c> is set to <c>'1'</c> and the WAL is
 /// checkpointed. This is the only code that writes the database after <see cref="SchemaBootstrap"/>.
@@ -50,6 +50,14 @@ public sealed class DbWriter : BackgroundService, IRealmWriter
     private const string SignalSql =
         "INSERT OR IGNORE INTO signals(member_id, ts, kind, value) VALUES (@member, @ts, @kind, @value)";
 
+    private const string PruneFixesSql = "DELETE FROM fixes WHERE id IN (SELECT id FROM fixes WHERE ts < @cutoff ORDER BY id LIMIT @limit)";
+
+    private const string PruneVehicleSamplesSql = "DELETE FROM vehicle_samples WHERE id IN (SELECT id FROM vehicle_samples WHERE ts < @cutoff ORDER BY id LIMIT @limit)";
+
+    private const string PruneSignalsSql = "DELETE FROM signals WHERE id IN (SELECT id FROM signals WHERE ts < @cutoff ORDER BY id LIMIT @limit)";
+
+    private const string MetaSql = "INSERT OR REPLACE INTO meta(key, value) VALUES (@key, @value)";
+
     // v1: distance_m = distance_gps_m and distance_source = 'gps'; no vehicle, no odometer drive, accel and braking always NULL (02 section 7.2, D20).
     private const string TripSql =
         "INSERT OR IGNORE INTO trips(member_id, start_ts, end_ts, duration_s, start_lat, start_lon, end_lat, end_lon, "
@@ -63,6 +71,9 @@ public sealed class DbWriter : BackgroundService, IRealmWriter
 
     private const string TripEventSql =
         "INSERT INTO trip_events(trip_id, kind, start_ts, end_ts, peak, lat, lon) VALUES (@trip, @kind, @start, @end, @peak, @lat, @lon)";
+
+    /// <summary>The tables of 02 section 7.6 that age out after <c>retention_fix_days</c>, in the order they are pruned.</summary>
+    internal static readonly string[] PrunedTables = ["fixes", "vehicle_samples", "signals"];
 
     private readonly IDbContextFactory<RealmDb> _factory;
     private readonly TimeProvider _time;
@@ -140,6 +151,16 @@ public sealed class DbWriter : BackgroundService, IRealmWriter
         return Accept(new WriteCommand.Signal(memberId, signal));
     }
 
+    public bool EnqueueMeta(string key, string value)
+    {
+        if (string.IsNullOrEmpty(key) || string.IsNullOrEmpty(value))
+        {
+            return false;
+        }
+
+        return Accept(new WriteCommand.Meta(key, value));
+    }
+
     public async Task<bool> WriteTripAsync(string memberId, DetectedTrip trip, int algoVersion, string deriveHash, CancellationToken cancellationToken = default)
     {
         var done = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -155,6 +176,67 @@ public sealed class DbWriter : BackgroundService, IRealmWriter
     public Task FlushAsync(CancellationToken cancellationToken = default)
     {
         return FlushQueuedAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Deletes up to <paramref name="limit"/> of the oldest rows of one of the raw tables (<c>fixes</c>, <c>signals</c>, <c>vehicle_samples</c>) with a time before
+    /// <paramref name="cutoff"/> and returns how many went (02 section 7.6, the <c>prune</c> job). It runs between flushes, never inside one, so the writer stays the
+    /// only code that changes the database. Any other table is refused: trips are kept for ever.
+    /// </summary>
+    internal async Task<int> PruneAsync(string table, DateTimeOffset cutoff, int limit, CancellationToken cancellationToken)
+    {
+        var sql = table switch
+        {
+            "fixes" => PruneFixesSql,
+            "vehicle_samples" => PruneVehicleSamplesSql,
+            "signals" => PruneSignalsSql,
+            _ => throw new ArgumentException("Only the raw tables are pruned", nameof(table)),
+        };
+
+        await _flushGate.WaitAsync(cancellationToken);
+        try
+        {
+            await using var session = await DbSession.OpenAsync(_factory, cancellationToken);
+            using var command = session.Connection.CreateCommand();
+            command.CommandText = sql;
+            command.Parameters.AddWithValue("@cutoff", SqlValues.Millis(cutoff));
+            command.Parameters.AddWithValue("@limit", (long)limit);
+            return command.ExecuteNonQuery();
+        }
+        finally
+        {
+            _flushGate.Release();
+        }
+    }
+
+    /// <summary>Gives back up to 2 000 free pages to the file (<c>PRAGMA incremental_vacuum(2000)</c>, 02 section 7.6); like <see cref="PruneAsync"/>, between flushes.</summary>
+    internal async Task VacuumAsync(CancellationToken cancellationToken)
+    {
+        await _flushGate.WaitAsync(cancellationToken);
+        try
+        {
+            await using var session = await DbSession.OpenAsync(_factory, cancellationToken);
+            Execute(session.Connection, "PRAGMA incremental_vacuum(2000)");
+        }
+        finally
+        {
+            _flushGate.Release();
+        }
+    }
+
+    /// <summary>Folds the write-ahead log into the file and truncates it (<c>PRAGMA wal_checkpoint(TRUNCATE)</c>); like <see cref="PruneAsync"/>, between flushes.</summary>
+    internal async Task CheckpointAsync(CancellationToken cancellationToken)
+    {
+        await _flushGate.WaitAsync(cancellationToken);
+        try
+        {
+            await using var session = await DbSession.OpenAsync(_factory, cancellationToken);
+            Execute(session.Connection, "PRAGMA wal_checkpoint(TRUNCATE)");
+        }
+        finally
+        {
+            _flushGate.Release();
+        }
     }
 
     public override Task StartAsync(CancellationToken cancellationToken)
@@ -326,6 +408,7 @@ public sealed class DbWriter : BackgroundService, IRealmWriter
                 connection, transaction, VehicleSampleSql,
                 "@vehicle", "@ts", "@odo", "@fuel", "@ignition", "@gear", "@speed", "@remote", "@lat", "@lon");
             using var signalInsert = new SqlStatement(connection, transaction, SignalSql, "@member", "@ts", "@kind", "@value");
+            using var metaUpsert = new SqlStatement(connection, transaction, MetaSql, "@key", "@value");
             for (var i = start; i < end; i++)
             {
                 switch (commands[i])
@@ -346,6 +429,9 @@ public sealed class DbWriter : BackgroundService, IRealmWriter
                         break;
                     case WriteCommand.Signal signal:
                         signalInsert.Run(signal.MemberId, SqlValues.Millis(signal.Value.Ts), SignalKindText(signal.Value.Kind), SignalValueText(signal.Value.IsOn));
+                        break;
+                    case WriteCommand.Meta meta:
+                        metaUpsert.Run(meta.Key, meta.Value);
                         break;
                 }
             }

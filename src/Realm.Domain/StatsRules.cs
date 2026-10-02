@@ -59,9 +59,10 @@ public static class StatsRules
             .ToList();
 
         var covered = ordered.Where(d => d.Summary.Covered).ToList();
+        // Partial means recording began mid-week for a covered driver; a driver who is not covered says nothing about it.
         var coverage = covered.Count == 0
             ? WeekCoverage.NoRecord
-            : ordered.All(d => d.Member.RecordingStart <= current.StartUtc) ? WeekCoverage.Full : WeekCoverage.Partial;
+            : covered.Any(d => d.Summary.CoverageStartUtc is not null) ? WeekCoverage.Partial : WeekCoverage.Full;
 
         var events = EventKeyOrder.ToDictionary(key => key, key => EventStatOf(key, ordered), StringComparer.Ordinal);
         var top = TopSpeedOf(ordered);
@@ -249,6 +250,9 @@ public static class StatsRules
             .ToList();
         var present = counts.Where(c => c.Count is not null).ToList();
 
+        // A driver who is not covered has no count because nothing is known, not because they did not share.
+        var coveredDrivers = drivers.Count(d => d.Summary.Covered);
+
         int? total = present.Count == 0 ? null : present.Sum(c => c.Count!.Value);
 
         // The comparator total covers the same drivers as the total, and exists only if every one of them has comparator data.
@@ -273,7 +277,7 @@ public static class StatsRules
             TrendDelta: trend,
             Source: StatSource.Derived,
             Availability: availability,
-            Partial: availability != EventAvailability.None && present.Count > 0 && present.Count < counts.Count,
+            Partial: availability != EventAvailability.None && present.Count > 0 && present.Count < coveredDrivers,
             Note: key == EventKeys.Speeding ? SpeedingNote : null,
             Drivers: counts);
     }

@@ -375,6 +375,36 @@ public class StatsRulesTests
     }
 
     [Fact]
+    public void A_covered_driver_with_no_count_still_gives_the_chip_an_asterisk_beside_an_uncovered_one()
+    {
+        // Bree cannot record phone use (null); Cade has not been recorded yet. Only Bree counts toward "k of n drivers shared this".
+        var report = Report(
+            0,
+            [Alden(), Bree(), Cade(since: Local(10, 6))],
+            Dense("alden", Local(9, 28, 8), phone: 3));
+
+        Assert.True(report.Events["phone"].Partial);
+        Assert.Equal(3, report.Events["phone"].Total);
+    }
+
+    [Fact]
+    public void A_week_with_one_fully_covered_driver_and_one_not_yet_recording_is_full()
+    {
+        var report = Report(0, [Alden(), Bree() with { RecordingStart = null }]);
+
+        Assert.Equal(WeekCoverage.Full, report.Coverage);
+        Assert.False(Summary(report, "bree").Covered);
+    }
+
+    [Fact]
+    public void A_week_with_a_driver_who_starts_recording_next_week_is_still_full_for_the_covered_ones()
+    {
+        var report = Report(0, [Alden(), Cade(since: Local(10, 6))]);
+
+        Assert.Equal(WeekCoverage.Full, report.Coverage);
+    }
+
+    [Fact]
     public void A_key_that_no_driver_has_a_count_for_has_no_total_and_no_asterisk()
     {
         var report = Report(0, [Bree()], Dense("bree", Local(9, 28, 9), phone: null));
@@ -659,12 +689,12 @@ public class StatsRulesTests
         Assert.Null(Summary(report, "bree").Drives);
         Assert.Null(Summary(report, "bree").Events["speeding"]);
         Assert.False(Summary(report, "bree").Covered);
-        Assert.Equal(WeekCoverage.Partial, report.Coverage);
+        Assert.Equal(WeekCoverage.Full, report.Coverage);   // CR1-003: an uncovered driver says nothing about how the covered ones were recorded
         Assert.Equal(new[] { "alden", "bree" }, report.Drivers.Select(d => d.MemberId));
     }
 
     [Fact]
-    public void An_uncovered_driver_is_not_in_the_totals_and_gives_the_chip_an_asterisk()
+    public void An_uncovered_driver_is_not_in_the_totals_and_does_not_give_the_chip_an_asterisk()
     {
         var report = Report(
             0,
@@ -674,7 +704,7 @@ public class StatsRulesTests
         Assert.False(Summary(report, "cade").Covered);
         Assert.Equal(1, report.Totals.Drives);
         Assert.Equal(1500.0, report.Totals.Meters);
-        Assert.True(report.Events["speeding"].Partial);
+        Assert.False(report.Events["speeding"].Partial);   // CR1-004: nobody covered is missing a count
         Assert.Equal(2, report.Events["speeding"].Total);
     }
 

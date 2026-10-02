@@ -21,6 +21,12 @@ public interface IRealmWriter
     bool EnqueueSignal(string memberId, PhoneSignal signal);
 
     /// <summary>
+    /// Queues one <c>meta</c> row (02 section 7.2): inserted, or replaced when the key exists (the <c>ha_time_zone</c> of D66 is written this way). The key and the value
+    /// must not be empty. Returns false when the row was not accepted, as the other row methods do.
+    /// </summary>
+    bool EnqueueMeta(string key, string value);
+
+    /// <summary>
     /// Writes a closed trip and its speeding and phone events (<c>trips</c> and <c>trip_events</c>), after everything queued before it has been committed
     /// (02 section 7.3: a close is written after the flush that holds its last fix). Completes when the trip is committed. Returns false when a trip of the
     /// same member and start time already exists (nothing is changed then), true when a new row was written. The writer must be running.

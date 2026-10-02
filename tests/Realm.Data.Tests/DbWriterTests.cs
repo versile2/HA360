@@ -185,6 +185,21 @@ public class DbWriterTests
     }
 
     [Fact]
+    public async Task A_meta_row_is_inserted_and_replaced_by_its_key_and_an_empty_one_is_refused()
+    {
+        await using var rig = await WriterRig.StartAsync();
+
+        Assert.True(rig.Writer.EnqueueMeta("ha_time_zone", "America/Chicago"));
+        Assert.True(rig.Writer.EnqueueMeta("ha_time_zone", "Europe/London")); // the key exists: replaced, in the order queued
+        Assert.False(rig.Writer.EnqueueMeta("ha_time_zone", string.Empty));
+        Assert.False(rig.Writer.EnqueueMeta(string.Empty, "Europe/London"));
+        await rig.Writer.FlushAsync();
+
+        Assert.Equal("Europe/London", TestSql.Text(rig.FilePath, "SELECT value FROM meta WHERE key = 'ha_time_zone'"));
+        Assert.Equal(1, TestSql.Long(rig.FilePath, "SELECT count(*) FROM meta WHERE key = 'ha_time_zone'"));
+    }
+
+    [Fact]
     public async Task A_full_queue_drops_track_0_rows_first_and_never_grows()
     {
         await using var rig = WriterRig.Create(); // not started: nothing is consumed while the queue fills

@@ -8,10 +8,13 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Realm.Domain;
 using Realm.Infrastructure.Avatars;
+using Realm.Infrastructure.Backfill;
 using Realm.Infrastructure.Data;
 using Realm.Infrastructure.Ha;
 using Realm.Infrastructure.Ingestion;
 using Realm.Infrastructure.Options;
+using Realm.Infrastructure.Retention;
+using Realm.Infrastructure.Stats;
 
 namespace Realm.Infrastructure.Hosting;
 
@@ -77,7 +80,8 @@ public static class RealmLiveServiceCollectionExtensions
 
     /// <summary>
     /// Registers the Live services: the SQLite data layer first (its hosted services must start first), then the HA connection, the discovery refresher and
-    /// the ingestion pipeline, the data source and its session factory, and the avatar proxy. Options that fail the validation of 02 section 3.3 refuse the
+    /// the ingestion pipeline, then the trip recorder, the backfill and the retention job, the statistics service, the data source and its session factory,
+    /// and the avatar proxy. Options that fail the validation of 02 section 3.3 refuse the
     /// data service: nothing but a logged reason starts, and the UI keeps what it has (the first-data error of 01 section 8.6).
     /// </summary>
     /// <param name="configuration">Where <c>Realm:Ha:*</c>, <c>Realm:Db</c>, <c>SUPERVISOR_TOKEN</c> and the mapped options live.</param>
@@ -92,6 +96,7 @@ public static class RealmLiveServiceCollectionExtensions
         services.AddSingleton(provider => RealmState.CreateInitial(settings.Options, provider.GetRequiredService<TimeProvider>()));
         services.AddSingleton<DiscoveryState>();
         services.AddSingleton<ChangeNotifier>();
+        services.AddSingleton<StatsService>();
         services.AddSingleton<HaDataSource>();
         services.AddSingleton<IRealmSessionFactory>(provider => new LiveRealmSessionFactory(provider.GetRequiredService<HaDataSource>(), demoFactory));
 
@@ -119,7 +124,11 @@ public static class RealmLiveServiceCollectionExtensions
             (item, token) => provider.GetRequiredService<IngestionPipeline>().EnqueueAsync(item, token),
             provider.GetRequiredService<TimeProvider>(),
             provider.GetRequiredService<ILogger<HaDiscoveryRefresher>>()));
+        services.AddSingleton<RealmStateHydrator>();
         services.AddSingleton<IngestionPipeline>();
+        services.AddSingleton<TripRecorder>();
+        services.AddSingleton<BackfillService>();
+        services.AddSingleton<RetentionService>();
 
         services.AddSingleton<IAvatarSource>(provider => new AvatarService(
             provider.GetRequiredService<DiscoveryState>(),
@@ -129,13 +138,18 @@ public static class RealmLiveServiceCollectionExtensions
             provider.GetRequiredService<TimeProvider>(),
             provider.GetRequiredService<ILogger<AvatarService>>()));
 
-        // The options are reported first, whatever follows. A refusal starts none of the three services that talk to Home Assistant.
+        // The options are reported first, whatever follows. A refusal starts none of the services that talk to Home Assistant or work from what it reports.
         services.AddHostedService(provider => new OptionsReport(settings.Errors, settings.Warnings, provider.GetRequiredService<ILogger<OptionsReport>>()));
         if (settings.Errors.Count == 0)
         {
             services.AddHostedService(provider => provider.GetRequiredService<HaWebSocketConnection>());
             services.AddHostedService(provider => provider.GetRequiredService<HaDiscoveryRefresher>());
             services.AddHostedService(provider => provider.GetRequiredService<IngestionPipeline>());
+
+            // After the pipeline: the recorder subscribes to its trips, the backfill waits for the first discovery, the prune waits five minutes.
+            services.AddHostedService(provider => provider.GetRequiredService<TripRecorder>());
+            services.AddHostedService(provider => provider.GetRequiredService<BackfillService>());
+            services.AddHostedService(provider => provider.GetRequiredService<RetentionService>());
         }
 
         return services;

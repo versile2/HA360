@@ -10,6 +10,7 @@ internal sealed class FakeHaGateway : IHaGateway
 {
     private readonly object _gate = new();
     private readonly List<IReadOnlyCollection<string>?> _watchLists = [];
+    private readonly List<HistoryCall> _historyCalls = [];
     private int _imageCalls;
     private int _configCalls;
     private int _stateCalls;
@@ -27,6 +28,9 @@ internal sealed class FakeHaGateway : IHaGateway
     public HaIntegrationEntities Integration { get; set; } = new([], [], []);
 
     public IReadOnlyList<RawPlace> Zones { get; set; } = [];
+
+    /// <summary>Answers a history request (entity, start, end, with attributes); a request while it is not set throws, so an unexpected one fails at once.</summary>
+    public Func<string, DateTimeOffset, DateTimeOffset, bool, IReadOnlyList<HaEntitySnapshot>>? History { get; set; }
 
     /// <summary>When set, <see cref="GetConfigAsync"/> throws it (Home Assistant is down).</summary>
     public Exception? Failure { get; set; }
@@ -49,6 +53,18 @@ internal sealed class FakeHaGateway : IHaGateway
             lock (_gate)
             {
                 return _watchLists.ToArray();
+            }
+        }
+    }
+
+    /// <summary>Every history request that was made, in order, including the ones that failed.</summary>
+    public IReadOnlyList<HistoryCall> HistoryCalls
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _historyCalls.ToArray();
             }
         }
     }
@@ -88,12 +104,24 @@ internal sealed class FakeHaGateway : IHaGateway
         return Task.FromResult(Zones);
     }
 
-    public Task<IReadOnlyList<HaEntitySnapshot>> GetHistoryAsync(string entityId, DateTimeOffset start, DateTimeOffset end, bool withAttributes, CancellationToken cancellationToken) =>
-        throw new InvalidOperationException("No history call is expected");
+    public Task<IReadOnlyList<HaEntitySnapshot>> GetHistoryAsync(string entityId, DateTimeOffset start, DateTimeOffset end, bool withAttributes, CancellationToken cancellationToken)
+    {
+        lock (_gate)
+        {
+            _historyCalls.Add(new HistoryCall(entityId, start, end, withAttributes));
+        }
+
+        return History is { } history
+            ? Task.FromResult(history(entityId, start, end, withAttributes))
+            : throw new InvalidOperationException("No history call is expected");
+    }
 
     public Task<AvatarImage?> GetImageAsync(string pathAndQuery, int maxBytes, CancellationToken cancellationToken)
     {
         Interlocked.Increment(ref _imageCalls);
         return Image is { } image ? image(pathAndQuery, maxBytes, cancellationToken) : throw new InvalidOperationException("No image call is expected");
     }
+
+    /// <summary>One history request as the backfill made it.</summary>
+    internal sealed record HistoryCall(string EntityId, DateTimeOffset Start, DateTimeOffset End, bool WithAttributes);
 }

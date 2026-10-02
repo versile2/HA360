@@ -36,6 +36,7 @@ public sealed class TripDetector
     private readonly DateTimeOffset?[] _lastByRank = new DateTimeOffset?[FeedingRanks];
     private readonly List<RawFix> _rejects = [];
     private readonly List<AddressFix> _addresses = [];
+    private bool _companionReportsSpeed;
     private DateTimeOffset? _lastAnyTs;
     private DateTimeOffset _clock = DateTimeOffset.MinValue;
 
@@ -114,8 +115,12 @@ public sealed class TripDetector
     {
         AdvanceTo(fix.Ts, step);
         NoteAddress(fix);
-        step.Decisions.Add(Consider(fix, step));
-        if (_lastAnyTs is not { } last || fix.Ts > last)
+        var decision = Consider(fix, step);
+        step.Decisions.Add(decision);
+
+        // "No fix at all" counts the fixes that enter the track and the ones a better source outranked, not the ones
+        // rejected as inaccurate, as spikes or as out of order: a phone spraying useless fixes does not keep a trip open.
+        if ((decision.InTrack || decision.Reason == TrackReason.Priority) && (_lastAnyTs is not { } last || fix.Ts > last))
         {
             _lastAnyTs = fix.Ts;
         }
@@ -176,15 +181,23 @@ public sealed class TripDetector
 
     // ---- track construction (02 sections 5.1 and 5.2) -----------------------------------------------------------
 
-    private static int Rank(RawFix fix) => fix.Source switch
+    // The rank belongs to the source, not to the fix (02 section 5.2): the companion app of an Android phone reports a
+    // speed and an iPhone's never does, so the companion ranks first once it has reported a speed at all and last
+    // until then. One member has one phone, so one flag per detector is enough, and replay learns it like live does.
+    private int Rank(RawFix fix) => fix.Source switch
     {
-        FixSource.Companion => fix.SpeedMps is null ? 2 : 0,   // an Android phone reports a speed, an iPhone does not
+        FixSource.Companion => _companionReportsSpeed ? 0 : 2,
         FixSource.Life360 => 1,
         _ => FeedingRanks,                                      // a vehicle tracker never feeds a member's track
     };
 
     private FixDecision Consider(RawFix fix, StepAccumulator step)
     {
+        if (fix.Source == FixSource.Companion && fix.SpeedMps is not null)
+        {
+            _companionReportsSpeed = true;
+        }
+
         var rank = Rank(fix);
         var better = false;
         if (rank < FeedingRanks)
@@ -195,11 +208,6 @@ public sealed class TripDetector
                 {
                     better = true;
                 }
-            }
-
-            if (_lastByRank[rank] is not { } own || fix.Ts > own)
-            {
-                _lastByRank[rank] = fix.Ts;
             }
         }
 
@@ -267,6 +275,13 @@ public sealed class TripDetector
         }
 
         Push(entry);
+
+        // Only a fix that entered the track silences the sources below its own.
+        if (rank < FeedingRanks && (_lastByRank[rank] is not { } own || fix.Ts > own))
+        {
+            _lastByRank[rank] = fix.Ts;
+        }
+
         return new FixDecision(fix, true, null);
     }
 
