@@ -202,7 +202,7 @@ public sealed class DemoDataSource
                 OdometerM: wagonState.OdometerM,
                 LastUpdateUtc: wagonState.LastUpdateUtc,
                 SpeedMps: wagonState.SpeedMps,
-                IsMoving: wagonState.Ignition == IgnitionState.On && wagonState.SpeedMps > 1.0,
+                IsMoving: VehicleRules.IsMoving(wagonState.Ignition, wagonState.SpeedMps, wagonState.LastUpdateUtc, now),
                 Freshness: FreshnessRules.ForVehicle(now, wagonState.LastUpdateUtc, VehicleStaleAfterMinutes),
                 IsPlaceholder: DemoCast.Wagon.IsPlaceholder,
                 PlaceholderNote: DemoCast.Wagon.PlaceholderNote),

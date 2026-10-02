@@ -529,6 +529,147 @@ public sealed class IngestionPipelineTests : IDisposable
         Assert.DoesNotContain("realm.db", warning, StringComparison.Ordinal);   // the type of the failure, never its message
     }
 
+    // ---- hydration: what a restart must not lose -------------------------------------------------------------------
+
+    [Fact]
+    public async Task ADriveThatWasOpenAtTheRestart_IsPickedUp_FromTheStoredHalfHour()
+    {
+        var rig = NewRig();
+        var depart = Start.AddMinutes(-2);
+        var rows = Drives.DriveRows(depart);
+        rig.Queries.Fixes.AddRange(rows.Where(r => r.LastUpdatedUtc <= Start).Select(Drives.Fix));   // the lead-in and four fixes of driving
+        var closed = new List<(string MemberId, DetectedTrip Trip)>();
+        rig.Pipeline.TripClosed += (member, trip) => closed.Add((member, trip));
+
+        await rig.DiscoverAsync(Plans.Member("king", life360: Plans.KingTracker));
+
+        Assert.Empty(rig.Writer.Fixes);   // read back, never written again
+        Assert.Empty(closed);
+        foreach (var row in rows.Where(r => r.LastUpdatedUtc > Start))
+        {
+            rig.Time.Advance(row.LastUpdatedUtc!.Value - rig.Time.GetUtcNow());
+            await rig.FeedAsync(row);
+        }
+
+        var (memberId, trip) = Assert.Single(closed);
+        Assert.Equal("king", memberId);
+        Assert.Equal(depart, trip.StartUtc);   // the departure the stored fixes show, not where this process first saw the car moving
+    }
+
+    [Fact]
+    public async Task ATripThatClosedBeforeTheRestart_IsClosedAgainByTheReplay_ForTheRecorderToWrite()
+    {
+        var rig = NewRig();
+        var depart = Start.AddMinutes(-14);
+        rig.Queries.Fixes.AddRange(Drives.Drive(depart));   // the whole drive, its last fix half a minute before the restart
+        var closed = new List<(string MemberId, DetectedTrip Trip)>();
+        rig.Pipeline.TripClosed += (member, trip) => closed.Add((member, trip));
+
+        await rig.DiscoverAsync(Plans.Member("king", life360: Plans.KingTracker));
+
+        var (memberId, trip) = Assert.Single(closed);
+        Assert.Equal("king", memberId);
+        Assert.Equal(depart, trip.StartUtc);
+        Assert.Empty(rig.Writer.Fixes);
+    }
+
+    [Fact]
+    public async Task TheReplay_StartsAHalfHourBack()
+    {
+        var rig = NewRig();
+
+        await rig.DiscoverAsync(Plans.Member("king", life360: Plans.KingTracker));
+
+        Assert.Equal(("king", Start.AddMinutes(-30), Start.AddMilliseconds(1)), Assert.Single(rig.Queries.FixRanges));
+    }
+
+    [Fact]
+    public async Task TheReplay_StartsTenMinutesBeforeAStoredTripItWouldCut_SoTheTripIsReplayedWhole()
+    {
+        var rig = NewRig();
+        rig.Queries.Trips.Add(StoredTrip(Start.AddMinutes(-40), Start.AddMinutes(-20)));   // the half hour would begin in the middle of it
+
+        await rig.DiscoverAsync(Plans.Member("king", life360: Plans.KingTracker));
+
+        Assert.Equal(Start.AddMinutes(-50), Assert.Single(rig.Queries.FixRanges).From);
+    }
+
+    [Fact]
+    public async Task TheReplay_FollowsAChainOfStoredTripsBack()
+    {
+        var rig = NewRig();
+        rig.Queries.Trips.Add(StoredTrip(Start.AddMinutes(-40), Start.AddMinutes(-20)));
+        rig.Queries.Trips.Add(StoredTrip(Start.AddMinutes(-70), Start.AddMinutes(-48)));   // the first move lands in the quiet time the second one needs
+
+        await rig.DiscoverAsync(Plans.Member("king", life360: Plans.KingTracker));
+
+        Assert.Equal(Start.AddMinutes(-80), Assert.Single(rig.Queries.FixRanges).From);
+    }
+
+    [Fact]
+    public async Task TheReplay_IgnoresAStoredTripThatEndedBeforeIt()
+    {
+        var rig = NewRig();
+        rig.Queries.Trips.Add(StoredTrip(Start.AddMinutes(-45), Start.AddMinutes(-35)));
+
+        await rig.DiscoverAsync(Plans.Member("king", life360: Plans.KingTracker));
+
+        Assert.Equal(Start.AddMinutes(-30), Assert.Single(rig.Queries.FixRanges).From);
+    }
+
+    [Fact]
+    public async Task TheMarkOfAMember_IsWhatTheDatabaseHeldBeforeTheLiveFeedStoredAnything()
+    {
+        var rig = NewRig();
+        var stored = new RawFix(Plans.KingTracker, FixSource.Life360, Start.AddMinutes(-3), HomeLat + 0.05, HomeLon);
+        rig.Queries.Latest[("king", FixSource.Life360)] = stored;
+        Assert.Null(rig.Hydrator.MarkOf("king"));
+
+        await rig.DiscoverAsync(Plans.Member("king", life360: Plans.KingTracker));
+        await rig.FeedAsync(Life360(Plans.KingTracker, Start, HomeLat + 0.06, HomeLon));   // the live feed's own fix does not move it
+
+        Assert.Equal(new HydrationMark(Start, stored.Ts, null), rig.Hydrator.MarkOf("king"));
+    }
+
+    [Fact]
+    public async Task AMemberWhoseHydrationFailed_StillHasAMark_SoTheBackfillIsNotHeldUpForEver()
+    {
+        var rig = NewRig();
+        rig.Queries.Failure = new IOException("the database is locked");
+
+        await rig.DiscoverAsync(Plans.Member("king", life360: Plans.KingTracker));
+
+        Assert.Equal(new HydrationMark(Start, null, null), rig.Hydrator.MarkOf("king"));
+    }
+
+    // ---- the time zone ----------------------------------------------------------------------------------------------
+
+    [Fact]
+    public async Task HomeAssistantsTimeZone_IsQueuedAsMeta_OnceForEachZoneItReports()
+    {
+        var rig = NewRig();
+
+        await rig.DiscoverInZoneAsync("America/Chicago");
+        await rig.DiscoverInZoneAsync("America/Chicago");   // the same zone again: nothing new to write
+        await rig.DiscoverInZoneAsync("Europe/London");
+
+        Assert.Equal([("ha_time_zone", "America/Chicago"), ("ha_time_zone", "Europe/London")], rig.Writer.Metas);
+    }
+
+    [Fact]
+    public async Task AZoneTheWriterRefused_IsQueuedAgain_ByTheNextDiscovery()
+    {
+        var rig = NewRig();
+        rig.Writer.RefuseMeta = true;
+        await rig.DiscoverInZoneAsync("America/Chicago");
+        Assert.Empty(rig.Writer.Metas);
+
+        rig.Writer.RefuseMeta = false;
+        await rig.DiscoverInZoneAsync("America/Chicago");
+
+        Assert.Equal([("ha_time_zone", "America/Chicago")], rig.Writer.Metas);
+    }
+
     // ---- phone signals and vehicles --------------------------------------------------------------------------------
 
     [Fact]
@@ -732,11 +873,15 @@ public sealed class IngestionPipelineTests : IDisposable
         var writer = new RecordingWriter(state);
         var queries = new FakeQueries();
         var log = new RecordingLogger<IngestionPipeline>();
-        var pipeline = new IngestionPipeline(options, state, notifier, writer, queries, time, log);
+        var hydrator = new RealmStateHydrator(queries);
+        var pipeline = new IngestionPipeline(options, state, notifier, writer, queries, time, log, hydrator);
         _disposables.Add(pipeline);
         _disposables.Add(notifier);
-        return new Rig(pipeline, state, notifier, writer, queries, time, log);
+        return new Rig(pipeline, state, notifier, writer, queries, time, log, hydrator);
     }
+
+    private static StatsTrip StoredTrip(DateTimeOffset start, DateTimeOffset end) =>
+        new("king", start, end, 5000, TripQuality.Dense, DistanceBasis.Gps, 20, null, null, 0, null, null, null, null, null);
 
     private static HaEntitySnapshot Entity(string id, string state, DateTimeOffset at, params (string Key, object? Value)[] attributes) =>
         new(id, state, Attributes(attributes), at, at);
@@ -782,9 +927,13 @@ public sealed class IngestionPipelineTests : IDisposable
         RecordingWriter Writer,
         FakeQueries Queries,
         ManualTimeProvider Time,
-        RecordingLogger<IngestionPipeline> Log)
+        RecordingLogger<IngestionPipeline> Log,
+        RealmStateHydrator Hydrator)
     {
         public Task DiscoverAsync(params ResolvedMember[] members) => DiscoverWithAsync(null, null, members);
+
+        public Task DiscoverInZoneAsync(string zone, params ResolvedMember[] members) =>
+            Pipeline.ProcessAsync(new DiscoveryUpdated(Plans.Discovery(zone: zone, members: members)), CancellationToken.None);
 
         public Task DiscoverWithAsync(IReadOnlyList<RawPlace>? zones, IReadOnlyList<ResolvedVehicle>? vehicles, params ResolvedMember[] members) =>
             Pipeline.ProcessAsync(new DiscoveryUpdated(Plans.Discovery(zones: zones, vehicles: vehicles, members: members)), CancellationToken.None);
@@ -849,10 +998,14 @@ public sealed class IngestionPipelineTests : IDisposable
         private readonly List<(string MemberId, PhoneSignal Signal)> _signals = [];
         private readonly List<VehicleSample> _samples = [];
         private readonly List<string> _trips = [];
+        private readonly List<(string Key, string Value)> _metas = [];
 
         public Action<string, RawFix>? OnFix { get; set; }
 
         public Exception? Failure { get; set; }
+
+        /// <summary>When true the writer refuses a meta row (its queue is full), as <see cref="IRealmWriter.EnqueueMeta"/> may.</summary>
+        public bool RefuseMeta { get; set; }
 
         public IReadOnlyList<(string MemberId, RawFix Fix, bool InTrack, TrackReason? Reason)> Fixes
         {
@@ -883,6 +1036,17 @@ public sealed class IngestionPipelineTests : IDisposable
                 lock (_gate)
                 {
                     return _samples.ToArray();
+                }
+            }
+        }
+
+        public IReadOnlyList<(string Key, string Value)> Metas
+        {
+            get
+            {
+                lock (_gate)
+                {
+                    return _metas.ToArray();
                 }
             }
         }
@@ -935,6 +1099,21 @@ public sealed class IngestionPipelineTests : IDisposable
             return true;
         }
 
+        public bool EnqueueMeta(string key, string value)
+        {
+            if (RefuseMeta)
+            {
+                return false;
+            }
+
+            lock (_gate)
+            {
+                _metas.Add((key, value));
+            }
+
+            return true;
+        }
+
         public Task<bool> WriteTripAsync(string memberId, DetectedTrip trip, int algoVersion, string deriveHash, CancellationToken cancellationToken = default)
         {
             lock (_gate)
@@ -954,16 +1133,28 @@ public sealed class IngestionPipelineTests : IDisposable
 
         public Dictionary<(string MemberId, FixSource Source), DateTimeOffset[]> Times { get; } = [];
 
+        /// <summary>The stored fixes (any member, any source); a query returns those in its range.</summary>
+        public List<RawFix> Fixes { get; } = [];
+
+        /// <summary>The stored trips of "king"; a query returns those that start in its range.</summary>
+        public List<StatsTrip> Trips { get; } = [];
+
+        /// <summary>The ranges the stored fixes were asked for, in order.</summary>
+        public List<(string MemberId, DateTimeOffset From, DateTimeOffset To)> FixRanges { get; } = [];
+
         public Exception? Failure { get; set; }
 
         public Task<IReadOnlyList<StatsTrip>> GetTripsAsync(DateTimeOffset fromUtc, DateTimeOffset toUtc, string? memberId, CancellationToken cancellationToken = default) =>
-            Answer<IReadOnlyList<StatsTrip>>([]);
+            Answer<IReadOnlyList<StatsTrip>>([.. Trips.Where(t => t.StartUtc >= fromUtc && t.StartUtc < toUtc && (memberId is null || t.MemberId == memberId))]);
 
         public Task<IReadOnlyDictionary<string, DateTimeOffset>> GetRecordingStartsAsync(CancellationToken cancellationToken = default) =>
             Answer<IReadOnlyDictionary<string, DateTimeOffset>>(new Dictionary<string, DateTimeOffset>());
 
-        public Task<IReadOnlyList<RawFix>> GetFixesAsync(string memberId, DateTimeOffset fromUtc, DateTimeOffset toUtc, CancellationToken cancellationToken = default) =>
-            Answer<IReadOnlyList<RawFix>>([]);
+        public Task<IReadOnlyList<RawFix>> GetFixesAsync(string memberId, DateTimeOffset fromUtc, DateTimeOffset toUtc, CancellationToken cancellationToken = default)
+        {
+            FixRanges.Add((memberId, fromUtc, toUtc));
+            return Answer<IReadOnlyList<RawFix>>([.. Fixes.Where(f => f.Ts >= fromUtc && f.Ts < toUtc).OrderBy(f => f.Ts)]);
+        }
 
         public Task<RawFix?> GetLatestFixAsync(string memberId, FixSource source, CancellationToken cancellationToken = default) =>
             Answer<RawFix?>(Latest.GetValueOrDefault((memberId, source)));

@@ -4,19 +4,22 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Realm.Domain;
+using Realm.Infrastructure.Backfill;
 using Realm.Infrastructure.Data;
 using Realm.Infrastructure.Ha;
 using Realm.Infrastructure.Hosting;
 using Realm.Infrastructure.Ingestion;
+using Realm.Infrastructure.Retention;
+using Realm.Infrastructure.Stats;
 using Realm.TestKit;
 using Xunit;
 
 namespace Realm.Web.Tests;
 
 /// <summary>
-/// What <c>AddRealmApp</c> composes in Live mode (03 section 2.1): the Live session factory, the data layer first and then the three services that talk to
-/// Home Assistant, which options that fail the validation of 02 section 3.3 keep from starting. The test host points Home Assistant at an address that
-/// refuses at once and the database at a temp file, so nothing here reaches outside the process.
+/// What <c>AddRealmApp</c> composes in Live mode (03 section 2.1): the Live session factory, the data layer first, then the three services that talk to
+/// Home Assistant and after them the trip recorder, the backfill and the retention job, which options that fail the validation of 02 section 3.3 keep from
+/// starting. The test host points Home Assistant at an address that refuses at once and the database at a temp file, so nothing here reaches outside the process.
 /// </summary>
 public sealed class RealmLiveCompositionTests
 {
@@ -30,7 +33,17 @@ public sealed class RealmLiveCompositionTests
         Assert.IsType<LiveRealmSessionFactory>(host.Services.GetRequiredService<IRealmSessionFactory>());
         Assert.NotNull(host.Services.GetService<IHaGateway>());
         var hosted = HostedServiceTypes(host);
-        var order = new List<Type> { typeof(SchemaBootstrap), typeof(DbWriter), typeof(HaWebSocketConnection), typeof(HaDiscoveryRefresher), typeof(IngestionPipeline) };
+        var order = new List<Type>
+        {
+            typeof(SchemaBootstrap),
+            typeof(DbWriter),
+            typeof(HaWebSocketConnection),
+            typeof(HaDiscoveryRefresher),
+            typeof(IngestionPipeline),
+            typeof(TripRecorder),
+            typeof(BackfillService),
+            typeof(RetentionService),
+        };
         Assert.All(order, type => Assert.Contains(type, hosted));
         Assert.Equal(order, hosted.Where(order.Contains).ToList());
     }
@@ -44,6 +57,9 @@ public sealed class RealmLiveCompositionTests
         Assert.DoesNotContain(typeof(HaWebSocketConnection), hosted);
         Assert.DoesNotContain(typeof(HaDiscoveryRefresher), hosted);
         Assert.DoesNotContain(typeof(IngestionPipeline), hosted);
+        Assert.DoesNotContain(typeof(TripRecorder), hosted);
+        Assert.DoesNotContain(typeof(BackfillService), hosted);
+        Assert.DoesNotContain(typeof(RetentionService), hosted);
         Assert.Null(host.Services.GetService<IHaGateway>());
         Assert.Null(host.Services.GetService<IAvatarSource>());
     }
@@ -65,6 +81,9 @@ public sealed class RealmLiveCompositionTests
         Assert.DoesNotContain(typeof(HaWebSocketConnection), hosted);
         Assert.DoesNotContain(typeof(HaDiscoveryRefresher), hosted);
         Assert.DoesNotContain(typeof(IngestionPipeline), hosted);
+        Assert.DoesNotContain(typeof(TripRecorder), hosted);
+        Assert.DoesNotContain(typeof(BackfillService), hosted);
+        Assert.DoesNotContain(typeof(RetentionService), hosted);
         Assert.Contains(logs.Entries, entry => entry.Level == LogLevel.Error && entry.Message.Contains("ui_offline_after_hours", StringComparison.Ordinal));
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
