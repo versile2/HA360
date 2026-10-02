@@ -1872,12 +1872,15 @@ function beginFollow(r, id) {
 }
 
 /**
- * Ends Follow (a user gesture, a bubble tap or recenter). S8c: tell .NET here once `MapCallbacks` has the follow-ended callback of 03 section 4.7; the
- * callbacks contract test lists them exactly, so the call cannot be added before that method exists.
+ * Ends Follow (a user gesture, a bubble tap, a recentre, a new selection, or the followed member stopping). When Follow was running, .NET hears it once through
+ * `OnFollowEnded` (03 section 4.7, R1-14), so that the page's mirror of it (`FollowMemberId`) does not outlive it; ending a Follow that was not running says nothing.
  * @param {Runtime} r
  */
 function endFollow(r) {
-  selectionState(r).followId = null;
+  const state = selectionState(r);
+  if (state.followId === null) return;
+  state.followId = null;
+  notify('OnFollowEnded');
 }
 
 /**
@@ -1890,7 +1893,7 @@ function followMember(r) {
   if (state.followId === null) return;
   const member = r.members?.members.find((item) => item.id === state.followId);
   if (!member || !member.drivingFresh || typeof member.lat !== 'number' || typeof member.lon !== 'number') {
-    state.followId = null;
+    endFollow(r);
     return;
   }
   if (state.flight) return;

@@ -1,11 +1,19 @@
-<Router AppAssembly="typeof(Program).Assembly" NotFoundPage="typeof(Realm.Web.Pages.NotFound)">
-    <Found Context="routeData">
-        <RouteView RouteData="routeData" DefaultLayout="typeof(MainLayout)" />
-    </Found>
-</Router>
+<CascadingValue Name="@ViewerMemberIdName" Value="@ViewerMemberId" IsFixed="true">
+    <Router AppAssembly="typeof(Program).Assembly" NotFoundPage="typeof(Realm.Web.Pages.NotFound)">
+        <Found Context="routeData">
+            <RouteView RouteData="routeData" DefaultLayout="typeof(MainLayout)" />
+        </Found>
+    </Router>
+</CascadingValue>
 
 @code {
-    /// <summary>The member slug of the viewer (for example <c>king</c>), or <c>null</c>. Resolved in the static SSR root; S8 cascades it into the UI state.</summary>
+    /// <summary>The name of the cascading value that carries <see cref="ViewerMemberId"/> to the pages (<c>[CascadingParameter(Name = Routes.ViewerMemberIdName)]</c>).</summary>
+    public const string ViewerMemberIdName = "ViewerMemberId";
+
+    /// <summary>
+    /// The member slug of the viewer (for example <c>king</c>), or <c>null</c>. Resolved in the static SSR root (<c>App.razor</c>, through <c>IViewerResolver</c>) and cascaded to the pages,
+    /// which put it into the circuit's <c>RealmUiState.MeId</c>. Only the slug passes here; the Home Assistant user id never leaves the SSR request (D38).
+    /// </summary>
     [Parameter]
     public string? ViewerMemberId { get; set; }
 }

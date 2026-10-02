@@ -1,12 +1,20 @@
 @implements IDisposable
+@using Microsoft.JSInterop
+@using Realm.Web.State
 @inject NavigationManager Navigation
+@inject IJSRuntime JS
+@inject RealmUiState Ui
+@inject HistorySync History
 
+@* The two tabs (01 section 2.2). The links stay real anchors, so a click before the circuit has connected still navigates; once the circuit is up the handler below takes the click
+   (preventDefault) and runs the rules of the table: a tab change releases the history entries of the page it leaves and navigates with a REPLACE, and a re-tap of the tab you are on is
+   a "home" gesture (Location: Peek and nothing selected; Driving: back to the top and This week). A modifier click is not told apart: Blazor's preventDefault is fixed per render. *@
 <nav class="realm-nav" aria-label="Main">
-    <a class="realm-nav-link" href="./" data-testid="nav-location" aria-current="@(OnLocation ? "page" : null)">
+    <a class="realm-nav-link" href="./" data-testid="nav-location" aria-current="@(OnLocation ? "page" : null)" @onclick="OnLocationTapAsync" @onclick:preventDefault="true">
         <MudIcon Icon="@(OnLocation ? Icons.Material.Filled.LocationOn : Icons.Material.Outlined.LocationOn)" />
         <span class="realm-nav-label">Location</span>
     </a>
-    <a class="realm-nav-link" href="driving" data-testid="nav-driving" aria-current="@(OnDriving ? "page" : null)">
+    <a class="realm-nav-link" href="driving" data-testid="nav-driving" aria-current="@(OnDriving ? "page" : null)" @onclick="OnDrivingTapAsync" @onclick:preventDefault="true">
         <MudIcon Icon="@(OnDriving ? Icons.Material.Filled.DirectionsCar : Icons.Material.Outlined.DirectionsCar)" />
         <span class="realm-nav-label">Driving</span>
     </a>
@@ -33,6 +41,49 @@
     protected override void OnInitialized() => Navigation.LocationChanged += OnLocationChanged;
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs e) => _ = InvokeAsync(StateHasChanged);
+
+    // Location: on Location the tab is a home gesture, the sheet to Peek and the selection cleared (the reducer's NavReTap, which the history then follows by itself); from anywhere else it
+    // is a tab change.
+    private Task OnLocationTapAsync() =>
+        OnLocation ? ReTapLocationAsync() : ChangeTabAsync("./");
+
+    // Driving: on a Driving route the tab scrolls the page to the top and selects This week; from anywhere else it is a tab change.
+    private Task OnDrivingTapAsync() =>
+        OnDriving ? ReTapDrivingAsync() : ChangeTabAsync("driving");
+
+    private Task ReTapLocationAsync()
+    {
+        Ui.Apply(new SheetEvent.NavReTap());
+        return Task.CompletedTask;
+    }
+
+    private async Task ReTapDrivingAsync()
+    {
+        Ui.SelectedWeek = 0;
+        try
+        {
+            await JS.InvokeVoidAsync("scrollTo", 0, 0);
+        }
+        catch (JSDisconnectedException)
+        {
+            // The circuit dropped; there is no page left to scroll.
+        }
+
+        // This week is the default and leaves no ?week= parameter (the chips write it the same way); a replace, so Back from Driving still leaves for Location.
+        var thisWeek = Navigation.GetUriWithQueryParameter("week", (string?)null);
+        if (!string.Equals(thisWeek, Navigation.Uri, StringComparison.Ordinal))
+        {
+            Navigation.NavigateTo(thisWeek, replace: true);
+        }
+    }
+
+    // A tab change replaces the history entry (01 section 2.2). The entries the page above pushed (the sheet's depth tokens, the Driving sentinel) are taken back first, and awaited, so that
+    // none stays between the new page and the entry it replaces.
+    private async Task ChangeTabAsync(string relativeUri)
+    {
+        await History.ReleaseAsync();
+        Navigation.NavigateTo(relativeUri, replace: true);
+    }
 
     public void Dispose() => Navigation.LocationChanged -= OnLocationChanged;
 }

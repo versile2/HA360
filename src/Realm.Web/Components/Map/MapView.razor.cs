@@ -37,6 +37,7 @@ public sealed partial class MapView : IMapEventHandler, IAsyncDisposable
     private bool _ready;
     private bool _disposed;
     private bool _webGlUnavailable;
+    private bool _keepCamera;
 
     // The last value sent of each section (null: not sent yet) and the per-circuit version counters (03 section 4.2).
     private MembersKey? _members;
@@ -124,6 +125,17 @@ public sealed partial class MapView : IMapEventHandler, IAsyncDisposable
     [Parameter]
     public EventCallback<CameraState> OnCameraChanged { get; set; }
 
+    /// <summary>The camera stopped following the selected driving member (a gesture, a bubble tap, a recentre, a new selection, or the member stopped driving): the page drops its mirror of Follow.</summary>
+    [Parameter]
+    public EventCallback OnFollowEnded { get; set; }
+
+    /// <summary>
+    /// The camera to start from when the Location page comes back (01 section 2.2, R1-12): read once, when the map is created. The map then starts there without animation, the default
+    /// camera fit does not run and neither does the first selection flight (the glow is still set, the camera stays where the person left it). Null starts the default camera.
+    /// </summary>
+    [Parameter]
+    public CameraState? RestoreCamera { get; set; }
+
     /// <summary>A style did not load; the value is the style id that was asked for. The script has already kept the last good style.</summary>
     [Parameter]
     public EventCallback<string> OnStyleFailed { get; set; }
@@ -181,19 +193,22 @@ public sealed partial class MapView : IMapEventHandler, IAsyncDisposable
     Task IMapEventHandler.ReadyAsync(ReadyInfo info) => Task.CompletedTask;
 
     Task IMapEventHandler.PinTapAsync(string kind, string id) =>
-        kind switch
-        {
-            "member" => InvokeAsync(() => OnPinTap.InvokeAsync(new EntityRef(EntityKind.Member, id))),
-            "vehicle" => InvokeAsync(() => OnPinTap.InvokeAsync(new EntityRef(EntityKind.Vehicle, id))),
-            "place" => InvokeAsync(() => OnPinTap.InvokeAsync(new EntityRef(EntityKind.Place, id))),
-            _ => Task.CompletedTask,
-        };
+        EntityOf(kind, id) is { } entity ? InvokeAsync(() => TapAsync(entity)) : Task.CompletedTask;
 
     Task IMapEventHandler.MapTapAsync() => InvokeAsync(() => OnMapTap.InvokeAsync());
 
-    Task IMapEventHandler.BubbleTapAsync(IReadOnlyList<string> ids) => InvokeAsync(() => OnBubbleTap.InvokeAsync(ids));
+    // D84: one id is the same selection as that member's pin. A cluster only announces (the script fitted the camera), so it can never be a repeat tap.
+    Task IMapEventHandler.BubbleTapAsync(IReadOnlyList<string> ids) =>
+        InvokeAsync(async () =>
+        {
+            var again = ids.Count == 1 && Selection is { Kind: EntityKind.Member } selected && selected.Id == ids[0] ? selected : null;
+            await OnBubbleTap.InvokeAsync(ids);
+            await FlyAgainAsync(again);
+        });
 
     Task IMapEventHandler.CameraChangedAsync(CameraState camera) => InvokeAsync(() => OnCameraChanged.InvokeAsync(camera));
+
+    Task IMapEventHandler.FollowEndedAsync() => InvokeAsync(() => OnFollowEnded.InvokeAsync());
 
     Task IMapEventHandler.StyleResultAsync(StyleResult result) =>
         result.Ok ? Task.CompletedTask : InvokeAsync(() => OnStyleFailed.InvokeAsync(result.StyleId));
@@ -211,6 +226,35 @@ public sealed partial class MapView : IMapEventHandler, IAsyncDisposable
         return Task.CompletedTask;
     }
 
+    private static EntityRef? EntityOf(string kind, string id) =>
+        kind switch
+        {
+            "member" => new EntityRef(EntityKind.Member, id),
+            "vehicle" => new EntityRef(EntityKind.Vehicle, id),
+            "place" => new EntityRef(EntityKind.Place, id),
+            _ => null,
+        };
+
+    // The page decides what a tap means (RealmUiState through the reducer). A tap on the entity that is already selected changes nothing there (D45, 01 section 4.13: "selected pin
+    // again: nothing"), so no parameter changes and no flight would follow; the selection flight is run here instead, camera only (D89, R1-04). Whether it is a repeat is read before
+    // the page handles the tap.
+    private async Task TapAsync(EntityRef entity)
+    {
+        var again = Selection == entity ? entity : null;
+        await OnPinTap.InvokeAsync(entity);
+        await FlyAgainAsync(again);
+    }
+
+    private async Task FlyAgainAsync(EntityRef? entity)
+    {
+        if (entity is null || !_ready || _disposed || _webGlUnavailable || _interop is not { } interop)
+        {
+            return;
+        }
+
+        await FlyAsync(interop, entity);
+    }
+
     // ---- first render: import, init, send everything --------------------------------------------------------------------------------------
 
     private async Task InitializeAsync()
@@ -222,8 +266,9 @@ public sealed partial class MapView : IMapEventHandler, IAsyncDisposable
             return;
         }
 
+        var restore = RestoreCamera; // read once: the map starts from it or from the default camera, whatever the page passes later
         _interop = interop; // from here DisposeAsync can release it, but nothing is sent until init has finished (the script drops a setter before then)
-        var ready = await interop.InitAsync(InitOptions());
+        var ready = await interop.InitAsync(InitOptions(restore));
         if (ready is not null && ready.PayloadSchema != MapInterop.PayloadSchema)
         {
             LogPayloadSchemaMismatch(Logger, ready.PayloadSchema, MapInterop.PayloadSchema);
@@ -237,13 +282,26 @@ public sealed partial class MapView : IMapEventHandler, IAsyncDisposable
         _style = StyleId;
         _reducedMotion = ReducedMotion;
         _ready = true;
-        await SyncAsync();
 
-        // The first load does not animate (01 section 4.9). The script keeps the request until it has targets and a size.
-        await interop.FitDefaultAsync(animate: false);
+        // R1-12: a map that starts from a restored camera stays there. The selection that came with the page is shown (setSelection) without the flight that would move the camera.
+        _keepCamera = restore is not null;
+        try
+        {
+            await SyncAsync();
+        }
+        finally
+        {
+            _keepCamera = false;
+        }
+
+        if (restore is null)
+        {
+            // The first load does not animate (01 section 4.9). The script keeps the request until it has targets and a size.
+            await interop.FitDefaultAsync(animate: false);
+        }
     }
 
-    private MapInitOptions InitOptions()
+    private MapInitOptions InitOptions(CameraState? restore)
     {
         var targets = MapPayloadFactory.Targets(Members, Vehicles, Places, MeId, Options, version: 0);
         return new MapInitOptions(
@@ -254,7 +312,8 @@ public sealed partial class MapView : IMapEventHandler, IAsyncDisposable
             ReducedMotion,
             TestHooks,
             MapStrings.Default,
-            MapFeatures.All);
+            MapFeatures.All,
+            restore);
     }
 
     // Only the starting point until the first fit: me, else the middle of the default view, else the world.
@@ -334,25 +393,35 @@ public sealed partial class MapView : IMapEventHandler, IAsyncDisposable
         {
             var selection = Selection;
             _selection = selection;
-            await SendSelectionAsync(interop, selection);
+            await SendSelectionAsync(interop, selection, fly: !_keepCamera);
         }
     }
 
     // 03 section 3.4: whichever path changed the selection (a pin, a bubble or a row), the map gets setSelection and then one flight command. Follow is requested for a
-    // member and the script honours it only for one that is driving with a fresh fix (01 section 4.14).
-    private static async Task SendSelectionAsync(MapInterop interop, EntityRef? selection)
+    // member and the script honours it only for one that is driving with a fresh fix (01 section 4.14). `fly` is false only for the selection the page came back with
+    // when the camera is restored (R1-12).
+    private static async Task SendSelectionAsync(MapInterop interop, EntityRef? selection, bool fly)
     {
         await interop.SetSelectionAsync(selection, follow: selection?.Kind == EntityKind.Member);
-        switch (selection)
+        if (fly && selection is not null)
         {
-            case { Kind: EntityKind.Member } member:
-                await interop.FlyToMemberAsync(member.Id, follow: true);
+            await FlyAsync(interop, selection);
+        }
+    }
+
+    // The selection flight of an entity (01 section 4.13), with the Peek padding the script computes itself.
+    private static async Task FlyAsync(MapInterop interop, EntityRef entity)
+    {
+        switch (entity.Kind)
+        {
+            case EntityKind.Member:
+                await interop.FlyToMemberAsync(entity.Id, follow: true);
                 break;
-            case { Kind: EntityKind.Vehicle } vehicle:
-                await interop.FlyToVehicleAsync(vehicle.Id);
+            case EntityKind.Vehicle:
+                await interop.FlyToVehicleAsync(entity.Id);
                 break;
-            case { Kind: EntityKind.Place } place:
-                await interop.FitPlaceAsync(place.Id);
+            case EntityKind.Place:
+                await interop.FitPlaceAsync(entity.Id);
                 break;
         }
     }

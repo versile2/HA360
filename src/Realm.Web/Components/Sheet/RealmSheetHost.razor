@@ -78,6 +78,14 @@ else if (Mode == LayoutMode.Expanded)
     [Parameter]
     public EventCallback<SheetSize> OnSizeChanged { get; set; }
 
+    /// <summary>
+    /// A tap on the handle (D46, R2-04): the page runs the same event as a tap on the selection header (<c>HandleToggle</c>), so that a tap here and a tap there cannot
+    /// disagree. When no page binds it, a tap is reported through <see cref="OnSizeChanged"/> with the other size instead, as before. Keys still go through
+    /// <see cref="OnSizeChanged"/>.
+    /// </summary>
+    [Parameter]
+    public EventCallback OnToggle { get; set; }
+
     /// <summary>The body: the same fragment goes to either container.</summary>
     [Parameter]
     public RenderFragment? ChildContent { get; set; }
@@ -134,7 +142,8 @@ else if (Mode == LayoutMode.Expanded)
         return Task.CompletedTask;
     }
 
-    private Task ToggleAsync() => OnSizeChanged.InvokeAsync(Size == SheetSize.Peek ? SheetSize.Tall : SheetSize.Peek);
+    private Task ToggleAsync() =>
+        OnToggle.HasDelegate ? OnToggle.InvokeAsync() : OnSizeChanged.InvokeAsync(Size == SheetSize.Peek ? SheetSize.Tall : SheetSize.Peek);
 
     private Task SetAsync(SheetSize size) => size == Size ? Task.CompletedTask : OnSizeChanged.InvokeAsync(size);
 }

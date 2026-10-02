@@ -1,16 +1,19 @@
+@implements IDisposable
 @using System.Reflection
 @using Realm.Web.Components.Driving
 @using Realm.Web.Formatting
 @using Realm.Web.Map
 @using Realm.Web.State
 @inject DevicePrefs Prefs
+@inject RealmUiState Ui
 
 @* The Settings dialog (01 sections 7.9 and 8.9; 03 section 3.4), opened from the gear with IDialogService.ShowAsync (TopControls). A full-screen dialog below 600 px with a top bar (the back
    arrow, "Settings", "Royal decrees") and a centred 480 px dialog from 600 px up (realm-map.css). Four sections: Map (the style as a list, which is the popover's list shown for
    discoverability, Show places, Default view), Appearance (Layout), Connections (read-only chips, one row per entry the session lists) and About (the version, the map credits and the
    48 px Diagnostics row that opens diagnostics.json in a new tab). There is no Save button: every choice applies at once through DevicePrefs, which stores it per device. And there
    are no Theme, Units, 12/24 h, Week starts on or Reset rows: dark and imperial are the only values in v1 (D35). Esc, the scrim and the back arrow close it. The title takes the
-   focus when the dialog opens (PopupTitle), and MudBlazor returns it to the gear. The stored values are read after the first render if no page has read them yet. *@
+   focus when the dialog opens (PopupTitle), and MudBlazor returns it to the gear. The stored values are read after the first render if no page has read them yet. The open dialog is one
+   history layer (03 section 3.7): the Android Back closes it, and whatever else closes it takes the layer's history entry back. *@
 <MudDialog Class="realm-settings"
            TitleClass="realm-settings__head"
            ContentClass="realm-settings__body"
@@ -148,6 +151,11 @@
 @code {
     private static readonly string Version = ReadVersion();
 
+    // One layer of the history depth while the dialog is open (03 section 3.7).
+    private static readonly OverlayLayer Layer = new(OverlayKind.Settings);
+
+    private bool _closed;
+
     /// <summary>The dialog this is the content of, cascaded by MudBlazor.</summary>
     [CascadingParameter]
     public IMudDialogInstance MudDialog { get; set; } = default!;
@@ -160,6 +168,32 @@
         Prefs.ViewRadius == DevicePrefs.RadiusAll
             ? "Everyone is on the map · no edge bubbles"
             : "Me and anyone within " + DevicePrefs.RadiusOf(Prefs.ViewRadius).Label + " · others appear as edge bubbles";
+
+    protected override void OnInitialized() => Ui.OpenOverlay(Layer, CloseFromBack);
+
+    // The Android Back or Esc took the layer off the stack: close the dialog too. It arrives off the renderer's context, so it marshals; a dialog that is closing already is left alone.
+    private void CloseFromBack()
+    {
+        if (_closed)
+        {
+            return;
+        }
+
+        _ = InvokeAsync(() =>
+        {
+            if (!_closed)
+            {
+                MudDialog.Close();
+            }
+        });
+    }
+
+    /// <summary>The dialog is gone, whoever closed it (Esc, the scrim, the back arrow or the Back gesture): its layer leaves the stack and the history entry goes with it.</summary>
+    public void Dispose()
+    {
+        _closed = true;
+        Ui.CloseOverlay(Layer);
+    }
 
     // The stored values are read by the Location page when it starts; a dialog opened from another page reads them here, once the circuit can talk to the browser.
     protected override async Task OnAfterRenderAsync(bool firstRender)

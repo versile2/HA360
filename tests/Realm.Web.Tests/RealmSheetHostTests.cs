@@ -1,6 +1,7 @@
 using Bunit;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Rendering;
+using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using MudBlazor;
@@ -110,6 +111,45 @@ public sealed class RealmSheetHostTests : ComponentTestBase
         await cut.InvokeAsync(() => sheet.OpenChanged.InvokeAsync(true));
         Assert.True(Sheet(cut).Open);
         Assert.Empty(cut.Instance.Requests);
+    }
+
+    // ---- the handle (D46, R2-04) -----------------------------------------------------------------------------------------------------------
+
+    [Fact(DisplayName = "[R2-04] A tap on the handle reaches the page as the toggle, the event of the header tap, and asks for no size")]
+    public async Task Compact_TheHandleTap_IsTheToggle_WhenThePageBindsIt()
+    {
+        var cut = Host(LayoutMode.Compact, 412, bindToggle: true);
+
+        await TapHandleAsync(cut);
+
+        Assert.Equal(1, cut.Instance.Toggles);
+        Assert.Empty(cut.Instance.Requests);
+    }
+
+    [Fact]
+    public async Task Compact_TheHandleTap_WithoutAToggleBinding_AsksForTheOtherSize_AsBefore()
+    {
+        var cut = Host(LayoutMode.Compact, 412);
+
+        await TapHandleAsync(cut);
+        Assert.Equal(SheetSize.Tall, Assert.Single(cut.Instance.Requests));
+
+        await TapHandleAsync(cut);
+        Assert.Equal([SheetSize.Tall, SheetSize.Peek], cut.Instance.Requests);
+        Assert.Equal(0, cut.Instance.Toggles);
+    }
+
+    [Theory]
+    [InlineData("ArrowUp")]
+    [InlineData("End")]
+    public async Task Compact_TheHandleKeys_StillSetASize_EvenWhenTheToggleIsBound(string key)
+    {
+        var cut = Host(LayoutMode.Compact, 412, bindToggle: true);
+
+        await HandleOf(cut).Find("[data-testid='sheet-handle']").TriggerEventAsync("onkeydown", new KeyboardEventArgs { Key = key });
+
+        Assert.Equal(SheetSize.Tall, Assert.Single(cut.Instance.Requests));
+        Assert.Equal(0, cut.Instance.Toggles);
     }
 
     // ---- the left panel (Expanded) ---------------------------------------------------------------------------------------------------------
@@ -299,7 +339,7 @@ public sealed class RealmSheetHostTests : ComponentTestBase
         Services.AddSingleton<IConfiguration>(new ConfigurationBuilder().AddInMemoryCollection(settings).Build());
     }
 
-    private IRenderedComponent<HostProbe> Host(LayoutMode mode, double width, SheetSize size = SheetSize.Peek)
+    private IRenderedComponent<HostProbe> Host(LayoutMode mode, double width, SheetSize size = SheetSize.Peek, bool bindToggle = false)
     {
         if (!_configured)
         {
@@ -310,8 +350,17 @@ public sealed class RealmSheetHostTests : ComponentTestBase
         return RenderWithProviders<HostProbe>(probe => probe
             .Add(p => p.Mode, mode)
             .Add(p => p.Width, width)
-            .Add(p => p.Initial, size));
+            .Add(p => p.Initial, size)
+            .Add(p => p.BindToggle, bindToggle));
     }
+
+    // MudX draws the handle inside the popover provider, which is not part of the probe's markup, so the handle fragment the host gave MudX is rendered on its own here: it is the host's own
+    // fragment, bound to the host's own callbacks.
+    private IRenderedComponent<FragmentProbe> HandleOf(IRenderedComponent<HostProbe> cut) =>
+        Render<FragmentProbe>(probe => probe.Add(p => p.Body, Sheet(cut).SheetHandleFragment));
+
+    private async Task TapHandleAsync(IRenderedComponent<HostProbe> cut) =>
+        await HandleOf(cut).Find("[data-testid='sheet-handle']").TriggerEventAsync("onclick", new MouseEventArgs());
 
     private static MudXSheet Sheet(IRenderedComponent<HostProbe> cut) => cut.FindComponent<MudXSheet>().Instance;
 
@@ -329,7 +378,12 @@ public sealed class RealmSheetHostTests : ComponentTestBase
         [Parameter]
         public SheetSize Initial { get; set; }
 
+        [Parameter]
+        public bool BindToggle { get; set; }
+
         public List<SheetSize> Requests { get; } = [];
+
+        public int Toggles { get; private set; }
 
         public void Set(SheetSize size)
         {
@@ -355,7 +409,20 @@ public sealed class RealmSheetHostTests : ComponentTestBase
             builder.AddComponentParameter(4, nameof(RealmSheetHost.Summary), "4 in the Realm · 1 driving");
             builder.AddComponentParameter(5, nameof(RealmSheetHost.OnSizeChanged), EventCallback.Factory.Create<SheetSize>(this, OnSizeChanged));
             builder.AddComponentParameter(6, nameof(RealmSheetHost.ChildContent), (RenderFragment)(body => body.AddMarkupContent(0, "<span id=\"body\">body</span>")));
+            if (BindToggle)
+            {
+                builder.AddComponentParameter(7, nameof(RealmSheetHost.OnToggle), EventCallback.Factory.Create(this, OnToggle));
+            }
+
             builder.CloseComponent();
+        }
+
+        // The page's HandleToggle: the other size, whoever tapped.
+        private Task OnToggle()
+        {
+            Toggles++;
+            _size = _size == SheetSize.Peek ? SheetSize.Tall : SheetSize.Peek;
+            return Task.CompletedTask;
         }
 
         private Task OnSizeChanged(SheetSize size)
@@ -364,5 +431,14 @@ public sealed class RealmSheetHostTests : ComponentTestBase
             _size = size;
             return Task.CompletedTask;
         }
+    }
+
+    // Renders a fragment taken from another component.
+    private sealed class FragmentProbe : ComponentBase
+    {
+        [Parameter]
+        public RenderFragment? Body { get; set; }
+
+        protected override void BuildRenderTree(RenderTreeBuilder builder) => builder.AddContent(0, Body);
     }
 }

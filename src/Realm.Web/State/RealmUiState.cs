@@ -45,11 +45,20 @@ public sealed record LayoutSnapshot(LayoutMode Mode, bool PanelHidden, double Vi
 public sealed class RealmUiState
 {
     private readonly List<OverlayLayer> _overlays = [];
+    private readonly List<Action?> _closers = [];
     private SheetState _sheet = SheetState.Initial;
     private LayoutSnapshot _layout = LayoutSnapshot.Unknown;
     private int _selectedWeek;
+    private DateTimeOffset _cameraAt;
+    private bool _startupBegun;
 
-    /// <summary>Raised after a change of any property or of the overlay stack.</summary>
+    /// <summary>How long a camera stays worth restoring when the person comes back to Location (01 section 2.2): after more than this the default camera runs instead.</summary>
+    public static TimeSpan CameraRestoreWindow { get; } = TimeSpan.FromMinutes(10);
+
+    /// <summary>
+    /// Raised after a change of any property or of the overlay stack, except <see cref="RecordCamera"/>, which nothing renders. It is raised on the caller's context,
+    /// so a subscriber that renders marshals with <c>InvokeAsync</c>.
+    /// </summary>
     public event Action? Changed;
 
     /// <summary>The section, the selection and the size as the one record the reducers work on.</summary>
@@ -103,12 +112,8 @@ public sealed class RealmUiState
         }
     }
 
-    /// <summary>The last camera JavaScript reported (it mirrors it to <c>sessionStorage["realm.camera"]</c> itself); null before the first report.</summary>
-    public CameraState? LastCamera
-    {
-        get;
-        set => Set(ref field, value);
-    }
+    /// <summary>The last camera JavaScript reported (it mirrors it to <c>sessionStorage["realm.camera"]</c> itself); null before the first report. Set by <see cref="RecordCamera"/>.</summary>
+    public CameraState? LastCamera { get; private set; }
 
     /// <summary>The viewer's member id, resolved in SSR (03 section 5.5); null when unknown.</summary>
     public string? MeId
@@ -124,14 +129,21 @@ public sealed class RealmUiState
         return Set(ref _sheet, next);
     }
 
-    /// <summary>One Back (the Android Back, the detail's back arrow): the topmost overlay closes if any, otherwise <see cref="BackReducer.Reduce"/> applies.</summary>
+    /// <summary>
+    /// One Back (the Android Back, the detail's back arrow): the topmost overlay closes if any, otherwise <see cref="BackReducer.Reduce"/> applies. A closing overlay
+    /// leaves the stack first and <see cref="Changed"/> is raised; then the close action its owner registered with <see cref="OpenOverlay"/> runs, so the owner can
+    /// take the dialog or popover down. The owner's later <see cref="CloseOverlay"/> then finds nothing to do.
+    /// </summary>
     public BackStep Back()
     {
         var (next, step) = BackReducer.Reduce(_sheet, _layout.Mode, _overlays.Count);
         if (step == BackStep.Overlay)
         {
+            var close = _closers[^1];
             _overlays.RemoveAt(_overlays.Count - 1);
+            _closers.RemoveAt(_closers.Count - 1);
             Changed?.Invoke();
+            close?.Invoke();
         }
         else
         {
@@ -155,13 +167,19 @@ public sealed class RealmUiState
     }
 
     /// <summary>Opens an overlay: one more history layer.</summary>
-    public void OpenOverlay(OverlayLayer layer)
+    /// <param name="layer">Which overlay it is.</param>
+    /// <param name="close">
+    /// What closes it from outside (the Android Back, Esc): called by <see cref="Back"/> and <see cref="Escape"/> after the layer left the stack, possibly off the
+    /// renderer's context, so it marshals itself (<c>InvokeAsync</c>). Null for an overlay that only its own button closes.
+    /// </param>
+    public void OpenOverlay(OverlayLayer layer, Action? close = null)
     {
         _overlays.Add(layer);
+        _closers.Add(close);
         Changed?.Invoke();
     }
 
-    /// <summary>Closes the topmost overlay of that layer's kind and id (an overlay closing by its own button); false when it is not open.</summary>
+    /// <summary>Closes the topmost overlay of that layer's kind and id (an overlay closing by its own button); false when it is not open. The close action is not called.</summary>
     public bool CloseOverlay(OverlayLayer layer)
     {
         var index = _overlays.LastIndexOf(layer);
@@ -171,7 +189,42 @@ public sealed class RealmUiState
         }
 
         _overlays.RemoveAt(index);
+        _closers.RemoveAt(index);
         Changed?.Invoke();
+        return true;
+    }
+
+    /// <summary>
+    /// Remembers the camera JavaScript just reported and when (the session's clock, never the wall clock). Raises nothing: no component renders the camera, and a
+    /// pan would otherwise re-render the page about eight times a second.
+    /// </summary>
+    public void RecordCamera(CameraState camera, DateTimeOffset at)
+    {
+        ArgumentNullException.ThrowIfNull(camera);
+        LastCamera = camera;
+        _cameraAt = at;
+    }
+
+    /// <summary>
+    /// The camera to restore when the Location page comes back (01 section 2.2, R1-12): the last one reported, unless more than <see cref="CameraRestoreWindow"/> has
+    /// passed since, when the default camera fit runs instead; null before any report.
+    /// </summary>
+    /// <param name="now">The session's clock now.</param>
+    public CameraState? CameraToRestore(DateTimeOffset now) =>
+        LastCamera is { } camera && now - _cameraAt <= CameraRestoreWindow ? camera : null;
+
+    /// <summary>
+    /// True the first time it is called in this circuit and false afterwards: the page's start-up overrides (the Demo <c>sheet=80</c> parameter) apply once, not each time
+    /// the page is created again after a trip to Driving, when the state they would override is the person's own.
+    /// </summary>
+    public bool TryBeginStartup()
+    {
+        if (_startupBegun)
+        {
+            return false;
+        }
+
+        _startupBegun = true;
         return true;
     }
 

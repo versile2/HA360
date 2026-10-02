@@ -7,6 +7,7 @@ using Realm.Domain;
 using Realm.Web.Components.Driving;
 using Realm.Web.Formatting;
 using Realm.Web.Pages;
+using Realm.Web.State;
 using Xunit;
 
 namespace Realm.Web.Tests;
@@ -369,6 +370,44 @@ public sealed class StatPopupTests : ComponentTestBase
         await button.TriggerEventAsync("onclick", new MouseEventArgs());
 
         await AssertClosedAsync(cut, EventKeys.Speeding);
+    }
+
+    // ---- the history layer (03 section 3.7) ---------------------------------------------------------------------------------------------------
+
+    [Fact]
+    public async Task TheOpenPopup_IsOneDialogLayer_OfTheHistoryDepth_AndItsOwnButtonTakesItBack()
+    {
+        var ui = Services.GetRequiredService<RealmUiState>();
+        Assert.Empty(ui.Overlays);
+
+        var cut = await OpenAsync(EventKeys.Speeding, await DrivingFormatterTests.Report(0));
+
+        Assert.Equal(new OverlayLayer(OverlayKind.Dialog, "stat-popup"), Assert.Single(ui.Overlays));
+
+        await cut.Find("button[data-testid='popup-gotit']").TriggerEventAsync("onclick", new MouseEventArgs());
+        await AssertClosedAsync(cut, EventKeys.Speeding);
+        Assert.Empty(ui.Overlays);
+    }
+
+    [Fact(DisplayName = "[AC-38] The Android Back closes the open popup first, one history entry for it, and the Driving entry stays")]
+    public async Task TheAndroidBack_ClosesThePopupBeforeAnythingElse_AndLeavesTheSentinel()
+    {
+        var sync = Services.GetRequiredService<HistorySync>();
+        var ui = Services.GetRequiredService<RealmUiState>();
+        var port = new FakeHistoryPort(tokens: true);
+        await sync.AttachAsync(port, HistorySurface.Driving);
+        Assert.Equal(1, port.Entries);   // the sentinel of the Driving page
+
+        var cut = await OpenAsync(EventKeys.Speeding, await DrivingFormatterTests.Report(0));
+        Assert.Equal(2, port.Entries);   // plus the popup's layer
+
+        var step = await sync.HandleBackAsync(port.UserPop());
+
+        Assert.Equal(BackStep.Overlay, step);
+        await AssertClosedAsync(cut, EventKeys.Speeding);
+        Assert.Empty(ui.Overlays);
+        Assert.Equal(1, port.Entries);
+        Assert.Equal(1, sync.TargetDepth);
     }
 
     [Fact]

@@ -227,6 +227,48 @@ public sealed class SettingsDialogTests : ComponentTestBase
         cut.WaitForAssertion(() => Assert.Empty(cut.FindAll("[role='dialog']")));
     }
 
+    // ---- the history layer (03 section 3.7) ----------------------------------------------------------------------------------------------------
+
+    [Fact]
+    public async Task TheOpenDialog_IsOneSettingsLayer_OfTheHistoryDepth()
+    {
+        var ui = Services.GetRequiredService<RealmUiState>();
+        Assert.Empty(ui.Overlays);
+
+        await OpenAsync();
+
+        Assert.Equal(new OverlayLayer(OverlayKind.Settings), Assert.Single(ui.Overlays));
+        Assert.Equal(1, ui.Depth);
+    }
+
+    [Fact(DisplayName = "[R3-03] The Back gesture closes the open Settings dialog before anything else")]
+    public async Task TheBackGesture_ClosesTheDialog_AndTakesItsLayerBack()
+    {
+        var ui = Services.GetRequiredService<RealmUiState>();
+        var cut = await OpenAsync();
+
+        Assert.Equal(BackStep.Overlay, ui.Back());
+
+        var result = await _reference!.Result.WaitAsync(TimeSpan.FromSeconds(5));   // null-forgiving: OpenAsync set the reference
+        Assert.NotNull(result);
+        Assert.False(result.Canceled);
+        cut.WaitForAssertion(() => Assert.Empty(cut.FindAll("[role='dialog']")));
+        Assert.Empty(ui.Overlays);
+    }
+
+    [Fact]
+    public async Task ClosingTheDialogByItsOwnArrow_TakesTheLayerBackToo()
+    {
+        var ui = Services.GetRequiredService<RealmUiState>();
+        var cut = await OpenAsync();
+
+        await cut.Find("button[aria-label='Close settings']").TriggerEventAsync("onclick", new MouseEventArgs());
+
+        await _reference!.Result.WaitAsync(TimeSpan.FromSeconds(5));   // null-forgiving: OpenAsync set the reference
+        cut.WaitForAssertion(() => Assert.Empty(cut.FindAll("[role='dialog']")));
+        Assert.Empty(ui.Overlays);
+    }
+
     [Fact]
     public async Task TheGear_OpensTheDialog_WithTheOptionsThatLetEscAndTheScrimCloseIt()
     {

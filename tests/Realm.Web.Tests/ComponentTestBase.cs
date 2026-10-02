@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using MudBlazor;
 using MudBlazor.Services;
 using MudX;
+using Realm.Web.State;
 using Xunit;
 
 namespace Realm.Web.Tests;
@@ -28,6 +29,9 @@ public abstract class ComponentTestBase : BunitContext, IAsyncLifetime
         JSInterop.SetupModule("import", IsMudXProviderModule).Setup<bool>("initialize", _ => true);
 
         Services.AddMudServices();
+
+        // The circuit's UI state and its history sync, as the product registers them (scoped; a bUnit context is one circuit): BottomNav, the dialogs, the popover and the pages take them.
+        Services.AddRealmUiState();
     }
 
     /// <summary>Renders the two providers once, then the component under test.</summary>

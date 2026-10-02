@@ -23,6 +23,9 @@ public interface IMapEventHandler
     /// <summary>A camera move settled.</summary>
     Task CameraChangedAsync(CameraState camera);
 
+    /// <summary>The camera stopped following a driving member (a pan, zoom, bubble tap or recentre, a new selection, or the member stopped driving); raised only when Follow was running (01 section 4.14, R1-14).</summary>
+    Task FollowEndedAsync();
+
     /// <summary>A style switch finished, well or badly.</summary>
     Task StyleResultAsync(StyleResult result);
 
