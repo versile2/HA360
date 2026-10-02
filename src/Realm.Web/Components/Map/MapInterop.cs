@@ -120,6 +120,9 @@ public sealed class MapInterop : IAsyncDisposable
     /// <summary>The selection flight to a place: its zone circle fitted into the Peek rectangle.</summary>
     public ValueTask FitPlaceAsync(string id) => CallAsync("fitPlace", id);
 
+    /// <summary>The recentre button (01 section 4.11): away from the default view the default camera, at it "me alone", from there the default camera again. The script computes the state; it comes back in the next camera report.</summary>
+    public ValueTask RecenterAsync() => CallAsync("recenter");
+
     /// <summary>Tears the map down, then releases the module and the reference to <see cref="MapCallbacks"/>. Safe to call twice and after the circuit is gone.</summary>
     public async ValueTask DisposeAsync()
     {

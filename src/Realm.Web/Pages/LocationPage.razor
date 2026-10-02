@@ -35,7 +35,11 @@
    RealmUiState.Body (list, selection header or detail, D45). The map's Selection is read from it, so nothing else holds a selection; a tap on the entity that is already selected changes
    nothing there and MapView flies to it again by itself (D89). A tap on the selection header and a tap on the handle are the same event (D46). HistorySync keeps the browser history at the
    state's depth (03 section 3.7): the Android Back and Esc come back here as reductions of the same state, and the page only re-renders. The floating pill of the hidden Expanded panel
-   (01 section 3.6) is drawn here when the layout says the panel is hidden, which nothing sets yet. *@
+   (01 section 3.6) is drawn here when the layout says the panel is hidden, which nothing sets yet.
+
+   The focus flow and the live region (01 section 10.2 and 10.3, D45): after an event or a Back step the page asks for a focus move with a new FocusRequest (SheetFocus decides where: a row to the
+   handle, Back from a detail to the handle, a cleared selection to the section tab); the handle and the segments act on a request once. A detail that has just been opened by the handle or the header
+   takes the focus itself (FocusDetail). What the one polite live region says is derived from the state's transition (SheetAnnouncements), whoever caused it, so a tap, the Android Back and Esc agree. *@
 <section class="realm-location">
     @if (_viewport is { } viewport)
     {
@@ -48,10 +52,12 @@
             ? SelectionHeaderFormatter.For(selected, members, vehicles, places, RowFacts.Create(members, places, Ui.MeId, Session.Time.GetUtcNow(), Session.Zone))
             : null;
 
-        <MapView Members="@members"
+        <MapView @ref="_map"
+                 Members="@members"
                  Vehicles="@vehicles"
                  Places="@places"
                  Now="@Session.Time.GetUtcNow()"
+                 Zone="@Session.Zone"
                  StyleId="@StyleId"
                  ShowZones="@Prefs.ShowZones"
                  Options="@_mapOptions"
@@ -72,6 +78,7 @@
                         Size="@Ui.SheetSize"
                         ViewportWidth="@viewport.Width"
                         Summary="@summary"
+                        Focus="@_focus"
                         OnSizeChanged="OnSizeChangedAsync"
                         OnToggle="OnToggleAsync">
             <SheetContent Members="@members"
@@ -81,6 +88,8 @@
                           Body="@Ui.Body"
                           MeId="@Ui.MeId"
                           FocusDetail="@_focusDetail"
+                          Focus="@_focus"
+                          Announcement="@_announcement"
                           OnSection="OnSectionAsync"
                           OnSelect="OnSelectAsync"
                           OnToggle="OnToggleAsync"
@@ -98,6 +107,8 @@
 
         <RightButtonStack Hidden="@(!_mapLayout.StackVisible)"
                           Panel="@panel"
+                          Recenter="@_recenter"
+                          OnRecenter="OnRecenterAsync"
                           MapStyleName="@StyleName"
                           StyleId="@StyleId"
                           ShowZones="@Prefs.ShowZones"
@@ -119,6 +130,11 @@
     private LayoutMode _mode = LayoutMode.Unknown;
     private LayoutOverride _layoutOverride;
     private bool _focusDetail;
+    private FocusRequest? _focus;
+    private MapView? _map;
+    private RecenterState _recenter = RecenterState.Default;
+    private string _announcement = string.Empty;
+    private SheetState _announced;
     private CameraState? _restoreCamera;
     private IAsyncDisposable? _history;
     private MapLayout _mapLayout = MapLayout.Compact;
@@ -181,11 +197,16 @@
 
         // R1-12: the camera the person left, when they are back within ten minutes; null runs the default camera.
         _restoreCamera = Ui.CameraToRestore(Session.Time.GetUtcNow());
+
+        // Whatever the sheet already shows on arrival (a selection kept from before a trip to Driving) is not news: only changes from here on are announced.
+        _announced = Ui.Sheet;
     }
 
     // The circuit exists from the first render on: only now can the page subscribe, tick and talk to the browser.
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        // The handle and the segments have acted on the request by now (they do so in their own after-render); a component that mounts later must not find it again.
+        _focus = null;
         if (!firstRender || _started)
         {
             return;
@@ -194,6 +215,7 @@
         _started = true;
         Session.Changed += OnSessionChanged;
         Ui.Changed += OnUiChanged;
+        History.BackTaken += OnBackTaken;
         _ticker = new MinuteTicker(Session.Time);
         _ticker.Tick += OnMinute;
         _ticker.Start();
@@ -238,7 +260,38 @@
 
         _ = InvokeAsync(() =>
         {
+            Announce();
             RefreshMapLayout();
+            StateHasChanged();
+        });
+    }
+
+    // What the live region says follows the transition of the sheet state (a null result leaves it as it is, the empty string empties it so that the same words can be said again).
+    private void Announce()
+    {
+        var sheet = Ui.Sheet;
+        if (SheetAnnouncements.Between(_announced, sheet, _mode == LayoutMode.Compact, Snapshot.Members, Snapshot.Vehicles, Snapshot.Places) is { } announcement)
+        {
+            _announcement = announcement;
+        }
+
+        _announced = sheet;
+    }
+
+    // A Back, Esc or the back arrow took a step (HistorySync raises it after the state changed, possibly off the renderer's context): the focus goes where 01 section 10.2 says. Nothing opens a
+    // detail here, so no detail asks for the focus.
+    private void OnBackTaken(BackStep step)
+    {
+        var target = SheetFocus.After(step);
+        if (_disposed || target == FocusTarget.None)
+        {
+            return;
+        }
+
+        _ = InvokeAsync(() =>
+        {
+            _focusDetail = false;
+            _focus = new FocusRequest(target);
             StateHasChanged();
         });
     }
@@ -294,7 +347,10 @@
     // opened the detail with the handle or the header (01 section 10.2).
     private Task ApplyAsync(SheetEvent sheetEvent)
     {
+        var before = Ui.Selection;
         _focusDetail = SheetDispatch.Apply(Ui, sheetEvent, Snapshot.Members);
+        var target = SheetFocus.After(sheetEvent, before, Ui.Selection);
+        _focus = target == FocusTarget.None ? null : new FocusRequest(target);
         RefreshMapLayout();
         return Task.CompletedTask;
     }
@@ -319,12 +375,22 @@
     // The empty map was tapped: at 80 percent the sheet collapses with the selection kept, at Peek the selection clears, in the panel it always clears (01 section 4.13).
     private Task OnMapTapAsync() => ApplyAsync(new SheetEvent.MapTap());
 
-    // A camera move settled: kept for the way back from Driving (R1-12). Nothing renders it, so nothing re-renders.
+    // A camera move settled: kept for the way back from Driving (R1-12), and the recentre button's icon follows where the camera is (01 section 4.11: the filled crosshair at the default view or on me
+    // alone, the outlined one away).
     private Task OnCameraChangedAsync(CameraState camera)
     {
         Ui.RecordCamera(camera, Session.Time.GetUtcNow());
+        if (camera.Recenter != _recenter)
+        {
+            _recenter = camera.Recenter;
+            StateHasChanged();
+        }
+
         return Task.CompletedTask;
     }
+
+    // The recentre button (AC-20): the script cycles the camera and the selection is never touched.
+    private Task OnRecenterAsync() => _map is null ? Task.CompletedTask : _map.RecenterAsync();
 
     // The script ended Follow (a gesture, a bubble tap, a recentre, or the member stopped driving).
     private Task OnFollowEndedAsync()
@@ -420,6 +486,7 @@
         {
             Session.Changed -= OnSessionChanged;
             Ui.Changed -= OnUiChanged;
+            History.BackTaken -= OnBackTaken;
 
             // R1-12: the ten minutes count from the moment the page goes away, not from the last camera move, so the camera is stamped again now.
             if (Ui.LastCamera is { } camera)

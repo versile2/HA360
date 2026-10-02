@@ -8,7 +8,7 @@
 // repeated until it has had its effect (toPass); an action that was lost is harmless to repeat, and one that did land is idempotent (a chip chooses a week, it does not step).
 import type { Locator, Page } from '@playwright/test';
 
-import { INGRESS_PREFIX, castMember, demo, expect, expectApprox, expectRectApprox, loadDemoCast, test, type DemoOptions, type Rect } from '../fixtures.js';
+import { INGRESS_PREFIX, castMember, demo, expect, expectApprox, expectHistoryDepth, expectRectApprox, loadDemoCast, test, type DemoOptions, type Rect } from '../fixtures.js';
 
 const TOLERANCE_PX = 2;
 
@@ -669,12 +669,14 @@ test.describe('acceptance D: driving popups and the driver week', () => {
     }
   });
 
-  // The Back button of the device is the fourth way to close a popup (01 section 6.7, AC-38): a history layer of the overlay stack of D31, which HistorySync (S8a) owns and
-  // this branch does not have. Un-fixme this test when it lands.
-  test.fixme('[AC-38] Back closes the popup, and focus returns to the opener', async ({ page }) => {
+  // The Back button of the device is the fourth way to close a popup (01 section 6.7, AC-38): a history layer of the overlay stack of D31, which HistorySync (S8a, S8c) owns. The layer is a
+  // token entry (`#r<n>`) that realmShell.js pushes AFTER the circuit has opened the popup (a round trip): on Driving the page itself is depth 1 (the sentinel that stops Back from leaving
+  // at once) and the open popup makes it 2. The test therefore waits for `#r2` before it presses Back, so that Back is pressed with the layer there and not on a guess (review R3-03).
+  test('[AC-38] Back closes the popup, and focus returns to the opener', async ({ page }) => {
     await openDriving(page);
     const opener = page.getByTestId('stat-speeding');
     const dialog = await openPopup(page, opener, 'speeding');
+    await expectHistoryDepth(page, 2, 'with the popup open over the Driving page');
 
     await page.goBack();
 

@@ -285,6 +285,7 @@ const PIN_TEMPLATE =
  * @property {number} dx the fan-out shift in px (S9b: 0, or 48 for each pin that overlaps a higher-priority one)
  * @property {HTMLElement | null} chipEl
  * @property {boolean} chipBelow
+ * @property {number} chipWidthPx the chip's width as last measured in a frame's read phase (D90); 0 when there is no chip, or its text just changed and it has not been measured
  */
 /** @typedef {{ drawn: boolean, occupied: boolean, fillAlpha: number, dashed: boolean, drawnRadiusM: number, lat: number, lon: number, name: string }} ZoneState */
 /** @typedef {{ styleId: StyleId, revert: boolean, notifyOnSuccess: boolean, resolve: (result: StyleResult) => void, timer: ReturnType<typeof setTimeout> }} PendingStyle */
@@ -461,7 +462,7 @@ function createPin(r, kind, id) {
   /** @type {Pin} */
   const pin = {
     kind, id, el, marker, last: {}, shown: null, target: null, glide: null,
-    sizePx: kind === 'vehicle' ? VEHICLE_SIZE_PX : MEMBER_SIZE_PX, ring: '', dashed: false, badge: null, dx: 0, chipEl: null, chipBelow: false,
+    sizePx: kind === 'vehicle' ? VEHICLE_SIZE_PX : MEMBER_SIZE_PX, ring: '', dashed: false, badge: null, dx: 0, chipEl: null, chipBelow: false, chipWidthPx: 0,
   };
 
   // The pin's own tap handling: a pan that ends over a pin is not a tap, and the click never reaches the map (03 section 4.6).
@@ -480,7 +481,9 @@ function createPin(r, kind, id) {
 }
 
 /**
- * The chip above (or, near the top padding, below) the pin (01 section 4.4). Its text is decided in C#.
+ * The chip above (or, near the top padding, below) the pin (01 section 4.4). Its text is decided in C#. A chip that appears, goes or changes its text changes the
+ * pin's footprint for the edge bubbles (D90), and its width is known only once it is laid out, so the width is forgotten and one more frame is asked for: that frame
+ * measures it in its read phase and lays the bubbles out around it.
  * @param {Pin} pin
  * @param {string | null} text
  */
@@ -490,6 +493,8 @@ function applyChip(pin, text) {
       pin.chipEl.remove();
       pin.chipEl = null;
       pin.chipBelow = false;
+      pin.chipWidthPx = 0;
+      scheduleRender();
     }
     return;
   }
@@ -500,9 +505,15 @@ function applyChip(pin, text) {
     chip.innerHTML = `${icon('place')}<span class="realm-chip__text"></span><span class="realm-chip__caret" data-testid="chip-caret" aria-hidden="true"></span>`;
     pin.el.appendChild(chip);
     pin.chipEl = chip;
+    pin.chipWidthPx = 0;
+    scheduleRender();
   }
   const label = pin.chipEl.querySelector('.realm-chip__text');
-  if (label && label.textContent !== text) label.textContent = text;
+  if (label && label.textContent !== text) {
+    label.textContent = text;
+    pin.chipWidthPx = 0;
+    scheduleRender();
+  }
 }
 
 /**
@@ -1920,7 +1931,9 @@ function followMember(r) {
 function clampChip(r, pin, tip) {
   const chip = pin.chipEl;
   if (!chip) return;
-  const width = chip.offsetWidth;
+  // The width of this frame's read phase (D90); a chip that was created or re-worded in this frame is measured now, once.
+  if (pin.chipWidthPx <= 0) pin.chipWidthPx = chip.offsetWidth;
+  const width = pin.chipWidthPx;
   if (width <= 0) return;
   const room = chipRoom(containerSize(r), r.layout, r.appliedPadding);
   const shiftPx = Math.round(clampChipShift(tip.x + pin.dx, width, room) * 2) / 2;
@@ -2205,30 +2218,45 @@ function measureKeepOuts(r, state) {
 }
 
 /**
+ * The read phase of the chips (D90): the width of every chip, read once per frame at the top of `layoutBubblesFrame`, before this frame writes anything (the boxes
+ * `measureKeepOuts` reads next find the layout already current, so this adds no forced layout of its own), and kept on the pin. The bubbles are laid out from it before any write of this frame, and `clampChip` places the
+ * chip from the same number instead of reading the DOM again after the frame's writes. A chip that was just created or re-worded has no width yet (`applyChip` cleared
+ * it): its pin has none until the frame `applyChip` asked for.
+ * @param {Runtime} r
+ */
+function measureChips(r) {
+  for (const pin of r.pins.values()) {
+    if (pin.chipEl) pin.chipWidthPx = pin.chipEl.offsetWidth;
+  }
+}
+
+/**
  * The pins of this frame as the keep-outs see them (D89 (1)): every vehicle with a fix and every member with a fix that is not off screen in this frame's verdict (an
  * off-screen member has a bubble and no pin, and a member that comes back gets its pin in this same frame). A point is where the pin is drawn, `pin.shown` while a glide
- * runs, in container pixels like the anchors; the size is the pin's own, or the size it will get. Pure arithmetic on projections: no DOM is read here.
+ * runs, in container pixels like the anchors; the size is the pin's own, or the size it will get. The width of its chip is the one `measureChips` read (D90; 0 when it has
+ * none). Pure arithmetic on projections: no DOM is read here.
  * @param {Runtime} r
  * @param {import('./bubbleLayout.js').BubbleAnchor[]} anchors the members' projected anchors of this frame
  * @param {ReadonlySet<string>} offIds the members that are off screen in this frame
- * @returns {Array<{ kind: 'member' | 'vehicle', id: string, x: number, y: number, driving: boolean, sizePx: number }>}
+ * @returns {Array<{ kind: 'member' | 'vehicle', id: string, x: number, y: number, driving: boolean, sizePx: number, chipWidthPx: number }>}
  */
 function framePins(r, anchors, offIds) {
-  /** @type {Array<{ kind: 'member' | 'vehicle', id: string, x: number, y: number, driving: boolean, sizePx: number }>} */
+  /** @type {Array<{ kind: 'member' | 'vehicle', id: string, x: number, y: number, driving: boolean, sizePx: number, chipWidthPx: number }>} */
   const pins = [];
   const at = new Map(anchors.map((anchor) => [anchor.id, anchor]));
   const selectedMember = selectedId(r, 'member');
   for (const member of r.members?.members ?? []) {
     const anchor = at.get(member.id);
     if (!anchor || offIds.has(member.id)) continue;
-    const sizePx = r.pins.get(`member:${member.id}`)?.sizePx ?? (member.id === selectedMember ? MEMBER_SELECTED_SIZE_PX : MEMBER_SIZE_PX);
-    pins.push({ kind: 'member', id: member.id, x: anchor.x, y: anchor.y, driving: member.status === 'driving', sizePx });
+    const pin = r.pins.get(`member:${member.id}`);
+    const sizePx = pin?.sizePx ?? (member.id === selectedMember ? MEMBER_SELECTED_SIZE_PX : MEMBER_SIZE_PX);
+    pins.push({ kind: 'member', id: member.id, x: anchor.x, y: anchor.y, driving: member.status === 'driving', sizePx, chipWidthPx: pin?.chipWidthPx ?? 0 });
   }
   for (const vehicle of r.vehicles?.vehicles ?? []) {
     if (typeof vehicle.lat !== 'number' || typeof vehicle.lon !== 'number') continue;
     const pin = r.pins.get(`vehicle:${vehicle.id}`);
     const here = r.map.project(pin?.shown ?? [vehicle.lon, vehicle.lat]);
-    pins.push({ kind: 'vehicle', id: vehicle.id, x: here.x, y: here.y, driving: false, sizePx: pin?.sizePx ?? VEHICLE_SIZE_PX });
+    pins.push({ kind: 'vehicle', id: vehicle.id, x: here.x, y: here.y, driving: false, sizePx: pin?.sizePx ?? VEHICLE_SIZE_PX, chipWidthPx: pin?.chipWidthPx ?? 0 });
   }
   return pins;
 }
@@ -2239,6 +2267,7 @@ function framePins(r, anchors, offIds) {
  * @param {Runtime} r
  */
 function layoutBubblesFrame(r) {
+  measureChips(r); // the read phase of the frame: before this frame writes anything, whether or not there are bubbles (D90)
   const state = bubbleState(r);
   const size = containerSize(r);
   const host = r.opts.features?.bubbles === false || size.width <= 0 || size.height <= 0 ? null : bubbleHost(r, state);
@@ -2262,11 +2291,13 @@ function layoutBubblesFrame(r) {
       state.reseed = false;
       anchors = reseedAnchors(anchors, rect);
     }
-    // D89 (1): the pins that are on screen, a fanned one at its shifted place, are keep-outs like the gear (read first, then the layout and the writes below).
+    // D89 (1): the pins that are on screen, a fanned one at its shifted place, are keep-outs like the gear; D90: so is the chip of a pin that carries one, where
+    // `placeChips` will put it. The reads came first (the chip widths at the top, the boxes here); then the layout and the writes below.
     const keepOuts = measureKeepOuts(r, state);
     const offIds = new Set(partitionAnchors(rect, anchors).offScreen);
     const view = { left: 0, top: 0, right: size.width, bottom: size.height };
-    keepOuts.push(...pinKeepOuts(framePins(r, anchors, offIds), selectedPinKey(r), view, { fan: r.opts.features?.fanout !== false }));
+    const chip = { paddingTop: r.appliedPadding.top, room: chipRoom(size, r.layout, r.appliedPadding) };
+    keepOuts.push(...pinKeepOuts(framePins(r, anchors, offIds), selectedPinKey(r), view, { fan: r.opts.features?.fanout !== false, chip }));
     result = layoutBubbles(rect, keepOuts, anchors);
   }
   const off = new Set(result.offScreen);

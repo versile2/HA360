@@ -6,13 +6,15 @@ import { test } from 'node:test';
 
 import { layoutBubbles } from '../../src/Realm.Web/wwwroot/js/bubbleLayout.js';
 import { FAN_DEFAULTS, FAN_PRIORITY, fanOut } from '../../src/Realm.Web/wwwroot/js/fanout.js';
-import { DEFAULT_LAYOUT, computePadding } from '../../src/Realm.Web/wwwroot/js/layoutMath.js';
+import { DEFAULT_LAYOUT, chipRoom, computePadding } from '../../src/Realm.Web/wwwroot/js/layoutMath.js';
 import {
   BUBBLE_EDGE_PX,
   BUBBLE_FADE_MS,
   BUBBLE_HIT_PX,
   BUBBLE_RESEED_TOLERANCE_PX,
   BUBBLE_SLIDE_MS,
+  CHIP_GAP_PX,
+  CHIP_HEIGHT_PX,
   CLUSTER_FIT_MAX_ZOOM,
   CLUSTER_FIT_MS,
   HOOK_NAMES,
@@ -23,6 +25,7 @@ import {
   bubbleKey,
   bubbleRect,
   bubbleTexts,
+  chipRect,
   clusterFitPoints,
   describeBubbles,
   fanItems,
@@ -450,4 +453,119 @@ test('[AC-19a] pins that leave no clear coordinate on the edge: the bubble joins
   assert.equal(alone.bubbles.length, 1);
   assert.equal(alone.bubbles[0].x, RIGHT_EDGE_X);
   assert.ok(alone.bubbles[0].y === 28 || alone.bubbles[0].y === 705, `at an end of the edge: ${alone.bubbles[0].y}`);
+});
+
+// ---- D90: the chip of a pin is part of that pin's footprint for the edge bubbles --------------------------------------------------------------------
+// The chip is 36 px high, 8 px above the pin body (flipped: 8 px below the pointer) and shifted inside the room by `clampChipShift` (D75, D79). `chipRect` is the
+// arithmetic of `placeChips` and `clampChip`, so the bubbles can be laid out around a chip before the frame draws it.
+
+/** Where chips may be at the 412 x 915 Peek: 8 px in from the left and right edge, and the map padding's top edge at 72. */
+const CHIP_FRAME = { paddingTop: PEEK.top, room: chipRoom(PHONE, DEFAULT_LAYOUT, PEEK) };
+const CHIP_W = 170;
+
+test('[AC-17] [D90] the chip is 36 px high and 8 px above the pin body; the numbers are the ones of realmMap.js and realm-map.css', () => {
+  assert.equal(CHIP_HEIGHT_PX, 36);
+  assert.equal(CHIP_GAP_PX, 8);
+  assert.deepEqual(CHIP_FRAME, { paddingTop: 72, room: { left: 8, right: 404 } });
+  // member 48 at (200, 400): the body is y 344..392 (the pointer below it), so the chip is y 300..336 and centred on x 200
+  assert.deepEqual(chipRect({ x: 200, y: 400, sizePx: 48 }, CHIP_W, CHIP_FRAME), { left: 115, top: 300, right: 285, bottom: 336 });
+  // a selected 60 px pin lifts it by the 12 px the body grew; a 44 px vehicle lowers it by 4
+  assert.equal(chipRect({ x: 200, y: 400, sizePx: 60 }, CHIP_W, CHIP_FRAME).top, 288);
+  assert.equal(chipRect({ x: 200, y: 400, sizePx: 44 }, CHIP_W, CHIP_FRAME).top, 304);
+});
+
+test('[AC-17] [D79] [D90] a chip that would clip is clamped inside the room, as clampChip does, and the rectangle is the clamped one', () => {
+  const right = chipRect({ x: 380, y: 400, sizePx: 48 }, CHIP_W, CHIP_FRAME);
+  assert.equal(right.right, CHIP_FRAME.room.right, 'the right edge of the chip sits at the edge of the room');
+  assert.equal(right.right - right.left, CHIP_W);
+  const left = chipRect({ x: 30, y: 400, sizePx: 48 }, CHIP_W, CHIP_FRAME);
+  assert.equal(left.left, CHIP_FRAME.room.left);
+  // in Expanded the left edge of the room is the panel's: the chip never goes under it
+  const panel = { ...DEFAULT_LAYOUT, mode: 'expanded', panelLeftPx: 16, panelWidthPx: 400 };
+  const padding = { top: 16, right: 16, bottom: 16, left: 432 };
+  const room = chipRoom({ width: 1100, height: 700 }, panel, padding);
+  assert.equal(chipRect({ x: 440, y: 400, sizePx: 48 }, CHIP_W, { paddingTop: padding.top, room }).left, padding.left);
+});
+
+test('[AC-17] [D90] a chip that would cross the top map padding flips below the pointer, on the TRUE point; the rectangle is placed at the drawn (rounded) one', () => {
+  // body top y 44, chip top 0: above the padding's top edge 72, so it is 8 px below the pointer (the true point is the pointer's tip)
+  assert.deepEqual(chipRect({ x: 200, y: 100, sizePx: 48 }, CHIP_W, CHIP_FRAME), { left: 115, top: 108, right: 285, bottom: 144 });
+  // 72.4 is not above 72: the chip stays above; 71.6 is: it flips. The decision is the unrounded one of placeChips.
+  const stays = chipRect({ x: 200, y: 172.4, sizePx: 48 }, CHIP_W, CHIP_FRAME);
+  assert.equal(stays.top, 72);
+  const flips = chipRect({ x: 200, y: 171.6, sizePx: 48 }, CHIP_W, CHIP_FRAME);
+  assert.equal(flips.top, 172 + CHIP_GAP_PX, 'below the pointer of the pin drawn at y 172');
+});
+
+test('[AC-17] [D90] pinKeepOuts adds the chip right after its pin, only for a pin that carries one and only when it is told where chips may be', () => {
+  const pins = [pinAt('member', 'm', 200, 400, { chipWidthPx: CHIP_W }), pinAt('vehicle', 'v', 100, 500)];
+  const withChips = pinKeepOuts(pins, null, VIEW, { fan: false, chip: CHIP_FRAME });
+  assert.deepEqual(withChips, [
+    pinHitRect({ x: 200, y: 400, sizePx: 48 }),
+    chipRect({ x: 200, y: 400, sizePx: 48 }, CHIP_W, CHIP_FRAME),
+    pinHitRect({ x: 100, y: 500, sizePx: 44 }),
+  ]);
+  // no `chip` option: exactly the rectangles of D89
+  assert.deepEqual(pinKeepOuts(pins, null, VIEW, { fan: false }), [pinHitRect({ x: 200, y: 400, sizePx: 48 }), pinHitRect({ x: 100, y: 500, sizePx: 44 })]);
+  // a width of 0 (no chip, or one not measured yet) or a missing one adds nothing
+  const unmeasured = pinKeepOuts([pinAt('member', 'm', 200, 400, { chipWidthPx: 0 }), pinAt('vehicle', 'v', 100, 500)], null, VIEW, { fan: false, chip: CHIP_FRAME });
+  assert.equal(unmeasured.length, 2);
+});
+
+test('[AC-16] [D90] a fanned pin\'s chip follows the SHIFTED pin, the true point is rounded as the marker is, and each rectangle is tested against the container on its own', () => {
+  const [first, second, chip] = pinKeepOuts(
+    [pinAt('member', 'm', 200.4, 400.6), pinAt('vehicle', 'v', 200.4, 400.6, { chipWidthPx: CHIP_W })],
+    null,
+    VIEW,
+    { chip: CHIP_FRAME },
+  );
+  assert.deepEqual(first, pinHitRect({ x: 200, y: 401, sizePx: 48 }));
+  assert.deepEqual(second, pinHitRect({ x: 200 + FAN_DEFAULTS.step, y: 401, sizePx: 44 }));
+  assert.deepEqual(chip, chipRect({ x: 200 + FAN_DEFAULTS.step, y: 400.6, sizePx: 44 }, CHIP_W, CHIP_FRAME));
+  assert.equal((chip.left + chip.right) / 2, 200 + FAN_DEFAULTS.step, 'centred on the drawn pin');
+  // a pin just below the container has no rectangle of its own on screen, but its chip, 100 px above it, is
+  const below = pinKeepOuts([pinAt('member', 'm', 200, PHONE.height + 60, { chipWidthPx: CHIP_W })], null, VIEW, { fan: false, chip: CHIP_FRAME });
+  assert.equal(below.length, 1);
+  assert.deepEqual(below[0], chipRect({ x: 200, y: PHONE.height + 60, sizePx: 48 }, CHIP_W, CHIP_FRAME));
+  assert.ok(below[0].bottom <= PHONE.height + 60);
+});
+
+test('[AC-13] [AC-14] [D90] a bubble whose natural spot is on a pin\'s chip slides along its edge until it is 8 px clear of the chip and of the pin', () => {
+  // A pin near the right edge whose chip is clamped to the room's right edge: the chip is a wide strip across the right-edge column, above the pin and above the centre line of R.
+  const pin = pinAt('member', 'm', 340, 380, { chipWidthPx: CHIP_W });
+  const rects = pinKeepOuts([pin], null, VIEW, { fan: false, chip: CHIP_FRAME });
+  const [hit, chip] = rects;
+  assert.equal(rects.length, 2);
+  assert.equal(chip.right, CHIP_FRAME.room.right);
+  const anchors = [farVia('east', { x: RIGHT_EDGE_X, y: (chip.top + chip.bottom) / 2 })];
+  const natural = layoutBubbles(RECT_R, [], anchors).bubbles[0];
+  assert.ok(gapFrom(natural, chip) < 0, 'precondition: the natural spot is on the chip');
+  // with the pin alone (D89) the bubble would sit on the chip; with the chip (D90) it does not
+  const pinOnly = layoutBubbles(RECT_R, [hit], anchors).bubbles[0];
+  assert.ok(gapFrom(pinOnly, chip) < 8, 'without the chip rectangle the bubble covers or touches the chip');
+
+  const [bubble] = layoutBubbles(RECT_R, rects, anchors).bubbles;
+  assert.equal(bubble.x, RIGHT_EDGE_X, 'it stays on its edge');
+  assert.equal(bubble.y, chip.top - 28, 'the member lies above the centre line: up, to the top of the chip grown by 8 + 20');
+  assert.ok(gapFrom(bubble, chip) >= 8, `8 px clear of the chip: ${gapFrom(bubble, chip)}`);
+  assert.ok(gapFrom(bubble, hit) >= 8, `and of the pin: ${gapFrom(bubble, hit)}`);
+  assert.equal(bubble.cluster, 1);
+});
+
+test('[AC-14] [D90] with no chip in the way the positions are exactly the ones of D89, and a chip far from every edge column moves nothing', () => {
+  const anchors = [farVia('east', { x: RIGHT_EDGE_X, y: 300 }), farVia('west', { x: 28, y: 500 })];
+  const bare = layoutBubbles(RECT_R, [], anchors);
+  // the chip of a pin in the middle of the map: 28 px grown it still stays clear of both edge columns
+  const rects = pinKeepOuts([pinAt('member', 'm', 200, 460, { chipWidthPx: CHIP_W })], null, VIEW, { fan: false, chip: CHIP_FRAME });
+  assert.deepEqual(layoutBubbles(RECT_R, rects, anchors), bare);
+});
+
+test('[AC-14] [D90] the input stays bounded: with chips on every pin the output is at most twice MAX_PIN_KEEP_OUTS, and the input is not changed', () => {
+  const pins = Array.from({ length: MAX_PIN_KEEP_OUTS + 25 }, (_, i) =>
+    pinAt('member', `m${String(i).padStart(3, '0')}`, 20 + (i % 8) * 50, 120 + Math.floor(i / 8) * 70, { chipWidthPx: CHIP_W }),
+  );
+  const copy = JSON.parse(JSON.stringify(pins));
+  const rects = pinKeepOuts(pins, null, { left: -1000, top: -1000, right: 5000, bottom: 5000 }, { fan: false, chip: CHIP_FRAME });
+  assert.equal(rects.length, 2 * MAX_PIN_KEEP_OUTS);
+  assert.deepEqual(pins, copy);
 });

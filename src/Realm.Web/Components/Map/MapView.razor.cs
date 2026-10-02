@@ -25,9 +25,11 @@ public sealed partial class MapView : IMapEventHandler, IAsyncDisposable
 
     // The inputs of each payload, compared as they were when last sent. The lists compare by reference (they are immutable and the session
     // replaces them), the records by value.
-    private readonly record struct MembersKey(IReadOnlyList<MemberVm> Members, IReadOnlyList<PlaceVm> Places, string? MeId, long Minute, MapPayloadOptions Options);
+    // The selection is part of both keys: the chip follows it (01 section 4.4), so a new selection resends the sections that carry the chips. The vehicles' key has the minute only while a vehicle is
+    // selected (its "Last heard 1 hr ago" is the one time-based chip there), so a quiet map does not resend them every minute.
+    private readonly record struct MembersKey(IReadOnlyList<MemberVm> Members, IReadOnlyList<PlaceVm> Places, string? MeId, long Minute, MapPayloadOptions Options, EntityRef? Selection);
 
-    private readonly record struct VehiclesKey(IReadOnlyList<VehicleVm> Vehicles, IReadOnlyList<PlaceVm> Places);
+    private readonly record struct VehiclesKey(IReadOnlyList<VehicleVm> Vehicles, IReadOnlyList<PlaceVm> Places, EntityRef? Selection, long Minute);
 
     private readonly record struct ZonesKey(IReadOnlyList<PlaceVm> Places, bool Show, MapPayloadOptions Options);
 
@@ -73,6 +75,10 @@ public sealed partial class MapView : IMapEventHandler, IAsyncDisposable
     /// <summary>The session's instant (<c>IRealmSession.Time</c>), for the "Here for" chip; the component never reads a clock.</summary>
     [Parameter]
     public DateTimeOffset Now { get; set; }
+
+    /// <summary>The session's zone (<c>IRealmSession.Zone</c>), for the relative times of the chips that are a day old or more; UTC until the page passes it.</summary>
+    [Parameter]
+    public TimeZoneInfo Zone { get; set; } = TimeZoneInfo.Utc;
 
     /// <summary>A style id of <see cref="MapStyleIds"/>. A change switches the style in place.</summary>
     [Parameter]
@@ -245,6 +251,20 @@ public sealed partial class MapView : IMapEventHandler, IAsyncDisposable
         await FlyAgainAsync(again);
     }
 
+    /// <summary>
+    /// The recentre button was tapped (01 section 4.11, AC-20): the script cycles away, the default view, "me alone", the default view. The selection is untouched. Nothing happens before the
+    /// map is ready or after it is gone.
+    /// </summary>
+    public async Task RecenterAsync()
+    {
+        if (!_ready || _disposed || _webGlUnavailable || _interop is not { } interop)
+        {
+            return;
+        }
+
+        await interop.RecenterAsync();
+    }
+
     private async Task FlyAgainAsync(EntityRef? entity)
     {
         if (entity is null || !_ready || _disposed || _webGlUnavailable || _interop is not { } interop)
@@ -364,18 +384,19 @@ public sealed partial class MapView : IMapEventHandler, IAsyncDisposable
             await interop.SetZonesAsync(MapPayloadFactory.Zones(Places, ShowZones, Options, ++_zonesVersion));
         }
 
-        var members = new MembersKey(Members, Places, MeId, Now.ToUnixTimeSeconds() / 60, Options);
+        var minute = Now.ToUnixTimeSeconds() / 60;
+        var members = new MembersKey(Members, Places, MeId, minute, Options, Selection);
         if (_members != members)
         {
             _members = members;
-            await interop.UpsertMembersAsync(MapPayloadFactory.Members(Members, Places, MeId, Now, Options, ++_membersVersion));
+            await interop.UpsertMembersAsync(MapPayloadFactory.Members(Members, Places, MeId, Now, Options, ++_membersVersion, Selection, Zone));
         }
 
-        var vehicles = new VehiclesKey(Vehicles, Places);
+        var vehicles = new VehiclesKey(Vehicles, Places, Selection, Selection is { Kind: EntityKind.Vehicle } ? minute : 0);
         if (_vehicles != vehicles)
         {
             _vehicles = vehicles;
-            await interop.UpsertVehiclesAsync(MapPayloadFactory.Vehicles(Vehicles, Places, ++_vehiclesVersion));
+            await interop.UpsertVehiclesAsync(MapPayloadFactory.Vehicles(Vehicles, Places, ++_vehiclesVersion, Selection, Now, Zone));
         }
 
         var targets = new TargetsKey(Members, Vehicles, Places, MeId, Options);

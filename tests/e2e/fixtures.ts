@@ -384,3 +384,159 @@ export async function saveShot(page: Page, testInfo: TestInfo, scene: string): P
   await page.screenshot({ path: file, animations: 'disabled', caret: 'hide', scale: 'css' });
   return file;
 }
+
+// ==== S8c additions (additive; append-only as a block): history depth, the Peek rectangle, the projection and the empty map ====================================
+
+// ---- the history depth tokens (03 section 3.7): `#r<n>` ----------------------------------------------------------------------------------------
+
+/**
+ * The depth of the browser history as the page shows it: the `n` of the `#r<n>` fragment, 0 for none. The token entries are pushed by `realmShell.js` AFTER the server has
+ * decided the depth (a round trip), so a test that is about to press Back first waits for the depth it expects, with `expectHistoryDepth`, and never presses it on a guess.
+ */
+export async function historyDepth(page: Page): Promise<number> {
+  const hash = await page.evaluate(() => window.location.hash);
+  const match = /^#r([1-9][0-9]?)$/.exec(hash);
+  return match === null ? 0 : Number.parseInt(match[1] ?? '0', 10);
+}
+
+/** Waits (auto-retrying) until the history is `depth` entries deep. The message names what the depth stands for. */
+export async function expectHistoryDepth(page: Page, depth: number, what: string): Promise<void> {
+  await expect.poll(() => historyDepth(page), { message: `history depth (#r<n>) ${what}`, timeout: 10_000 }).toBe(depth);
+}
+
+// ---- the Peek rectangle (01 section 3.4.3) -------------------------------------------------------------------------------------------------------
+
+/** The map padding at Peek, hence the rectangle a selection flight centres the pin in: x 16 to 340, y 72 to 725 at 412 x 915, centre (178, 399). */
+export const PEEK_INSET = { top: 72, right: 72, bottom: 190, left: 16 };
+/** AC-22: how far from the centre of the Peek rectangle the selected pin may be. */
+export const PEEK_CENTRE_TOLERANCE_PX = 24;
+
+/** The centre of the Peek visible rectangle in the page (01 section 3.4.3). */
+export function peekCentre(viewport: { width: number; height: number }): { x: number; y: number } {
+  return { x: (PEEK_INSET.left + viewport.width - PEEK_INSET.right) / 2, y: (PEEK_INSET.top + viewport.height - PEEK_INSET.bottom) / 2 };
+}
+
+/**
+ * How far the true point of a pin is from the centre of the Peek rectangle, in px; Infinity while the map holds no such pin. A selection flight starts after the server round
+ * trip, so a test polls this (`expect.poll(...).toBeLessThanOrEqual(24)`) and calls `settled()` before it trusts the number.
+ */
+export async function pinDistanceFromPeekCentre(page: Page, kind: 'member' | 'vehicle', id: string): Promise<number> {
+  const viewport = page.viewportSize();
+  if (viewport === null) throw new Error('the page has no viewport size');
+  const pin = ((await readHook(page, 'pins')) ?? []).find((candidate) => candidate.kind === kind && candidate.id === id);
+  if (pin === undefined) return Number.POSITIVE_INFINITY;
+  const centre = peekCentre(viewport);
+  return Math.hypot(pin.anchorX - centre.x, pin.anchorY - centre.y);
+}
+
+/**
+ * How far the true point of a pin is from the centre of the visible map the map PADDING says it has now (`mapPadding()`: the Peek rectangle at Peek, the strip above the sheet at 80 %,
+ * the part right of the panel in Expanded), in px; Infinity while the map holds no such pin. The padding follows the sheet after it has settled, so a test that is about a size change
+ * first waits for the padding to say so, and only then polls this.
+ */
+export async function pinDistanceFromVisibleCentre(page: Page, kind: 'member' | 'vehicle', id: string): Promise<number> {
+  const viewport = page.viewportSize();
+  if (viewport === null) throw new Error('the page has no viewport size');
+  const padding = await readHook(page, 'mapPadding');
+  const pin = ((await readHook(page, 'pins')) ?? []).find((candidate) => candidate.kind === kind && candidate.id === id);
+  if (pin === undefined) return Number.POSITIVE_INFINITY;
+  return Math.hypot(pin.anchorX - (padding.left + viewport.width - padding.right) / 2, pin.anchorY - (padding.top + viewport.height - padding.bottom) / 2);
+}
+
+/**
+ * Waits until the selected pin is in the middle of the visible map of the sheet size `tall` says (80 %: the strip above the sheet; otherwise the Peek rectangle or the panel's), and the map is
+ * still. The map padding follows the sheet only after it has settled (03 section 4.3: 120 ms), so the padding is waited for first: until then the pin is still in the middle of the OLD rectangle
+ * and would pass for centred. The re-centre then eases the pin over (D45), which is the second poll; `settled()` ends it.
+ */
+export async function expectSelectionCentred(page: Page, who: { kind: 'member' | 'vehicle'; id: string }, tall: boolean, label: string): Promise<void> {
+  const viewport = page.viewportSize();
+  if (viewport === null) throw new Error('the page has no viewport size');
+  await expect
+    .poll(async () => (await readHook(page, 'mapPadding')).bottom > viewport.height / 2, { message: `${label}: the map padding says the sheet is ${tall ? 'at 80 %' : 'low'}`, timeout: 10_000 })
+    .toBe(tall);
+  await expect
+    .poll(() => pinDistanceFromVisibleCentre(page, who.kind, who.id), { message: `${label}: distance of pin-${who.kind}-${who.id} from the middle of the visible map`, timeout: 10_000 })
+    .toBeLessThanOrEqual(PEEK_CENTRE_TOLERANCE_PX);
+  await settled(page);
+}
+
+// ---- where the map is, without a coordinate in a spec (D82) ------------------------------------------------------------------------------------------
+
+export interface MapPoint { x: number; y: number }
+
+/** Web Mercator y of a latitude in units of the world's width (0 at the top): linear in the screen's y at any camera with no bearing or pitch. */
+function mercatorY(latitude: number): number {
+  const sine = Math.sin((latitude * Math.PI) / 180);
+  return 0.5 - Math.log((1 + sine) / (1 - sine)) / (4 * Math.PI);
+}
+
+/**
+ * A function that turns a longitude and a latitude into a point of the page, for the camera as it is now. It is built from `camera().bounds` (the whole canvas, which is the
+ * viewport) and not from the centre and the padding, so the arithmetic is independent of what the padding does to the centre. The map is north-up and flat, so x is linear in
+ * the longitude and y in the Mercator y. The fixture's places and members come from the cast and the hooks; no spec has to type a coordinate (D82).
+ */
+export async function viewportProjector(page: Page): Promise<(longitude: number, latitude: number) => MapPoint> {
+  const viewport = page.viewportSize();
+  if (viewport === null) throw new Error('the page has no viewport size');
+  const camera = await readHook(page, 'camera');
+  const [[west, south], [east, north]] = camera.bounds;
+  const top = mercatorY(north);
+  const bottom = mercatorY(south);
+  return (longitude, latitude) => ({
+    x: ((longitude - west) / (east - west)) * viewport.width,
+    y: ((mercatorY(latitude) - top) / (bottom - top)) * viewport.height,
+  });
+}
+
+/**
+ * A point of the page where a tap reaches the empty map and nothing else: no pin, bubble, chip, control, panel or sheet under it or within `MARGIN` px of it, and no zone circle
+ * within `MARGIN` px of its edge (a tap on a zone selects its place). The DOM half is `elementFromPoint` on a cross of five points, so it is what the browser would hit; the zone
+ * half is the cast's places projected with the camera and `zones()`'s radius in px. Of the free points the one nearest the middle of the visible map is returned. Call it after
+ * `settled()`: it describes the camera of the moment. Throws, with the reason, when the map has no such point.
+ */
+export async function emptyMapPoint(page: Page): Promise<MapPoint> {
+  const MARGIN = 28;
+  const STEP = 8;
+  const viewport = page.viewportSize();
+  if (viewport === null) throw new Error('the page has no viewport size');
+  const free = await page.evaluate(
+    ({ margin, step, width, height }) => {
+      const onlyTheMap = (x: number, y: number): boolean => {
+        const hit = document.elementFromPoint(x, y);
+        return hit !== null && hit.closest('[data-testid="map-canvas"]') !== null && hit.closest('button, a, [role="button"], [role="dialog"], .realm-pin, .realm-bubble, .realm-chip, .maplibregl-ctrl, [data-testid="map-attribution"]') === null;
+      };
+      const points: Array<{ x: number; y: number }> = [];
+      for (let y = 16; y <= height - 16; y += step) {
+        for (let x = 16; x <= width - 16; x += step) {
+          if (onlyTheMap(x, y) && onlyTheMap(x - margin, y) && onlyTheMap(x + margin, y) && onlyTheMap(x, y - margin) && onlyTheMap(x, y + margin)) points.push({ x, y });
+        }
+      }
+      return points;
+    },
+    { margin: MARGIN, step: STEP, width: viewport.width, height: viewport.height },
+  );
+
+  const project = await viewportProjector(page);
+  const zones = await readHook(page, 'zones');
+  const circles = loadDemoCast().places.flatMap((place) => {
+    const zone = zones.find((candidate) => candidate.id === place.id && candidate.drawn);
+    return zone === undefined ? [] : [{ ...project(place.lon, place.lat), radius: zone.radiusPx }];
+  });
+  const clear = free.filter((point) => circles.every((circle) => Math.hypot(point.x - circle.x, point.y - circle.y) > circle.radius + MARGIN));
+  const padding = await readHook(page, 'mapPadding');
+  const middle = { x: (padding.left + viewport.width - padding.right) / 2, y: (padding.top + viewport.height - padding.bottom) / 2 };
+  clear.sort((a, b) => Math.hypot(a.x - middle.x, a.y - middle.y) - Math.hypot(b.x - middle.x, b.y - middle.y));
+  const best = clear[0];
+  if (best === undefined) {
+    throw new Error(`the map has no empty point: ${free.length} points hit only the map, ${free.length - clear.length} of them near a zone circle (${circles.length} zones projected)`);
+  }
+  return best;
+}
+
+/** Taps the empty map the way a finger does (a click on the canvas), at a point `emptyMapPoint` found. Returns where it tapped. */
+export async function tapEmptyMap(page: Page): Promise<MapPoint> {
+  await settled(page);
+  const point = await emptyMapPoint(page);
+  await page.mouse.click(point.x, point.y);
+  return point;
+}

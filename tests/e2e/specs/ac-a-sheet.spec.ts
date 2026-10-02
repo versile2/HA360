@@ -338,10 +338,14 @@ test.describe('navigation, right stack, sheet and layout', () => {
       await page.mouse.move(x, y);
       await page.mouse.down();
       await page.mouse.move(x, y + dy, { steps: 12 });
-      // A server-driven drag would have armed itself (pointer capture) and followed the pointer within this time.
-      await page.waitForTimeout(600);
+      // No sleep (review R2-05). What a drag would do is done by script on the pointer events themselves (the pointer capture on the pointerdown, the dragging class and the new height on the
+      // first pointermove), and Playwright has dispatched all twelve moves before the call above returns; a frame boundary then lets every handler and style change land, and the hook is read
+      // after the style has settled. The assertions retry, so a drag that was merely slow would still be seen, and the one thing a test cannot wait for, a drag that never happens, is what
+      // the settled sheet and the absent capture say.
+      await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+      await settled(page);
+      await expect.poll(async () => (await readHook(page, 'sheet')).state, { message: `window.__realm.sheet().state while the pointer is held ${what}` }).toBe(at);
       const during = await readHook(page, 'sheet');
-      expect(during.state, `window.__realm.sheet().state while the pointer is held ${what}`).toBe(at);
       expectNear(during.heightPx, wantedHeight, TOL, `the sheet height while the pointer is held ${what}`);
       expect(
         await page.evaluate(() => document.querySelector('.mud-sheet-handle')?.hasPointerCapture(1) ?? false),

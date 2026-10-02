@@ -12,7 +12,8 @@
    The rows are MemberRow, VehicleRow and PlaceRow, identical in both layouts: their strings come from VmFactory, built here once per render from the lists and the session's clock and zone
    (never the browser's). A tap raises OnSelect with the entity; the page turns it into the selection. The header's body raises OnToggle and its X raises OnClear (D46); the detail's back arrow
    raises OnBack and a person in a place's Here-now list raises OnHereNow. The page wires OnToggle to the handler of the handle's own tap, so there is one code path; this component decides
-   nothing about sizes. FocusDetail asks a detail that has just opened to take the focus (01 section 10.2). *@
+   nothing about sizes. FocusDetail asks a detail that has just opened to take the focus (01 section 10.2). The one polite live region of the sheet (01 section 10.3) is here, outside the segments and the list, so it stays on
+   the page whatever the body is: it says what the page hands it in Announcement and nothing of its own. *@
 @{
     var facts = RowFacts.Create(Members, Places, MeId, Moment, Zone ?? Session?.Zone ?? TimeZoneInfo.Utc);
     var selected = Body switch
@@ -39,7 +40,7 @@
     }
     else
     {
-        <SheetSegments Section="Section" Counts="Counts" OnSection="OnSection" />
+        <SheetSegments Section="Section" Focus="Focus" OnSection="OnSection" />
     }
 
     @if (showDetail)
@@ -93,6 +94,8 @@
             </ul>
         </div>
     }
+
+    <span class="realm-sr-only" role="status" aria-live="polite" aria-atomic="true" data-testid="sheet-announce">@Announcement</span>
 </div>
 
 @code {
@@ -144,6 +147,14 @@
     [Parameter]
     public bool FocusDetail { get; set; }
 
+    /// <summary>The page's request to move the focus (01 section 10.2), handed to the section tabs: a new one that names the section tab puts the focus on the tab that shows. The handle is the host's.</summary>
+    [Parameter]
+    public FocusRequest? Focus { get; set; }
+
+    /// <summary>The text of the sheet's one polite live region ("Showing Cass", "Details opened", "List opened", "List collapsed", "4 drivers"); the page derives it from the state's transitions (<c>SheetAnnouncements</c>). Empty says nothing.</summary>
+    [Parameter]
+    public string Announcement { get; set; } = string.Empty;
+
     /// <summary>The summary line of 01 section 8.2, shown here only when <see cref="ShowSummary"/> is true.</summary>
     [Parameter]
     public string Summary { get; set; } = string.Empty;
@@ -167,8 +178,6 @@
     /// <summary>The circuit's session, cascaded by <c>RealmShell</c> (it reaches the popover the sheet is drawn in). Absent in a bare component test.</summary>
     [CascadingParameter]
     public IRealmSession? Session { get; set; }
-
-    private SheetSegments.SegmentCounts Counts => new(Members.Count, Vehicles.Count, Places.Count);
 
     // The session's own clock, never the wall clock. Only a render with neither an explicit Now nor a session (a bare component test) falls back to the system clock.
     private DateTimeOffset Moment => Now ?? Session?.Time.GetUtcNow() ?? TimeProvider.System.GetUtcNow();
