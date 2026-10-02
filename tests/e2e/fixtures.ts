@@ -10,6 +10,11 @@
 import { expect, test as base, type APIRequestContext, type Page } from '@playwright/test';
 
 import { APP_HOST, APP_PORT, CONTROL_PREFIX, INGRESS_PREFIX, PROXY_HOST, PROXY_PORT } from './harness/ingressProxy.mjs';
+// Imports of the S6b additions at the end of this file (the Demo cast, mapReady, geometry helpers, saveShot).
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import type { TestInfo } from '@playwright/test';
 
 export { expect, INGRESS_PREFIX };
 
@@ -195,3 +200,157 @@ export const test = base.extend<Options>({
     expect(problems, 'guard fixture: the page logged an error or reached outside the ingress proxy').toEqual([]);
   },
 });
+
+// ==== S6b additions (additive; append-only as a block): the Demo cast, mapReady, geometry helpers, saveShot =======================================
+
+const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+
+// ---- the Demo cast (02 section 9.2, 03 section 8.1 rule 2) -----------------------------------------------------------------------------------
+
+/** One member of `tests/e2e/fixtures/demo-cast.json`: the shape `DemoCastExporter.ToJson` writes (camelCase). */
+export interface CastMember {
+  id: string;
+  name: string;
+  lore: string;
+  color: string;
+  kind: 'live' | 'static';
+  sortOrder: number;
+  personUserId: string | null;
+  phoneCapable: boolean;
+  address: string | null;
+  staticLabel: string | null;
+}
+export interface CastVehicle { id: string; name: string; lore: string; glyph: 'pickup' | 'car'; sortOrder: number; isPlaceholder: boolean; placeholderNote: string | null }
+/** `drawn` is false only for the arrival zone (radius above the 5 km maximum), which is never drawn or listed. */
+export interface CastPlace { id: string; zoneName: string; name: string; subtitle: string; kind: string; lat: number; lon: number; radiusM: number; drawn: boolean }
+export interface DemoCastFile { members: CastMember[]; vehicles: CastVehicle[]; chariotNote: string; places: CastPlace[] }
+
+let demoCast: DemoCastFile | undefined;
+
+/**
+ * The fictional cast, read from `tests/e2e/fixtures/demo-cast.json`, which the e2e job writes with `export-demo-cast` before Playwright starts. Read
+ * lazily (never at import time), so `playwright test --list` needs neither the file nor the app. Tests take every name and place from here and never
+ * retype one (03 section 8.1 rule 2).
+ */
+export function loadDemoCast(): DemoCastFile {
+  if (demoCast) return demoCast;
+  const file = path.join(repositoryRoot, 'tests', 'e2e', 'fixtures', 'demo-cast.json');
+  let text: string;
+  try {
+    text = fs.readFileSync(file, 'utf8');
+  } catch (error) {
+    throw new Error(`${file} is missing (${String(error)}); the e2e job writes it with: dotnet publish/web/Realm.Web.dll export-demo-cast tests/e2e/fixtures/demo-cast.json`);
+  }
+  demoCast = JSON.parse(text) as DemoCastFile;
+  return demoCast;
+}
+
+/** A member of the cast by role id (`king`, `queen`, `jester`, `cryptid`, `prince`); throws when the role id is not in the cast. */
+export function castMember(cast: DemoCastFile, id: string): CastMember {
+  const found = cast.members.find((member) => member.id === id);
+  if (!found) throw new Error(`the demo cast has no member '${id}' (it has ${cast.members.map((member) => member.id).join(', ')})`);
+  return found;
+}
+
+/** A place of the cast by zone id (`home`, `jester_hall`, `approach`, ...); throws when the id is not in the cast. */
+export function castPlace(cast: DemoCastFile, id: string): CastPlace {
+  const found = cast.places.find((place) => place.id === id);
+  if (!found) throw new Error(`the demo cast has no place '${id}' (it has ${cast.places.map((place) => place.id).join(', ')})`);
+  return found;
+}
+
+// ---- mapReady: wait for the payloads, not only for the style -----------------------------------------------------------------------------------
+
+/** The pins on screen at the default view of the Demo fixture (01 Appendix A, AC-13), as `<kind>-<id>`. */
+export const DEFAULT_VIEW_PINS: readonly string[] = ['member-king', 'member-queen', 'member-jester', 'vehicle-wagon'];
+
+/**
+ * Waits until the map holds what the Demo snapshot sends and has made its first default-view fit. `demo()` returns after `settled()`, and `settled()` can
+ * resolve in the short gap between `window.__realm` appearing (during `init`) and the first payloads arriving (MapView sends zones, members, vehicles,
+ * the default targets and last the first fit, one interop call each), because nothing is pending yet. A spec that reads pins, zones or the camera, or
+ * takes a screenshot, calls `mapReady(page)` right after `demo(page)`. Only for the first load: it expects the camera at the default view (01 section 4.9).
+ *
+ * @param opts.pins the `<kind>-<id>` of the pins that must exist; the default is the four of the default view (a variant that moves people passes its own).
+ */
+export async function mapReady(page: Page, opts: { pins?: readonly string[] } = {}): Promise<void> {
+  const wanted = opts.pins ?? DEFAULT_VIEW_PINS;
+  const timeout = 20_000;
+  await expect
+    .poll(
+      async () => {
+        const have = new Set(((await readHook(page, 'pins')) ?? []).map((pin) => `${pin.kind}-${pin.id}`));
+        return wanted.filter((key) => !have.has(key));
+      },
+      { message: 'pins the Demo snapshot sends that are not on the map yet', timeout },
+    )
+    .toEqual([]);
+  await expect
+    .poll(async () => ((await readHook(page, 'camera')) as { recenter?: string } | undefined)?.recenter, {
+      message: "camera().recenter: the first default-view fit has not run ('default' expected)",
+      timeout,
+    })
+    .toBe('default');
+  await settled(page);
+}
+
+/**
+ * The test ids (`pin-<kind>-<id>`, sorted) of the pins whose box meets the viewport: what a person sees. `pins()` lists every pin the map holds, on screen
+ * or not, so an assertion about "the pins on screen" reads the DOM, where a pin that is off the viewport has a box outside it.
+ */
+export async function onScreenPinTestIds(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    return [...document.querySelectorAll<HTMLElement>('button.realm-pin[data-testid^="pin-"]')]
+      .filter((pin) => {
+        const box = pin.getBoundingClientRect();
+        return box.right > 0 && box.bottom > 0 && box.left < width && box.top < height;
+      })
+      .map((pin) => pin.getAttribute('data-testid') ?? '')
+      .sort();
+  });
+}
+
+// ---- geometry helpers (soft: one failing test lists every wrong number) --------------------------------------------------------------------------
+
+export interface Rect { x: number; y: number; width: number; height: number }
+
+/** `expect.soft(|actual - expected| <= tolerance)` with a message that carries both numbers. */
+export function expectApprox(actual: number, expected: number, tolerance: number, label: string): void {
+  expect.soft(Math.abs(actual - expected), `${label}: expected ${expected} ± ${tolerance}, got ${actual}`).toBeLessThanOrEqual(tolerance);
+}
+
+/** A bounding box against an expected one, every edge within `tolerance` px (01 section 11: ±2 px unless stated). A null box (not rendered) fails at once. */
+export function expectRectApprox(actual: Rect | null, expected: Rect, tolerance: number, label: string): void {
+  expect(actual, `${label} has no bounding box (not rendered, or display: none)`).not.toBeNull();
+  if (actual === null) return;
+  expectApprox(actual.x, expected.x, tolerance, `${label} x`);
+  expectApprox(actual.y, expected.y, tolerance, `${label} y`);
+  expectApprox(actual.width, expected.width, tolerance, `${label} width`);
+  expectApprox(actual.height, expected.height, tolerance, `${label} height`);
+}
+
+// ---- the gallery's screenshot writer (03 section 7.5, 04 card S6b) -------------------------------------------------------------------------------
+
+/**
+ * `<repo>/ci-out/shots/<project>/<scene>.png`. The e2e job uploads `ci-out` whole, and `make-summary.mjs` copies every PNG under a folder named `shots`
+ * to `shots/<project>/<scene>.png` of the run folder on `ci-artifacts` (and lists it with its sha256 in SUMMARY.md); nothing in CI has to change for a
+ * new scene.
+ */
+export function shotPath(project: string, scene: string): string {
+  return path.join(repositoryRoot, 'ci-out', 'shots', project, `${scene}.png`);
+}
+
+/**
+ * Writes one gallery scene: waits for `settled()` (a no-op on a page without hooks, such as Driving) and the fonts, then takes a viewport screenshot with
+ * animations disabled. The caller has already put the page in the scene's state and is responsible for `reducedMotion: 'reduce'` and the frozen clock.
+ * Returns the file it wrote.
+ */
+export async function saveShot(page: Page, testInfo: TestInfo, scene: string): Promise<string> {
+  await settled(page);
+  await page.evaluate(() => document.fonts.ready.then(() => undefined));
+  const file = shotPath(testInfo.project.name, scene);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  await page.screenshot({ path: file, animations: 'disabled', caret: 'hide', scale: 'css' });
+  return file;
+}
