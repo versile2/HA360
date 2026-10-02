@@ -47,9 +47,32 @@ jobs:
           -flp:"logfile=ci-out/build.log;verbosity=minimal" -flp1:"logfile=ci-out/errors.log;errorsonly"
       - name: Unit and bUnit tests
         run: dotnet test Realm.slnx -c Release --no-build --logger trx --results-directory ci-out/trx
+      - if: always()                              # S5b: two paths put the artifact root at the workspace, so the e2e job reads tests/contract/payloads next to ci-out
+        uses: actions/upload-artifact@v7
+        with:
+          name: dotnet
+          path: |
+            ci-out
+            tests/contract/payloads
+          retention-days: 3
+
+  js:                                             # 7.2, S5a: types and Node tests of wwwroot/js and tools/ci; no browser, no C#
+    needs: guards
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: 22, cache: npm }
+      - run: npm ci --ignore-scripts
+      - run: mkdir -p ci-out
+      - run: npm run typecheck 2>&1 | tee ci-out/tsc.log
+      - run: node --test --test-reporter=tap "tests/js/**/*.test.mjs" 2>&1 | tee ci-out/js-tests.tap
+      - name: Validate map styles (third-party fetch is soft)
+        continue-on-error: true
+        run: node tools/ci/validate-styles.mjs 2>&1 | tee ci-out/styles.log
       - if: always()
         uses: actions/upload-artifact@v7
-        with: { name: dotnet, path: ci-out, retention-days: 3 }
+        with: { name: js, path: ci-out, retention-days: 3 }
 
   docker-smoke:                                   # 7.8, S2: the Dockerfile is built and exercised on every push, not only at release
     needs: guards
@@ -71,7 +94,7 @@ jobs:
         with: { name: docker-smoke, path: ci-out, retention-days: 3 }
 
   publish-ci:                                     # 7.4
-    needs: [guards, dotnet, docker-smoke]
+    needs: [guards, dotnet, js, docker-smoke]
     if: ${{ always() && !cancelled() }}
     runs-on: ubuntu-latest
     permissions: { contents: write }

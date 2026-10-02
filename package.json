@@ -2,7 +2,16 @@
   "name": "realm-dev-tools",
   "private": true,
   "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test:js": "node --test \"tests/js/**/*.test.mjs\"",
+    "validate:styles": "node tools/ci/validate-styles.mjs"
+  },
   "devDependencies": {
+    "@maplibre/maplibre-gl-style-spec": "26.4.4",
+    "@types/node": "22.20.4",
+    "maplibre-gl": "6.11.2",
+    "typescript": "5.9.3",
     "yaml": "2.9.1"
   }
 }
