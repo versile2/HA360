@@ -19,6 +19,15 @@ public enum PillTone
 /// <summary>The events pill of a driver card (01 section 6.5). <paramref name="Tooltip"/> is null when the pill carries none.</summary>
 public sealed record DriverPill(PillTone Tone, string Text, string? Tooltip);
 
+/// <summary>A small event chip of a drive row (01 section 6.6): the type, its (non-zero) count and the words of its accessible name ("2 speeding events").</summary>
+public sealed record DriveEventChip(string Key, int Count, string Text);
+
+/// <summary>One drive of a driver's week (01 section 6.6): its three lines and the chips of its non-zero counts. <paramref name="Index"/> counts from 0 down the whole list.</summary>
+public sealed record DriveLine(int Index, string Time, string Route, string Detail, IReadOnlyList<DriveEventChip> Events);
+
+/// <summary>The drives of one day under their header ("Tue, Sep 29").</summary>
+public sealed record DriveDay(string Label, IReadOnlyList<DriveLine> Rows);
+
 /// <summary>
 /// The strings and numbers of the Driving screen that are not about one stat (03 section 3.10; 01 sections 6.1 to 6.5, 8.8 and 10.3): the week chips and the
 /// range line, the driver card lines and pills, and the display rounding of distance and speed. Pure: the session's zone is passed in and no clock is read.
@@ -56,6 +65,18 @@ public static class DrivingFormatter
 
     /// <summary>The tooltip of a pill asterisk: some of the driver's trips were too sparse to measure speed (01 section 6.5, O-9).</summary>
     public const string SparseTripsTooltip = "Some drives were too sparse to measure speed";
+
+    /// <summary>The text of a pill, and of a week-detail tile, whose tracked counts are all zero (01 section 6.5).</summary>
+    public const string NoEvents = "No events";
+
+    /// <summary>The empty state of a driver's week with no drives (01 section 8.7).</summary>
+    public const string NoDrivesWeek = "No drives this week. The roads are quiet.";
+
+    /// <summary>The place of a drive end that has neither a place name nor a street (01 section 6.6).</summary>
+    public const string UnknownPlace = "Unknown place";
+
+    /// <summary>The accessible name of the Back link of the driver week (01 section 6.6).</summary>
+    public const string BackLabel = "Back to the driving report";
 
     private const double MetersPerMile = 1609.344;
     private const double MetersPerSecondPerMph = 0.44704;
@@ -240,7 +261,7 @@ public static class DrivingFormatter
 
         if (total == 0)
         {
-            return new DriverPill(PillTone.Clear, "No events", null);
+            return new DriverPill(PillTone.Clear, NoEvents, null);
         }
 
         var star = driver.CoarseTrips > 0 ? "*" : string.Empty;
@@ -295,4 +316,122 @@ public static class DrivingFormatter
     /// <summary>The link of a driver card to the driver's week (01 section 6.5, relative as every link, 03 section 3.3): <c>driving/jester?week=0</c>.</summary>
     public static string DriverHref(string memberId, int week) =>
         "driving/" + Uri.EscapeDataString(memberId) + "?week=" + week.ToString(CultureInfo.InvariantCulture);
+
+    // ---- the driver week (01 section 6.6) ----------------------------------------------------------------------------------------------------
+
+    /// <summary>
+    /// The week label under a driver's name (01 section 6.6): "This week · Sep 28 – Oct 4", "Last week · Sep 21 – Sep 27", then the plain range of the two earlier
+    /// weeks.
+    /// </summary>
+    public static string WeekHeading(WeekRef week) =>
+        week.Offset <= 1 ? ChipLabel(week) + Middle + RangeText(week.Start, week.End) : RangeText(week.Start, week.End);
+
+    /// <summary>The link of the Back button of the driver week (01 section 6.6, relative as every link): <c>driving?week=1</c>.</summary>
+    public static string BackHref(int week) => "driving?week=" + week.ToString(CultureInfo.InvariantCulture);
+
+    /// <summary>A driver's top speed of the week in metres per second, from the report's per-driver speeds (01 section 6.8); null when the driver has none.</summary>
+    public static double? TopSpeedOf(WeekReportVm? report, string memberId)
+    {
+        foreach (var entry in report?.TopSpeed?.Drivers ?? [])
+        {
+            if (string.Equals(entry.MemberId, memberId, StringComparison.Ordinal))
+            {
+                return entry.SpeedMps;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>The Drives tile of the driver week (01 section 6.6): the count, or "—" for a driver who was not covered.</summary>
+    public static string DrivesTile(DriverSummary driver) => driver.Covered && driver.Drives is { } drives ? Count(drives) : Dash;
+
+    /// <summary>The Miles tile: miles to one decimal, or "—".</summary>
+    public static string MilesTile(DriverSummary driver) => driver.Covered && driver.Meters is { } meters ? DriverMiles(meters) : Dash;
+
+    /// <summary>The Top speed tile: "96 mph", or "—" when the driver has no speed or was not covered.</summary>
+    public static string TopSpeedTile(DriverSummary driver, double? topSpeedMps) => driver.Covered ? SpeedText(topSpeedMps) : Dash;
+
+    /// <summary>
+    /// The Events tile: the text of the card pill with its asterisk (01 section 6.6), "No events" when the tracked counts are all zero (also for a week without
+    /// drives), and "—" when no type has a count or the driver was not covered.
+    /// </summary>
+    public static string EventsTile(DriverSummary driver)
+    {
+        if (!driver.Covered)
+        {
+            return Dash;
+        }
+
+        if (Pill(driver) is { } pill)
+        {
+            return pill.Tone == PillTone.Unknown ? Dash : pill.Text;
+        }
+
+        return driver.EventsTotal == 0 ? NoEvents : Dash;
+    }
+
+    /// <summary>The tooltip of the Events tile: the asterisk's sentence or the unavailable one, as on the card pill; null when it has none.</summary>
+    public static string? EventsTileTooltip(DriverSummary driver) => driver.Covered ? Pill(driver)?.Tooltip : null;
+
+    /// <summary>One count of the event row (01 section 6.6): the number, or "—" when it is <c>null</c> (never 0) or the driver was not covered.</summary>
+    public static string EventCount(DriverSummary driver, string key) =>
+        driver.Covered && driver.Events.TryGetValue(key, out var count) && count is { } value ? Count(value) : Dash;
+
+    /// <summary>
+    /// The empty state of a driver's week (01 sections 6.6 and 8.7): the no-record sentence for a driver who was not covered, "No drives this week. The roads are
+    /// quiet." for a covered one with no drives; null when there are drives to list.
+    /// </summary>
+    public static string? EmptyWeekText(DriverSummary driver, int driveCount) =>
+        !driver.Covered ? NoRecordWeek : driveCount == 0 ? NoDrivesWeek : null;
+
+    /// <summary>True while the driver's distances are GPS-estimated and there are some to caption (01 section 6.6, item 4): the basis is <c>Gps</c> or <c>Mixed</c>.</summary>
+    public static bool ShowDriverCaption(DriverSummary driver, int driveCount) =>
+        driver.Covered && driveCount > 0 && driver.DistanceBasis is DistanceBasis.Gps or DistanceBasis.Mixed;
+
+    /// <summary>
+    /// The drives of a driver's week grouped by day, in the order they come (newest first, 02 section 6.7). Each row has the time range ("9:01 – 9:06 pm"), "From → To"
+    /// ("Unknown place" for an end without a label), "1.1 mi · Top 38 mph" ("Top —" without a speed) and a chip for each type whose count is above zero: a zero or a
+    /// <c>null</c> count draws nothing.
+    /// </summary>
+    public static IReadOnlyList<DriveDay> DriveDays(IReadOnlyList<DriveVm> trips, TimeZoneInfo zone)
+    {
+        var days = new List<DriveDay>();
+        List<DriveLine>? rows = null;
+        DateTime? current = null;
+        var index = 0;
+        foreach (var trip in trips)
+        {
+            var date = TimeZoneInfo.ConvertTime(trip.StartUtc, zone).Date;
+            if (rows is null || current != date)
+            {
+                rows = [];
+                current = date;
+                days.Add(new DriveDay(DayText(trip.StartUtc, zone), rows));
+            }
+
+            rows.Add(new DriveLine(index, TimeFormatter.Range(trip.StartUtc, trip.EndUtc, zone), Route(trip), Detail(trip), DriveChips(trip)));
+            index++;
+        }
+
+        return days;
+    }
+
+    private static string Route(DriveVm trip) => (trip.FromLabel ?? UnknownPlace) + " → " + (trip.ToLabel ?? UnknownPlace);
+
+    private static string Detail(DriveVm trip) => UnitFormatter.Distance(trip.Meters) + Middle + "Top " + SpeedText(trip.TopSpeedMps);
+
+    private static List<DriveEventChip> DriveChips(DriveVm trip)
+    {
+        var chips = new List<DriveEventChip>(PillOrder.Length);
+        foreach (var (key, _) in PillOrder)
+        {
+            if (trip.Events.TryGetValue(key, out var count) && count is { } value && value > 0)
+            {
+                chips.Add(new DriveEventChip(key, value, Count(value) + " " + StatNameFormatter.Noun(key, value)));
+            }
+        }
+
+        return chips;
+    }
 }

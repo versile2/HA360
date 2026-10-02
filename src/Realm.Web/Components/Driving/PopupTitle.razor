@@ -1,0 +1,33 @@
+@using Microsoft.JSInterop
+
+@* The title of a popup (01 sections 6.7 and 10.2): an H2 that takes the focus when it first renders, so a screen reader announces the dialog it names (the dialog's
+   aria-labelledby points at the header that holds this element). It is a component of its own because MudBlazor renders the header after the dialog body: the title
+   exists in a later render than StatPopup's first one, and the focus trap has by then saved the opener, so the focus can be restored to it when the popup closes. The
+   focus moves after a yield, so the trap's own bookkeeping is always done first. *@
+<h2 @ref="_heading" class="realm-popup__title" tabindex="-1">@ChildContent</h2>
+
+@code {
+    private ElementReference _heading;
+
+    /// <summary>The title text.</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        try
+        {
+            await Task.Yield();
+            await _heading.FocusAsync();
+        }
+        catch (Exception exception) when (exception is JSException or JSDisconnectedException or InvalidOperationException or TaskCanceledException)
+        {
+            // A circuit that is gone or a title that was already closed: there is nothing to focus.
+        }
+    }
+}

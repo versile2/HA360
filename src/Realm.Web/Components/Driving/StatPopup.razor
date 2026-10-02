@@ -1,0 +1,127 @@
+@* The popup of the six headline items (01 sections 6.7 and 6.7.1; 03 section 3.4): one anatomy for the four stat chips, the Top Speed card and the Drives card, opened
+   with IDialogService.ShowAsync<StatPopup>. Top to bottom: the icon circle and the title in the dialog's header (the dialog is labelled by it, so its name is the title
+   alone), the lore line, the one-sentence summary, the Drives | Miles toggle (Drives popup only), the bars, the footnote and the full-width "Got it". The Close button is
+   the first control of the body, so the Tab order is Close, (toggle or information button), Got it inside MudBlazor's focus trap. Every sentence and every bar is built
+   by StatNameFormatter from the week report, so the popup does no arithmetic of its own: a null count is a "—" row, never 0. The footnote always begins "Source: The Realm's
+   own records" (D26); the phone popup adds the Android Auto information button (D36) and the speeding footnote says the count is sampled (D39). Esc, the scrim, the
+   Close button and "Got it" close it (the options and the dialog's own handlers); MudBlazor saves the focused opener when the focus trap first renders and focuses it
+   again when the popup goes, so focus returns to the chip or card. *@
+<MudDialog Class="realm-popup"
+           TitleClass="realm-popup__head"
+           ContentClass="realm-popup__body"
+           DefaultFocus="DefaultFocus.None"
+           data-testid="@("popup-" + Key)">
+    <TitleContent>
+        <span class="realm-popup__icon" aria-hidden="true">
+            <MudIcon Icon="@DrivingIcons.For(Key)" />
+        </span>
+        <PopupTitle>@StatNameFormatter.Title(Key)</PopupTitle>
+    </TitleContent>
+    <DialogContent>
+        <button type="button" class="realm-popup__close" data-testid="popup-close" aria-label="Close" @onclick="Close">
+            <MudIcon Icon="@Icons.Material.Filled.Close" />
+        </button>
+
+        <p class="realm-popup__lore">@StatNameFormatter.Lore(Key)</p>
+        <p class="realm-popup__summary">@Summary</p>
+
+        @if (StatNameFormatter.HasToggle(Key))
+        {
+            <div class="realm-popup__toggle" role="group" aria-label="Show">
+                <button type="button"
+                        class="realm-popup__toggle-chip"
+                        data-testid="popup-toggle-drives"
+                        aria-pressed="@(_miles ? "false" : "true")"
+                        @onclick="ShowDrives">Drives</button>
+                <button type="button"
+                        class="realm-popup__toggle-chip"
+                        data-testid="popup-toggle-miles"
+                        aria-pressed="@(_miles ? "true" : "false")"
+                        @onclick="ShowMiles">Miles</button>
+            </div>
+        }
+
+        <div class="realm-bars @(StatNameFormatter.IsWide(Key, _miles) ? "realm-bars--wide" : null)" role="list" aria-label="@(StatNameFormatter.Title(Key) + " by driver")">
+            @foreach (var bar in Bars)
+            {
+                var member = MemberOf(bar.MemberId);
+                <div @key="bar.MemberId"
+                     class="realm-bar @(bar.Fraction is null ? "realm-bar--unknown" : null)"
+                     role="listitem"
+                     data-testid="@("bar-" + bar.MemberId)">
+                    <span class="realm-bar__fill" style="@FillStyle(bar)">
+                        <DriverAvatar Name="@bar.Name" MemberColor="@member?.Color" AvatarUrl="@member?.AvatarUrl" Diameter="40" />
+                    </span>
+                    <span class="realm-bar__pill" aria-hidden="true">
+                        <span class="realm-bar__value">@bar.Pill</span>
+                        @if (bar.Fraction is null)
+                        {
+                            <span class="realm-bar__info">
+                                <MudIcon Icon="@Icons.Material.Outlined.Info" />
+                            </span>
+                        }
+                    </span>
+                    <span class="realm-sr-only">@bar.Text</span>
+                </div>
+            }
+        </div>
+
+        <div class="realm-popup__footnote">
+            @StatNameFormatter.Footnote(Key)
+            @if (Key == EventKeys.Phone)
+            {
+                <MudTooltip Text="@StatNameFormatter.AndroidAutoTooltip" Placement="Placement.Top" Inline="true" RootClass="realm-popup__info-root">
+                    <button type="button" class="realm-popup__info" aria-label="About Android Auto" aria-describedby="realm-popup-info-description">
+                        <MudIcon Icon="@Icons.Material.Outlined.Info" />
+                    </button>
+                </MudTooltip>
+                <span id="realm-popup-info-description" class="realm-sr-only">@StatNameFormatter.AndroidAutoTooltip</span>
+            }
+        </div>
+
+        <button type="button" class="realm-popup__gotit" data-testid="popup-gotit" @onclick="Close">Got it</button>
+    </DialogContent>
+</MudDialog>
+
+@code {
+    private bool _miles;
+
+    /// <summary>The dialog this popup is the content of, cascaded by MudBlazor.</summary>
+    [CascadingParameter]
+    public IMudDialogInstance MudDialog { get; set; } = default!;
+
+    /// <summary>The item to explain: a chip key (<see cref="EventKeys"/>), <see cref="StatNameFormatter.TopSpeedKey"/> or <see cref="StatNameFormatter.DrivesKey"/>.</summary>
+    [Parameter, EditorRequired]
+    public string Key { get; set; } = EventKeys.Speeding;
+
+    /// <summary>The week report the page showed; null when it could not be read (every sentence then says the Realm has not recorded it yet).</summary>
+    [Parameter]
+    public WeekReportVm? Report { get; set; }
+
+    /// <summary>The members by id, for the names and the avatars of the bars.</summary>
+    [Parameter]
+    public IReadOnlyDictionary<string, MemberVm> Members { get; set; } = new Dictionary<string, MemberVm>(StringComparer.Ordinal);
+
+    /// <summary>The week offset (0 to 3), for the period words of the sentences ("this week", "last week", "that week").</summary>
+    [Parameter]
+    public int WeekOffset { get; set; }
+
+    /// <summary>The session's zone, for the day of the top speed.</summary>
+    [Parameter]
+    public TimeZoneInfo Zone { get; set; } = TimeZoneInfo.Utc;
+
+    private string Summary => StatNameFormatter.PopupSummary(Key, Report, Members, WeekOffset, Zone);
+
+    private IReadOnlyList<PopupBar> Bars => StatNameFormatter.PopupBars(Key, Report, Members, _miles);
+
+    private MemberVm? MemberOf(string memberId) => Members.TryGetValue(memberId, out var member) ? member : null;
+
+    // The fill's share of the room it may take (01 section 6.7.1); the stylesheet turns it into a width and floors it at 56 px. An unavailable row has no share.
+    private static string FillStyle(PopupBar bar) => "--realm-bar-fraction:" + (bar.Fraction ?? 0).ToString("0.####", CultureInfo.InvariantCulture);
+
+    private void ShowDrives() => _miles = false;
+
+    private void ShowMiles() => _miles = true;
+
+    private void Close() => MudDialog.Close();
+}

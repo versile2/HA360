@@ -20,6 +20,13 @@ public enum TrendDirection
 }
 
 /// <summary>
+/// One row of the bars of a popup (01 section 6.7.1). <paramref name="Pill"/> is the value as the pill shows it ("22", "366.0 mi", "96 mph") or "—" for an
+/// unavailable one. <paramref name="Fraction"/> is the value divided by the largest value of the popup (0 to 1, so the largest bar is 100 %); it is <c>null</c> for
+/// an unavailable row, which sits at the floor. <paramref name="Text"/> is the accessible text of the row ("Alden: 22 drives", "Briar: not recorded").
+/// </summary>
+public sealed record PopupBar(string MemberId, string Name, string Pill, double? Fraction, string Text);
+
+/// <summary>
 /// The names and sentences of the six headline items of the Driving screen (01 sections 6.3, 6.7, 8.8 and 10.3): the stat chips (speeding, phone use, rapid
 /// acceleration, hard braking), the Top Speed card and the Drives card. Pure, with no clock and no zone read except the one passed in. Every number is the data
 /// layer's: a chip renders one <see cref="EventStat"/> and this class never subtracts, sums or compares totals (01 section 6.3); counting the drivers that
@@ -286,4 +293,130 @@ public static class StatNameFormatter
             DrivesKey => ". " + DistanceCaption + ".",
             _ => ".",
         };
+
+    /// <summary>
+    /// The summary sentence of any of the six popups (01 section 6.7): the Top Speed and Drives sentences, or <see cref="Summary"/> of the chip's stat. A week that
+    /// was not recorded, or whose report could not be read, says <see cref="UnavailableSentence"/> for all six (01 section 6.9).
+    /// </summary>
+    public static string PopupSummary(string key, WeekReportVm? report, IReadOnlyDictionary<string, MemberVm> members, int weekOffset, TimeZoneInfo zone)
+    {
+        if (report is null || report.Coverage == WeekCoverage.NoRecord)
+        {
+            return UnavailableSentence;
+        }
+
+        return key switch
+        {
+            TopSpeedKey => TopSpeedSummary(report.TopSpeed, report.TopSpeed is { } top ? NameOf(members, top.MemberId) : null, zone),
+            DrivesKey => DrivesSummary(report.Totals),
+            _ => Summary(key, report.Events.TryGetValue(key, out var stat) ? stat : null, weekOffset),
+        };
+    }
+
+    /// <summary>True for the popup that has the Drives and Miles toggle (01 section 6.7): the Drives popup only.</summary>
+    public static bool HasToggle(string key) => key == DrivesKey;
+
+    /// <summary>True when the pills of the bars are the wide ones (01 section 6.7.1): miles and mph values, 72 px against 56.</summary>
+    public static bool IsWide(string key, bool miles) => key == TopSpeedKey || (key == DrivesKey && miles);
+
+    /// <summary>
+    /// The bars of a popup (01 section 6.7.1), one per report driver. The value is the driver's own count of the stat (<see cref="EventStat.Drivers"/>), top speed
+    /// (<see cref="TopSpeedStat.Drivers"/>), drives, or with <paramref name="miles"/> the distance; a driver with no value, or who was not covered, reads "—" and
+    /// sorts last. The order is value descending, then drives descending, then name; the fraction is the value over the largest value, never computed from totals.
+    /// </summary>
+    public static IReadOnlyList<PopupBar> PopupBars(string key, WeekReportVm? report, IReadOnlyDictionary<string, MemberVm> members, bool miles = false)
+    {
+        if (report is null)
+        {
+            return [];
+        }
+
+        var rows = new List<BarRow>(report.Drivers.Count);
+        var maximum = 0.0;
+        foreach (var driver in report.Drivers)
+        {
+            var value = BarValue(key, report, driver, miles);
+            if (value is { } known && known > maximum)
+            {
+                maximum = known;
+            }
+
+            rows.Add(new BarRow(driver, NameOf(members, driver.MemberId), value));
+        }
+
+        return rows
+            .OrderBy(row => row.Value is null)
+            .ThenByDescending(row => row.Value ?? 0)
+            .ThenByDescending(row => row.Driver.Drives ?? 0)
+            .ThenBy(row => row.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(row => ToBar(key, row, maximum, miles))
+            .ToList();
+    }
+
+    /// <summary>The display name of a member, or the id when the member is not known.</summary>
+    public static string NameOf(IReadOnlyDictionary<string, MemberVm> members, string memberId) =>
+        members.TryGetValue(memberId, out var member) ? member.DisplayName : memberId;
+
+    private sealed record BarRow(DriverSummary Driver, string Name, double? Value);
+
+    // The driver's own figure for the popup, or null when there is none: not covered, not recorded that week, or a type that no driver has a count of.
+    private static double? BarValue(string key, WeekReportVm report, DriverSummary driver, bool miles)
+    {
+        if (!driver.Covered || report.Coverage == WeekCoverage.NoRecord)
+        {
+            return null;
+        }
+
+        switch (key)
+        {
+            case TopSpeedKey:
+                return DrivingFormatter.TopSpeedOf(report, driver.MemberId);
+            case DrivesKey:
+                return miles ? driver.Meters : driver.Drives;
+            default:
+                if (!report.Events.TryGetValue(key, out var stat) || IsUnavailable(stat))
+                {
+                    return null;
+                }
+
+                foreach (var entry in stat.Drivers)
+                {
+                    if (string.Equals(entry.MemberId, driver.MemberId, StringComparison.Ordinal))
+                    {
+                        return entry.Count;
+                    }
+                }
+
+                return null;
+        }
+    }
+
+    private static PopupBar ToBar(string key, BarRow row, double maximum, bool miles)
+    {
+        var id = row.Driver.MemberId;
+        if (row.Value is not { } value)
+        {
+            return new PopupBar(id, row.Name, DrivingFormatter.Dash, null, row.Name + ": not recorded");
+        }
+
+        // A maximum of 0 (every driver has a real zero) leaves every bar at the floor.
+        var fraction = maximum > 0 ? Math.Clamp(value / maximum, 0, 1) : 0;
+        var whole = (int)Math.Round(value, MidpointRounding.AwayFromZero);
+        var (pill, text) = key switch
+        {
+            TopSpeedKey => (
+                DrivingFormatter.SpeedText(value),
+                row.Name + ": " + DrivingFormatter.Mph(value).ToString(CultureInfo.InvariantCulture) + " miles per hour"),
+            DrivesKey when miles => (
+                DrivingFormatter.DriverMiles(value) + " mi",
+                row.Name + ": " + DrivingFormatter.DriverMiles(value) + " miles"),
+            DrivesKey => (
+                DrivingFormatter.Count(whole),
+                row.Name + ": " + DrivingFormatter.Count(whole) + " " + DrivingFormatter.Drives(whole)),
+            _ => (
+                DrivingFormatter.Count(whole),
+                row.Name + ": " + DrivingFormatter.Count(whole) + " " + Noun(key, whole)),
+        };
+        return new PopupBar(id, row.Name, pill, fraction, text);
+    }
 }

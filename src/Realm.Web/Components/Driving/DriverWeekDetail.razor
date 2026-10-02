@@ -1,0 +1,83 @@
+@* The body of a driver's week (01 section 6.6; 03 section 3.4): the four summary tiles (Drives, Miles, Top speed, Events, "—" when unknown), the event row (the four
+   types with their counts, "sampled" under speeding, "—" for a null count and never 0), the drives grouped by day with their day headers, newest first, and the GPS-estimate
+   footnote while the driver's basis is GPS or mixed. A driver who was not covered, or has no drives, gets the empty state of 01 section 8.7 in place of the list. The page
+   decides nothing: every figure is the DriverSummary's or the DriveVm's and every string is built by DrivingFormatter. The Events tile carries the same text, asterisk
+   and tooltip as the driver card's pill. *@
+<div class="realm-week-tiles">
+    <div class="realm-week-tile">
+        <span class="realm-week-tile__label">Drives</span>
+        <span class="realm-week-tile__value">@DrivingFormatter.DrivesTile(Data.Summary)</span>
+    </div>
+    <div class="realm-week-tile">
+        <span class="realm-week-tile__label">Miles</span>
+        <span class="realm-week-tile__value">@DrivingFormatter.MilesTile(Data.Summary)</span>
+    </div>
+    <div class="realm-week-tile">
+        <span class="realm-week-tile__label">Top speed</span>
+        <span class="realm-week-tile__value">@DrivingFormatter.TopSpeedTile(Data.Summary, TopSpeedMps)</span>
+    </div>
+    <MudTooltip Text="@DrivingFormatter.EventsTileTooltip(Data.Summary)" Placement="Placement.Bottom" Inline="false" RootClass="realm-week-tile-root">
+        <div class="realm-week-tile">
+            <span class="realm-week-tile__label">Events</span>
+            <span class="realm-week-tile__value realm-week-tile__value--text">@DrivingFormatter.EventsTile(Data.Summary)</span>
+        </div>
+    </MudTooltip>
+</div>
+
+<div class="realm-week-events" role="list" aria-label="Events by type">
+    @foreach (var key in StatNameFormatter.ChipKeys)
+    {
+        <div class="realm-week-event" role="listitem" data-event="@key">
+            <span class="realm-stat-chip__icon realm-stat-chip__icon--@(key)" aria-hidden="true">
+                <MudIcon Icon="@DrivingIcons.For(key)" />
+            </span>
+            <span class="realm-week-event__text">
+                <span class="realm-week-event__count">@DrivingFormatter.EventCount(Data.Summary, key)</span>
+                <span class="realm-week-event__label">@StatNameFormatter.Label(key)</span>
+                @if (key == EventKeys.Speeding)
+                {
+                    <span class="realm-week-event__caption">@StatNameFormatter.SampledCaption</span>
+                }
+            </span>
+        </div>
+    }
+</div>
+
+@if (DrivingFormatter.EmptyWeekText(Data.Summary, Data.Trips.Count) is { } empty)
+{
+    <p class="realm-driving__quiet" role="status">@empty</p>
+}
+else
+{
+    @foreach (var day in DrivingFormatter.DriveDays(Data.Trips, Zone))
+    {
+        <section class="realm-drive-day">
+            <h2 class="realm-drive-day__header">@day.Label</h2>
+            <ul class="realm-drive-list">
+                @foreach (var line in day.Rows)
+                {
+                    <DriveRow @key="line.Index" Line="@line" />
+                }
+            </ul>
+        </section>
+    }
+}
+
+@if (DrivingFormatter.ShowDriverCaption(Data.Summary, Data.Trips.Count))
+{
+    <p class="realm-driving__caption">@(StatNameFormatter.DistanceCaption + ".")</p>
+}
+
+@code {
+    /// <summary>The driver's week: the summary of the tiles and the event row, and the drives of the list.</summary>
+    [Parameter, EditorRequired]
+    public DriverWeek Data { get; set; } = default!;
+
+    /// <summary>The driver's top speed of the week in metres per second (the report's per-driver speeds, 01 section 6.8); null when unknown.</summary>
+    [Parameter]
+    public double? TopSpeedMps { get; set; }
+
+    /// <summary>The session's zone, for the times and the day headers.</summary>
+    [Parameter]
+    public TimeZoneInfo Zone { get; set; } = TimeZoneInfo.Utc;
+}
