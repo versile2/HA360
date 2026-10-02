@@ -11,6 +11,7 @@ import {
   BUBBLE_EDGE_PX,
   BUBBLE_FADE_MS,
   BUBBLE_HIT_PX,
+  BUBBLE_RESEED_TOLERANCE_PX,
   BUBBLE_SLIDE_MS,
   CLUSTER_FIT_MAX_ZOOM,
   CLUSTER_FIT_MS,
@@ -25,6 +26,7 @@ import {
   fillTemplate,
   isOwnBubble,
   keepOutRects,
+  reseedAnchors,
 } from '../../src/Realm.Web/wwwroot/js/testHooks.js';
 
 const PHONE = { width: 412, height: 915 };
@@ -108,6 +110,69 @@ test('[AC-19b] the priority of a cluster is the fan-out\'s: selected, then drivi
   assert.deepEqual(plain, [FAN_PRIORITY.member, FAN_PRIORITY.drivingMember, FAN_PRIORITY.member]);
   const chosen = bubbleAnchors(members, at, new Map(), 'c').map((a) => a.priority);
   assert.deepEqual(chosen, [FAN_PRIORITY.member, FAN_PRIORITY.drivingMember, FAN_PRIORITY.selected]);
+});
+
+// ---- the first verdict after a camera command (the default view keeps every pin) ---------------------------------------------------------
+
+// The default fit (01 section 4.9) puts the outermost pins on the edge of the map padding: x 16 on the left, which is 8 px inside R (x 8), and y 725 on the bottom,
+// which is R's own bottom edge. A member that was off screen before the fit is remembered as off, and the 12 px hysteresis of 01 section 4.10 step 2 keeps it a bubble
+// unless it is 12 px inside R: the default view lost the pin of the member farthest to the west (every E2E spec that waits for the four default pins failed).
+test('[AC-13] a camera command decides afresh: a member that was off screen and is now 8 px inside R is on screen, where the hysteresis alone keeps it off', () => {
+  const rect = bubbleRect(PHONE, DEFAULT_LAYOUT, PEEK);
+  const members = [{ id: 'west', status: 'idle' }, { id: 'far', status: 'idle' }];
+  const places = { west: { x: PEEK.left, y: 500 }, far: { x: 5000, y: 366 } };
+  const previous = new Map([['west', true], ['far', true]]); // both were off screen before the command
+  const remembered = bubbleAnchors(members, (m) => places[m.id], previous, null);
+  assert.deepEqual(layoutBubbles(rect, [], remembered).offScreen.sort(), ['far', 'west'], 'the hysteresis alone: west stays a bubble (the defect)');
+
+  const fresh = reseedAnchors(remembered, rect);
+  const result = layoutBubbles(rect, [], fresh);
+  assert.deepEqual(result.onScreen, ['west'], 'the plain verdict: 8 px inside R is on screen');
+  assert.deepEqual(result.offScreen, ['far']);
+});
+
+test('[AC-13] the plain verdict is R grown by a pixel: the pin the fit leaves exactly on the bottom edge (or a hair past it) is on screen, 2 px past it is not', () => {
+  assert.equal(BUBBLE_RESEED_TOLERANCE_PX, 1);
+  const rect = bubbleRect(PHONE, DEFAULT_LAYOUT, PEEK);
+  const anchor = (id, x, y) => ({ id, x, y, priority: FAN_PRIORITY.member });
+  const verdict = (anchors) => Object.fromEntries(reseedAnchors(anchors, rect).map((a) => [a.id, a.wasOff]));
+  assert.deepEqual(
+    verdict([
+      anchor('onEdge', 200, rect.bottom),
+      anchor('floatNoise', 200, rect.bottom + 1e-6),
+      anchor('withinTolerance', rect.left - 1, 300),
+      anchor('twoPast', 200, rect.bottom + 2),
+      anchor('farRight', rect.right + 40, 300),
+      anchor('farUp', 200, rect.top - 40),
+    ]),
+    { onEdge: false, floatNoise: false, withinTolerance: false, twoPast: true, farRight: true, farUp: true },
+  );
+});
+
+test('reseeding keeps the anchors: same order, same ids, positions and priorities, the input untouched, and a member without a previous verdict gets one', () => {
+  const rect = bubbleRect(PHONE, DEFAULT_LAYOUT, PEEK);
+  const input = [
+    { id: 'b', x: 50, y: 60, priority: FAN_PRIORITY.selected },
+    { id: 'a', x: -300, y: 60, wasOff: false, priority: FAN_PRIORITY.drivingMember },
+  ];
+  const output = reseedAnchors(input, rect);
+  assert.deepEqual(output, [
+    { id: 'b', x: 50, y: 60, priority: FAN_PRIORITY.selected, wasOff: false },
+    { id: 'a', x: -300, y: 60, priority: FAN_PRIORITY.drivingMember, wasOff: true },
+  ]);
+  assert.ok(!('wasOff' in input[0]) && input[1].wasOff === false, 'the input is not modified');
+});
+
+test('after the fresh frame the memory is the normal one again: a pin 8 px inside R that came back stays on screen, and goes off only 12 px outside R', () => {
+  const rect = bubbleRect(PHONE, DEFAULT_LAYOUT, PEEK);
+  const members = [{ id: 'west', status: 'idle' }];
+  const at = (x) => () => ({ x, y: 500 });
+  const fresh = layoutBubbles(rect, [], reseedAnchors(bubbleAnchors(members, at(rect.left + 8), new Map([['west', true]]), null), rect));
+  assert.deepEqual(fresh.onScreen, ['west']);
+  const next = (x) => layoutBubbles(rect, [], bubbleAnchors(members, at(x), new Map([['west', false]]), null));
+  assert.deepEqual(next(rect.left + 8).onScreen, ['west'], 'the next frame, nothing moved');
+  assert.deepEqual(next(rect.left - 11).onScreen, ['west'], 'a pan that takes it 11 px outside R does not flicker it off');
+  assert.deepEqual(next(rect.left - 13).offScreen, ['west'], '13 px outside R it is a bubble');
 });
 
 // ---- the bubbles hook ----------------------------------------------------------------------------------------------------------

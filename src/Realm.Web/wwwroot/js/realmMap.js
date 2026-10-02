@@ -83,6 +83,7 @@ import {
   isOwnBubble,
   keepOutRects,
   removeTestHooks,
+  reseedAnchors,
 } from './testHooks.js';
 import { readSheet, sheetHeightForPadding, sheetMetrics } from './realmShell.js';
 
@@ -1320,6 +1321,7 @@ function bindMap(r) {
   });
   map.on('moveend', () => {
     r.lastMoveUser = r.moveUser;
+    if (!r.moveUser) reseedBubbles(r); // S9b: a command moved the camera (not a person), so the bubbles decide afresh
     scheduleCameraReport(r);
   });
   map.on('move', scheduleRender);
@@ -2061,6 +2063,7 @@ export function recenter() {
  * @typedef {object} BubbleRuntime
  * @property {HTMLElement | null} host the `.realm-bubbles` container that EdgeBubbles.razor renders
  * @property {Map<string, boolean>} known last frame's verdict by member id (true: off screen), the hysteresis memory of layoutBubbles
+ * @property {boolean} reseed a camera command ended since the last frame: the next verdict is the plain one, not the hysteresis memory (reseedAnchors)
  * @property {Set<string>} off the members that are off screen now: they have a bubble and no pin
  * @property {Map<string, BubbleEl>} els the bubble elements, the ones that are fading out included
  * @property {import('./bubbleLayout.js').Bubble[]} bubbles the last layout (the `bubbles` hook)
@@ -2085,7 +2088,7 @@ const BUBBLE_TEMPLATE =
 function bubbleState(r) {
   let state = bubbleRuntimes.get(r);
   if (!state) {
-    state = { host: null, known: new Map(), off: new Set(), els: new Map(), bubbles: [], busyUntil: 0, observer: null, observed: new WeakSet() };
+    state = { host: null, known: new Map(), reseed: false, off: new Set(), els: new Map(), bubbles: [], busyUntil: 0, observer: null, observed: new WeakSet() };
     bubbleRuntimes.set(r, state);
   }
   return state;
@@ -2110,6 +2113,18 @@ function releaseBubbles(r) {
   }
   state.els.clear();
   bubbleRuntimes.delete(r);
+}
+
+/**
+ * Hook of the map's `moveend` when the move was not a person's (a fit, a flight, a recentre, the follow, a padding or size change): the hysteresis memory is dropped for
+ * the next frame. A command does not move the camera gradually: it puts the members where it wants them, and the 12 px of hysteresis would hold a member that was
+ * off screen before the command in its bubble although the command put it on screen (the default fit puts the outermost pin 8 px inside R on the left). The memory
+ * stays for gestures and for the sheet's own transitions, which is what it is for (01 section 4.10 step 2).
+ * @param {Runtime} r
+ */
+function reseedBubbles(r) {
+  bubbleState(r).reseed = true;
+  scheduleRender();
 }
 
 /** Hook of reconcilePins: the member is off screen, so its pin does not exist. @param {Runtime} r @param {string} id @returns {boolean} */
@@ -2187,7 +2202,8 @@ function layoutBubblesFrame(r) {
   /** @type {import('./bubbleLayout.js').BubbleResult} */
   let result = { bubbles: [], onScreen: [], offScreen: [] };
   if (host) {
-    const anchors = bubbleAnchors(
+    const rect = bubbleRect(size, r.layout, r.appliedPadding);
+    let anchors = bubbleAnchors(
       members,
       (member) => {
         if (typeof member.lat !== 'number' || typeof member.lon !== 'number') return null;
@@ -2198,7 +2214,11 @@ function layoutBubblesFrame(r) {
       state.known,
       selectedId(r, 'member'),
     );
-    result = layoutBubbles(bubbleRect(size, r.layout, r.appliedPadding), measureKeepOuts(r, state), anchors);
+    if (state.reseed) {
+      state.reseed = false;
+      anchors = reseedAnchors(anchors, rect);
+    }
+    result = layoutBubbles(rect, measureKeepOuts(r, state), anchors);
   }
   const off = new Set(result.offScreen);
   let flipped = off.size !== state.off.size;

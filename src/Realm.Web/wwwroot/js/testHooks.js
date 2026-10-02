@@ -116,6 +116,32 @@ export function bubbleAnchors(members, project, previous, selectedId) {
   return anchors;
 }
 
+/**
+ * How far outside R a member may sit and still count as inside on the first verdict after a camera command: the default fit puts the outermost member exactly on
+ * the edge of the map padding, which is the bottom edge of R itself, and a fraction of a pixel of floating point must not decide whether that member has a pin.
+ */
+export const BUBBLE_RESEED_TOLERANCE_PX = 1;
+
+/**
+ * The anchors of the first frame after a camera command (a fit, a flight, a recentre, a resize; not a person's own pan or zoom). The 12 px hysteresis of
+ * `layoutBubbles` is memory of the last frame, and a command does not move the camera gradually: `fitBounds` puts the outermost pins on the edge of the map padding,
+ * which is 8 px inside R on the left (padding 16, R 8) and not at all inside it on the bottom, so a member that was off screen before the command lands in the
+ * 12 px band, stays a bubble for good and the default view loses a pin. The verdict of that frame is the plain one instead: each anchor's `wasOff` becomes "outside R
+ * by more than `tolerance`", and from the next frame the hysteresis memory is the normal one.
+ * @template {{ id: string, x: number, y: number, wasOff?: boolean, priority: number }} A
+ * @param {ReadonlyArray<A>} anchors
+ * @param {Rect} rect R, as `bubbleRect` gives it
+ * @param {number} [tolerance]
+ * @returns {Array<A & { wasOff: boolean }>} the same anchors, in the same order, with `wasOff` set
+ */
+export function reseedAnchors(anchors, rect, tolerance = BUBBLE_RESEED_TOLERANCE_PX) {
+  return anchors.map((anchor) => {
+    const outside =
+      anchor.x < rect.left - tolerance || anchor.x > rect.right + tolerance || anchor.y < rect.top - tolerance || anchor.y > rect.bottom + tolerance;
+    return { ...anchor, wasOff: outside };
+  });
+}
+
 /** The key of a bubble and the suffix of its test id: the member id, or `id1-id2` for a cluster (03 section 4.6). @param {ReadonlyArray<string>} ids @returns {string} */
 export function bubbleKey(ids) {
   return ids.join('-');

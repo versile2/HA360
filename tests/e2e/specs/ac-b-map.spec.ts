@@ -528,9 +528,10 @@ test.describe('acceptance B: the map', () => {
   });
 
   // [AC-15] A single-member bubble selects (D45, D84): the tap reaches the server, the member is selected, the sheet stays at Peek and the camera flies to zoom 13 with her pin in the
-  // Peek rectangle. What is asserted here is what is on the map; the selection header (name, lore, line, battery) is the second test below, which waits for S8b. Two readings of the
-  // sentence are recorded in the report: the bubble of Alden (`king`) may be part of a cluster (the King, the Queen and the Jester are one group west of Dara), so the test asks for
-  // the bubble that holds him and not for the id `bubble-king`; and "within 1,000 ms" starts at the tap, so the round trip to the server is inside it (the slack above).
+  // Peek rectangle. What is asserted here is what is on the map; the selection header (name, lore, line, battery) is the second test below, which waits for S8b. D86 rules on the
+  // sentence "`bubble-king` exists": it means the bubble whose member set includes `king` (the King, the Queen and the Jester are one group west of Dara, so that bubble is the
+  // cluster `queen-king-jester`), which the test finds in `bubbles()` by `ids`; the viewer is not exempt from clustering. "Within 1,000 ms" starts at the tap, so the round trip to
+  // the server is inside it (the slack above).
   test('[AC-15] tapping bubble-cryptid selects Dara: Peek, zoom 13 within 1,000 ms, her pin in the Peek rectangle, her bubble gone and the King\'s bubble there', async ({ page }) => {
     await demo(page);
     await mapReady(page);
@@ -569,11 +570,12 @@ test.describe('acceptance B: the map', () => {
     expect(pin.ring.toUpperCase(), 'her ring colour').toBe('#9AA0BD');
     expect(pin.badge, 'her clock badge').toBe('stale');
 
-    // Alden is now far to the west: the bubble that holds him exists (alone as `bubble-king`, or with the people at home, a cluster).
+    // Alden is now far to the west: the bubble whose member set includes `king` exists (D86: alone as `bubble-king`, or with the people at home, a cluster such as `queen-king-jester`).
     const bubbles = await readHook(page, 'bubbles');
     const kings = bubbles.find((bubble) => bubble.ids.includes('king'));
-    expect(kings, `a bubble holds 'king' (bubbles(): ${bubbles.map((bubble) => bubble.id).join(', ')})`).toBeDefined();
+    expect(kings, `a bubble whose member set includes 'king' (bubbles(): ${bubbles.map((bubble) => `${bubble.id} [${bubble.ids.join(', ')}]`).join('; ')})`).toBeDefined();
     if (kings === undefined) return;
+    expect(kings.id, 'its test id is its member ids joined (a single member: bubble-king)').toBe(kings.ids.join('-'));
     await expect(page.getByTestId(`bubble-${kings.id}`), `bubble-${kings.id} is on screen`).toBeVisible();
     test.info().annotations.push({ type: 'info', description: `[AC-15] the bubble that holds the King after the flight: bubble-${kings.id} (cluster of ${kings.cluster})` });
   });
