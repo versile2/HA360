@@ -1,7 +1,7 @@
 // Platform tests for the open questions of 01 Appendix C that nobody could run before MudX was in the page (03 section 7.5).
 // S7a creates this file with [X-14]; [X-12] (z-index order and the non-modal overlay) belongs to S10b and [X-13] (the focus trap, a declared expected
-// failure) to S8c, which append to it.
-import { demo, expect, readHook, settled, test } from '../fixtures.js';
+// failure) to S8c, which appends it at the end.
+import { demo, expect, mapReady, readHook, settled, test } from '../fixtures.js';
 
 test.describe('appendix C platform tests', () => {
   // 01 Appendix C item 7. MudXSheet renders a MudOverlay with LockScroll=true even when it is non-modal, and MudBlazor's scroll lock adds the class
@@ -171,4 +171,43 @@ test.describe('appendix C platform tests', () => {
     }
     expect(overlays.mapPointHitsAnOverlay, 'a point on the map above the sheet is not caught by an overlay').toBe(false);
   });
+
+  // 01 Appendix C item 5, R-032, 03 section 3.5: Tab leaves the sheet. It does not, and the test is DECLARED to fail: MudXSheet wraps its content in a MudFocusTrap that has no parameter to switch it
+  // off (MudX 9.5.0, `MudXSheet.razor` line 15), and the trap's bumpers are tab stops, so once the focus is inside the sheet Tab cycles inside it and never reaches the bottom navigation or
+  // the browser. v1 accepts that (01 section 10.2): a keyboard user leaves the sheet with Esc and then Shift+Tab from the handle, which [AC-47a] records. This is `test.fail`, not a skip:
+  // Playwright runs it and the suite goes RED if it ever passes, which is the signal that MudX shipped `DisableFocusTrap` and that the decision of 03 section 3.5 is to be re-evaluated.
+  // The precondition (the focus really is inside the sheet when the Tab presses begin) is asserted first, so that the one thing that can fail is the claim itself.
+  test.fail(
+    '[X-13] Tab leaves the sheet: from a control inside it, Tab reaches something outside it within a full cycle of stops',
+    { annotation: { type: 'reason', description: 'MudX focus trap, R-032: MudXSheet wraps its content in a MudFocusTrap with no DisableFocusTrap parameter (expected to fail until MudX ships one)' } },
+    async ({ page }) => {
+      const MAX_TABS = 16; // far more than the sheet has tab stops (the handle, the tab control, the bumpers of the trap)
+      await demo(page);
+      await mapReady(page);
+
+      const where = () =>
+        page.evaluate(() => {
+          const element = document.activeElement;
+          if (element === null) return { inside: false, label: 'nothing' };
+          const testId = element.getAttribute('data-testid');
+          return { inside: element.closest('div[mudsheet]') !== null, label: `${element.tagName.toLowerCase()}${testId === null ? '' : `[${testId}]`}` };
+        });
+
+      // Precondition: a tap on the Drivers tab puts the focus inside the sheet.
+      await page.getByTestId('tab-drivers').click();
+      await expect(page.getByTestId('tab-drivers'), 'the Drivers tab has the focus').toBeFocused();
+      expect((await where()).inside, 'the focus is inside the sheet when the Tab presses begin').toBe(true);
+
+      const visited: string[] = [];
+      let left = false;
+      for (let press = 0; press < MAX_TABS && !left; press += 1) {
+        await page.keyboard.press('Tab');
+        const now = await where();
+        visited.push(`${now.label}${now.inside ? '' : ' (outside)'}`);
+        left = !now.inside;
+      }
+      test.info().annotations.push({ type: 'info', description: `[X-13] ${visited.length} Tab presses from tab-drivers visited: ${visited.join(' > ')}` });
+      expect(left, `Tab left the sheet (it visited ${visited.join(' > ')}): the focus trap of MudXSheet is still there`).toBe(true);
+    },
+  );
 });

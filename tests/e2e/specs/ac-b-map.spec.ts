@@ -1,15 +1,41 @@
 // Acceptance tests B of 01 section 11 (03 section 7.5): the map. S6b writes the map-side halves that the S5 map already satisfies:
 // [AC-13a] the pins on screen, [AC-16a] pin anatomy, [AC-17] the Here-for chip and [AC-18] the zones. The halves that need later slices are the
 // `b` tests of S9 (bubbles, fan-out, the halo, off-screen pins gone) and the assertions that need a selection (S8) or the Layers popover (S10); each
-// test says below what it leaves to them. S8 adds AC-20, 22, 23, 24, S10 AC-21 to this file. S9b adds [AC-13b], [AC-14], [AC-15] and [AC-16b] in the block
-// at the end ("S9b: the edge bubbles and the fan-out").
+// test says below what it leaves to them. S10 adds AC-21 to this file. S9b adds [AC-13b], [AC-14], [AC-15] and [AC-16b] in the block
+// "S9b: the edge bubbles and the fan-out"; S8c adds [AC-17b], [AC-20], [AC-22], [AC-23] and [AC-24] in the block at the end ("S8c: selection, the chip that
+// follows it, recenter and the Back chain") and extends [AC-13b] and [AC-14] with the chips of D90.
 //
 // Every name, place and zone comes from tests/e2e/fixtures/demo-cast.json (the DemoCast, written by `export-demo-cast`; 03 section 8.1 rule 2); a
 // role id (`king`, `queen`, `jester`, `wagon`, ...) is the only literal about the cast in this file. Numbers are those of 01 section 11 and 4.2 to 4.6.
 // The Demo style is `demo-offline`, whose appearance is `light` (01 section 4.12): the zone alpha below follows it (see ZONE_FILL_ALPHA).
 import type { Page } from '@playwright/test';
 
-import { DEFAULT_VIEW_PINS, castMember, castPlace, demo, expect, expectApprox, loadDemoCast, mapReady, onScreenPinTestIds, readHook, settled, test, type BubbleInfo, type PinInfo, type Rect, type ZoneInfo } from '../fixtures.js';
+import {
+  DEFAULT_VIEW_PINS,
+  PEEK_CENTRE_TOLERANCE_PX,
+  PEEK_INSET,
+  castMember,
+  castPlace,
+  demo,
+  emptyMapPoint,
+  expect,
+  expectApprox,
+  expectHistoryDepth,
+  expectSelectionCentred,
+  loadDemoCast,
+  mapReady,
+  onScreenPinTestIds,
+  peekCentre,
+  pinDistanceFromPeekCentre,
+  readHook,
+  settled,
+  tapEmptyMap,
+  test,
+  type BubbleInfo,
+  type PinInfo,
+  type Rect,
+  type ZoneInfo,
+} from '../fixtures.js';
 
 // ---- the DOM of a pin, read in the page --------------------------------------------------------------------------------------------------
 
@@ -83,12 +109,12 @@ const ZONE_FILL_ALPHA: Record<'dark' | 'light' | 'imagery', { empty: number; occ
 // a coordinate in this file, so the Demo fixture can move (D82, D85) without touching a test; names come from the cast. The screen-pixel numbers of the spec are at the phone
 // project's 412 x 915 (these tests carry no viewport tag, so they run there only).
 
-/** 01 section 3.4.3: the map padding at Peek, hence the visible rectangle a selection flight centres the pin in (x 16 to 340, y 72 to 725 at 412 x 915, centre (178, 399)). */
-const PEEK_INSET = { top: 72, right: 72, bottom: 190, left: 16 };
 /** 01 section 4.10 step 4: a bubble keeps 8 px clear of the gear, the attribution, the right stack and the sheet. */
 const KEEP_OUT_GAP_PX = 8;
 /** What the browser's own 1/64 px layout units and the 0.01 px rounding of a bubble's position may take off a measured gap (the layout places the bubble to the pixel). */
 const GAP_NOISE_PX = 0.1;
+/** D90: the chip's keep-out rectangle is computed arithmetically before the bubbles are laid out (36 px high, 8 px above the pin, its measured width), the drawn chip is CSS; they agree to the pixel. */
+const CHIP_SLACK_PX = 1;
 /** AC-15: the camera is at zoom 13 (+-0.1) within 1,000 ms of the tap; the flight itself is 900 ms (01 section 4.13). */
 const FAR_ZOOM = 13;
 const FAR_ZOOM_TOLERANCE = 0.1;
@@ -169,8 +195,8 @@ function gapBetween(a: Rect, b: Rect): number {
   return Math.max(b.x - (a.x + a.width), a.x - (b.x + b.width), b.y - (a.y + a.height), a.y - (b.y + b.height));
 }
 
-/** One pin as it is drawn: its button (the body and the pointer) and its 56 x 56 hit area (the `::after` box, which is what the bubbles keep clear of, D89 (1)). */
-interface PinBoxes { id: string; body: Rect; hit: Rect }
+/** One pin as it is drawn: its button (the body and the pointer), its 56 x 56 hit area (the `::after` box, which is what the bubbles keep clear of, D89 (1)) and, when it carries one, its chip (D90). */
+interface PinBoxes { id: string; body: Rect; hit: Rect; chip: Rect | null }
 /** One bubble as it is drawn: the 48 x 48 button and the 40 px avatar. */
 interface BubbleBoxes { id: string; hit: Rect; disc: Rect }
 
@@ -184,7 +210,8 @@ async function readPinAndBubbleBoxes(page: Page): Promise<{ pins: PinBoxes[]; bu
         const after = getComputedStyle(pin, '::after');
         const move = new DOMMatrixReadOnly(after.transform);
         const hit = { x: body.x + Number.parseFloat(after.left) + move.m41, y: body.y + Number.parseFloat(after.top) + move.m42, width: Number.parseFloat(after.width), height: Number.parseFloat(after.height) };
-        return { id: pin.getAttribute('data-testid') ?? '', body: rect(body), hit };
+        const chip = pin.querySelector('[data-testid="chip-here-for"]');
+        return { id: pin.getAttribute('data-testid') ?? '', body: rect(body), hit, chip: chip === null ? null : rect(chip.getBoundingClientRect()) };
       })
       .filter((pin) => pin.body.x + pin.body.width > 0 && pin.body.y + pin.body.height > 0 && pin.body.x < window.innerWidth && pin.body.y < window.innerHeight);
     const bubbles = [...document.querySelectorAll<HTMLElement>('button.realm-bubble[data-testid^="bubble-"]:not(.realm-bubble--leave)')].map((bubble) => {
@@ -201,11 +228,6 @@ const bubbleOf = (bubbles: BubbleInfo[], id: string): BubbleInfo => {
   if (!found) throw new Error(`bubbles() has no '${id}' (it has ${bubbles.map((bubble) => bubble.id).join(', ') || 'none'})`);
   return found;
 };
-
-/** The centre of the Peek visible rectangle in the page (01 section 3.4.3). */
-function peekCentre(viewport: { width: number; height: number }): { x: number; y: number } {
-  return { x: (PEEK_INSET.left + viewport.width - PEEK_INSET.right) / 2, y: (PEEK_INSET.top + viewport.height - PEEK_INSET.bottom) / 2 };
-}
 
 /**
  * Arms a watch in the page that resolves when, after the next click, the camera first comes within `FAR_ZOOM_TOLERANCE` of zoom 13 (the time is the page's own clock, from the click
@@ -484,10 +506,12 @@ test.describe('acceptance B: the map', () => {
   });
 
   // [AC-14] Where the two fixture bubbles sit and what they look like. The centres are the spec's pixels (within 12 px); the clearances are measured on the boxes the browser draws.
-  // D89 (1) changes one of them: the spec's (384, 347) for Dara is where her bubble covered the fanned wagon (R1-01), and an on-screen pin, a fanned one included, is a keep-out for
-  // the edge bubbles now (the same slide as the gear). Her bubble slides up the right edge, the way she lies, until it is 8 px above the King's pin and the wagon's, so it is at
-  // (384, 280); Elio's has no pin near it and stays at the spec's (28, 142).
-  test('[AC-14] the two bubbles sit at (384, 280) and (28, 142), 8 px clear of the gear, the right stack and the sheet, 48 px to hit, pointing at their members', async ({ page }) => {
+  // Two rulings move one of them. D89 (1): the spec's (384, 347) for Dara is where her bubble covered the fanned wagon (R1-01), and an on-screen pin, a fanned one included, is a
+  // keep-out for the edge bubbles (the same slide as the gear). D90 extends it to the pin's chip: the King's "Here for" chip is 36 px high, 8 px above his pin, clamped to the right edge
+  // of the map, which is where the slide of fix/W8-3 left Dara's bubble ((384, 280)), so her bubble keeps 8 px clear of the chip too and slides on up the right edge, the way she lies,
+  // to (384, 240). D90 says the test asserts "no overlap with any pin footprint" (the next test, and the clearances below) and a 12 px tolerance on the new position. Elio's bubble has
+  // no pin near it and stays at the spec's (28, 142).
+  test('[AC-14] the two bubbles sit at (384, 240) and (28, 142), 8 px clear of the gear, the right stack and the sheet, 48 px to hit, pointing at their members', async ({ page }) => {
     await demo(page);
     await mapReady(page);
     const cast = loadDemoCast();
@@ -509,7 +533,7 @@ test.describe('acceptance B: the map', () => {
     const sheetTop: Rect = { x: 0, y: sheet.topPx, width: viewport.width, height: viewport.height - sheet.topPx };
 
     const wanted: Array<{ id: string; x: number; y: number }> = [
-      { id: 'cryptid', x: 384, y: 280 }, // D89 (1): 347 in 01 section 11, moved up past the pins by the slide rule
+      { id: 'cryptid', x: 384, y: 240 }, // D89 (1) and D90: 347 in 01 section 11, moved up past the King's pin and its chip by the slide rule
       { id: 'prince', x: 28, y: 142 },
     ];
     for (const { id, x, y } of wanted) {
@@ -562,7 +586,9 @@ test.describe('acceptance B: the map', () => {
   // [AC-13b] D89 (1), the ruling on R1-01: an on-screen pin, a fanned one included, is a keep-out rectangle for the edge bubbles. In the default view the King's pin sits at the right edge of the
   // map and the wagon is fanned 48 px to its right, which is where Dara's bubble used to be drawn over the wagon. Both rectangles are read from the DOM: the button of every pin on screen
   // and its 56 x 56 hit area (`::after`), against the 48 px button and the 40 px avatar of every bubble. The layout keeps the avatar 8 px clear of the hit area, the gap it keeps from the gear.
-  test('[AC-13b] no edge bubble covers a pin on screen: every avatar is 8 px clear of the hit area of every pin, the fanned wagon included (D89 (1))', { tag: ['@phone', '@unfolded'] }, async ({ page }) => {
+  // D90 adds the chip: a pin's "Here for" chip is part of that pin's footprint, so the avatar is 8 px clear of the chip's box too. The layout computes the chip's rectangle from the same
+  // numbers the CSS uses (36 px high, 8 px above the pin, shifted inside the map) and not from the DOM, so the box the browser draws may differ from it by a pixel at most (CHIP_SLACK_PX).
+  test('[AC-13b] no edge bubble covers a pin or its chip on screen: every avatar is 8 px clear of the hit area and of the chip of every pin, the fanned wagon included (D89 (1), D90)', { tag: ['@phone', '@unfolded'] }, async ({ page }) => {
     await demo(page);
     await mapReady(page);
     const pins = await readHook(page, 'pins');
@@ -571,10 +597,15 @@ test.describe('acceptance B: the map', () => {
     const boxes = await readPinAndBubbleBoxes(page);
     expect(boxes.pins.map((pin) => pin.id).sort(), 'the pins on screen').toEqual(DEFAULT_VIEW_PINS.map((key) => `pin-${key}`).sort());
     expect(boxes.bubbles.length, 'the default view has edge bubbles (there is something to keep off the pins)').toBeGreaterThan(0);
+    const chips = boxes.pins.filter((pin) => pin.chip !== null);
+    expect(chips.map((pin) => pin.id), 'the one pin with a chip in the default view is the King\'s (AC-17)').toEqual(['pin-member-king']);
     for (const bubble of boxes.bubbles) {
       for (const pin of boxes.pins) {
         expect.soft(gapBetween(bubble.hit, pin.body), `${bubble.id} (48 px button) does not touch ${pin.id}`).toBeGreaterThan(0);
         expect.soft(gapBetween(bubble.disc, pin.hit), `${bubble.id}: gap between the avatar and the hit area of ${pin.id}, at least ${KEEP_OUT_GAP_PX} px`).toBeGreaterThanOrEqual(KEEP_OUT_GAP_PX - GAP_NOISE_PX);
+        if (pin.chip === null) continue;
+        expect.soft(gapBetween(bubble.hit, pin.chip), `${bubble.id} (48 px button) does not touch the chip of ${pin.id}`).toBeGreaterThan(0);
+        expect.soft(gapBetween(bubble.disc, pin.chip), `${bubble.id}: gap between the avatar and the chip of ${pin.id}, at least ${KEEP_OUT_GAP_PX} px (D90)`).toBeGreaterThanOrEqual(KEEP_OUT_GAP_PX - CHIP_SLACK_PX);
       }
     }
   });
@@ -671,10 +702,10 @@ test.describe('acceptance B: the map', () => {
     for (const id of cluster.ids) await expect(page.getByTestId(`bubble-${id}`).and(page.locator('.realm-bubble--selected')), `${id} was not selected by the tap`).toHaveCount(0);
   });
 
-  // [AC-15] The header half of the sentence ("Dara", "The Court Cryptid", the line, the battery badge "10%" in the low style). The selection header (`sheet-selection-header`) is S8b's and
-  // the wiring of the page's selection to it is S8c's: neither is on this branch, so the test is fixme until they are merged, like the Back test of AC-38 in ac-d-driving.spec.ts.
-  // Un-fixme this test when the header lands. The line is built from the cast (the street, the city and the region of the member's address) and the frozen clock's 42 minutes.
-  test.fixme('[AC-15] the selection header of Dara reads her name, her lore, her line and her battery', async ({ page }) => {
+  // [AC-15] The header half of the sentence ("Dara", "The Court Cryptid", the line, the battery badge "10%" in the low style). The selection header (`sheet-selection-header`, S8b) is
+  // wired to the page's selection by S8c, which un-parked this test (review R1-02, R2-06). The line is built from the cast (the street, the city and the region of the member's
+  // address) and the frozen clock's 42 minutes.
+  test('[AC-15] the selection header of Dara reads her name, her lore, her line and her battery', async ({ page }) => {
     await demo(page);
     await mapReady(page);
     const dara = castMember(loadDemoCast(), 'cryptid');
@@ -687,6 +718,7 @@ test.describe('acceptance B: the map', () => {
     await expect(header, 'her lore title').toContainText(dara.lore);
     await expect(header, 'her line: the street, the city and region, and when she was last seen').toContainText(`${street} · ${city}, ${region} · Last seen 42 min ago`);
     await expect(page.getByTestId('sheet-selection-battery'), 'her battery badge').toHaveText(/10%/);
+    await expect(page.getByTestId('sheet-selection-battery'), 'her battery badge is in the low style').toHaveAttribute('data-low', 'true');
     await expect(page.getByTestId('detail-back'), 'no detail at Peek').toHaveCount(0);
     expect((await readHook(page, 'sheet')).state, 'the sheet is at Peek').toBe('peek');
   });
@@ -754,5 +786,395 @@ test.describe('acceptance B: the map', () => {
     expectApprox(maxY - pin.anchorY, radiusPx, 3, 'halo: the lowest changed row below the true point (the radius)');
     expectApprox((maxX - minX) / 2, radiusPx, 3, 'halo: half the width of the changed area (the radius)');
     expectApprox((maxX + minX) / 2, pin.anchorX, 3, 'halo: the changed area is centred on the true point');
+  });
+});
+
+// ==== S8c: selection, the chip that follows it, recenter and the Back chain (01 section 11 AC-17b, AC-20, AC-22, AC-23, AC-24; D45, D46, D47, D90) ==================================
+// The numbers of the AC rows at 412 x 915 (the phone project: these tests carry no viewport tag unless they say so). Every name comes from the cast; every position is read from the
+// `__realm` hooks or the DOM, or projected from the cast with the camera (`emptyMapPoint`), so no test types a coordinate (D82). Nothing sleeps: a tap reaches the server over the
+// websocket and the flight starts after it, so a test waits for the END state it is about (a poll on the number), calls `settled()`, and asserts the number again.
+
+/** 01 section 11 AC-22: the sheet at Peek is 174 px high at 915 (19 %, floor 168). */
+const PEEK_HEIGHT_PX = 174;
+/** AC-22: a selection flight ends at zoom 15 or closer. */
+const SELECTION_MIN_ZOOM = 15;
+/** AC-12: the map centre moves by less than this (degrees) when the layout changes. */
+const CENTRE_TOLERANCE_DEG = 0.0005;
+/** What the Drivers section's handle summary reads while the Demo's four live people are in the Realm (01 section 8.2, AC-25 to AC-27). */
+const DRIVERS_SUMMARY = '4 in the Realm · 1 driving';
+/** AC-22: Cass's chip at the frozen clock (he arrived at 9:06 pm, it is 9:25 pm). */
+const JESTER_CHIP_TEXT = 'Here for 19 mins';
+/** AC-17: Briar's chip while she is selected, driving. */
+const QUEEN_CHIP_TEXT = 'Driving · 54 mph';
+/** The proxy's own page: an earlier history entry than the app, so "Back leaves the page" is something a test can see. */
+const BEFORE_THE_APP = '/__proxy/health';
+
+const selectionHeader = (page: Page) => page.getByTestId('sheet-selection-header');
+const sheetHandle = (page: Page) => page.getByTestId('sheet-handle');
+const sectionTabs = (page: Page) => page.getByTestId('sheet-segments');
+
+/** `sheet().state` as a value a poll can compare. */
+async function sheetState(page: Page): Promise<string> {
+  return (await readHook(page, 'sheet')).state;
+}
+
+/**
+ * The end state of 01 section 11 AC-22 that every way of selecting shares, wherever the sheet was before: the selection header is shown in place of the tabs, the sheet is at Peek
+ * (174 px), there is no detail, the handle summary is the Drivers one, the right stack is visible and the pin's true point is within 24 px of the centre of the Peek rectangle.
+ * The flight starts after the server round trip, so the distance is POLLED for, then `settled()` runs and the numbers are read again.
+ */
+async function expectPeekSelection(page: Page, who: { kind: 'member' | 'vehicle'; id: string }, label: string): Promise<void> {
+  await expect(selectionHeader(page), `${label}: the selection header shows`).toBeVisible();
+  await expect.poll(() => sheetState(page), { message: `${label}: sheet().state` }).toBe('peek');
+  await expect
+    .poll(() => pinDistanceFromPeekCentre(page, who.kind, who.id), { message: `${label}: distance of pin-${who.kind}-${who.id} from the centre of the Peek rectangle`, timeout: 10_000 })
+    .toBeLessThanOrEqual(PEEK_CENTRE_TOLERANCE_PX);
+  await settled(page);
+
+  const sheet = await readHook(page, 'sheet');
+  expect(sheet.state, `${label}: sheet().state after the flight`).toBe('peek');
+  expectApprox(sheet.heightPx, PEEK_HEIGHT_PX, 2, `${label}: the Peek height`);
+  expect(await pinDistanceFromPeekCentre(page, who.kind, who.id), `${label}: the pin's distance from the Peek centre after the flight`).toBeLessThanOrEqual(PEEK_CENTRE_TOLERANCE_PX);
+  await expect(sectionTabs(page), `${label}: the tab control is hidden`).toBeHidden();
+  await expect(page.getByTestId('detail-back'), `${label}: no detail at Peek`).toHaveCount(0);
+  await expect(page.getByTestId('btn-layers'), `${label}: the right stack stays visible`).toBeVisible();
+}
+
+/** Peek with a selection, whatever the camera did: the header, no tabs, no detail. */
+async function expectPeekHeader(page: Page, label: string): Promise<void> {
+  await expect(selectionHeader(page), `${label}: the selection header`).toBeVisible();
+  await expect.poll(() => sheetState(page), { message: `${label}: sheet().state` }).toBe('peek');
+  await expect(sectionTabs(page), `${label}: the tab control is hidden`).toBeHidden();
+  await expect(page.getByTestId('detail-back'), `${label}: no detail at Peek`).toHaveCount(0);
+}
+
+/** The list at Peek with nothing selected: the tab control is back, there is no header and no detail. */
+async function expectListAtPeek(page: Page, label: string): Promise<void> {
+  await expect(selectionHeader(page), `${label}: no selection header`).toHaveCount(0);
+  await expect(page.getByTestId('tab-drivers'), `${label}: the tab control is back`).toBeVisible();
+  await expect.poll(() => sheetState(page), { message: `${label}: sheet().state` }).toBe('peek');
+  await expect(page.getByTestId('detail-back'), `${label}: no detail`).toHaveCount(0);
+}
+
+/** The detail of a selection at 80 %: the back arrow shows, the header is gone, the sheet reports `80`. */
+async function expectDetailAtTall(page: Page, label: string): Promise<void> {
+  await expect(page.getByTestId('detail-back'), `${label}: the detail's back arrow shows`).toBeVisible();
+  await expect.poll(() => sheetState(page), { message: `${label}: sheet().state` }).toBe('80');
+  await expect(selectionHeader(page), `${label}: the header is replaced by the detail`).toHaveCount(0);
+}
+
+/** Waits for the camera to report `state` (the script computes it against the default targets) and for the move to end. */
+async function expectRecenterState(page: Page, state: 'default' | 'me' | 'away', label: string): Promise<void> {
+  await expect
+    .poll(async () => ((await readHook(page, 'camera')) as { recenter?: string }).recenter, { message: `${label}: camera().recenter`, timeout: 10_000 })
+    .toBe(state);
+  await settled(page);
+}
+
+test.describe('acceptance B: selection, chip, recenter and Back (S8c)', () => {
+  // [AC-17b] The second sentence of AC-17: the chip follows the selection (01 section 4.4). Briar, driving, shows "Driving · 54 mph" above HER pin (8 px clear of it, centred: she is
+  // in the middle of the Peek rectangle, so nothing clips it) and Alden's chip is removed; clearing the selection brings his back. His pin is off screen while the camera is on Briar,
+  // so "his chip is gone" is read as: the page holds exactly one chip and it is hers; the return of his is read after the recenter button put the default view back.
+  test("[AC-17b] selecting Briar shows Driving · 54 mph above her pin and removes Alden's chip, and clearing the selection brings his chip back", async ({ page }) => {
+    test.slow(); // two flights and a recentre
+    await demo(page);
+    await mapReady(page);
+    const chips = page.getByTestId('chip-here-for');
+    await expect(chips, "before the selection the one chip is Alden's (AC-17)").toHaveCount(1);
+    await expect(page.getByTestId('pin-member-king').getByTestId('chip-here-for'), "Alden's chip").toHaveText(KING_CHIP_TEXT);
+
+    await page.getByTestId('pin-member-queen').click();
+    await expectPeekSelection(page, { kind: 'member', id: 'queen' }, 'Briar selected');
+    const briar = page.getByTestId('pin-member-queen').getByTestId('chip-here-for');
+    await expect(briar, "Briar's chip reads her status line without the street").toHaveText(QUEEN_CHIP_TEXT);
+    await expect(chips, 'one chip on the page, and it is hers').toHaveCount(1);
+    await expect(page.getByTestId('pin-member-king').getByTestId('chip-here-for'), "Alden's chip is removed").toHaveCount(0);
+
+    // Above her pin (8 px clear of its top, never below it), centred on it, the caret over its centre (D79).
+    const pinDom = await readPinDom(page, 'pin-member-queen');
+    const chipBox = await briar.boundingBox();
+    expect(chipBox, "Briar's chip has a bounding box").not.toBeNull();
+    if (chipBox === null) return;
+    expectApprox(pinDom.box.y - (chipBox.y + chipBox.height), 8, 2, "gap between Briar's chip and the top of her pin");
+    expectApprox(chipBox.x + chipBox.width / 2, pinDom.box.x + pinDom.box.width / 2, 2, "Briar's chip is centred on her pin (it fits)");
+    const caretBox = await page.getByTestId('pin-member-queen').getByTestId('chip-caret').boundingBox();
+    expect(caretBox, "Briar's caret has a bounding box").not.toBeNull();
+    if (caretBox !== null) expectApprox(caretBox.x + caretBox.width / 2, pinDom.box.x + pinDom.box.width / 2, 2, 'the caret is over her pin centre');
+
+    // The ✕ clears, and with nothing selected the chip is Alden's again (his pin is back on screen with the default view).
+    await page.getByTestId('sheet-selection-clear').click();
+    await expect(selectionHeader(page), 'the selection is cleared').toHaveCount(0);
+    await page.getByTestId('btn-recenter').click();
+    await expectRecenterState(page, 'default', 'after the recenter tap');
+    await expect(chips, 'one chip on the page again').toHaveCount(1);
+    await expect(page.getByTestId('pin-member-king').getByTestId('chip-here-for'), "Alden's chip is back").toHaveText(KING_CHIP_TEXT);
+    await expect(page.getByTestId('pin-member-queen').getByTestId('chip-here-for'), 'Briar has none').toHaveCount(0);
+  });
+
+  // [AC-20] Recenter: the filled crosshair (GpsFixed) at the default view, the outlined one (MyLocation) away; away -> the default camera; at the default view -> Alden alone at zoom 16; then
+  // the default camera again; the selection is never cleared by it. The two icons are told apart by the markup MudBlazor draws and not by a path typed here: the icon at the default view
+  // is the filled one, the icon after a pan has to differ from it, and the icon on "me alone" (filled too) has to be the first again.
+  test('[AC-20] recenter cycles default, Alden alone at zoom 16, default; the icon is filled at the default view and outlined after a pan; the selection is never cleared', async ({ page }) => {
+    test.slow(); // six recentre flights, a pan and a selection
+    await demo(page);
+    await mapReady(page);
+    const recenter = page.getByTestId('btn-recenter');
+    const iconOf = (): Promise<string> => recenter.locator('svg').innerHTML();
+
+    await expectRecenterState(page, 'default', 'on load');
+    const filled = await iconOf();
+
+    // A pan (a drag on the empty map, towards the side that has room) puts the camera away from the default view and the icon changes.
+    const viewport = page.viewportSize();
+    expect(viewport, 'the phone project').not.toBeNull();
+    if (viewport === null) return;
+    await settled(page);
+    const grab = await emptyMapPoint(page);
+    const towards = grab.x > viewport.width / 2 ? -120 : 120;
+    await page.mouse.move(grab.x, grab.y);
+    await page.mouse.down();
+    await page.mouse.move(grab.x + towards, grab.y, { steps: 20 });
+    await page.mouse.up();
+    await expectRecenterState(page, 'away', 'after a pan');
+    await expect.poll(iconOf, { message: 'the icon after a pan is not the filled crosshair' }).not.toBe(filled);
+
+    // Away: the tap runs the default camera (the icon is the filled one again).
+    await recenter.click();
+    await expectRecenterState(page, 'default', 'first tap, from away');
+    await expect.poll(iconOf, { message: 'the icon at the default view is the filled crosshair' }).toBe(filled);
+
+    // At the default view: Alden alone at zoom 16, his pin in the middle of the visible map.
+    await recenter.click();
+    await expectRecenterState(page, 'me', 'second tap, at the default view');
+    const camera = await readHook(page, 'camera');
+    expectApprox(camera.zoom, 16, 0.1, 'camera().zoom on Alden alone');
+    const padding = await readHook(page, 'mapPadding');
+    const king = pinOf(await readHook(page, 'pins'), 'member', 'king');
+    expectApprox(king.anchorX, (padding.left + viewport.width - padding.right) / 2, 12, "Alden's true point x against the middle of the visible map");
+    expectApprox(king.anchorY, (padding.top + viewport.height - padding.bottom) / 2, 12, "Alden's true point y against the middle of the visible map");
+    await expect.poll(iconOf, { message: 'the icon on "me alone" is the filled crosshair' }).toBe(filled);
+
+    // A third tap goes back to the default camera.
+    await recenter.click();
+    await expectRecenterState(page, 'default', 'third tap');
+
+    // The selection is never cleared by it: select Cass, then run the whole cycle.
+    await page.getByTestId('pin-member-jester').click();
+    await expectPeekSelection(page, { kind: 'member', id: 'jester' }, 'Cass selected');
+    for (const [step, state] of [['first', 'default'], ['second', 'me'], ['third', 'default']] as const) {
+      await recenter.click();
+      await expectRecenterState(page, state, `${step} tap with Cass selected`);
+      await expect(selectionHeader(page), `${step} tap: Cass is still selected`).toBeVisible();
+      await expect(selectionHeader(page).locator('.realm-row-name'), `${step} tap: the selection is still Cass`).toHaveText(castMember(loadDemoCast(), 'jester').name);
+      expect(await sheetState(page), `${step} tap: the sheet stays at Peek`).toBe('peek');
+    }
+  });
+
+  // [AC-22] A pin tap selects at Peek (D45): the header, no tabs, no detail, the Drivers summary, the right stack, the zoom, the pin in the Peek rectangle, Cass's own chip; then the handle opens the detail.
+  test('[AC-22] tapping pin-member-jester selects Cass at Peek: his header and 12% badge, the pin in the Peek rectangle at zoom 15 or more, his chip; the handle then opens the detail at 80 %', async ({ page }) => {
+    await demo(page);
+    await mapReady(page);
+    const cast = loadDemoCast();
+    const jester = castMember(cast, 'jester');
+    const hall = castPlace(cast, 'jester_hall');
+    await expect(selectionHeader(page), 'nothing is selected yet').toHaveCount(0);
+
+    await page.getByTestId('pin-member-jester').click();
+    await expectPeekSelection(page, { kind: 'member', id: 'jester' }, 'Cass selected by his pin');
+
+    const header = selectionHeader(page);
+    await expect(header.locator('.realm-row-name'), 'the name').toHaveText(jester.name);
+    await expect(header.locator('.realm-row-lore'), 'the lore title').toHaveText(jester.lore);
+    await expect(header.locator('.realm-sel-line'), 'the status line and since').toHaveText(`At ${hall.name} · Since 9:06 pm`);
+    await expect(page.getByTestId('sheet-selection-battery'), 'the battery badge').toHaveText('12%');
+    await expect(page.getByTestId('sheet-selection-battery'), 'the battery badge is in the low style').toHaveAttribute('data-low', 'true');
+    await expect(page.getByTestId('sheet-summary'), 'the handle summary is unchanged').toHaveText(DRIVERS_SUMMARY);
+    expect((await readHook(page, 'camera')).zoom, 'camera().zoom is at least 15').toBeGreaterThanOrEqual(SELECTION_MIN_ZOOM - 0.01);
+    await expect(page.getByTestId('pin-member-jester').getByTestId('chip-here-for'), "Cass's chip, above his pin").toHaveText(JESTER_CHIP_TEXT);
+    await expect(page.getByTestId('chip-here-for'), 'and the only chip').toHaveCount(1);
+
+    // The handle then shows his detail.
+    await sheetHandle(page).click();
+    await expectDetailAtTall(page, 'after the handle tap');
+    await expect(page.locator('.realm-detail-name'), "the detail is Cass's").toHaveText(jester.name);
+  });
+
+  // [AC-22] The same end state from a row tapped at 80 %: the collapse and the flight run together, and the flight uses the TARGET Peek padding and not the measured one (03 section 4.3), which is
+  // why the distance is asserted after settled() and not while the sheet is still on its way down.
+  test('[AC-22] tapping the Cass row with the sheet at 80 % ends in the same state: Peek, his header and the pin in the Peek rectangle', async ({ page }) => {
+    await demo(page, { sheet: '80' });
+    await mapReady(page);
+    await expect(page.getByTestId('row-member-jester'), 'the Drivers list is showing').toBeVisible();
+    expect(await sheetState(page), 'the sheet starts at 80 %').toBe('80');
+
+    await page.getByTestId('row-member-jester').click();
+    await expectPeekSelection(page, { kind: 'member', id: 'jester' }, 'Cass selected from his row at 80 %');
+    await expect(selectionHeader(page).locator('.realm-row-name'), 'the header is his').toHaveText(castMember(loadDemoCast(), 'jester').name);
+    expect((await readHook(page, 'camera')).zoom, 'camera().zoom is at least 15').toBeGreaterThanOrEqual(SELECTION_MIN_ZOOM - 0.01);
+  });
+
+  // [AC-23] D45 as amended by D46. At Peek the empty map clears the selection. The header is not inert any more (D46): a tap on it, anywhere but the ✕, is the handle's tap (80 %, the detail,
+  // the selection kept); the ✕ clears and does not expand. At 80 % (the detail) the empty map collapses to Peek and KEEPS the selection; a second tap clears it.
+  test('[AC-23] empty map at Peek clears the selection; a header tap opens the detail at 80 % with the selection kept; there the empty map collapses to Peek and a second tap clears it; the ✕ clears and does not expand', async ({ page }) => {
+    test.slow(); // five selection and collapse flights with their re-centres
+    await demo(page);
+    await mapReady(page);
+    const jester = castMember(loadDemoCast(), 'jester');
+
+    // At Peek the empty map clears: the header is gone, the tabs are back, and with nothing selected the chip is Alden's alone (his pin is on screen once the camera is back at the default view).
+    await page.getByTestId('pin-member-jester').click();
+    await expectPeekSelection(page, { kind: 'member', id: 'jester' }, 'Cass selected');
+    await tapEmptyMap(page);
+    await expectListAtPeek(page, 'after the empty-map tap at Peek');
+    await page.getByTestId('btn-recenter').click();
+    await expectRecenterState(page, 'default', 'back at the default view');
+    await expect(page.getByTestId('chip-here-for'), 'one chip on the page').toHaveCount(1);
+    await expect(page.getByTestId('pin-member-king').getByTestId('chip-here-for'), "the chip is Alden's again").toHaveText(KING_CHIP_TEXT);
+
+    // D46: a tap on the header (the name, not the ✕) goes to 80 %, shows the detail and keeps the selection.
+    await page.getByTestId('pin-member-jester').click();
+    await expectPeekSelection(page, { kind: 'member', id: 'jester' }, 'Cass selected again');
+    await selectionHeader(page).locator('.realm-row-name').click();
+    await expectDetailAtTall(page, 'after a tap on the header');
+    await expect(page.locator('.realm-detail-name'), 'the selection is kept: the detail is Cass\'s').toHaveText(jester.name);
+    await expectSelectionCentred(page, { kind: 'member', id: 'jester' }, true, 'the detail at 80 %');
+
+    // At 80 % the empty map collapses to Peek and keeps the selection (the header with its ✕, no tabs) ...
+    await tapEmptyMap(page);
+    await expectPeekSelection(page, { kind: 'member', id: 'jester' }, 'after the empty-map tap at 80 %');
+    await expect(selectionHeader(page).locator('.realm-row-name'), 'the selection is kept').toHaveText(jester.name);
+    await expect(page.getByTestId('sheet-selection-clear'), 'the header has its ✕').toBeVisible();
+    // ... and a second tap clears it.
+    await tapEmptyMap(page);
+    await expectListAtPeek(page, 'after the second empty-map tap');
+
+    // The ✕ clears and does not expand: the sheet stays at Peek, the tabs return, no detail.
+    await page.getByTestId('pin-member-jester').click();
+    await expectPeekSelection(page, { kind: 'member', id: 'jester' }, 'Cass selected a third time');
+    await page.getByTestId('sheet-selection-clear').click();
+    await expectListAtPeek(page, 'after the ✕');
+    await settled(page);
+    expect(await sheetState(page), 'the ✕ did not expand the sheet').toBe('peek');
+  });
+
+  // [AC-23] The panel: there is no Peek, so one tap on the empty map clears the selection at once (the detail is replaced by the list).
+  test('[AC-23] in the 884 × 916 panel one tap on the empty map clears the selection', { tag: ['@unfolded'] }, async ({ page }) => {
+    await demo(page);
+    await mapReady(page);
+    expect(await sheetState(page), 'the panel layout').toBe('panel');
+
+    await page.getByTestId('pin-member-jester').click();
+    await expect(page.getByTestId('detail-back'), "the panel shows Cass's detail").toBeVisible();
+    await expect(page.locator('.realm-detail-name'), 'the detail is Cass\'s').toHaveText(castMember(loadDemoCast(), 'jester').name);
+    await expectSelectionCentred(page, { kind: 'member', id: 'jester' }, false, 'the panel with Cass selected');
+
+    await tapEmptyMap(page);
+    await expect(page.getByTestId('detail-back'), 'the detail is gone at once').toHaveCount(0);
+    await expect(page.getByTestId('tab-drivers'), 'the tabs are back').toBeVisible();
+    await expect(page.locator('[data-testid^="row-member-"]'), 'the Drivers list is back').toHaveCount(5);
+    expect(await sheetState(page), 'still the panel').toBe('panel');
+  });
+
+  // [AC-24] The Back chain with the depth tokens on (`Realm:Ui:HistoryTokens`, default true; D45 restated, D31, D47): a token entry `#r<n>` per level (an overlay, the selection, the Tall size).
+  // The tests open the proxy's own page first, so the entry before the app is one they can see, and press Back only after the depth they expect has been pushed (the push follows the
+  // server's decision).
+  test('[AC-24] Back from the detail: Peek with Cass still selected, then the selection cleared with the list at Peek, then the page is left', async ({ page }) => {
+    await page.goto(BEFORE_THE_APP);
+    await demo(page);
+    await mapReady(page);
+
+    await page.getByTestId('pin-member-jester').click();
+    await expectPeekHeader(page, 'Cass selected');
+    await expectHistoryDepth(page, 1, 'with a selection at Peek');
+    await sheetHandle(page).click();
+    await expectDetailAtTall(page, 'the detail');
+    await expectHistoryDepth(page, 2, 'with the detail at 80 %');
+
+    await page.goBack();
+    await expectPeekHeader(page, 'first Back');
+    await expect(selectionHeader(page).locator('.realm-row-name'), 'first Back keeps Cass selected').toHaveText(castMember(loadDemoCast(), 'jester').name);
+    await expectHistoryDepth(page, 1, 'after the first Back');
+
+    await page.goBack();
+    await expectListAtPeek(page, 'second Back');
+    await expectHistoryDepth(page, 0, 'after the second Back');
+
+    await page.goBack();
+    await expect(page, 'the third Back leaves the page').toHaveURL(new RegExp(`${BEFORE_THE_APP}$`));
+  });
+
+  test('[AC-24] Back after a row tapped at 80 %: the list at Peek with nothing selected (not 80 %), then the page is left', async ({ page }) => {
+    await page.goto(BEFORE_THE_APP);
+    await demo(page, { sheet: '80' });
+    await mapReady(page);
+    await expectHistoryDepth(page, 1, 'with the list at 80 %');
+
+    await page.getByTestId('row-member-jester').click();
+    await expectPeekHeader(page, 'Cass selected from his row');
+    await expectHistoryDepth(page, 1, 'the row tap keeps the depth (the Tall step is replaced by the selection)');
+
+    await page.goBack();
+    await expectListAtPeek(page, 'first Back');
+    await expectHistoryDepth(page, 0, 'after the first Back');
+
+    await page.goBack();
+    await expect(page, 'the second Back leaves the page').toHaveURL(new RegExp(`${BEFORE_THE_APP}$`));
+  });
+
+  test('[AC-24] Back with the list at 80 % and nothing selected: Peek, then the page is left', async ({ page }) => {
+    await page.goto(BEFORE_THE_APP);
+    await demo(page, { sheet: '80' });
+    await mapReady(page);
+    expect(await sheetState(page), 'the sheet starts at 80 %').toBe('80');
+    await expectHistoryDepth(page, 1, 'with the list at 80 %');
+
+    await page.goBack();
+    await expect.poll(() => sheetState(page), { message: 'sheet().state after Back' }).toBe('peek');
+    await expectListAtPeek(page, 'first Back');
+    await expectHistoryDepth(page, 0, 'after the first Back');
+
+    await page.goBack();
+    await expect(page, 'the second Back leaves the page').toHaveURL(new RegExp(`${BEFORE_THE_APP}$`));
+  });
+
+  test('[AC-24] with Settings open the first Back closes it and leaves the sheet state as it was; the next Back clears the selection', async ({ page }) => {
+    await page.goto(BEFORE_THE_APP);
+    await demo(page);
+    await mapReady(page);
+
+    await page.getByTestId('pin-member-jester').click();
+    await expectPeekHeader(page, 'Cass selected');
+    await expectHistoryDepth(page, 1, 'with a selection at Peek');
+    await page.getByTestId('btn-settings').click();
+    await expect(page.getByTestId('settings-dialog'), 'Settings is open').toBeVisible();
+    await expectHistoryDepth(page, 2, 'with Settings open over the selection');
+
+    await page.goBack();
+    await expect(page.getByTestId('settings-dialog'), 'the first Back closes Settings').toHaveCount(0);
+    await expectPeekHeader(page, 'after closing Settings');
+    await expect(selectionHeader(page).locator('.realm-row-name'), 'the sheet state is unchanged: Cass is still selected').toHaveText(castMember(loadDemoCast(), 'jester').name);
+    await expectHistoryDepth(page, 1, 'after closing Settings');
+
+    await page.goBack();
+    await expectListAtPeek(page, 'second Back');
+  });
+
+  // The detail opened by a tap on the HEADER (D46) is the same level of depth as the one opened by the handle: Back returns to Peek with the selection kept (01 section 5.7).
+  test('[AC-24] Back after a detail opened by a tap on the header returns to Peek with the selection kept', async ({ page }) => {
+    await page.goto(BEFORE_THE_APP);
+    await demo(page);
+    await mapReady(page);
+
+    await page.getByTestId('pin-member-jester').click();
+    await expectPeekHeader(page, 'Cass selected');
+    await expectHistoryDepth(page, 1, 'with a selection at Peek');
+    await selectionHeader(page).locator('.realm-row-name').click();
+    await expectDetailAtTall(page, 'the detail opened by the header');
+    await expectHistoryDepth(page, 2, 'with the detail at 80 %');
+
+    await page.goBack();
+    await expectPeekHeader(page, 'Back from the header-opened detail');
+    await expect(selectionHeader(page).locator('.realm-row-name'), 'Cass is still selected').toHaveText(castMember(loadDemoCast(), 'jester').name);
+    await expectHistoryDepth(page, 1, 'after Back');
   });
 });

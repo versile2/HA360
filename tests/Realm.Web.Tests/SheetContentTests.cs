@@ -287,12 +287,53 @@ public sealed class SheetContentTests : ComponentTestBase
         Assert.Single(panel.FindAll("[data-testid='sheet-summary']"));
     }
 
+    private const string LiveSel = "[data-testid='sheet-announce']";
+
     [Fact]
-    public void TheCountsOfTheThreeSections_AreAnnounced()
+    public void TheLiveRegion_StartsEmpty_AndSaysWhateverThePageHandsIt()
     {
-        Assert.Equal("5 drivers", Content(Section.Drivers).Find("[data-testid='sheet-announce']").TextContent);
-        Assert.Equal("2 vehicles", Content(Section.Vehicles).Find("[data-testid='sheet-announce']").TextContent);
-        Assert.Equal("14 places", Content(Section.Places).Find("[data-testid='sheet-announce']").TextContent);
+        var quiet = Content(Section.Drivers);
+        Assert.Equal(string.Empty, quiet.Find(LiveSel).TextContent);
+
+        var cut = Selected(null, SheetSize.Peek, LayoutMode.Compact, content => content.Add(p => p.Announcement, "Showing Cass"));
+        Assert.Equal("Showing Cass", cut.Find(LiveSel).TextContent);
+
+        cut.Render(content => content.Add(p => p.Announcement, "List opened"));
+        Assert.Equal("List opened", cut.Find(LiveSel).TextContent);
+    }
+
+    [Theory]
+    [InlineData(false, SheetSize.Peek, LayoutMode.Compact)]
+    [InlineData(false, SheetSize.Tall, LayoutMode.Compact)]
+    [InlineData(true, SheetSize.Peek, LayoutMode.Compact)]   // the selection header takes the tabs' place; the region stays
+    [InlineData(true, SheetSize.Tall, LayoutMode.Compact)]   // the detail
+    [InlineData(true, SheetSize.Peek, LayoutMode.Expanded)]  // the panel
+    public void TheLiveRegion_IsTheOnlyOne_Polite_AndStaysWhateverTheBodyIs(bool selected, SheetSize size, LayoutMode mode)
+    {
+        var cut = Selected(selected ? Jester : null, size, mode, content => content.Add(p => p.Announcement, "Details opened"));
+
+        var live = Assert.Single(cut.FindAll("[aria-live]"));
+        Assert.Equal("sheet-announce", live.GetAttribute("data-testid"));
+        Assert.Equal("polite", live.GetAttribute("aria-live"));
+        Assert.Equal("status", live.GetAttribute("role"));
+        Assert.Equal("true", live.GetAttribute("aria-atomic"));
+        Assert.Equal("Details opened", live.TextContent);
+    }
+
+    [Fact]
+    public void ASectionTabRequest_FromThePage_ReachesTheSegments()
+    {
+        var list = Selected(null, SheetSize.Peek, LayoutMode.Compact, content => content.Add(p => p.Focus, new FocusRequest(FocusTarget.SectionTab)));
+        list.WaitForAssertion(() => JSInterop.VerifyFocusAsyncInvoke());
+    }
+
+    [Fact]
+    public void TheSegmentsAreNotRendered_WhileTheHeaderTakesTheirPlace_SoARequestForTheTabWaitsForThem()
+    {
+        var header = Selected(Jester, SheetSize.Peek, LayoutMode.Compact, content => content.Add(p => p.Focus, new FocusRequest(FocusTarget.SectionTab)));
+
+        Assert.Empty(header.FindAll(SegmentsSel));
+        AssertNothingFocused();
     }
 
     // ---- the body: list, header, detail (D45, D46, 01 section 5.7) ---------------------------------------------------------------------------

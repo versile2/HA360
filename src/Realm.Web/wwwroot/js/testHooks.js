@@ -44,6 +44,7 @@ export function removeTestHooks(win) {
 // its own). `describeBubbles` is the content of the `bubbles` hook. Nothing here reads the DOM or MapLibre.
 
 import { FAN_PRIORITY, fanOut } from './fanout.js';
+import { clampChipShift } from './layoutMath.js';
 
 /** @typedef {import('./layoutMath.js').Rect} Rect */
 /** @typedef {{ left: number, top: number, right: number, bottom: number }} Edges */
@@ -112,31 +113,64 @@ export function pinHitRect(pin) {
   return { left: pin.x - side / 2, top: centreY - side / 2, right: pin.x + side / 2, bottom: centreY + side / 2 };
 }
 
+/** 01 section 4.4: the chip is 36 px high and sits 8 px above the pin body, or 8 px below the pointer when flipped (realmMap.js `CHIP_HEIGHT_PX` and `CHIP_GAP_PX`, realm-map.css `.realm-chip`). */
+export const CHIP_HEIGHT_PX = 36;
+export const CHIP_GAP_PX = 8;
+
+/**
+ * D90: the rectangle of a pin's chip in container pixels, worked out the way `placeChips` and `clampChip` of realmMap.js place it, from numbers alone so that the
+ * layout of the bubbles can know it BEFORE the frame draws it (no reading of the chip's box after the fact, so no frame in which a bubble sits on a chip). The chip is
+ * centred on the pin and shifted sideways by `clampChipShift` inside `frame.room` (D75, D79); it flips below the pointer when its top would be above the map padding's
+ * top (01 section 4.4). The caret lies in the 8 px gap between the chip and the pin, so it adds nothing to the rectangle.
+ * @param {{ x: number, y: number, sizePx: number }} pin `x` is the DRAWN centre (fan-out shift included), `y` the true point (the bottom of the pointer)
+ * @param {number} widthPx the chip's width as measured (`offsetWidth`)
+ * @param {{ paddingTop: number, room: { left: number, right: number } }} frame the map padding's top edge, and where a chip may be (`chipRoom` of layoutMath.js)
+ * @returns {Rect}
+ */
+export function chipRect(pin, widthPx, frame) {
+  const bodyTop = pin.y - (pin.sizePx + PIN_POINTER_PX);
+  const flipped = bodyTop - CHIP_GAP_PX - CHIP_HEIGHT_PX < frame.paddingTop; // the rule of placeChips, on the true point
+  const drawnY = Math.round(pin.y); // the marker is drawn at whole pixels, the chip with it
+  const top = flipped ? drawnY + CHIP_GAP_PX : drawnY - (pin.sizePx + PIN_POINTER_PX) - CHIP_GAP_PX - CHIP_HEIGHT_PX;
+  const centre = pin.x + Math.round(clampChipShift(pin.x, widthPx, frame.room) * 2) / 2; // clampChip rounds the shift to half a pixel
+  return { left: centre - widthPx / 2, top, right: centre + widthPx / 2, bottom: top + CHIP_HEIGHT_PX };
+}
+
 /**
  * D89 (1): every pin that is on screen is a keep-out for the edge bubbles, a fanned one where the fan-out puts it (01 section 4.8: the shift is applied here with the
  * same `fanItems` and `fanOut` as the frame's own fan-out, from the TRUE anchors, so the rectangle is the one the pin will occupy). Members and vehicles alike; the
  * caller lists only the pins that exist in this frame (a member that has a bubble has no pin). The result goes to `layoutBubbles` with the other keep-outs, which grows
  * each by the same 8 px and slides a bubble along its edge until it is clear. Nothing here reads the DOM: the rectangles are arithmetic on projected points, rounded to the
  * whole pixels the markers are drawn at.
- * @param {ReadonlyArray<{ kind: 'member' | 'vehicle', id: string, x: number, y: number, driving: boolean, sizePx: number }>} pins true points in container pixels
+ *
+ * D90: the chip of a pin is part of that pin's footprint. A pin that carries one (`chipWidthPx` above 0, the width the caller measured in its read phase) contributes a second
+ * rectangle, right after its own, when `opts.chip` says where chips may be (see `chipRect`); a bubble then keeps 8 px clear of the chip as it does of the pin. Each rectangle is
+ * tested against the container on its own: a pin just below the container can have a chip that is inside it.
+ * @param {ReadonlyArray<{ kind: 'member' | 'vehicle', id: string, x: number, y: number, driving: boolean, sizePx: number, chipWidthPx?: number }>} pins true points in container pixels
  * @param {string | null} selectedKey `kind:id` of the selected pin, or null (the selected pin keeps its place in a fan)
- * @param {Rect} view the container: a pin whose hit area is entirely outside it is not on screen and is left out
- * @param {{ fan?: boolean }} [opts] `fan: false` when the fan-out is switched off (the pins then stay on their true points)
- * @returns {Rect[]} at most `MAX_PIN_KEEP_OUTS`, in the order of `pins`
+ * @param {Rect} view the container: a rectangle that is entirely outside it is not on screen and is left out
+ * @param {{ fan?: boolean, chip?: { paddingTop: number, room: { left: number, right: number } } }} [opts] `fan: false` when the fan-out is switched off (the pins then stay on their true points); `chip` switches the chip rectangles on
+ * @returns {Rect[]} at most `MAX_PIN_KEEP_OUTS` pins' rectangles, a pin and then its chip, in the order of `pins` (so at most twice that many)
  */
 export function pinKeepOuts(pins, selectedKey, view, opts = {}) {
   const bounded = pins.slice(0, MAX_PIN_KEEP_OUTS);
   /** @type {Map<string, number>} */
   const shifts = new Map();
   if (opts.fan !== false) for (const result of fanOut(fanItems(bounded, selectedKey))) shifts.set(result.id, result.dx);
+  /** @param {Rect} rect @returns {boolean} */
+  const onScreen = (rect) => !(rect.right <= view.left || rect.left >= view.right || rect.bottom <= view.top || rect.top >= view.bottom);
   /** @type {Rect[]} */
   const rects = [];
   for (const pin of bounded) {
     if (!Number.isFinite(pin.x) || !Number.isFinite(pin.y)) continue;
     // MapLibre puts a marker at whole pixels once the camera is at rest (it rounds `project(point) + offset`), so the rectangle is the one of the DRAWN pin, not of the fractional point.
-    const rect = pinHitRect({ x: Math.round(pin.x + (shifts.get(`${pin.kind}:${pin.id}`) ?? 0)), y: Math.round(pin.y), sizePx: pin.sizePx });
-    if (rect.right <= view.left || rect.left >= view.right || rect.bottom <= view.top || rect.top >= view.bottom) continue;
-    rects.push(rect);
+    const drawnX = Math.round(pin.x + (shifts.get(`${pin.kind}:${pin.id}`) ?? 0));
+    const rect = pinHitRect({ x: drawnX, y: Math.round(pin.y), sizePx: pin.sizePx });
+    if (onScreen(rect)) rects.push(rect);
+    if (opts.chip && typeof pin.chipWidthPx === 'number' && pin.chipWidthPx > 0) {
+      const chip = chipRect({ x: drawnX, y: pin.y, sizePx: pin.sizePx }, pin.chipWidthPx, opts.chip);
+      if (onScreen(chip)) rects.push(chip);
+    }
   }
   return rects;
 }

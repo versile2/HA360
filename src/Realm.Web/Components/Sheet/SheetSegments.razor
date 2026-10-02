@@ -1,8 +1,10 @@
+@using Microsoft.JSInterop
 @using Realm.Domain
 
 @* The three-tab control under the handle (01 section 5.0; 03 section 3.4): Drivers, Vehicles, Places. role=tablist with a roving tabindex and arrow-key
-   focus; below 360 px only the icons show (the label stays for the accessible name). The count of the section that shows is announced politely
-   ("5 drivers"), because the summary line in the handle changes with it. *@
+   focus; below 360 px only the icons show (the label stays for the accessible name). The count of the section that shows ("5 drivers") is announced by the sheet's one live region
+   (SheetContent), which stays on the page while the selection header takes this control's place. A new FocusRequest for the section tab (01 section 10.2: the selection was cleared) puts the
+   focus on the tab that shows, once per request. *@
 <div class="realm-segments" role="tablist" aria-label="Sections" data-testid="sheet-segments">
     @foreach (var segment in All)
     {
@@ -24,12 +26,8 @@
         </button>
     }
 </div>
-<span class="realm-sr-only" role="status" aria-live="polite" data-testid="sheet-announce">@Announcement</span>
 
 @code {
-    /// <summary>How many rows each section has.</summary>
-    public readonly record struct SegmentCounts(int Drivers, int Vehicles, int Places);
-
     private sealed record Segment(Section Section, string Label, string Icon, string TestId);
 
     /// <summary>The id the list panel carries (<c>aria-controls</c> of every tab, and the panel's own id in <c>SheetContent</c>).</summary>
@@ -44,14 +42,15 @@
 
     private readonly ElementReference[] _tabs = new ElementReference[3];
     private bool _focusSelected;
+    private FocusRequest? _handled;
 
     /// <summary>The selected section (Drivers by default).</summary>
     [Parameter]
     public Section Section { get; set; } = Section.Drivers;
 
-    /// <summary>The row counts, for the announcement.</summary>
+    /// <summary>The page's request to move the focus (01 section 10.2). One that names <see cref="FocusTarget.SectionTab"/> and has not been acted on yet puts the focus on the tab that shows, after this render.</summary>
     [Parameter]
-    public SegmentCounts Counts { get; set; }
+    public FocusRequest? Focus { get; set; }
 
     /// <summary>A tab was chosen, by tap or by the arrow keys.</summary>
     [Parameter]
@@ -59,14 +58,6 @@
 
     /// <summary>The id of the tab of <paramref name="section"/>; the list panel is labelled by the selected one.</summary>
     public static string TabId(Section section) => $"realm-tab-{section.ToString().ToLowerInvariant()}";
-
-    private string Announcement =>
-        Section switch
-        {
-            Section.Vehicles => $"{Counts.Vehicles} {(Counts.Vehicles == 1 ? "vehicle" : "vehicles")}",
-            Section.Places => $"{Counts.Places} {(Counts.Places == 1 ? "place" : "places")}",
-            _ => $"{Counts.Drivers} {(Counts.Drivers == 1 ? "driver" : "drivers")}",
-        };
 
     private Task SelectAsync(Section section) => OnSection.InvokeAsync(section);
 
@@ -91,12 +82,30 @@
         await OnSection.InvokeAsync(All[target].Section);
     }
 
+    protected override void OnParametersSet()
+    {
+        if (Focus is { Target: FocusTarget.SectionTab } request && !ReferenceEquals(request, _handled))
+        {
+            _handled = request;
+            _focusSelected = true;
+        }
+    }
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (_focusSelected)
+        if (!_focusSelected)
         {
-            _focusSelected = false;
+            return;
+        }
+
+        _focusSelected = false;
+        try
+        {
             await _tabs[(int)Section].FocusAsync();
+        }
+        catch (Exception exception) when (exception is JSException or JSDisconnectedException or InvalidOperationException or TaskCanceledException)
+        {
+            // A circuit that is gone, or a tab that has already left the page: there is nothing to focus.
         }
     }
 }

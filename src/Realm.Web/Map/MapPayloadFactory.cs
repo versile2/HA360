@@ -29,14 +29,21 @@ public static class MapPayloadFactory
         return members.Where(member => member.Kind == MemberKind.Live).OrderBy(member => member.SortOrder).FirstOrDefault()?.Id;
     }
 
-    /// <summary>The member payload. <paramref name="meId"/> goes through <see cref="ResolveMeId"/>; <paramref name="now"/> sets the chip and its minute.</summary>
+    /// <summary>
+    /// The member payload. <paramref name="meId"/> goes through <see cref="ResolveMeId"/>; <paramref name="now"/> sets the chip and its minute. <paramref name="selection"/> decides who
+    /// carries a chip (01 section 4.4, <see cref="MemberChip"/>): the selected member, or mine when nothing is selected. <paramref name="zone"/> is the session's zone (the clock part of a
+    /// relative time that is a day old or more; the default is UTC) and <paramref name="units"/> the unit system of the speed.
+    /// </summary>
     public static MembersPayload Members(
         IReadOnlyList<MemberVm> members,
         IReadOnlyList<PlaceVm> places,
         string? meId,
         DateTimeOffset now,
         MapPayloadOptions options,
-        int version)
+        int version,
+        EntityRef? selection = null,
+        TimeZoneInfo? zone = null,
+        UnitSystem units = UnitSystem.Imperial)
     {
         var me = ResolveMeId(members, meId);
         var drawn = DrawnPlaces(places, options);
@@ -45,22 +52,105 @@ public static class MapPayloadFactory
         var items = new List<MemberPayloadItem>(members.Count);
         foreach (var member in members)
         {
-            items.Add(Member(member, member.Id == me, drawn, origin, now, minute, options));
+            items.Add(Member(member, member.Id == me, drawn, origin, now, minute, options, selection, zone ?? TimeZoneInfo.Utc, units));
         }
 
         return new MembersPayload(version, me ?? string.Empty, items);
     }
 
-    /// <summary>The vehicle payload (01 section 4.7): the ring follows <c>Freshness</c> first and <c>IsMoving</c> second; a vehicle without a position, and the placeholder, have no coordinates and so no pin.</summary>
-    public static VehiclesPayload Vehicles(IReadOnlyList<VehicleVm> vehicles, IReadOnlyList<PlaceVm> places, int version)
+    /// <summary>The vehicle payload with no selection, so no chip (see the overload with the selection).</summary>
+    public static VehiclesPayload Vehicles(IReadOnlyList<VehicleVm> vehicles, IReadOnlyList<PlaceVm> places, int version) =>
+        Vehicles(vehicles, places, version, selection: null, now: default, zone: TimeZoneInfo.Utc);
+
+    /// <summary>
+    /// The vehicle payload (01 section 4.7): the ring follows <c>Freshness</c> first and <c>IsMoving</c> second; a vehicle without a position, and the placeholder, have no coordinates and so no pin.
+    /// Only the selected vehicle carries a chip (01 section 4.4, <see cref="VehicleChip"/>).
+    /// </summary>
+    public static VehiclesPayload Vehicles(
+        IReadOnlyList<VehicleVm> vehicles,
+        IReadOnlyList<PlaceVm> places,
+        int version,
+        EntityRef? selection,
+        DateTimeOffset now,
+        TimeZoneInfo zone,
+        UnitSystem units = UnitSystem.Imperial)
     {
+        ArgumentNullException.ThrowIfNull(zone);
         var items = new List<VehiclePayloadItem>(vehicles.Count);
         foreach (var vehicle in vehicles)
         {
-            items.Add(Vehicle(vehicle, places));
+            var selected = selection is { Kind: EntityKind.Vehicle } chosen && string.Equals(chosen.Id, vehicle.Id, StringComparison.Ordinal);
+            items.Add(Vehicle(vehicle, places, selected ? VehicleChip(vehicle, now, zone, units) : null));
         }
 
         return new VehiclesPayload(version, items);
+    }
+
+    /// <summary>
+    /// The chip text of a member (01 section 4.4), decided here and never in JavaScript. The selected member has one whatever its status: at a place "Here for 3 hrs, 33 mins" (or "Just arrived"),
+    /// driving "Driving · 54 mph" (the speed only when one was reported, R-112) or "Driving", stale or offline "Last seen 42 min ago", the static pin its label ("Home · Highmeadow"); out and
+    /// not driving, and a member with no fix, have none. The viewer's own chip, when nothing is selected, is the at-a-place one and no other (matches screenshot 7784); once anything else is
+    /// selected (a person, a vehicle or a place) it goes, so that exactly one pin carries a chip. The text is blank (null) when the fact it needs, the arrival or the last update, is unknown.
+    /// </summary>
+    public static string? MemberChip(
+        MemberVm member,
+        MemberStatus status,
+        bool isMe,
+        EntityRef? selection,
+        DateTimeOffset now,
+        TimeZoneInfo zone,
+        UnitSystem units = UnitSystem.Imperial)
+    {
+        ArgumentNullException.ThrowIfNull(member);
+        ArgumentNullException.ThrowIfNull(zone);
+        var selected = selection is { Kind: EntityKind.Member } chosen && string.Equals(chosen.Id, member.Id, StringComparison.Ordinal);
+        var mine = isMe && selection is null && status == MemberStatus.AtPlace;
+        if (!selected && !mine)
+        {
+            return null;
+        }
+
+        return status switch
+        {
+            MemberStatus.AtPlace => member.SinceUtc is { } since ? TimeFormatter.HereForChip(now - since) : null,
+            MemberStatus.Driving => member.SpeedMps is { } speed ? "Driving · " + UnitFormatter.Speed(speed, units) : "Driving",
+            MemberStatus.Stale or MemberStatus.Offline => member.LastUpdateUtc is { } seen ? "Last seen " + TimeFormatter.Relative(seen, now, zone) : null,
+            MemberStatus.Static => string.IsNullOrWhiteSpace(member.StaticLabel) ? MemberTextFormatter.FixedPosition : member.StaticLabel,
+            _ => null,
+        };
+    }
+
+    /// <summary>
+    /// The chip text of the selected vehicle (01 section 4.4). A stale vehicle reads "Last heard 1 hr ago" and never "Driving", whatever the engine says; a fresh moving one "Driving · 62 mph" (the
+    /// speed only when <see cref="VehicleVm.SpeedMps"/> is known, else "Driving"); a fresh one that is not moving "Parked · Engine off" or "Parked · Accessory on", and "Engine on" alone with the engine
+    /// running (a vehicle that idles is not parked; the remote start reads the same way, with its minutes left). Without an ignition reading the chip is "Parked". A vehicle with no fix or no position has
+    /// no pin and the placeholder none, so no chip; a stale one with no update time has no chip either.
+    /// </summary>
+    public static string? VehicleChip(VehicleVm vehicle, DateTimeOffset now, TimeZoneInfo zone, UnitSystem units = UnitSystem.Imperial)
+    {
+        ArgumentNullException.ThrowIfNull(vehicle);
+        ArgumentNullException.ThrowIfNull(zone);
+        if (!HasPin(vehicle))
+        {
+            return null;
+        }
+
+        if (vehicle.Freshness == Freshness.Stale)
+        {
+            return vehicle.LastUpdateUtc is { } heard ? "Last heard " + TimeFormatter.Relative(heard, now, zone) : null;
+        }
+
+        if (vehicle.IsMoving)
+        {
+            return vehicle.SpeedMps is { } speed ? "Driving · " + UnitFormatter.Speed(speed, units) : "Driving";
+        }
+
+        var engine = VehicleTextFormatter.Engine(vehicle);
+        return vehicle.Ignition switch
+        {
+            IgnitionState.On or IgnitionState.RemoteStart => engine,
+            _ => engine is null ? "Parked" : "Parked · " + engine,
+        };
     }
 
     /// <summary>The zones: every place whose radius is above 0 and at most <see cref="MapPayloadOptions.MaxZoneRadiusKm"/> (the arrival zone is never sent), with the occupied flag (people only) and the three appearances.</summary>
@@ -120,7 +210,10 @@ public static class MapPayloadFactory
         (double Lat, double Lon)? origin,
         DateTimeOffset now,
         long minute,
-        MapPayloadOptions options)
+        MapPayloadOptions options,
+        EntityRef? selection,
+        TimeZoneInfo zone,
+        UnitSystem units)
     {
         var status = StatusOf(member, drawn);
         var hasFix = status != MemberStatus.NoFix;
@@ -137,8 +230,8 @@ public static class MapPayloadFactory
             far = fromMe.Value.Meters > options.FarAwayKm * 1000;
         }
 
-        // 01 section 4.4: nothing is selected in this slice, so the only chip is mine, at a place, with a known arrival.
-        var chip = isMe && status == MemberStatus.AtPlace && member.SinceUtc is { } since ? TimeFormatter.HereForChip(now - since) : null;
+        // 01 section 4.4: the chip follows the selection (the selected member's, mine when nothing is selected).
+        var chip = MemberChip(member, status, isMe, selection, now, zone, units);
 
         return new MemberPayloadItem(
             Id: member.Id,
@@ -217,9 +310,13 @@ public static class MapPayloadFactory
         _ => 0,
     };
 
-    private static VehiclePayloadItem Vehicle(VehicleVm vehicle, IReadOnlyList<PlaceVm> places)
+    // A vehicle has a pin when it is not the placeholder and has a fix and a position.
+    private static bool HasPin(VehicleVm vehicle) =>
+        !vehicle.IsPlaceholder && vehicle.Freshness != Freshness.NoFix && vehicle.Lat is not null && vehicle.Lon is not null;
+
+    private static VehiclePayloadItem Vehicle(VehicleVm vehicle, IReadOnlyList<PlaceVm> places, string? chip)
     {
-        var hasPin = !vehicle.IsPlaceholder && vehicle.Freshness != Freshness.NoFix && vehicle.Lat is not null && vehicle.Lon is not null;
+        var hasPin = HasPin(vehicle);
         var stale = vehicle.Freshness == Freshness.Stale;
         var ring = vehicle.Freshness switch
         {
@@ -237,7 +334,7 @@ public static class MapPayloadFactory
             Lon: hasPin ? vehicle.Lon : null,
             Ring: ring,
             Stale: stale,
-            Chip: null,
+            Chip: chip,
             AriaLabel: MapText.VehiclePinName(vehicle, place),
             Tooltip: MapText.Title(vehicle.Name, vehicle.LoreTitle));
     }

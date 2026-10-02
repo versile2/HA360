@@ -1,6 +1,7 @@
 // The sheet's lists: AC-25 to AC-27 (Drivers), the list half of AC-28 (Vehicles), AC-29 (Places) and AC-50 (a UTC browser changes no string) of 01 section 11
-// C, on the Demo app behind the ingress proxy. This is S7b's file; the sheet itself (handle, tabs, heights, layout) is S7a's `ac-a-sheet.spec.ts`, and the selection
-// half of AC-28 (tap the pickup, the Peek header, the pin centred) arrives with S8, which is why no test here taps a live row and asserts what it does.
+// C, on the Demo app behind the ingress proxy. This is S7b's file; the sheet itself (handle, tabs, heights, layout) is S7a's `ac-a-sheet.spec.ts`. S8c appends the other half: the
+// selection half of AC-28 (tap the pickup, the Peek header, the pin centred, the handle opens the detail), AC-30 (the member detail) and AC-31 (a place: the header, the detail, the
+// Here-now row, the tab switch), in the block at the end of the file ("S8c: selecting from the lists").
 //
 // What the rows are made of is the markup of `MemberRow`, `VehicleRow` and `PlaceRow`: one `button[data-testid="row-<kind>-<id>"]` per entity, whose parts are found by
 // class (`.realm-row-name`, `.realm-row-lore`, `.realm-row-status`, `.realm-row-detail-text`, `.realm-battery-pill`, ...). The strings are the ones of 01 section 8; every
@@ -13,7 +14,24 @@
 
 import type { Locator, Page } from '@playwright/test';
 
-import { castMember, castPlace, demo, expect, loadDemoCast, test, type CastMember, type CastPlace, type CastVehicle, type DemoCastFile, type DemoOptions } from '../fixtures.js';
+import {
+  PEEK_CENTRE_TOLERANCE_PX,
+  castMember,
+  castPlace,
+  demo,
+  expect,
+  loadDemoCast,
+  mapReady,
+  pinDistanceFromPeekCentre,
+  readHook,
+  settled,
+  test,
+  type CastMember,
+  type CastPlace,
+  type CastVehicle,
+  type DemoCastFile,
+  type DemoOptions,
+} from '../fixtures.js';
 
 /** Below this width the layout is Compact (a bottom sheet); from it, with room in height, the Expanded panel (01 section 3.1). */
 const EXPANDED_FROM = 840;
@@ -389,5 +407,161 @@ test.describe('a browser in UTC', () => {
 
     await showSection(page, 'vehicles');
     await expect(row(page, 'vehicle', 'wagon').locator('.realm-row-detail-text'), 'the pickup update age is relative, unchanged').toHaveText('Updated 20 min ago');
+  });
+});
+
+// ==== S8c: selecting from the lists (01 section 11 AC-28 (D45 half), AC-30, AC-31; D45, D46) ===========================================================================================
+// A row tap at 80 % collapses the sheet to Peek with the selection header (D45); the handle then opens the detail. These tests run at 412 x 915 (the phone project): the Peek numbers
+// are its own. Every name, place and lore title comes from the cast; the times and the counts are the spec's. Nothing sleeps: after the tap the test waits for the header, then for the
+// pin to arrive in the Peek rectangle (the flight starts after the server round trip), then for `settled()`.
+
+const handle = (page: Page): Locator => page.getByTestId('sheet-handle');
+const header = (page: Page): Locator => page.getByTestId('sheet-selection-header');
+
+/** Opens the list at 80 % and waits until the map holds its pins, so that a row tap has something to fly to. */
+async function openListWithMap(page: Page, section: Section): Promise<void> {
+  await openList(page);
+  await mapReady(page);
+  if (section !== 'drivers') await showSection(page, section);
+}
+
+/** After a row tap: Peek with the header (no detail, no tabs) and, when a pin is named, the pin's true point within 24 px of the middle of the Peek rectangle (AC-22). */
+async function expectSelectedAtPeek(page: Page, label: string, pin?: { kind: 'member' | 'vehicle'; id: string }): Promise<void> {
+  await expect(header(page), `${label}: the selection header shows`).toBeVisible();
+  await expect.poll(async () => (await readHook(page, 'sheet')).state, { message: `${label}: sheet().state` }).toBe('peek');
+  await expect(page.getByTestId('sheet-segments'), `${label}: the tab control is hidden`).toBeHidden();
+  await expect(page.getByTestId('detail-back'), `${label}: no detail at Peek`).toHaveCount(0);
+  if (pin === undefined) return;
+  await expect
+    .poll(() => pinDistanceFromPeekCentre(page, pin.kind, pin.id), { message: `${label}: distance of pin-${pin.kind}-${pin.id} from the centre of the Peek rectangle`, timeout: 10_000 })
+    .toBeLessThanOrEqual(PEEK_CENTRE_TOLERANCE_PX);
+  await settled(page);
+  expect(await pinDistanceFromPeekCentre(page, pin.kind, pin.id), `${label}: the pin's distance from the Peek centre after the flight`).toBeLessThanOrEqual(PEEK_CENTRE_TOLERANCE_PX);
+}
+
+/** The handle's tap: the detail of the selection at 80 %. */
+async function openDetail(page: Page, label: string): Promise<void> {
+  await handle(page).click();
+  await expect(page.getByTestId('detail-back'), `${label}: the detail's back arrow shows`).toBeVisible();
+  await expect.poll(async () => (await readHook(page, 'sheet')).state, { message: `${label}: sheet().state` }).toBe('80');
+}
+
+test.describe('S8c: selecting from the lists', () => {
+  // [AC-28] The D45 half: the pickup row (sheet at 80 %) selects it. Peek, the header with no battery badge, the pin `pin-vehicle-wagon` centred as in AC-22 (the wagon is drawn beside the
+  // King's pin, the true point is what is centred), then the handle opens the vehicle detail (01 section 5.5: Location, Engine, Fuel, Odometer, Last update; no Speed while it is parked).
+  test('[AC-28] tapping the pickup row selects it at Peek with its header and no battery badge, the pin centred as in AC-22; the handle opens the vehicle detail', { tag: ['@phone'] }, async ({ page }) => {
+    const cast = loadDemoCast();
+    const wagon = castVehicle(cast, 'wagon');
+    const home = castPlace(cast, 'home');
+    await openListWithMap(page, 'vehicles');
+
+    await row(page, 'vehicle', 'wagon').click();
+    await expectSelectedAtPeek(page, 'the pickup selected from its row', { kind: 'vehicle', id: 'wagon' });
+    await expect(header(page).locator('.realm-row-name'), 'the header names the pickup').toHaveText(wagon.name);
+    await expect(header(page).locator('.realm-row-lore'), 'the header gives its lore title').toHaveText(wagon.lore);
+    await expect(header(page).locator('.realm-sel-line'), 'the second line: where it is, the engine, how old that is').toHaveText(`At ${home.name} · Engine off · Updated 20 min ago`);
+    await expect(page.getByTestId('sheet-selection-battery'), 'a vehicle has no battery badge').toHaveCount(0);
+
+    await openDetail(page, 'after the handle tap');
+    await expect(page.locator('.realm-detail-name'), 'the vehicle detail is the pickup\'s').toHaveText(wagon.name);
+    await expect(page.locator('.realm-detail-heading .realm-detail-eyebrow'), 'its lore title').toHaveText(wagon.lore);
+    await expect(page.locator('.realm-detail-rows dt'), 'the rows of a parked vehicle (no Speed)').toHaveText(['Location', 'Engine', 'Fuel', 'Odometer', 'Last update']);
+    await expect(page.locator('.realm-detail-rows .realm-detail-row').nth(0).locator('dd'), 'Location').toHaveText(`At ${home.name}`);
+    await expect(page.locator('.realm-detail-rows .realm-detail-row').nth(1).locator('dd'), 'Engine').toHaveText('Off');
+    await expect(page.locator('.realm-detail-fuel-text'), 'Fuel').toHaveText('71%');
+  });
+
+  // [AC-30] Cass's detail at v1 scope, reached by selecting at Peek and tapping the handle: back, the 64 px avatar, the name, the eyebrow, "Updated 3 min ago", the status, the since line with
+  // the distance, the battery chip, the address, the week's three tiles and the Full report link. No timeline and no trail button. The week loads from the session after the detail opens, so
+  // the tiles are asserted with the retrying matchers.
+  test('[AC-30] the member detail: back, a 64 px avatar, name, eyebrow, Updated 3 min ago, status, since and distance, the 12% Low battery chip, the address, the week tiles and Full report; no timeline and no Show trail', { tag: ['@phone'] }, async ({ page }) => {
+    const cast = loadDemoCast();
+    const jester = castMember(cast, 'jester');
+    const hall = castPlace(cast, 'jester_hall');
+    await openListWithMap(page, 'drivers');
+
+    await row(page, 'member', 'jester').click();
+    await expectSelectedAtPeek(page, 'Cass selected from his row', { kind: 'member', id: 'jester' });
+    await openDetail(page, 'after the handle tap');
+
+    const back = await page.getByTestId('detail-back').boundingBox();
+    expect(back, 'the back arrow has a box').not.toBeNull();
+    expect(Math.min(back?.width ?? 0, back?.height ?? 0), 'the back arrow is at least a 48 px target').toBeGreaterThanOrEqual(TARGET_MIN - SLACK);
+    const avatar = await page.locator('.realm-detail-avatar').boundingBox();
+    expect(avatar, 'the avatar has a box').not.toBeNull();
+    expect(avatar?.width ?? 0, 'the avatar is 64 px wide').toBeCloseTo(64, 0);
+    expect(avatar?.height ?? 0, 'the avatar is 64 px high').toBeCloseTo(64, 0);
+
+    await expect(page.locator('.realm-detail-name'), 'the name').toHaveText(jester.name);
+    await expect(page.locator('.realm-detail-heading .realm-detail-eyebrow'), 'the eyebrow is the lore title (drawn in capitals by the style)').toHaveText(jester.lore);
+    await expect(page.locator('.realm-detail-updated'), 'the freshness line').toHaveText('Updated 3 min ago');
+    await expect(page.locator('.realm-detail-status-line'), 'the status').toHaveText(`At ${hall.name}`);
+    await expect(page.locator('.realm-detail-line'), 'since, and how far away').toHaveText('Since 9:06 pm · 1.0 mi away');
+    await expect(page.locator('.realm-detail-chips .realm-detail-chip').first(), 'the battery chip').toHaveText('12% · Low battery');
+    await expect(page.locator('.realm-detail-address'), 'the address of the cast').toHaveText(jester.address ?? '');
+
+    await expect(page.locator('.realm-detail-week-title'), 'the week block is titled').toHaveText('This week');
+    await expect(page.locator('.realm-detail-tile-value'), 'the three tiles: drives, miles, top speed').toHaveText(['18', '202.6', '88 mph']);
+    await expect(page.locator('.realm-detail-tile-label'), 'their labels').toHaveText(['drives', 'mi', 'top']);
+    await expect(page.locator('.realm-detail-link'), 'the link to the full report').toHaveText('Full report ›');
+    await expect(page.locator('.realm-detail-link'), 'it goes to his week').toHaveAttribute('href', 'driving/jester?week=0');
+
+    // v1 scope: the Today timeline and the trail button are v1.1 (01 section 13).
+    await expect(page.getByTestId('btn-show-trail'), 'no Show trail button').toHaveCount(0);
+    await expect(page.getByRole('button', { name: /trail/i }), 'nothing in the sheet is a trail control').toHaveCount(0);
+    await expect(page.locator('.realm-detail').getByText(/timeline|today/i), 'no Today timeline').toHaveCount(0);
+  });
+
+  // [AC-30] The last sentence: Elio's detail shows no street address (`static_show_address` is off by default), and no week (he shares nothing); he is a static member.
+  test('[AC-30] the static prince\'s detail shows no street address and no week', { tag: ['@phone'] }, async ({ page }) => {
+    const prince = castMember(loadDemoCast(), 'prince');
+    await openListWithMap(page, 'drivers');
+
+    await row(page, 'member', 'prince').click();
+    await expectSelectedAtPeek(page, 'Elio selected from his row');
+    await openDetail(page, 'after the handle tap');
+
+    await expect(page.locator('.realm-detail-name'), 'the name').toHaveText(prince.name);
+    await expect(page.locator('.realm-detail-address'), 'no street address (static_show_address is off)').toHaveCount(0);
+    await expect(page.locator('.realm-detail-week'), 'no week block for a static member').toHaveCount(0);
+    await expect(page.locator('.realm-detail-sentence'), 'his own counsel, built from the lore title').toHaveText(`The ${prince.lore} keeps his own counsel.`);
+  });
+
+  // [AC-31] A place: its row selects it at Peek with the header "Hearth Haven" over "Here now (2)" (the person and the parked pickup); the handle opens its detail, which lists Alden and then the
+  // pickup and has no comings and goings; a tap on Alden's row there selects him at Peek with his header; and a tab switch at 80 % keeps the size, clears the selection and shows the new section
+  // with its summary. (The zone on the map is the other way in; it is a tap on a 14 px circle under the pins and is left to the unit tests of the map.)
+  test('[AC-31] the Hearth Haven row selects it at Peek with Here now (2); the handle opens its detail with Alden then the pickup; his row there selects him at Peek; a tab switch at 80 % keeps the size and clears the selection', { tag: ['@phone'] }, async ({ page }) => {
+    test.slow(); // three selections and a tab switch
+    const cast = loadDemoCast();
+    const home = castPlace(cast, 'home');
+    const king = castMember(cast, 'king');
+    const wagon = castVehicle(cast, 'wagon');
+    await openListWithMap(page, 'places');
+
+    await row(page, 'place', 'home').click();
+    await expectSelectedAtPeek(page, 'Hearth Haven selected from its row');
+    await expect(header(page).locator('.realm-row-name'), 'the header names the place').toHaveText(home.name);
+    await expect(header(page).locator('.realm-sel-line'), 'the header counts the people and vehicles inside').toHaveText('Here now (2)');
+
+    await openDetail(page, 'after the handle tap');
+    await expect(page.locator('.realm-detail-name'), 'the place detail is its own').toHaveText(home.name);
+    await expect(page.locator('.realm-detail-here-title'), 'the heading counts the same two').toHaveText('Here now (2)');
+    await expect(page.locator('.realm-detail-here-item .realm-here-name'), 'Alden, then the pickup').toHaveText([king.name, wagon.name]);
+    await expect(page.getByText(/comings and goings/i), 'no comings and goings (v1.1)').toHaveCount(0);
+
+    // Alden's row selects him: the sheet goes to Peek with his header.
+    await row(page, 'member', 'king').click();
+    await expectSelectedAtPeek(page, 'Alden selected from the Here-now list');
+    await expect(header(page).locator('.realm-row-name'), 'the header is Alden\'s').toHaveText(king.name);
+
+    // At 80 % again (his detail), a tab switch keeps the size, clears the selection and shows the section with its summary.
+    await openDetail(page, 'after the handle tap on Alden');
+    await page.getByTestId('tab-vehicles').click();
+    await expect(page.getByTestId('tab-vehicles'), 'the Vehicles tab is selected').toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByTestId('detail-back'), 'the selection is cleared: no detail').toHaveCount(0);
+    await expect(header(page), 'the selection is cleared: no header').toHaveCount(0);
+    expect((await readHook(page, 'sheet')).state, 'the tab switch kept the size').toBe('80');
+    await expect(rowsOf(page, 'vehicle'), 'the Vehicles list shows').toHaveCount(2);
+    await expect(page.getByTestId('sheet-summary'), 'the summary follows the section').toHaveText('2 vehicles · all parked');
   });
 });

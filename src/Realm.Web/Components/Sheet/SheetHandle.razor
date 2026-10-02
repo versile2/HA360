@@ -1,12 +1,15 @@
 @using Microsoft.AspNetCore.Components.Web
+@using Microsoft.JSInterop
 @using Realm.Web.Layout
 
 @* The custom SheetHandleFragment of the bottom sheet (01 section 3.4.1; 03 section 3.4): one 48 px full-width button with the 40 x 4 bar and the summary.
    A tap toggles Peek and Tall and never closes the sheet. There is no drag (D73): MudXSheet runs with EnableDragToSize=false, so MudX takes no pointer
-   capture on the wrapper div.mud-sheet-handle and the browser's own click reaches this button. The toggle is the click; the keys are handled here. *@
+   capture on the wrapper div.mud-sheet-handle and the browser's own click reaches this button. The toggle is the click; the keys are handled here. The handle takes the focus when the page asks
+   with a new FocusRequest (01 section 10.2: after a row tap, which hides the row the focus was on, and after a Back from the detail), once per request. *@
 <button type="button"
         class="realm-sheet-handle"
         data-testid="sheet-handle"
+        @ref="_button"
         aria-label="@AriaLabel"
         aria-expanded="@(Size == SheetSize.Tall ? "true" : "false")"
         @onclick="ToggleAsync"
@@ -16,6 +19,10 @@
 </button>
 
 @code {
+    private ElementReference _button;
+    private FocusRequest? _handled;
+    private bool _focusPending;
+
     /// <summary>The current state: <see cref="SheetSize.Peek"/> or <see cref="SheetSize.Tall"/> (80 % of the viewport height).</summary>
     [Parameter]
     public SheetSize Size { get; set; }
@@ -32,7 +39,11 @@
     [Parameter]
     public EventCallback<SheetSize> OnSet { get; set; }
 
-    // "Resize list. Currently {peek, 80 percent} height." (01 section 10.3); the visible summary is not part of the name, the section tabs announce the count.
+    /// <summary>The page's request to move the focus (01 section 10.2). One that names <see cref="FocusTarget.Handle"/> and has not been acted on yet takes the focus after this render; any other changes nothing.</summary>
+    [Parameter]
+    public FocusRequest? Focus { get; set; }
+
+    // "Resize list. Currently {peek, 80 percent} height." (01 section 10.3); the visible summary is not part of the name, the sheet's live region announces the count.
     private string AriaLabel => Size == SheetSize.Tall ? "Resize list. Currently 80 percent height." : "Resize list. Currently peek height.";
 
     private Task ToggleAsync() => OnToggle.InvokeAsync();
@@ -44,4 +55,33 @@
             "ArrowDown" or "Home" => OnSet.InvokeAsync(SheetSize.Peek),
             _ => Task.CompletedTask,
         };
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        if (Focus is { Target: FocusTarget.Handle } request && !ReferenceEquals(request, _handled))
+        {
+            _handled = request;
+            _focusPending = true;
+        }
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_focusPending)
+        {
+            return;
+        }
+
+        _focusPending = false;
+        try
+        {
+            await _button.FocusAsync();
+        }
+        catch (Exception exception) when (exception is JSException or JSDisconnectedException or InvalidOperationException or TaskCanceledException)
+        {
+            // A circuit that is gone, or a handle that has already left the page: there is nothing to focus.
+        }
+    }
 }

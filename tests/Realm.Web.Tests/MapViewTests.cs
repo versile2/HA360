@@ -203,6 +203,25 @@ public sealed class MapViewTests : ComponentTestBase
         Assert.Equal(1, _cameras);
     }
 
+    [Fact(DisplayName = "[X-07] the camera is read from the script when the page asks, never as a side effect of rendering, and there is none once the map is gone")]
+    public async Task GetCameraAsync_ReadsTheCameraFromTheScript_AndAfterTheMapIsGoneThereIsNone()
+    {
+        var cut = RenderMap(selection: null);
+        Assert.Empty(Calls("getCamera"));
+
+        var camera = await cut.Instance.GetCameraAsync();
+
+        Assert.NotNull(camera);
+        Assert.Equal(RecenterState.Away, camera.Recenter);
+        Assert.Single(Calls("getCamera"));
+        Assert.Equal(0, _cameras);
+
+        await cut.Instance.DisposeAsync();
+
+        Assert.Null(await cut.Instance.GetCameraAsync());
+        Assert.Single(Calls("getCamera"));
+    }
+
     // ---- the way back from Driving (R1-12) -------------------------------------------------------------------------------------------------------------------
 
     [Fact]
@@ -265,6 +284,63 @@ public sealed class MapViewTests : ComponentTestBase
         Assert.Empty(Calls("fitDefault"));
     }
 
+    // ---- the chip follows the selection (01 section 4.4, review R1-03) --------------------------------------------------------------------------------------------
+
+    [Fact(DisplayName = "[AC-17b] A new selection sends the members and the vehicles again, and the chip is the selected one's")]
+    public void ANewSelection_ResendsTheSectionsThatCarryTheChips_WithTheChipOfTheSelected()
+    {
+        var cut = RenderMapWithData(selection: null);
+        Assert.Equal([DemoCast.King.Id], ChipOwners(LastMembers()));
+        Assert.DoesNotContain(LastVehicles().Vehicles, vehicle => vehicle.Chip is not null);
+        var sent = Calls("upsertMembers").Count;
+
+        cut.Render(parameters => parameters.Add(map => map.Selection, Queen));
+
+        Assert.Equal(sent + 1, Calls("upsertMembers").Count);
+        var members = LastMembers();
+        Assert.Equal([DemoCast.Queen.Id], ChipOwners(members));
+        Assert.Equal("Driving · 54 mph", members.Members.Single(item => item.Id == DemoCast.Queen.Id).Chip);
+
+        cut.Render(parameters => parameters.Add(map => map.Selection, Wagon));
+
+        Assert.Empty(ChipOwners(LastMembers()));   // the king is not selected, so his chip is gone as well
+        Assert.Equal("Parked · Engine off", LastVehicles().Vehicles.Single(vehicle => vehicle.Id == DemoCast.Wagon.Id).Chip);
+
+        cut.Render(parameters => parameters.Add(map => map.Selection, null));
+
+        Assert.Equal([DemoCast.King.Id], ChipOwners(LastMembers()));   // nothing selected: mine again
+        Assert.All(LastVehicles().Vehicles, vehicle => Assert.Null(vehicle.Chip));
+    }
+
+    [Fact]
+    public void ARenderWithTheSameSelection_SendsNoPayloadAgain()
+    {
+        var cut = RenderMapWithData(selection: Queen);
+        var members = Calls("upsertMembers").Count;
+        var vehicles = Calls("upsertVehicles").Count;
+
+        cut.Render(parameters => parameters.Add(map => map.Selection, new EntityRef(EntityKind.Member, DemoCast.Queen.Id)));   // equal by value, not the same instance
+
+        Assert.Equal(members, Calls("upsertMembers").Count);
+        Assert.Equal(vehicles, Calls("upsertVehicles").Count);
+    }
+
+    [Fact]
+    public void TheMinute_ResendsTheVehiclesOnlyWhileAVehicleIsSelected()
+    {
+        // "Last heard 1 hr ago" is the one time-based chip of a vehicle; with nothing selected a quiet map sends nothing on the minute.
+        var cut = RenderMapWithData(selection: null);
+        var vehicles = Calls("upsertVehicles").Count;
+        cut.Render(parameters => parameters.Add(map => map.Now, DemoDataSource.Anchor.AddMinutes(1)));
+        Assert.Equal(vehicles, Calls("upsertVehicles").Count);
+
+        cut.Render(parameters => parameters.Add(map => map.Selection, Wagon));
+        vehicles = Calls("upsertVehicles").Count;
+        cut.Render(parameters => parameters.Add(map => map.Now, DemoDataSource.Anchor.AddMinutes(2)));
+
+        Assert.Equal(vehicles + 1, Calls("upsertVehicles").Count);
+    }
+
     // ---- a dropped circuit -------------------------------------------------------------------------------------------------------------------------------------------
 
     [Fact]
@@ -278,6 +354,36 @@ public sealed class MapViewTests : ComponentTestBase
 
         Assert.Equal(Queen, Assert.Single(_pinTaps));
         Assert.Equal(flights, Calls("flyToMember").Count);
+    }
+
+    // ---- the recentre button (01 section 4.11, AC-20) -----------------------------------------------------------------------------------------------------------
+
+    [Fact(DisplayName = "[AC-20] RecenterAsync asks the script to recenter once per call, and neither sends a selection nor flies to one")]
+    public async Task RecenterAsync_AsksTheScript_AndLeavesTheSelectionAlone()
+    {
+        var cut = RenderMap(selection: King);
+        var selections = Calls("setSelection").Count;
+        var flights = Calls("flyToMember").Count;
+        Assert.Empty(Calls("recenter"));
+
+        await cut.InvokeAsync(() => cut.Instance.RecenterAsync());
+        await cut.InvokeAsync(() => cut.Instance.RecenterAsync());
+
+        Assert.Equal(2, Calls("recenter").Count);
+        Assert.Empty(Calls("recenter")[0].Args);
+        Assert.Equal(selections, Calls("setSelection").Count);
+        Assert.Equal(flights, Calls("flyToMember").Count);
+    }
+
+    [Fact]
+    public async Task RecenterAsync_AfterTheMapIsGone_DoesNothing()
+    {
+        var cut = RenderMap(selection: null);
+        await cut.Instance.DisposeAsync();
+
+        await cut.Instance.RecenterAsync();
+
+        Assert.Empty(Calls("recenter"));
     }
 
     // ---- helpers -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -312,6 +418,31 @@ public sealed class MapViewTests : ComponentTestBase
         return cut;
     }
 
+    private static List<string> ChipOwners(MembersPayload payload) => [.. payload.Members.Where(item => item.Chip is not null).Select(item => item.Id)];
+
+    private MembersPayload LastMembers() => Assert.IsType<MembersPayload>(Calls("upsertMembers")[^1].Args[0]);
+
+    private VehiclesPayload LastVehicles() => Assert.IsType<VehiclesPayload>(Calls("upsertVehicles")[^1].Args[0]);
+
+    // The map with the Demo's people, vehicles and places and the Demo's frozen clock, so the payloads carry real chips.
+    private IRenderedComponent<MapView> RenderMapWithData(EntityRef? selection)
+    {
+        var snapshot = new DemoRealmSessionFactory().Create(null).Current;
+        var cut = Render<MapView>(parameters => parameters
+            .Add(map => map.Members, snapshot.Members)
+            .Add(map => map.Vehicles, snapshot.Vehicles)
+            .Add(map => map.Places, snapshot.Places)
+            .Add(map => map.Now, DemoDataSource.Anchor)
+            .Add(map => map.Selection, selection)
+            .Add(map => map.OnPinTap, EventCallback.Factory.Create<EntityRef>(this, entity => { _pinTaps.Add(entity); })));
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Contains(_js.Module, call => call.Identifier == "upsertMembers");
+            Assert.Contains(_js.Module, call => call.Identifier == "upsertVehicles");
+        });
+        return cut;
+    }
+
     private sealed record RecordedCall(string Identifier, object?[] Args);
 
     // The script, answered by hand: the module of realmMap.js records its calls, init says the payload schema is the server's, and everything else returns nothing.
@@ -332,7 +463,12 @@ public sealed class MapViewTests : ComponentTestBase
         {
             calls.Add(new RecordedCall(identifier, args ?? []));
 
-            object? result = identifier == "init" ? new ReadyInfo("test", MapInterop.PayloadSchema, "6.11.2") : null;
+            object? result = identifier switch
+            {
+                "init" => new ReadyInfo("test", MapInterop.PayloadSchema, "6.11.2"),
+                "getCamera" => HomeCamera(),
+                _ => null,
+            };
             return new ValueTask<TValue>((TValue)result!);   // null-forgiving: a void call's result is never read
         }
 
