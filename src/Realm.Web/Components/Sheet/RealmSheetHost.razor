@@ -1,0 +1,158 @@
+@using Realm.Web.Layout
+
+@* The only place that knows about MudX (03 section 3.5). It chooses the container for the one body it is given:
+   - Compact: MudXSheet at the bottom, two states (Peek 19 % and Tall 80 % of the viewport height, D42), the custom handle, server-driven drag with SnapMode.
+   - Expanded: MudXSheet at the left, one size (the percent of the width that makes 400 px), no states, no drag, no handle; or, with the environment switch
+     Realm:Ui:SheetHost=aside, a plain <aside> with the same geometry (the fallback of 03 section 3.5, for the panel only).
+   Every MudXSheet parameter below was checked against MudX 9.5.0's MudXSheet.razor.cs: MudX has no parameter analyzer, so an unknown one would only fail at
+   render time. The contract element (data-testid="sheet", data-state="peek|80|panel") is passed to MudXSheet as unmatched attributes, which MudX puts on its
+   .mud-sheet-container; window.__realm.sheet().state reads it. The host is controlled: Size comes in, a change goes out through OnSizeChanged, and the
+   parent decides (a selection at Tall collapses the sheet by setting Size = Peek, D45; S8 drives it). *@
+@if (Mode == LayoutMode.Compact || (Mode == LayoutMode.Expanded && !UseAside))
+{
+    <MudXSheet @key="Mode"
+               Position="@(Compact ? Position.Bottom : Position.Left)"
+               Standard="true"
+               Open="_open"
+               OpenChanged="OpenChangedAsync"
+               OnDismissed="DismissedAsync"
+               CloseOnEscapeKey="false"
+               Paper="false"
+               Elevation="0"
+               BorderRadius="24"
+               PresetSizes="_presets"
+               SnapMode="Compact"
+               EnableDragToSize="Compact"
+               CurrentSize="_currentSize"
+               CurrentSizeChanged="CurrentSizeChangedAsync"
+               SheetHandleFragment="@(Compact ? HandleFragment : EmptyFragment)"
+               AriaLabel="Realm list"
+               data-testid="sheet"
+               data-state="@DataState">
+        @ChildContent
+    </MudXSheet>
+}
+else if (Mode == LayoutMode.Expanded)
+{
+    <aside class="realm-sheet-aside" data-testid="sheet" data-state="panel" role="region" aria-label="Realm list">
+        @ChildContent
+    </aside>
+}
+
+@code {
+    /// <summary>The Peek preset: percent of the viewport height (01 section 3.2). The 168 px floor is the CSS min-height.</summary>
+    public const int PeekPercent = 19;
+
+    /// <summary>The Tall preset: 80 percent of the viewport height.</summary>
+    public const int TallPercent = 80;
+
+    private static readonly int[] CompactPresets = [PeekPercent, TallPercent];
+
+    private static readonly RenderFragment EmptyFragment = _ => { };
+
+    private int[] _presets = CompactPresets;
+    private int _currentSize = PeekPercent;
+    private bool _open = true;
+    private bool _reopen;
+
+    /// <summary>
+    /// What the viewport allows: <see cref="LayoutMode.Compact"/> (bottom sheet) or <see cref="LayoutMode.Expanded"/> (left panel).
+    /// <see cref="LayoutMode.Unknown"/>, before the browser has reported the window, renders nothing.
+    /// </summary>
+    [Parameter]
+    public LayoutMode Mode { get; set; }
+
+    /// <summary>Compact only: the state the sheet is in. Setting it moves the sheet (a 250 ms MudX transition); the panel has no states.</summary>
+    [Parameter]
+    public SheetSize Size { get; set; }
+
+    /// <summary>The viewport width in CSS pixels; the panel's <c>CurrentSize</c> is the percent of it that makes 400 px (884 gives 45), recomputed on every report.</summary>
+    [Parameter]
+    public double ViewportWidth { get; set; }
+
+    /// <summary>The summary line of 01 section 8.2, shown in the handle.</summary>
+    [Parameter]
+    public string Summary { get; set; } = string.Empty;
+
+    /// <summary>The user asked for the other state: a tap, a key or a drag released nearer to it. The parent decides whether to accept it (it sets <see cref="Size"/>).</summary>
+    [Parameter]
+    public EventCallback<SheetSize> OnSizeChanged { get; set; }
+
+    /// <summary>The body: the same fragment goes to either container.</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    [Inject]
+    private IConfiguration Configuration { get; set; } = default!;
+
+    private bool Compact => Mode == LayoutMode.Compact;
+
+    // The environment switch Realm:Ui:SheetHost (mudx by default, or aside). It never applies to the bottom sheet, which has no fallback.
+    private bool UseAside => string.Equals(Configuration["Realm:Ui:SheetHost"], "aside", StringComparison.OrdinalIgnoreCase);
+
+    private string DataState => Compact ? (Size == SheetSize.Tall ? "80" : "peek") : "panel";
+
+    private RenderFragment HandleFragment =>
+        @<SheetHandle Size="Size" Summary="@Summary" OnToggle="ToggleAsync" OnSet="SetAsync" />;
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        if (Compact)
+        {
+            _presets = CompactPresets;
+            _currentSize = Size == SheetSize.Tall ? TallPercent : PeekPercent;
+        }
+        else
+        {
+            _currentSize = LayoutResolver.PanelSizePercent(ViewportWidth);
+            _presets = [_currentSize];
+        }
+    }
+
+    /// <inheritdoc />
+    protected override void OnAfterRender(bool firstRender)
+    {
+        // MudX closed itself (or was asked to): the sheet never closes (01 section 3.4). MudX reads Open through a ParameterState, which only reacts to a CHANGE of
+        // the value its parent passes, so the sheet is reopened by passing false for one render and true for the next.
+        if (_reopen)
+        {
+            _reopen = false;
+            _open = true;
+            StateHasChanged();
+        }
+    }
+
+    // MudX raises CurrentSizeChanged on every pointer move of a drag AND once more, unconditionally, for every size change it was given, a tap included. Only
+    // the two presets are states: anything in between is a drag in progress, and the release snaps to a preset (SnapMode) and raises it.
+    private Task CurrentSizeChangedAsync(int percent)
+    {
+        if (!Compact)
+        {
+            return Task.CompletedTask;
+        }
+
+        var size = percent switch
+        {
+            PeekPercent => (SheetSize?)SheetSize.Peek,
+            TallPercent => SheetSize.Tall,
+            _ => null,
+        };
+        return size is { } state && state != Size ? OnSizeChanged.InvokeAsync(state) : Task.CompletedTask;
+    }
+
+    private Task OpenChangedAsync(bool open) => open ? Task.CompletedTask : Reassert();
+
+    private Task DismissedAsync() => Reassert();
+
+    private Task Reassert()
+    {
+        _open = false;
+        _reopen = true;
+        return Task.CompletedTask;
+    }
+
+    private Task ToggleAsync() => OnSizeChanged.InvokeAsync(Size == SheetSize.Peek ? SheetSize.Tall : SheetSize.Peek);
+
+    private Task SetAsync(SheetSize size) => size == Size ? Task.CompletedTask : OnSizeChanged.InvokeAsync(size);
+}

@@ -1,7 +1,7 @@
 // Platform tests: what the Ingress hosting decisions of 03 section 5 promise, and no acceptance criterion covers (03 section 7.5).
 // Every test runs through the ingress proxy (harness/ingressProxy.mjs). [X-02] and [X-06] are retired by D41 and their numbers are not reused;
-// [X-04], [X-07] to [X-09], [X-11] to [X-14] belong to later slices.
-import { APP_ORIGIN, INGRESS_PREFIX, demo, expect, readHook, test } from '../fixtures.js';
+// [X-04], [X-09] and [X-11] to [X-14] belong to later slices ([X-14] lives in appendix-c.spec.ts); [X-07] and [X-08] are S7a's.
+import { APP_ORIGIN, INGRESS_PREFIX, demo, expect, readHook, settled, test } from '../fixtures.js';
 
 const BASE_HREF = `${INGRESS_PREFIX}/`;
 
@@ -117,5 +117,87 @@ test.describe('ingress platform tests', () => {
     } finally {
       await bare.dispose();
     }
+  });
+
+  // 03 section 7.5, R-030 and 01 Appendix C item 10: the map does its per-frame work in the browser. A pan and a wheel zoom send a handful of
+  // frames at most (the camera report when the gesture ends), whatever the number of pointer events. The MudXSheet handle drag is the one server-driven
+  // gesture (D36): its frame count is recorded in the report and never limited.
+  test('[X-07] a map pan and a zoom send fewer than 6 websocket frames; a sheet handle drag is only counted', async ({ page }) => {
+    const sent: number[] = [];
+    page.on('websocket', (socket) => socket.on('framesent', () => sent.push(Date.now())));
+
+    await demo(page);
+    await expect.poll(async () => (await readHook(page, 'sheet')).open, { message: 'window.__realm.sheet().open before the traffic is measured' }).toBe(true);
+    // Let the start-up traffic finish: the count below is the traffic of the gestures only.
+    let quietSince = Date.now();
+    let seen = sent.length;
+    await expect
+      .poll(
+        () => {
+          if (sent.length !== seen) {
+            seen = sent.length;
+            quietSince = Date.now();
+          }
+          return Date.now() - quietSince >= 800;
+        },
+        { message: 'the websocket never went quiet after the page loaded', timeout: 15_000 },
+      )
+      .toBe(true);
+
+    const width = page.viewportSize()?.width ?? 412;
+    const x = width / 2;
+    const beforeMap = sent.length;
+    await page.mouse.move(x, 300);
+    await page.mouse.down();
+    await page.mouse.move(x - 140, 380, { steps: 30 });
+    await page.mouse.up();
+    await page.mouse.wheel(0, -300);
+    await settled(page);
+    const mapFrames = sent.length - beforeMap;
+    test.info().annotations.push({ type: 'info', description: `[X-07] websocket frames sent by the browser during a map pan and zoom: ${mapFrames} (limit: fewer than 6)` });
+    expect(mapFrames, 'websocket frames sent by the browser during a map pan (30 pointer moves) and a wheel zoom').toBeLessThan(6);
+
+    // The handle drag: counted for the report, never asserted against a limit.
+    const handle = await page.getByTestId('sheet-handle').boundingBox();
+    if (handle !== null) {
+      const handleX = handle.x + handle.width / 2;
+      const handleY = handle.y + handle.height / 2;
+      const beforeDrag = sent.length;
+      await page.mouse.move(handleX, handleY);
+      await page.mouse.down();
+      await page.mouse.move(handleX, handleY - 300, { steps: 30 });
+      await page.mouse.up();
+      await expect.poll(async () => (await readHook(page, 'sheet')).state, { message: 'the sheet settled after the handle drag' }).toMatch(/^(peek|80)$/);
+      test.info().annotations.push({ type: 'info', description: `[X-07] websocket frames sent by the browser during a sheet handle drag: ${sent.length - beforeDrag} (informational, R-030: the drag is server-driven)` });
+    }
+  });
+
+  // 03 section 4.8, R-02: observeSheet follows `div[mudsheet], [data-testid="sheet"]`. A selector LIST matches every element of either kind, so the union
+  // matches two elements by design (the popover and the contract element inside it): what the script needs, and what is asserted, is that each kind
+  // exists exactly once, that the contract element is inside the popover, and that the list's first match in document order is the popover (the whole
+  // sheet, handle included), which is the element the script measures.
+  test('[X-08] exactly one popover div[mudsheet] and one [data-testid="sheet"], nested, and the selector list resolves to the popover', { tag: ['@phone', '@unfolded'] }, async ({ page }) => {
+    await demo(page);
+    await expect.poll(async () => (await readHook(page, 'sheet')).open, { message: 'window.__realm.sheet().open: MudX has not rendered the sheet' }).toBe(true);
+
+    const found = await page.evaluate(() => {
+      const list = 'div[mudsheet], [data-testid="sheet"]';
+      const first = document.querySelector(list);
+      return {
+        popovers: document.querySelectorAll('div[mudsheet]').length,
+        contracts: document.querySelectorAll('[data-testid="sheet"]').length,
+        union: document.querySelectorAll(list).length,
+        nested: document.querySelector('div[mudsheet] [data-testid="sheet"]') !== null,
+        firstIsPopover: first !== null && first.matches('div[mudsheet]'),
+        firstTag: first === null ? null : `${first.tagName.toLowerCase()}${first.id === '' ? '' : `#${first.id}`}`,
+        state: document.querySelector('[data-testid="sheet"]')?.getAttribute('data-state') ?? null,
+      };
+    });
+    const report = JSON.stringify(found);
+    expect(found.popovers, `elements matching div[mudsheet]: ${report}`).toBe(1);
+    expect(found.contracts, `elements matching [data-testid="sheet"]: ${report}`).toBe(1);
+    expect(found.nested, `the contract element is inside the popover: ${report}`).toBe(true);
+    expect(found.firstIsPopover, `the first match of the selector list is the popover: ${report}`).toBe(true);
+    expect(found.state, `the contract element carries data-state: ${report}`).toMatch(/^(peek|80|panel)$/);
   });
 });

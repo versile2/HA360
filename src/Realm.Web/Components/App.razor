@@ -6,8 +6,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <base href="@BaseHref" />
     <link rel="stylesheet" href="@Assets["_content/MudBlazor/MudBlazor.min.css"]" />
+    @* CR2-006: MudXProvider injects MudX's stylesheet at runtime and, with no <link data-mudx-css> in the document, would append it AFTER ours, so MudX's rules
+       would win every tie. Declaring the link here fixes its place: the provider only rewrites the href of this element (injectCssFromFile). Relative, no @Assets. *@
+    <link rel="stylesheet" data-mudx-css="true" href="_content/MudX.MudBlazor.Extension/mudx.min.css" />
     <link rel="stylesheet" href="css/tokens.css" />
     <link rel="stylesheet" href="css/app.css" />
+    <link rel="stylesheet" href="css/realm-sheet.css" />
     <script src="js/theme-boot.js"></script>
     <ImportMap />
     <HeadOutlet @rendermode="InteractiveServer" />

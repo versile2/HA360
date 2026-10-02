@@ -1,0 +1,48 @@
+@using Microsoft.AspNetCore.Components.Web
+@using Realm.Web.Layout
+
+@* The custom SheetHandleFragment of the bottom sheet (01 section 3.4.1; 03 section 3.4): one 48 px full-width button with the 40 x 4 bar and the summary.
+   A tap toggles Peek and Tall and never closes the sheet. The drag is MudX's own, bound on the wrapper div.mud-sheet-handle (a server round trip per
+   move, accepted for v1, D36), so this button must NEVER stop pointerdown from bubbling: that would kill the drag (R-033). The toggle is the click; the
+   keys are handled here. realmShell.js sends the click itself for a tap whose click MudX's pointer capture swallowed (the tap shim). *@
+<button type="button"
+        class="realm-sheet-handle"
+        data-testid="sheet-handle"
+        aria-label="@AriaLabel"
+        aria-expanded="@(Size == SheetSize.Tall ? "true" : "false")"
+        @onclick="ToggleAsync"
+        @onkeydown="KeyDownAsync">
+    <span class="realm-sheet-handle-bar" aria-hidden="true"></span>
+    <span class="realm-sheet-summary" data-testid="sheet-summary">@Summary</span>
+</button>
+
+@code {
+    /// <summary>The current state: <see cref="SheetSize.Peek"/> or <see cref="SheetSize.Tall"/> (80 % of the viewport height).</summary>
+    [Parameter]
+    public SheetSize Size { get; set; }
+
+    /// <summary>The section summary of 01 section 8.2 ("4 in the Realm · 1 driving"); the formatter has already built it.</summary>
+    [Parameter]
+    public string Summary { get; set; } = string.Empty;
+
+    /// <summary>A tap, Enter or Space: the host moves to the other state.</summary>
+    [Parameter]
+    public EventCallback OnToggle { get; set; }
+
+    /// <summary>ArrowUp and End ask for Tall; ArrowDown and Home ask for Peek.</summary>
+    [Parameter]
+    public EventCallback<SheetSize> OnSet { get; set; }
+
+    // "Resize list. Currently {peek, 80 percent} height." (01 section 10.3); the visible summary is not part of the name, the section tabs announce the count.
+    private string AriaLabel => Size == SheetSize.Tall ? "Resize list. Currently 80 percent height." : "Resize list. Currently peek height.";
+
+    private Task ToggleAsync() => OnToggle.InvokeAsync();
+
+    private Task KeyDownAsync(KeyboardEventArgs args) =>
+        args.Key switch
+        {
+            "ArrowUp" or "End" => OnSet.InvokeAsync(SheetSize.Tall),
+            "ArrowDown" or "Home" => OnSet.InvokeAsync(SheetSize.Peek),
+            _ => Task.CompletedTask,
+        };
+}
