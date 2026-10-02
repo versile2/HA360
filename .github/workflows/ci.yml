@@ -45,6 +45,8 @@ jobs:
         run: >
           dotnet build Realm.slnx -c Release --no-restore
           -flp:"logfile=ci-out/build.log;verbosity=minimal" -flp1:"logfile=ci-out/errors.log;errorsonly"
+      - name: Publish the web app for the e2e job (S6a; right after the build, so e2e still runs when a unit test fails)
+        run: dotnet publish src/Realm.Web/Realm.Web.csproj -c Release --no-build -o publish/web -p:UseAppHost=false
       - name: Unit and bUnit tests
         run: dotnet test Realm.slnx -c Release --no-build --logger trx --results-directory ci-out/trx
       - if: always()                              # S5b: two paths put the artifact root at the workspace, so the e2e job reads tests/contract/payloads next to ci-out
@@ -55,6 +57,9 @@ jobs:
             ci-out
             tests/contract/payloads
           retention-days: 3
+      - if: always()                              # S6a: nothing is uploaded (a warning, no failure) when the build died before the publish step
+        uses: actions/upload-artifact@v7
+        with: { name: publish-web, path: publish/web, retention-days: 1 }
 
   js:                                             # 7.2, S5a: types and Node tests of wwwroot/js and tools/ci; no browser, no C#
     needs: guards
@@ -93,8 +98,66 @@ jobs:
         uses: actions/upload-artifact@v7
         with: { name: docker-smoke, path: ci-out, retention-days: 3 }
 
+  e2e:                                            # 7.5, S6a: Playwright behind the ingress proxy, against the published app in Demo mode
+    needs: [guards, dotnet]
+    if: ${{ !cancelled() && needs.guards.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - id: dl
+        uses: actions/download-artifact@v8
+        continue-on-error: true
+        with: { name: publish-web, path: publish/web }
+      - if: steps.dl.outcome != 'success'
+        run: echo "::error::no published build; the dotnet job failed before publish, read its errors.log" && exit 1
+      - uses: actions/setup-dotnet@v6
+        with: { global-json-file: global.json }
+      - uses: actions/setup-node@v7
+        with: { node-version: 22, cache: npm }
+      - run: npm ci --ignore-scripts
+      - id: pw
+        run: echo "v=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v6
+        with: { path: ~/.cache/ms-playwright, key: "pw-${{ runner.os }}-${{ steps.pw.outputs.v }}" }
+      - run: npx playwright install --with-deps chromium
+      - name: Demo cast for the tests (single source of truth, 02 section 9.2; no host is built)
+        run: |
+          mkdir -p tests/e2e/fixtures
+          dotnet publish/web/Realm.Web.dll export-demo-cast tests/e2e/fixtures/demo-cast.json
+      - id: contract_dl
+        uses: actions/download-artifact@v8
+        continue-on-error: true
+        with: { name: dotnet, path: ci-in-dotnet }
+      # The C# golden payloads are validated by node (03 section 4.5, G-9). The step does not stop the job: Playwright still runs, so one push shows both
+      # results, and the last step of the job fails it if this one did. The TAP file is what make-summary.mjs reads. An empty folder would make the
+      # golden test skip, so a missing one fails when the dotnet job passed (03 only warned: a vacuous pass hides a broken fixture upload).
+      - id: contract
+        name: Payload contract (C# fixtures validated by node)
+        continue-on-error: true
+        run: |
+          mkdir -p ci-out/e2e
+          if ls ci-in-dotnet/tests/contract/payloads/*.json > /dev/null 2>&1; then
+            mkdir -p tests/contract
+            cp -r ci-in-dotnet/tests/contract/payloads tests/contract/
+            node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=tap --test-reporter-destination=ci-out/e2e/contract.tap "tests/contract/**/*.test.mjs"   # quoted glob (PR-3, R3-009)
+          elif [ "${{ needs.dotnet.result }}" = "success" ]; then
+            echo "::error::the dotnet job passed but uploaded no tests/contract/payloads (PayloadContractTests writes them)"
+            exit 1
+          else
+            echo "::warning::payload fixtures missing (the dotnet tests died early)"
+          fi
+      - name: Run E2E (Demo mode behind the ingress harness)
+        run: npx playwright test --config tests/e2e/playwright.config.ts
+        env: { CI: "true", REALM_APP_DLL: publish/web/Realm.Web.dll }
+      - if: always()                              # ci-out holds only e2e/ (results.json, html, artifacts, app.log, contract.tap) and shots/ (the gallery, S6b)
+        uses: actions/upload-artifact@v7
+        with: { name: e2e, path: ci-out, retention-days: 3 }
+      - if: steps.contract.outcome == 'failure'
+        run: echo "::error::the payload contract step failed (details in the step above and in SUMMARY.md)" && exit 1
+
   publish-ci:                                     # 7.4
-    needs: [guards, dotnet, js, docker-smoke]
+    needs: [guards, dotnet, js, docker-smoke, e2e]
     if: ${{ always() && !cancelled() }}
     runs-on: ubuntu-latest
     permissions: { contents: write }

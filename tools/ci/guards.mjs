@@ -211,13 +211,15 @@ function makeContext(root) {
 // Line scanners shared by the source guards
 // ---------------------------------------------------------------------------------------------
 
-// rules: [{ re, message }]; returns the fails of one file (comments skipped, allow-list honoured).
+// rules: [{ re, message, files? }]; returns the fails of one file (comments skipped, allow-list honoured). A rule with `files` (a RegExp over the
+// relative path) only looks at the files it matches.
 function scanFile(ctx, guard, rel, rules) {
   const text = readText(ctx.root, rel);
   const rawLines = text.split('\n');
   const fails = [];
   stripComments(text, kindOf(rel)).split('\n').forEach((line, i) => {
     for (const rule of rules) {
+      if (rule.files && !rule.files.test(rel)) continue;
       if (rule.re.test(line) && !ctx.allowed(guard, rel, rawLines[i])) fails.push({ file: rel, line: i + 1, message: rule.message });
     }
   });
@@ -230,6 +232,9 @@ function scanSources(ctx, guard, accepts, rules) {
 }
 
 const SOURCE_TEXT = /\.(?:razor|cshtml|html?|cs|js|mjs|css)$/i;
+// Where JavaScript lives (script files and inline <script> in markup) and where CSS does (stylesheets and inline <style> or style="" in markup).
+const SCRIPT_SOURCE = /\.(?:js|mjs|razor|cshtml|html?)$/i;
+const STYLE_SOURCE = /\.(?:css|razor|cshtml|html?)$/i;
 
 // ---------------------------------------------------------------------------------------------
 // The guards (03 section 7.3). Each returns { fails, reports?, checked, note? }.
@@ -310,7 +315,13 @@ function optionBindings(ctx) {
 
 function noLeadingSlash(ctx) {
   return scanSources(ctx, 'no-leading-slash', (rel) => SOURCE_TEXT.test(rel), [
-    { re: /\b(?:href|src)=\\?["']\//, message: 'href="/ or src="/ starts at the server root and breaks behind Ingress; use a relative URL' },
+    // HTML attribute names are case-insensitive (CR2-005): HREF="/x" breaks behind Ingress like href="/x".
+    { re: /\b(?:href|src)=\\?["']\//i, message: 'href="/ or src="/ starts at the server root and breaks behind Ingress; use a relative URL' },
+    // The same mistake in scripts and styles (CR2-005): a leading slash in a module specifier, a fetch, a worker or a stylesheet url().
+    { re: /\bimport\(\s*["'`]\//, files: SCRIPT_SOURCE, message: 'import("/...") starts at the server root and breaks behind Ingress; use a URL relative to the module (import.meta.url) or the page' },
+    { re: /\bfetch\(\s*["'`]\//, files: SCRIPT_SOURCE, message: 'fetch("/...") starts at the server root and breaks behind Ingress; use a relative URL' },
+    { re: /\bnew\s+(?:Shared)?Worker\(\s*["'`]\//, files: SCRIPT_SOURCE, message: 'new Worker("/...") starts at the server root and breaks behind Ingress; use a relative URL' },
+    { re: /\burl\(\s*["']?\//i, files: STYLE_SOURCE, message: 'url(/...) starts at the server root and breaks behind Ingress; use a URL relative to the stylesheet' },
     { re: /\bNavigateTo\(\s*[$@]*"\//, message: 'NavigateTo("/...") starts at the server root; use a relative URL' },
     { re: /\b(?:Results|Response)\.Redirect\(/, message: 'Results.Redirect( and Response.Redirect( are banned; use Results.LocalRedirect with the PathBase' },
     { re: /\bnew\s+Uri\((?:[^()]|\([^()]*\))*,\s*[$@]*"\//, message: 'new Uri(..., "/...") starts at the server root; use a relative URL' },

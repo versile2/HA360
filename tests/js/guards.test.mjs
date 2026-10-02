@@ -355,6 +355,18 @@ const LEADING_SLASH = [
   ['Response.Redirect(', web('Ep.cs', 'ctx.Response.Redirect("x");\n'), /Ep\.cs:1/],
   ['new Uri(..., "/', web('Ep.cs', 'var u = new Uri(Base(a), "/x");\n'), /Ep\.cs:1 new Uri/],
   ['href="/ in a script file', web('wwwroot/js/a.js', 'el.innerHTML = \'<a href="/x">\';\n'), /a\.js:1/],
+  // CR2-005: attribute names are case-insensitive, and scripts and styles can start at the server root too.
+  ['HREF="/ (upper case attribute)', web('Pages/A.razor', '<a HREF="/driving">x</a>\n'), /Pages\/A\.razor:1 href="\/ or src="\/ starts at the server root/],
+  ['Src=\'/ (mixed case attribute)', web('wwwroot/index.html', "<img Src='/img/x.svg'>\n"), /index\.html:1 href="\/ or src="\//],
+  ['import("/ in a script', web('wwwroot/js/a.js', 'const m = await import("/lib/maplibre-gl/maplibre-gl.mjs");\n'), /a\.js:1 import\("\/\.\.\."\) starts at the server root/],
+  ['import(`/ in a module (template literal)', web('wwwroot/js/a.mjs', 'const m = await import( `/lib/x.mjs`);\n'), /a\.mjs:1 import\("\//],
+  ['fetch("/ in a script', web('wwwroot/js/a.js', "const r = await fetch('/api/x');\n"), /a\.js:1 fetch\("\/\.\.\."\) starts at the server root/],
+  ['new Worker("/ in a script', web('wwwroot/js/a.js', 'const w = new Worker("/lib/maplibre-gl/maplibre-gl-worker.mjs", { type: "module" });\n'), /a\.js:1 new Worker\("\/\.\.\."\) starts at the server root/],
+  ['new SharedWorker("/ in a script', web('wwwroot/js/a.js', "const w = new SharedWorker('/w.js');\n"), /a\.js:1 new Worker\(/],
+  ['import("/ in an inline script', web('Pages/A.razor', '<script>import("/x.mjs");</script>\n'), /Pages\/A\.razor:1 import\(/],
+  ['url(/ in a stylesheet', web('wwwroot/css/app.css', '.a { background: url(/img/x.svg); }\n'), /app\.css:1 url\(\/\.\.\.\) starts at the server root/],
+  ['url("/ in a stylesheet (quoted, upper case)', web('wwwroot/css/app.css', '@font-face { src: URL( "/fonts/x.woff2" ); }\n'), /app\.css:1 url\(/],
+  ['url(\'/ in a style attribute', web('Pages/A.razor', "<div style=\"background:url('/img/x.svg')\"></div>\n"), /Pages\/A\.razor:1 url\(/],
 ];
 
 for (const [label, overrides, pattern] of LEADING_SLASH) {
@@ -362,6 +374,49 @@ for (const [label, overrides, pattern] of LEADING_SLASH) {
     expectFail(overrides, 'no-leading-slash', pattern);
   });
 }
+
+test('no-leading-slash: passes on relative URLs in scripts and styles, and on each rule outside its file kind', () => {
+  expectPass(
+    {
+      ...web('wwwroot/js/a.js', [
+        'const m = await import("./maplibre-gl.mjs");',
+        'const n = await import(new URL("./x.mjs", import.meta.url));',
+        'const r = await fetch("api/x");',
+        'const s = await fetch(url);',
+        'const w = new Worker(workerUrl, { type: "module" });',
+        'const t = new Worker("worker.mjs");',
+        'const u = new URL("/x", location.origin);',
+        '// fetch("/x") and import("/y") are comments',
+        '/* new Worker("/z") */',
+        'el.style.background = "url(img/x.svg)";',
+        '',
+      ].join('\n')),
+      ...web('wwwroot/css/app.css', [
+        '.a { background: url(img/x.svg); }',
+        '.b { background: url("../img/x.svg"); }',
+        '.c { background: url(data:image/svg+xml,%3Csvg%3E%3C/svg%3E); }',
+        '.d { fill: url(#gradient); }',
+        '.e { background: url(https://example.invalid/x.png); }',
+        '/* .f { background: url(/old.png); } */',
+        '',
+      ].join('\n')),
+      ...web('Pages/A.razor', '<a href="driving">x</a>\n<div style="background:url(img/x.svg)"></div>\n<script>fetch("api/x");</script>\n'),
+      // A rule looks only at its own file kind: the script rules skip C# and CSS, the url() rule skips scripts and C#.
+      ...web('Ep.cs', 'var s = "fetch(\\"/x\\") and import(\\"/y\\") and url(/z)";\nvar t = "new Worker(\\"/w\\")";\n'),
+    },
+    'no-leading-slash',
+  );
+  expectPass(web('wwwroot/css/other.css', 'a::after { content: "fetch(\'/x\')"; }\n'), 'no-leading-slash');
+  expectPass(web('wwwroot/js/other.js', "const css = '.a { background: url(/img/x.svg); }';\n"), 'no-leading-slash');
+});
+
+test('no-leading-slash: a script finding is allowed by file and line text, with a reason; the other line still fails', () => {
+  const overrides = web('wwwroot/js/a.js', "const r = await fetch('/api/x');\nconst s = await fetch('/api/y');\n");
+  expectFail(overrides, 'no-leading-slash', /a\.js:1 fetch/);
+  const entry = { file: 'src/Realm.Web/wwwroot/js/a.js', contains: '/api/x', reason: 'a stand-in for a call that must reach the server root' };
+  const result = expectFail({ ...overrides, ...allow('no-leading-slash', entry) }, 'no-leading-slash', /a\.js:2 fetch/);
+  assert.ok(!linesOf(result, 'no-leading-slash').some((line) => /a\.js:1 /.test(line)), 'line 1 is allowed');
+});
 
 // ---------------------------------------------------------------------------------------------
 // no-static-files

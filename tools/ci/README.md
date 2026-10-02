@@ -5,7 +5,7 @@ Nobody reads a console, so every run, pass or fail, ends in a readable summary o
 
 | File | Role |
 |---|---|
-| `make-summary.mjs` | Reads the downloaded job artifacts and writes `SUMMARY.md`, `errors.log`, `build.tail.log` and `tests/*.trx`. Node built-ins only. |
+| `make-summary.mjs` | Reads the downloaded job artifacts and writes `SUMMARY.md`, `errors.log`, `build.tail.log`, `tests/*.trx` and, from the `e2e` job, `e2e/results.json`, `e2e/contract.tap`, `e2e/app.log`, `shots/` and `failures/`. Renders `## E2E` and the AC matrix `## Acceptance criteria`. Node built-ins only. |
 | `guards.mjs` | The twelve guards of 03 section 7.3: one `PASS`/`FAIL`/`REPORT` line per finding, exit 1 on any `FAIL`. The `guards` job tees its whole output to `guards.log` (uploaded with the `guards` artifact, also when a guard fails). |
 | `image-smoke.sh` | Runs the built image the way the Supervisor does (Demo data, no Home Assistant) and checks items 1 to 4, 9 and 10 of 03 section 7.8; prints one `PASS`/`WARN`/`FAIL`/`SKIP` line per item and writes `ci-out/smoke.json` (sizes, time to healthy, one entry per item, and `failing_requests`: the response headers of a failed request, plus what the image holds for static web assets when the Blazor script is not served), which `make-summary.mjs` renders as `## Docker smoke`. Item 4 (`Set-Cookie` on `/`) is informational (D61): `WARN` with the cookie names, never `FAIL`. Needs Docker, so only the `docker-smoke` job runs it. |
 | `validate-styles.mjs` | Validates the map styles against the MapLibre style specification: the styles built in `mapStyles.js` (satellite, demo-offline) with the zone and halo overlay appended are a `FAIL` on any error (exit 1); the three OpenFreeMap styles are fetched and an unreachable URL or a problem in the published style is only a `WARN`. `--offline` skips the fetches. The `js` job runs it as a soft step (`continue-on-error`) and keeps the output in `styles.log`. |
@@ -62,6 +62,11 @@ runs/<branch-slug>/<run>-<sha7>/
     errors.log                             compiler errors, distinct (the restore.log tail when the build never ran)
     build.tail.log                         last 300 lines of the build log
     tests/*.trx                            test results
+    e2e/results.json                       Playwright's JSON report (the e2e job)
+    e2e/contract.tap                       the payload contract run (tests/contract, node --test)
+    e2e/app.log                            the last 300 lines of the Demo app's log during the e2e run
+    shots/<project>/<scene>.png            the screenshot gallery (S6b), when there is one
+    failures/<test>.<project>.png          the first 20 screenshots of failing e2e tests
 ```
 
 The branch slug is the branch name in lower case with every character outside `[a-z0-9._-]` replaced by `-`
@@ -80,6 +85,19 @@ the run left no input at all.
 `## Guards` (after the job table, when a `guards.log` was downloaded) lists every `FAIL` line as written, one `REPORT` line per
 guard with id ranges compressed (`REPORT ac-coverage: 50 AC ids missing (AC-01 … AC-50)`) and the `PASS` count; when guards
 fail, `- why:` and the Notes say `guards failed: <guard names>` instead of the compiler or test-host wording.
+
+`## E2E` (after the job table, when the `e2e` job left a `results.json` or `contract.tap`) gives the Playwright counts (passed, failed,
+flaky, skipped), then one block per failed test (project, file, title, the acceptance criteria in its title, the first 15 lines of
+the error), the payload contract result, and the tail of the app log when something failed. A failed test, a failed contract test,
+an unreadable `results.json` or one with no test fails the run; so does an `e2e` job that succeeded and left no `results.json`.
+A test that failed and then passed on its retry is `flaky`: listed under `## Flaky tests`, never a failure of the run.
+
+`## Acceptance criteria` is the AC matrix: one row per criterion, AC-01 to AC-50, with the status `passed`, `failed`, `skipped`,
+`flaky` or `missing` and where the tests were found. A criterion is read from the test titles that carry `[AC-nn]` (a suffix
+such as `[AC-49a]` counts for AC-49): the display names in the `.trx` files (dotnet), the titles in `e2e/results.json` (retries
+turn a pass into `flaky`) and the TAP of the `js` job (`js-tests.tap`). With several tests the worst status wins: failed, flaky,
+passed, skipped; no test at all is `missing`. The matrix is report-only until S15 (D50): it never changes the verdict, a failed
+test fails the run through the rules above. The `ac-coverage` guard still checks the titles themselves.
 
 ## Authentication of the publish step
 

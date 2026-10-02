@@ -1,11 +1,28 @@
 // Tests for tools/ci/make-summary.mjs: SUMMARY.md from errors.log, restore.log and .trx files.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 
-import { crashReport, distinctDiagnostics, normalizeDiagnostic, parseGuardsLog, parseSmoke, parseTrx, reportLine, smokeSection } from '../../tools/ci/make-summary.mjs';
+import {
+  acTokens,
+  buildAcMatrix,
+  crashReport,
+  distinctDiagnostics,
+  e2eReport,
+  normalizeDiagnostic,
+  parseGuardsLog,
+  parsePlaywright,
+  parseSmoke,
+  parseTap,
+  parseTrx,
+  parseTrxAcTests,
+  reportLine,
+  screenshotCopies,
+  smokeSection,
+} from '../../tools/ci/make-summary.mjs';
 import { cleanEnv, fixture, repoRoot, tempDir, tools, writeFile } from './helpers/ci-harness.mjs';
 
 const WORKSPACE = '/home/runner/work/ha360/ha360';
@@ -507,4 +524,405 @@ test('helpers: parseSmoke reads items by number, tolerates case and gaps, and co
   assert.match(smokeSection(parseSmoke('nope')), /^## Docker smoke\n\nsmoke\.json is not valid JSON/);
   const long = smokeSection(parseSmoke(JSON.stringify({ item1: 'FAIL', item1_title: 't', item1_detail: `${'x'.repeat(600)}\nsecond line` })));
   assert.match(long, /\| 1 \| t \| FAIL \| x{400}\.\.\. \|/, 'a long detail is cut and kept on one line');
+});
+
+// ---------------------------------------------------------------------------------------------
+// S6a: the AC matrix ("## Acceptance criteria") and the e2e job (Playwright's results.json, the payload contract TAP, screenshots)
+// ---------------------------------------------------------------------------------------------
+
+// A .trx with one result per [name, outcome].
+const trxOf = (results) =>
+  `<TestRun xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010"><Results>${results
+    .map(([name, outcome]) => `<UnitTestResult testId="x" testName="${name}" outcome="${outcome}" />`)
+    .join('')}</Results><ResultSummary outcome="Completed"><Counters total="${results.length}" executed="${results.length}" passed="${results.filter((r) => r[1] === 'Passed').length}" failed="${results.filter((r) => r[1] === 'Failed').length}" error="0" /></ResultSummary></TestRun>`;
+
+// A Playwright JSON report (the shape of the `json` reporter: suites > suites > specs > tests > results) from [{ title, project, status, retries, error, attachments }].
+// status is Playwright's own: expected | unexpected | flaky | skipped.
+const playwrightOf = (tests, errors = []) => {
+  const spec = (t, i) => {
+    const attempts = t.attempts ?? (t.status === 'flaky' ? ['failed', 'passed'] : t.status === 'unexpected' ? ['failed', 'failed'] : t.status === 'skipped' ? ['skipped'] : ['passed']);
+    return {
+      title: t.title,
+      ok: t.status === 'expected' || t.status === 'flaky',
+      tags: [],
+      id: `spec-${i}`,
+      file: 'specs/demo.spec.ts',
+      line: 10 + i,
+      column: 3,
+      tests: [
+        {
+          timeout: 45000,
+          annotations: [],
+          expectedStatus: t.expectedStatus ?? 'passed',
+          projectId: t.project ?? 'phone',
+          projectName: t.project ?? 'phone',
+          results: attempts.map((status, retry) => ({
+            workerIndex: 0,
+            status,
+            duration: 5,
+            errors: [],
+            error: status === 'failed' ? { message: t.error ?? 'Error: expect(received).toBe(expected)', location: { file: '/w/tests/e2e/specs/demo.spec.ts', line: 12, column: 5 } } : undefined,
+            stdout: [],
+            stderr: [],
+            retry,
+            attachments: status === 'failed' && retry === attempts.length - 1 ? (t.attachments ?? []) : [],
+          })),
+          status: t.status,
+        },
+      ],
+    };
+  };
+  return JSON.stringify({
+    config: {},
+    suites: [{ title: 'demo.spec.ts', file: 'demo.spec.ts', column: 0, line: 0, specs: [], suites: [{ title: 'demo group', file: 'demo.spec.ts', column: 6, line: 3, specs: tests.map(spec), suites: [] }] }],
+    errors,
+    stats: {},
+  });
+};
+
+const e2eNeeds = (e2e) => JSON.stringify({ dotnet: { result: 'success', outputs: {} }, e2e: { result: e2e, outputs: {} } });
+const acRows = (summary) => new Map([...summary.matchAll(/^\| (AC-\d\d) \| (\w+) \| (.*) \|$/gm)].map((m) => [m[1], { status: m[2], found: m[3] }]));
+
+test('helpers: acTokens reads [AC-nn] and [AC-nna], ignores ids outside AC-01..AC-50', () => {
+  assert.deepEqual(acTokens('[AC-05] [AC-49a] two tokens'), [{ n: 5, part: '05' }, { n: 49, part: '49a' }]);
+  assert.deepEqual(acTokens('Realm.Web.Tests.X.[AC-13a] [AC-16a] pins'), [{ n: 13, part: '13a' }, { n: 16, part: '16a' }]);
+  assert.deepEqual(acTokens('[AC-00] [AC-51] [AC-5] [ac-05] AC-05 [X-01] [AC-050]'), [], 'out of range, one digit, lower case, no brackets, three digits');
+});
+
+test('helpers: parseTrxAcTests keeps the tests whose name carries a token, decodes the name and maps the outcome', () => {
+  const tests = parseTrxAcTests(
+    trxOf([
+      ['Realm.Web.Tests.A.[AC-01] one', 'Passed'],
+      ['Realm.Web.Tests.A.[AC-02] a &lt;b&gt; &amp; c', 'Failed'],
+      ['Realm.Web.Tests.A.[AC-03] third', 'NotExecuted'],
+      ['Realm.Web.Tests.A.[AC-04] fourth', 'Inconclusive'],
+      ['Realm.Web.Tests.A.no token', 'Passed'],
+      ['Realm.Web.Tests.A.[AC-99] outside', 'Passed'],
+    ]),
+  );
+  assert.deepEqual(tests, [
+    { title: 'Realm.Web.Tests.A.[AC-01] one', status: 'passed' },
+    { title: 'Realm.Web.Tests.A.[AC-02] a <b> & c', status: 'failed' },
+    { title: 'Realm.Web.Tests.A.[AC-03] third', status: 'skipped' },
+    { title: 'Realm.Web.Tests.A.[AC-04] fourth', status: 'skipped' },
+  ]);
+  assert.deepEqual(parseTrxAcTests('<TestRun></TestRun>'), []);
+});
+
+test('helpers: parseTap reads ok, not ok and directives, the counters and the YAML block of a failure', () => {
+  const tap = [
+    'TAP version 13',
+    '# Subtest: a suite',
+    'ok 1 - passes [AC-01]',
+    'not ok 2 - breaks [AC-02]',
+    '  ---',
+    '  duration_ms: 1.5',
+    '  error: \'Expected values to be strictly equal:\'',
+    '  expected: 1',
+    '  actual: 2',
+    '  ...',
+    'ok 3 - later # SKIP not yet',
+    'ok 4 - planned # TODO soon',
+    'not ok 5 - failing todo # TODO soon',
+    '1..5',
+    '# tests 5',
+    '# pass 2',
+    '# fail 1',
+    '',
+  ].join('\n');
+  const parsed = parseTap(tap);
+  assert.deepEqual(parsed.tests, [
+    { title: 'passes [AC-01]', status: 'passed' },
+    { title: 'breaks [AC-02]', status: 'failed' },
+    { title: 'later', status: 'skipped' },
+    { title: 'planned', status: 'skipped' },
+    { title: 'failing todo', status: 'skipped' },
+  ]);
+  assert.equal(parsed.pass, 2);
+  assert.equal(parsed.fail, 1);
+  assert.equal(parsed.failures.length, 1);
+  assert.equal(parsed.failures[0].title, 'breaks [AC-02]');
+  assert.match(parsed.failures[0].detail, /error: 'Expected values to be strictly equal:'\n\s+expected: 1\n\s+actual: 2/);
+  assert.doesNotMatch(parsed.failures[0].detail, /^\s*\.\.\.\s*$/m, 'the YAML terminator is not part of the detail');
+  assert.deepEqual(parseTap('nothing here'), { tests: [], pass: null, fail: null, failures: [] });
+  // Nested subtests are indented in the TAP of node:test; they count like the top-level ones.
+  assert.deepEqual(parseTap('    ok 1 - inner [AC-07]\nok 1 - outer').tests.map((t) => t.title), ['inner [AC-07]', 'outer']);
+});
+
+test('helpers: parsePlaywright maps passed, failed, flaky and skipped, joins the titles and keeps the first error and its screenshots', () => {
+  const parsed = parsePlaywright(
+    playwrightOf([
+      { title: '[AC-01] passes', status: 'expected' },
+      { title: '[AC-02] fails', status: 'unexpected', project: 'unfolded', error: '\u001b[31mError: boom\u001b[39m\nCall log', attachments: [{ name: 'screenshot', contentType: 'image/png', path: '/w/ci-out/e2e/artifacts/t-1/test-failed-1.png' }, { name: 'trace', contentType: 'application/zip', path: '/w/t.zip' }] },
+      { title: '[AC-03] flaky', status: 'flaky' },
+      { title: '[AC-04] skipped', status: 'skipped' },
+      { title: '[AC-05] expected to fail', status: 'expected', expectedStatus: 'failed', attempts: ['failed'] },
+    ]),
+  );
+  assert.deepEqual(parsed.tests.map((t) => [t.specTitle, t.status, t.project]), [
+    ['[AC-01] passes', 'passed', 'phone'],
+    ['[AC-02] fails', 'failed', 'unfolded'],
+    ['[AC-03] flaky', 'flaky', 'phone'],
+    ['[AC-04] skipped', 'skipped', 'phone'],
+    ['[AC-05] expected to fail', 'skipped', 'phone'],
+  ]);
+  assert.equal(parsed.tests[0].title, 'demo group › [AC-01] passes', 'the file suite is left out, the describe title is kept');
+  assert.equal(parsed.tests[1].message, 'Error: boom\nCall log', 'colour codes are removed');
+  assert.equal(parsed.tests[1].location, 'demo.spec.ts:12');
+  assert.deepEqual(parsed.tests[1].screenshots, ['/w/ci-out/e2e/artifacts/t-1/test-failed-1.png'], 'only PNG attachments');
+  assert.deepEqual(parsed.errors, []);
+  assert.deepEqual(parsePlaywright(playwrightOf([], [{ message: 'Error: no tests found' }])).errors, ['Error: no tests found']);
+  assert.match(parsePlaywright('{ nope').unreadable, /not valid JSON/);
+  assert.match(parsePlaywright('{"config":{}}').unreadable, /no "suites"/);
+  assert.match(parsePlaywright('[]').unreadable, /no "suites"/);
+});
+
+test('helpers: buildAcMatrix gives every criterion one row; failed beats flaky beats passed beats skipped; a suffix counts for its criterion', () => {
+  const rows = buildAcMatrix([
+    { title: '[AC-01] a', status: 'passed', source: 'dotnet' },
+    { title: '[AC-02] a', status: 'passed', source: 'dotnet' },
+    { title: '[AC-02] b', status: 'failed', source: 'e2e' },
+    { title: '[AC-03] a', status: 'passed', source: 'e2e' },
+    { title: '[AC-03] b', status: 'flaky', source: 'e2e' },
+    { title: '[AC-04] a', status: 'skipped', source: 'e2e' },
+    { title: '[AC-04] b', status: 'passed', source: 'node' },
+    { title: '[AC-05] a', status: 'skipped', source: 'e2e' },
+    { title: '[AC-49a] a', status: 'passed', source: 'dotnet' },
+    { title: '[AC-49b] [AC-50] both', status: 'passed', source: 'dotnet' },
+    { title: '[AC-77] outside', status: 'failed', source: 'dotnet' },
+  ]);
+  assert.equal(rows.length, 50);
+  assert.deepEqual(rows.map((r) => r.id).slice(0, 2).concat(rows[49].id), ['AC-01', 'AC-02', 'AC-50']);
+  const status = (id) => rows.find((r) => r.id === id).status;
+  assert.equal(status('AC-01'), 'passed');
+  assert.equal(status('AC-02'), 'failed');
+  assert.equal(status('AC-03'), 'flaky');
+  assert.equal(status('AC-04'), 'passed');
+  assert.equal(status('AC-05'), 'skipped');
+  assert.equal(status('AC-06'), 'missing');
+  assert.equal(status('AC-49'), 'passed');
+  assert.equal(status('AC-50'), 'passed');
+  assert.equal(rows.find((r) => r.id === 'AC-02').found, 'dotnet 1, e2e 1');
+  assert.deepEqual(rows.find((r) => r.id === 'AC-49').parts, ['49a', '49b']);
+  assert.equal(rows.filter((r) => r.status === 'missing').length, 43);
+  assert.deepEqual(buildAcMatrix([]).map((r) => r.status), Array(50).fill('missing'));
+});
+
+test('AC matrix: 50 rows built from the .trx, results.json and the js TAP; report-only, so the verdict does not move', () => {
+  const run = summarize({
+    files: {
+      'dotnet/trx/results.trx': trxOf([
+        ['Realm.Web.Tests.Zones.[AC-13a] zone fill', 'Passed'],
+        ['Realm.Web.Tests.Zones.[AC-49a] pins', 'Passed'],
+        ['Realm.Web.Tests.Zones.[AC-49b] pins again', 'Passed'],
+        ['Realm.Web.Tests.Zones.[AC-30] cut', 'NotExecuted'],
+        ['Realm.Web.Tests.Zones.untitled', 'Passed'],
+      ]),
+      'e2e/results.json': playwrightOf([
+        { title: '[AC-01] opens', status: 'expected' },
+        { title: '[AC-02] sheet', status: 'flaky' },
+        { title: '[AC-13] zone fill, seen', status: 'expected' },
+        { title: '[X-01] platform', status: 'expected' },
+      ]),
+      'js/js-tests.tap': 'ok 1 - [AC-40] the layout solver\nok 2 - plain test\n# pass 2\n# fail 0\n',
+    },
+    needs: e2eNeeds('success'),
+  });
+  assert.equal(run.status, 0, run.stderr);
+  assert.match(run.summary, /^- result: success$/m, 'a flaky test and 44 missing criteria do not fail the run');
+  const matrix = section(run.summary, 'Acceptance criteria');
+  assert.ok(matrix, 'the section exists');
+  assert.match(matrix, /Report-only until S15 \(D50\)/);
+  assert.match(matrix, /^50 criteria: 4 passed, 0 failed, 1 skipped, 1 flaky, 44 missing\.$/m);
+  const rows = acRows(run.summary);
+  assert.equal(rows.size, 50, 'one row per criterion');
+  assert.deepEqual([...rows.keys()].slice(0, 3), ['AC-01', 'AC-02', 'AC-03']);
+  assert.deepEqual(rows.get('AC-01'), { status: 'passed', found: 'e2e 1' });
+  assert.deepEqual(rows.get('AC-02'), { status: 'flaky', found: 'e2e 1' });
+  assert.deepEqual(rows.get('AC-13'), { status: 'passed', found: 'dotnet 1, e2e 1 (13a)' }, 'a dotnet [AC-13a] and an e2e [AC-13] meet in one row');
+  assert.deepEqual(rows.get('AC-30'), { status: 'skipped', found: 'dotnet 1' });
+  assert.deepEqual(rows.get('AC-40'), { status: 'passed', found: 'node 1' });
+  assert.deepEqual(rows.get('AC-49'), { status: 'passed', found: 'dotnet 2 (49a, 49b)' });
+  assert.deepEqual(rows.get('AC-50'), { status: 'missing', found: '—' });
+  assert.ok(run.summary.indexOf('## Jobs') < run.summary.indexOf('## Acceptance criteria'), 'the matrix follows the job table');
+});
+
+test('AC matrix: a failed test turns its criterion red and nothing else; a run without any test source has no matrix', () => {
+  const run = summarize({
+    files: { 'dotnet/trx/r.trx': trxOf([['T.[AC-07] x', 'Failed'], ['T.[AC-08] y', 'Passed']]) },
+    needs: NEEDS_OK,
+  });
+  const rows = acRows(run.summary);
+  assert.equal(rows.get('AC-07').status, 'failed');
+  assert.equal(rows.get('AC-08').status, 'passed');
+  assert.match(run.summary, /^- result: failure$/m, 'the failed test fails the run through the existing rule, not through the matrix');
+  assert.match(run.summary, /^50 criteria: 1 passed, 1 failed, 0 skipped, 0 flaky, 48 missing\.$/m);
+
+  const none = summarize({ files: { 'dotnet/errors.log': '' }, needs: NEEDS_OK });
+  assert.doesNotMatch(none.summary, /^## Acceptance criteria/m, 'no test source, no matrix');
+  const noTests = summarize({ files: { 'dotnet/errors.log': '', 'dotnet/trx/r.trx': fixture('results.passed.trx') }, needs: NEEDS_OK });
+  assert.equal(acRows(noTests.summary).size, 50, 'a .trx without tokens still gives the matrix, all missing');
+  assert.match(noTests.summary, /^50 criteria: 0 passed, 0 failed, 0 skipped, 0 flaky, 50 missing\.$/m);
+});
+
+test('AC matrix: the grouped ac-coverage guards line is kept as it was', () => {
+  const run = summarize({
+    files: { 'guards/guards.log': ['PASS config-name', ...AC_LINES, ''].join('\n'), 'dotnet/trx/r.trx': trxOf([['T.[AC-01] x', 'Passed']]) },
+    needs: guardsNeeds('success', 'success'),
+  });
+  assert.ok(section(run.summary, 'Guards').includes('REPORT ac-coverage: 50 AC ids missing (AC-01 … AC-50)\n'));
+  assert.equal(acRows(run.summary).get('AC-01').status, 'passed');
+});
+
+test('e2e: a clean run is summarised in one section, the matrix counts its tests, and results.json is published beside SUMMARY.md', () => {
+  const results = playwrightOf([
+    { title: '[X-01] platform', status: 'expected' },
+    { title: '[X-01] platform', status: 'expected', project: 'unfolded' },
+  ]);
+  const run = summarize({
+    files: { 'e2e/e2e/results.json': results, 'e2e/e2e/contract.tap': 'ok 1 - payload shape\n# pass 1\n# fail 0\n', 'e2e/e2e/app.log': 'info: started\nlistening\n' },
+    needs: e2eNeeds('success'),
+  });
+  assert.match(run.summary, /^- result: success$/m);
+  const e2e = section(run.summary, 'E2E');
+  assert.match(e2e, /2 passed, 0 failed, 0 flaky, 0 skipped \(2 test runs in 2 projects\)\./);
+  assert.match(e2e, /Payload contract \(node --test of tests\/contract\): 1 passed, 0 failed\./);
+  assert.doesNotMatch(run.summary, /^## App log/m, 'the app log is shown only when something failed');
+  assert.doesNotMatch(run.summary, /^## Flaky tests/m);
+  assert.equal(fs.readFileSync(path.join(run.outDir, 'e2e', 'results.json'), 'utf8'), results);
+  assert.equal(fs.readFileSync(path.join(run.outDir, 'e2e', 'contract.tap'), 'utf8'), 'ok 1 - payload shape\n# pass 1\n# fail 0\n');
+  assert.equal(fs.readFileSync(path.join(run.outDir, 'e2e', 'app.log'), 'utf8'), 'info: started\nlistening\n');
+});
+
+test('e2e: a failed test fails the run, with its message, its criteria and the app log; the job is not listed a second time', () => {
+  const run = summarize({
+    files: {
+      'e2e/e2e/results.json': playwrightOf([
+        { title: '[AC-05] [AC-06] pins fan', status: 'unexpected', project: 'phone-short', error: 'Error: expect(received).toBe(expected)\n\nExpected: 3\nReceived: 2' },
+        { title: '[X-01] fine', status: 'expected' },
+      ]),
+      'e2e/e2e/app.log': Array.from({ length: 50 }, (_, i) => `app line ${i + 1}`).join('\n') + '\n',
+    },
+    needs: e2eNeeds('failure'),
+  });
+  assert.match(run.summary, /^- result: failure$/m);
+  assert.match(run.summary, /^- why: 1 failed E2E test\(s\)$/m, 'the failure is named once; "job e2e: failure" is not added');
+  const failed = section(run.summary, 'Failed E2E tests \\(1\\)');
+  assert.ok(failed, 'a failed-tests section exists');
+  assert.match(failed, /^### \[phone-short\] specs\/demo\.spec\.ts › demo group › \[AC-05\] \[AC-06\] pins fan$/m);
+  assert.match(failed, /Acceptance criteria: AC-05, AC-06; at demo\.spec\.ts:12/);
+  assert.match(failed, /Expected: 3\nReceived: 2/);
+  const log = section(run.summary, 'App log \\(last 30 lines of e2e/app\\.log\\)');
+  assert.ok(log.includes('app line 50') && log.includes('app line 21') && !log.includes('app line 20\n'), 'the last 30 lines');
+  assert.doesNotMatch(run.summary, /^## Notes/m);
+  const rows = acRows(run.summary);
+  assert.equal(rows.get('AC-05').status, 'failed');
+  assert.equal(rows.get('AC-06').status, 'failed');
+});
+
+test('e2e: a flaky test is listed, reported in the matrix, and does not fail the run', () => {
+  const run = summarize({
+    files: { 'e2e/e2e/results.json': playwrightOf([{ title: '[AC-12] sheet snaps', status: 'flaky', project: 'unfolded' }]) },
+    needs: e2eNeeds('success'),
+  });
+  assert.match(run.summary, /^- result: success$/m);
+  assert.match(section(run.summary, 'E2E'), /0 passed, 0 failed, 1 flaky, 0 skipped/);
+  const flaky = section(run.summary, 'Flaky tests \\(1, passed on retry\\)');
+  assert.ok(flaky, 'a flaky section exists');
+  assert.match(flaky, /^\[unfolded\] demo group › \[AC-12\] sheet snaps$/m);
+  assert.equal(acRows(run.summary).get('AC-12').status, 'flaky');
+});
+
+test('e2e: no results.json after a failed job is explained; after a successful job it is a failure; a skipped job says nothing', () => {
+  const failedJob = summarize({ files: { 'e2e/e2e/app.log': 'Unhandled exception. boom\n' }, needs: e2eNeeds('failure') });
+  assert.match(failedJob.summary, /^- result: failure$/m);
+  assert.match(failedJob.summary, /^- why: job e2e: failure$/m);
+  assert.match(section(failedJob.summary, 'E2E'), /No e2e\/results\.json was found: Playwright did not get as far as writing its report .* The e2e job result is failure\./);
+  assert.match(section(failedJob.summary, 'App log \\(last 30 lines of e2e/app\\.log\\)'), /Unhandled exception\. boom/, 'the app log explains a start-up failure');
+
+  const lying = summarize({ files: { 'dotnet/errors.log': '' }, needs: e2eNeeds('success') });
+  assert.match(lying.summary, /^- why: job e2e succeeded but left no e2e\/results\.json$/m);
+  assert.match(lying.summary, /^- result: failure$/m);
+
+  const skipped = summarize({ files: { 'dotnet/errors.log': '' }, needs: JSON.stringify({ dotnet: { result: 'success', outputs: {} }, e2e: { result: 'skipped', outputs: {} } }) });
+  assert.doesNotMatch(skipped.summary, /^## E2E/m);
+  assert.doesNotMatch(skipped.summary, /e2e succeeded but left no/);
+});
+
+test('e2e: an unreadable results.json and a report without a test are failures, never silent', () => {
+  const broken = summarize({ files: { 'e2e/e2e/results.json': '{ not json' }, needs: e2eNeeds('failure') });
+  assert.match(broken.summary, /^- why: e2e: results\.json is not valid JSON/m);
+  assert.match(section(broken.summary, 'E2E'), /results\.json is not valid JSON/);
+  assert.equal(acRows(broken.summary).size, 50, 'the matrix is still written, every criterion missing');
+
+  const empty = summarize({ files: { 'e2e/e2e/results.json': playwrightOf([]) }, needs: e2eNeeds('success') });
+  assert.match(empty.summary, /^- why: e2e: results\.json holds no test$/m);
+
+  const outside = summarize({ files: { 'e2e/e2e/results.json': playwrightOf([], [{ message: 'Error: Timed out waiting 120000ms from config.webServer.' }]) }, needs: e2eNeeds('failure') });
+  assert.match(outside.summary, /^- why: Playwright reported an error outside the tests$/m);
+  assert.match(section(outside.summary, 'Playwright errors outside any test'), /Timed out waiting 120000ms/);
+});
+
+test('e2e: a failing payload contract fails the run and its TAP detail is shown', () => {
+  const tap = ['not ok 1 - members.json has the camelCase shape', '  ---', '  error: \'Expected values to be strictly equal\'', '  expected: true', '  actual: false', '  ...', 'ok 2 - zones.json', '# pass 1', '# fail 1', ''].join('\n');
+  const run = summarize({
+    files: { 'e2e/e2e/results.json': playwrightOf([{ title: '[X-01] fine', status: 'expected' }]), 'e2e/e2e/contract.tap': tap },
+    needs: e2eNeeds('failure'),
+  });
+  assert.match(run.summary, /^- result: failure$/m);
+  assert.match(run.summary, /^- why: payload contract: 1 failed$/m);
+  assert.match(section(run.summary, 'E2E'), /Payload contract \(node --test of tests\/contract\): 1 passed, 1 failed\./);
+  const detail = section(run.summary, 'Payload contract failures');
+  assert.match(detail, /### members\.json has the camelCase shape/);
+  assert.match(detail, /expected: true\n\s*actual: false/);
+});
+
+test('screenshots: the gallery under shots/ and the first 20 failure screenshots are copied and indexed with their sha256', () => {
+  const png = (seed) => `\u0089PNG-${seed}`;
+  const failing = Array.from({ length: 22 }, (_, i) => ({
+    title: `[X-${String(i + 1).padStart(2, '0')}] t${i + 1}`,
+    status: 'unexpected',
+    attachments: [{ name: 'screenshot', contentType: 'image/png', path: `/home/runner/work/ha360/ha360/ci-out/e2e/artifacts/t${i + 1}-phone/test-failed-1.png` }],
+  }));
+  const files = {
+    'e2e/e2e/results.json': playwrightOf(failing),
+    'e2e/shots/phone/location-sheet-peek.png': png('a'),
+    'e2e/shots/unfolded/location-panel.png': png('b'),
+    'e2e/e2e/readme.txt': 'not a png',
+  };
+  failing.forEach((_, i) => {
+    files[`e2e/e2e/artifacts/t${i + 1}-phone/test-failed-1.png`] = png(`f${i + 1}`);
+  });
+  const run = summarize({ files, needs: e2eNeeds('failure') });
+  assert.equal(fs.readFileSync(path.join(run.outDir, 'shots', 'phone', 'location-sheet-peek.png'), 'utf8'), png('a'));
+  assert.equal(fs.readFileSync(path.join(run.outDir, 'shots', 'unfolded', 'location-panel.png'), 'utf8'), png('b'));
+  const copied = fs.readdirSync(path.join(run.outDir, 'failures')).sort();
+  assert.equal(copied.length, 20, 'at most 20 failing-test screenshots');
+  assert.ok(copied.includes('x-01.phone.png') && copied.includes('x-20.phone.png') && !copied.includes('x-21.phone.png'));
+  assert.equal(fs.readFileSync(path.join(run.outDir, 'failures', 'x-01.phone.png'), 'utf8'), png('f1'));
+  assert.ok(!fs.existsSync(path.join(run.outDir, 'e2e', 'readme.txt')), 'only the named files are copied');
+  const index = section(run.summary, 'Screenshots \\(22\\)');
+  assert.ok(index, 'the index counts the gallery and the failure screenshots');
+  const digest = (text) => crypto.createHash('sha256').update(text).digest('hex').slice(0, 12);
+  assert.ok(index.includes(`shots/phone/location-sheet-peek.png  sha256:${digest(png('a'))}`));
+  assert.ok(index.includes(`failures/x-02.phone.png  sha256:${digest(png('f2'))}`));
+});
+
+test('helpers: screenshotCopies ignores PNGs outside a shots folder and numbers two failures of one test and project', () => {
+  const copies = screenshotCopies(['/a/b/other/x.png', '/a/e2e/shots/phone/a.png', '/a/shots'], null);
+  assert.deepEqual(copies, [{ from: '/a/e2e/shots/phone/a.png', to: 'shots/phone/a.png' }]);
+  const results = parsePlaywright(
+    playwrightOf([
+      { title: '[X-01] t', status: 'unexpected', attachments: [{ contentType: 'image/png', path: '/r/ci-out/e2e/artifacts/one/test-failed-1.png' }] },
+      { title: '[X-01] t', status: 'unexpected', attachments: [{ contentType: 'image/png', path: '/r/ci-out/e2e/artifacts/two/test-failed-1.png' }] },
+    ]),
+  );
+  const both = screenshotCopies(['/in/e2e/artifacts/one/test-failed-1.png', '/in/e2e/artifacts/two/test-failed-1.png'], results);
+  assert.deepEqual(both.map((c) => c.to), ['failures/x-01.phone.png', 'failures/x-01.phone-2.png']);
+  assert.equal(screenshotCopies(['/in/elsewhere/test-failed-1.png'], results).length, 0, 'a screenshot the report names but the artifact lacks is skipped');
+});
+
+test('helpers: e2eReport with nothing to report is empty', () => {
+  assert.deepEqual(e2eReport({ results: null, contract: null, appLog: null, jobResult: undefined }), { sections: [], problems: [], flaky: [] });
+  assert.deepEqual(e2eReport({ results: null, contract: null, appLog: null, jobResult: 'skipped' }), { sections: [], problems: [], flaky: [] });
 });
