@@ -69,10 +69,14 @@ public static class HandleSummaryFormatter
         return moving > 0 ? FormattableString.Invariant($"{count} · {moving} on the road") : $"{count} · all parked";
     }
 
-    /// <summary>"{n} places" and " · {m} occupied" when m &gt; 0, else " · all quiet"; a place is occupied when a person or a vehicle is inside it.</summary>
+    /// <summary>"{n} places" and " · {m} occupied" when m &gt; 0, else " · all quiet"; a place is occupied when a <b>person</b> is inside it, never because of a vehicle (01 section 5.3, R2-009).</summary>
+    /// <remarks>
+    /// 01 section 5.3: "A place is occupied when at least one person is inside it (PlaceVm.MemberIdsInside, which includes stale members, 02 §4.5); a vehicle never makes a place occupied."
+    /// This summary counts the same set as the row's "n here", the occupied-first sort and the zone's occupied fill, so the line and the rows agree.
+    /// </remarks>
     public static string Places(IReadOnlyList<PlaceVm> places)
     {
-        var occupied = places.Count(place => place.MemberIdsInside.Count + place.VehicleIdsInside.Count > 0);
+        var occupied = places.Count(place => place.MemberIdsInside.Count > 0);
         var count = places.Count == 1 ? "1 place" : FormattableString.Invariant($"{places.Count} places");
         return occupied > 0 ? FormattableString.Invariant($"{count} · {occupied} occupied") : $"{count} · all quiet";
     }

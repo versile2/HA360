@@ -63,11 +63,12 @@ public static class MapPayloadFactory
         return new VehiclesPayload(version, items);
     }
 
-    /// <summary>The zones: every place whose radius is above 0 and at most <see cref="MapPayloadOptions.MaxZoneRadiusKm"/> (the arrival zone is never sent), with the occupied flag and the three appearances.</summary>
+    /// <summary>The zones: every place whose radius is above 0 and at most <see cref="MapPayloadOptions.MaxZoneRadiusKm"/> (the arrival zone is never sent), with the occupied flag (people only) and the three appearances.</summary>
     public static ZonesPayload Zones(IReadOnlyList<PlaceVm> places, bool show, MapPayloadOptions options, int version)
     {
+        // 01 section 5.3 (R2-009): "A place is occupied when at least one person is inside it ... a vehicle never makes a place occupied", and the zone's occupied fill (4.6) counts people only.
         var zones = DrawnPlaces(places, options).Values
-            .Select(place => new ZoneItem(place.Id, place.DisplayName, place.Lat, place.Lon, place.RadiusM, place.MemberIdsInside.Count + place.VehicleIdsInside.Count > 0))
+            .Select(place => new ZoneItem(place.Id, place.DisplayName, place.Lat, place.Lon, place.RadiusM, place.MemberIdsInside.Count > 0))
             .ToList();
         return new ZonesPayload(version, show, zones, new ZoneAppearances(MapPalette.ZoneDark, MapPalette.ZoneLight, MapPalette.ZoneImagery));
     }
