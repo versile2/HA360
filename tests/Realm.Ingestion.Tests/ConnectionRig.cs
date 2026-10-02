@@ -43,6 +43,15 @@ internal sealed class ConnectionRig : IAsyncDisposable
 
     public HaWebSocketConnection Connection { get; }
 
+    /// <summary>
+    /// Where every feed item goes before it is recorded (a pipeline under test): when a wait for items returns, the receiver has handled them. Set before
+    /// the connection starts; null records only.
+    /// </summary>
+    public Func<HaFeedItem, CancellationToken, ValueTask>? Forward { get; set; }
+
+    /// <summary>Where every status change goes before it is recorded, with the same promise as <see cref="Forward"/>. Set before the connection starts; null records only.</summary>
+    public Action<HaConnectionStatus>? ForwardStatus { get; set; }
+
     /// <summary>The states the connection went through, in order.</summary>
     public IReadOnlyList<HaConnectionState> StateHistory
     {
@@ -149,19 +158,24 @@ internal sealed class ConnectionRig : IAsyncDisposable
         await Server.DisposeAsync();
     }
 
-    private ValueTask OnItem(HaFeedItem item, CancellationToken cancellationToken)
+    private async ValueTask OnItem(HaFeedItem item, CancellationToken cancellationToken)
     {
+        if (Forward is { } forward)
+        {
+            await forward(item, cancellationToken);
+        }
+
         lock (_gate)
         {
             _items.Add(item);
         }
 
         Notify();
-        return ValueTask.CompletedTask;
     }
 
     private void OnStatus(HaConnectionStatus status)
     {
+        ForwardStatus?.Invoke(status);
         lock (_gate)
         {
             _history.Add(status);

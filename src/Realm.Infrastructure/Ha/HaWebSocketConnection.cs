@@ -71,12 +71,19 @@ public sealed class HaWebSocketConnection : BackgroundService
         _loop = new ResilientLoop(nameof(HaWebSocketConnection), logger, time);
     }
 
-    /// <summary>Raised on every change of <see cref="HaConnectionStatus.State"/>, on the thread that made it; subscribers must be quick and must not throw.</summary>
+    /// <summary>
+    /// Raised on every change of <see cref="HaConnectionStatus.State"/>, on the thread that made it; subscribers must be quick and must not throw. It is NOT
+    /// raised when a state event or a ping reply arrives: <see cref="HaConnectionStatus.LastActivityUtc"/> of the status it carries is the activity at the
+    /// moment of the change, so a consumer that wants the 90 s rule of 02 section 1.8 reads <see cref="Status"/> when it needs it.
+    /// </summary>
     public event Action<HaConnectionStatus>? StatusChanged;
 
     public ServiceHealth Health => _loop.Health;
 
-    /// <summary>The current state, instants and attempt counter; map it with <see cref="HaConnectionStatus.ToConnectionVm"/>.</summary>
+    /// <summary>
+    /// The current state, instants and attempt counter, read live (every call builds a new record, so a state event or a ping reply that arrived a moment ago
+    /// is in it); map it with <see cref="HaConnectionStatus.ToConnectionVm"/>. Safe from any thread.
+    /// </summary>
     public HaConnectionStatus Status
     {
         get

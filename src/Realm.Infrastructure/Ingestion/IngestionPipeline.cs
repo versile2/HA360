@@ -40,6 +40,9 @@ public sealed class IngestionPipeline : BackgroundService
     private static readonly TimeSpan CensoredRunMaxAge = TimeSpan.FromDays(7);
     private static readonly TimeSpan ErrorLogInterval = TimeSpan.FromMinutes(1);
 
+    // A check on the HomeAssistant entry runs this long after the instant at which the entry changes (the limits of 02 section 1.8 are inclusive).
+    private static readonly TimeSpan CheckMargin = TimeSpan.FromSeconds(1);
+
     private readonly RealmOptions _options;
     private readonly RealmState _state;
     private readonly ChangeNotifier _notifier;
@@ -50,6 +53,7 @@ public sealed class IngestionPipeline : BackgroundService
     private readonly ResilientLoop _loop;
     private readonly DetectionSettings _detection;
     private readonly RealmStateHydrator _hydrator;
+    private readonly Func<HaConnectionStatus>? _liveStatus;
     private readonly Channel<IngestItem> _channel = Channel.CreateBounded<IngestItem>(new BoundedChannelOptions(QueueCapacity)
     {
         FullMode = BoundedChannelFullMode.Wait,
@@ -74,12 +78,28 @@ public sealed class IngestionPipeline : BackgroundService
     private string? _zoneMetaQueued;
     private HaConnectionStatus _connection;
     private ConnectionState[] _lastConnections = [];
+    private ConnectionState? _publishedHomeAssistant;
     private bool _dirty;
     private bool _zonesDirty;
-    private ITimer? _outageTimer;
+    private bool _disposed;
+    private ITimer? _livenessTimer;
+    private DateTimeOffset? _livenessDue;
     private long _processed;
     private DateTimeOffset _lastErrorLogged = DateTimeOffset.MinValue;
 
+    /// <param name="options">The add-on options.</param>
+    /// <param name="state">Where every snapshot is published.</param>
+    /// <param name="notifier">Announces the snapshots and raises the 30 s tick.</param>
+    /// <param name="writer">Receives the rows after the snapshot that follows them was published.</param>
+    /// <param name="queries">The stored fixes and trips, for hydrating a new member.</param>
+    /// <param name="time">The clock of every measurement and timer.</param>
+    /// <param name="logger">The pipeline's log.</param>
+    /// <param name="hydrator">Hydrates a new member; created from <paramref name="queries"/> when null.</param>
+    /// <param name="connection">
+    /// The websocket whose status the HomeAssistant entry of the snapshot follows. Its status is read every time a snapshot is built, because the connection
+    /// announces only a change of its state, never the state events and ping replies that keep it alive (02 section 1.8 counts those). Null (the pipeline
+    /// on its own, in a test) leaves the entry to <see cref="ApplyConnectionStatus"/>. The service provider fills it in with the registered connection.
+    /// </param>
     public IngestionPipeline(
         RealmOptions options,
         RealmState state,
@@ -88,7 +108,8 @@ public sealed class IngestionPipeline : BackgroundService
         IRealmQueries queries,
         TimeProvider time,
         ILogger<IngestionPipeline> logger,
-        RealmStateHydrator? hydrator = null)
+        RealmStateHydrator? hydrator = null,
+        HaWebSocketConnection? connection = null)
     {
         _options = options;
         _state = state;
@@ -100,6 +121,7 @@ public sealed class IngestionPipeline : BackgroundService
         _loop = new ResilientLoop(nameof(IngestionPipeline), logger, time);
         _hydrator = hydrator ?? new RealmStateHydrator(queries);
         _detection = new DetectionSettings(options);
+        _liveStatus = connection is null ? null : () => connection.Status;
 
         // Until the websocket says otherwise Home Assistant is being reached for the first time: Reconnecting for 15 s, then Unavailable.
         _connection = new HaConnectionStatus(HaConnectionState.Connecting, time.GetUtcNow(), null, 0, null);
@@ -137,14 +159,17 @@ public sealed class IngestionPipeline : BackgroundService
         }
     }
 
-    /// <summary>The websocket's state changed: the Home Assistant connection entry of the snapshot follows at once (a state change is never throttled).</summary>
+    /// <summary>
+    /// The websocket's state changed: the Home Assistant connection entry of the snapshot follows at once (a state change is never throttled). When the
+    /// pipeline was given the connection, the entry is built from the connection's status as it is now (with the activity since this change), and
+    /// <paramref name="status"/> only says that it is time to look.
+    /// </summary>
     public void ApplyConnectionStatus(HaConnectionStatus status)
     {
         Publication publication;
         lock (_gate)
         {
             _connection = status;
-            ArmOutageTimer(status);
             _dirty = true;
             publication = PublishLocked(_time.GetUtcNow());
         }
@@ -224,6 +249,7 @@ public sealed class IngestionPipeline : BackgroundService
                     break;
             }
 
+            MarkConnectionDirtyIfItReadsDifferentlyLocked(now);
             publication = PublishLocked(now);
             writes = [.. _writes];
             _writes.Clear();
@@ -246,11 +272,10 @@ public sealed class IngestionPipeline : BackgroundService
         await Task.Yield();
         _notifier.Start();
 
-        // The first snapshot with a clock of its own, and the check that turns the first 15 s of Reconnecting into Unavailable when HA never answers.
+        // The first snapshot with a clock of its own; publishing arms the check that turns the first 15 s of Reconnecting into Unavailable when HA never answers.
         Publication first;
         lock (_gate)
         {
-            ArmOutageTimer(_connection);
             _dirty = true;
             first = PublishLocked(_time.GetUtcNow());
         }
@@ -290,8 +315,10 @@ public sealed class IngestionPipeline : BackgroundService
         _notifier.Tick -= OnTick;
         lock (_gate)
         {
-            _outageTimer?.Dispose();
-            _outageTimer = null;
+            _disposed = true;
+            _livenessTimer?.Dispose();
+            _livenessTimer = null;
+            _livenessDue = null;
         }
 
         base.Dispose();
@@ -815,6 +842,7 @@ public sealed class IngestionPipeline : BackgroundService
             vehicle.PlaceId = membership?.PlaceId;
         }
 
+        var connection = CurrentConnectionLocked();
         var snapshot = SnapshotBuilder.Build(new BuildInput
         {
             Options = _options,
@@ -823,12 +851,14 @@ public sealed class IngestionPipeline : BackgroundService
             Members = [.. _members.Values],
             Vehicles = [.. _vehicles.Values],
             Places = _places,
-            Connection = _connection,
+            Connection = connection,
             Entities = _entities,
             StatsVersion = _state.Current.StatsVersion,
         });
         _state.Publish(snapshot);
         _dirty = false;
+        _publishedHomeAssistant = connection.ToConnectionState(now);
+        ArmLivenessTimer(connection, now);
 
         var states = snapshot.Connections.Select(c => c.State).ToArray();
         var changed = !states.SequenceEqual(_lastConnections);
@@ -944,22 +974,99 @@ public sealed class IngestionPipeline : BackgroundService
         }
     }
 
-    // While Home Assistant is being reached again the first 15 s read Reconnecting; one check just after they end turns it into Unavailable
-    // without waiting for the 30 s tick (the banner of 01 section 8.6 follows the outage closely).
-    private void ArmOutageTimer(HaConnectionStatus status)
+    // ---- the Home Assistant connection entry -------------------------------------------------------------------
+
+    // The websocket's own record when the pipeline has the connection. It moves with every state event and ping reply, which the pipeline is never told about
+    // (StatusChanged fires on a change of state only), so a copy taken at the last change would read as silent for 90 s after it however healthy the socket is.
+    // Without a connection (the pipeline alone in a test) it is the last status that was pushed.
+    private HaConnectionStatus CurrentConnectionLocked()
     {
-        _outageTimer?.Dispose();
-        _outageTimer = null;
-        var now = _time.GetUtcNow();
-        if (status.State is HaConnectionState.NotConfigured or HaConnectionState.AuthFailed
-            || status.ToConnectionState(now) != ConnectionState.Reconnecting
-            || status.OutageSinceUtc is not { } since)
+        if (_liveStatus is { } live)
+        {
+            _connection = live();
+        }
+
+        return _connection;
+    }
+
+    // An item shows that Home Assistant is talking, and the websocket has counted it before handing it over. When that changes what the HomeAssistant entry
+    // reads (Connected again after a silence), the snapshot is published even if the item changed nothing that a member or a vehicle shows.
+    private void MarkConnectionDirtyIfItReadsDifferentlyLocked(DateTimeOffset now)
+    {
+        if (_liveStatus is { } live && live().ToConnectionState(now) != _publishedHomeAssistant)
+        {
+            _dirty = true;
+        }
+    }
+
+    // The HomeAssistant entry changes by itself at two instants that no event announces: when an open socket has been silent for 90 s (Reconnecting) and 15 s
+    // after that, or 15 s into an outage (Unavailable). One check, set just after the next of them, republishes the snapshot then, without waiting for the 30 s
+    // tick (the banner of 01 section 8.6 follows the outage closely). Activity moves the first of the two later, so a check that is due earlier than the next
+    // change is kept: it looks again when it fires and arms the later one. The check is re-armed by every publication, which every tick is.
+    private void ArmLivenessTimer(HaConnectionStatus status, DateTimeOffset now)
+    {
+        if (_disposed)
         {
             return;
         }
 
-        var due = since + HaConnectionStatus.ReconnectingWindow + TimeSpan.FromSeconds(1) - now;
-        _outageTimer = _time.CreateTimer(_ => RecheckConnection(), null, due > TimeSpan.Zero ? due : TimeSpan.Zero, Timeout.InfiniteTimeSpan);
+        if (NextConnectionChange(status, now) is not { } next)
+        {
+            _livenessTimer?.Dispose();
+            _livenessTimer = null;
+            _livenessDue = null;
+            return;
+        }
+
+        if (_livenessTimer is not null && _livenessDue is { } armed && armed > now && armed <= next)
+        {
+            return;
+        }
+
+        var due = next - now;
+        due = due > TimeSpan.Zero ? due : TimeSpan.Zero;
+        _livenessDue = now + due;
+        if (_livenessTimer is null)
+        {
+            _livenessTimer = _time.CreateTimer(_ => RecheckConnection(), null, due, Timeout.InfiniteTimeSpan);
+        }
+        else
+        {
+            _livenessTimer.Change(due, Timeout.InfiniteTimeSpan);
+        }
+    }
+
+    // The instant just after which the HomeAssistant entry reads differently if nothing more is heard (the same limits as HaConnectionStatus.ToConnectionState,
+    // 02 section 1.8, both inclusive); null when it stays as it is (Unavailable for good, or at once for a refused or missing token).
+    private static DateTimeOffset? NextConnectionChange(HaConnectionStatus status, DateTimeOffset now)
+    {
+        DateTimeOffset outageStart;
+        switch (status.State)
+        {
+            case HaConnectionState.NotConfigured:
+            case HaConnectionState.AuthFailed:
+                return null;
+            case HaConnectionState.Connected:
+                var silentAfter = (status.LastActivityUtc ?? now) + HaConnectionStatus.SilenceLimit;
+                if (now <= silentAfter)
+                {
+                    return silentAfter + CheckMargin;
+                }
+
+                outageStart = silentAfter;
+                break;
+            default:
+                if (status.OutageSinceUtc is not { } since)
+                {
+                    return null;
+                }
+
+                outageStart = since;
+                break;
+        }
+
+        var unavailableAfter = outageStart + HaConnectionStatus.ReconnectingWindow;
+        return now <= unavailableAfter ? unavailableAfter + CheckMargin : null;
     }
 
     private void RecheckConnection()
@@ -967,6 +1074,12 @@ public sealed class IngestionPipeline : BackgroundService
         Publication publication;
         lock (_gate)
         {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _livenessDue = null;
             _dirty = true;
             publication = PublishLocked(_time.GetUtcNow());
         }
