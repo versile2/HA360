@@ -8,8 +8,12 @@
     <link rel="stylesheet" href="@Assets["_content/MudBlazor/MudBlazor.min.css"]" />
     @* MapLibre's own sheet (markers, the attribution control) loads before ours; realm-map.css loads last so its equal-specificity rules win by order. *@
     <link rel="stylesheet" href="lib/maplibre-gl/maplibre-gl.css" />
+    @* CR2-006: MudXProvider injects MudX's stylesheet at runtime and, with no <link data-mudx-css> in the document, would append it AFTER ours, so MudX's rules
+       would win every tie. Declaring the link here fixes its place: the provider only rewrites the href of this element (injectCssFromFile). Relative, no @Assets. *@
+    <link rel="stylesheet" data-mudx-css="true" href="_content/MudX.MudBlazor.Extension/mudx.min.css" />
     <link rel="stylesheet" href="css/tokens.css" />
     <link rel="stylesheet" href="css/app.css" />
+    <link rel="stylesheet" href="css/realm-sheet.css" />
     <link rel="stylesheet" href="css/realm-map.css" />
     <script src="js/theme-boot.js"></script>
     <ImportMap />

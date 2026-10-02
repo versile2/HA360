@@ -1,0 +1,63 @@
+@using Realm.Web.Map
+
+@* The right-hand button stack (01 section 3.5; 03 section 3.4): recenter above layers, two 48 px circles 12 px apart, right-aligned. In Compact its bottom edge
+   sits 12 px above the sheet's top edge through --realm-sheet-h (written by realmShell.js from a ResizeObserver, so it follows the sheet's 250 ms transition with no server call);
+   in the panel layout it stays above the navigation bar. Hidden (the sheet is Tall, D42) is visibility:hidden plus inert, so it leaves the focus order.
+   The reserved "+" slot (slot-add) renders nothing in v1. S7a only places the buttons: the recenter camera and the style popover belong to later slices,
+   so the callbacks are optional and the buttons do nothing without them. *@
+<div class="@Classname" inert="@(Hidden && !Panel)">
+    @* slot-add: reserved, intentionally not rendered (Features:TempBubble, 5.8). *@
+    <MudIconButton Icon="@RecenterIcon"
+                   Class="realm-stack-btn"
+                   aria-label="@RecenterName"
+                   title="@RecenterName"
+                   data-testid="btn-recenter"
+                   OnClick="RecenterAsync" />
+    <MudIconButton Icon="@Icons.Material.Filled.Layers"
+                   Class="realm-stack-btn"
+                   aria-label="@LayersName"
+                   title="@LayersName"
+                   data-testid="btn-layers"
+                   OnClick="LayersAsync" />
+</div>
+
+@code {
+    /// <summary>Away from the default view (the outlined crosshair), at the default view or on me alone (the filled one).</summary>
+    [Parameter]
+    public RecenterState Recenter { get; set; } = RecenterState.Default;
+
+    /// <summary>True while the sheet is Tall (D42): the stack is not shown and not focusable.</summary>
+    [Parameter]
+    public bool Hidden { get; set; }
+
+    /// <summary>True in the Expanded layout, where the stack stays above the navigation bar and is never hidden.</summary>
+    [Parameter]
+    public bool Panel { get; set; }
+
+    /// <summary>The display name of the map style, for the layers button's accessible name ("Night").</summary>
+    [Parameter]
+    public string MapStyleName { get; set; } = "Night";
+
+    /// <summary>The recenter button was tapped.</summary>
+    [Parameter]
+    public EventCallback OnRecenter { get; set; }
+
+    /// <summary>The layers button was tapped.</summary>
+    [Parameter]
+    public EventCallback OnLayers { get; set; }
+
+    private Task RecenterAsync() => OnRecenter.InvokeAsync();
+
+    private Task LayersAsync() => OnLayers.InvokeAsync();
+
+    private string Classname =>
+        "realm-right-stack" + (Panel ? " realm-right-stack--panel" : string.Empty) + (Hidden && !Panel ? " realm-right-stack--hidden" : string.Empty);
+
+    // 01 section 4.11: the outlined crosshair while the camera is away from the default view, the filled one otherwise.
+    private string RecenterIcon => Recenter == RecenterState.Away ? Icons.Material.Outlined.MyLocation : Icons.Material.Filled.GpsFixed;
+
+    // Away and "me alone" both go back to the default camera; at the default view the next tap zooms to me alone (01 section 4.11).
+    private string RecenterName => Recenter == RecenterState.Default ? "Zoom to me only" : "Show me and nearby members";
+
+    private string LayersName => $"Map style, currently {MapStyleName}.";
+}

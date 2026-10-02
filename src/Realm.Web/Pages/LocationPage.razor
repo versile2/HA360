@@ -1,37 +1,86 @@
 @page "/"
-@implements IDisposable
+@implements IAsyncDisposable
+@using Microsoft.JSInterop
 @using Realm.Demo
 @using Realm.Domain
 @using Realm.Web.Components.Map
 @using Realm.Web.Components.Shell
+@using Realm.Web.Components.Sheet
+@using Realm.Web.Formatting
+@using Realm.Web.Layout
 @using Realm.Web.Map
+@using Realm.Web.Shell
 @inject IConfiguration Configuration
+@inject IJSRuntime JS
+@inject ILogger<LocationPage> Logger
 
-@* The Location screen (01 section 3). The map fills the canvas behind the sheet; the sheet itself arrives with S7, so until then the page keeps
-   the placeholder that reserves its Peek band (03 section 3.1). The session comes from RealmShell's cascading value and its snapshot is read at
-   render: the page re-renders on IRealmSession.Changed and passes the new immutable lists down, so MapView's reference check sends only what
-   changed. The instant is the session's own clock (no wall clock). *@
+@* The Location screen (01 section 3): the map fills the canvas, the sheet (a bottom sheet, or the left panel from 840 x 560) draws over it, and the right button
+   stack floats above the sheet. The session comes from RealmShell's cascading value and its snapshot is read at render: the page re-renders on
+   IRealmSession.Changed and passes the new immutable lists down, so MapView's reference check sends only what changed. The instant is the session's own
+   clock (no wall clock), and a MinuteTicker re-renders on the minute so that time-based strings and the 24 hour rule of the handle summary stay current.
+
+   The layout is unknown until the browser has reported its window (ShellInterop, after the first render: prerendering has no window). Until then only a
+   placeholder reserving the Peek band is drawn; the map and the sheet start together with the real layout, so the map's first default camera already uses the
+   right padding. *@
 <section class="realm-location">
-    <MapView Members="@Snapshot.Members"
-             Vehicles="@Snapshot.Vehicles"
-             Places="@Snapshot.Places"
-             Now="@Session.Time.GetUtcNow()"
-             StyleId="@StyleId"
-             TestHooks="@TestHooks" />
+    @if (_viewport is { } viewport)
+    {
+        var members = Snapshot.Members;
+        var vehicles = Snapshot.Vehicles;
+        var places = Snapshot.Places;
+        var summary = HandleSummaryFormatter.Format(_section, members, vehicles, places, Session.Time.GetUtcNow());
+        var panel = _mode == LayoutMode.Expanded;
 
-    <div class="realm-peek-placeholder">
-        <p class="realm-summoning" role="status">Summoning the court…</p>
-    </div>
+        <MapView Members="@members"
+                 Vehicles="@vehicles"
+                 Places="@places"
+                 Now="@Session.Time.GetUtcNow()"
+                 StyleId="@StyleId"
+                 Layout="@_mapLayout"
+                 ReducedMotion="@viewport.ReducedMotion"
+                 TestHooks="@TestHooks" />
+
+        <RealmSheetHost Mode="@_mode"
+                        Size="@_size"
+                        ViewportWidth="@viewport.Width"
+                        Summary="@summary"
+                        OnSizeChanged="OnSizeChangedAsync">
+            <SheetContent Members="@members"
+                          Vehicles="@vehicles"
+                          Places="@places"
+                          Section="@_section"
+                          OnSection="OnSectionAsync"
+                          Summary="@summary"
+                          ShowSummary="@panel" />
+        </RealmSheetHost>
+
+        <RightButtonStack Hidden="@(!_mapLayout.StackVisible)" Panel="@panel" MapStyleName="@StyleName" />
+    }
+    else
+    {
+        <div class="realm-peek-placeholder">
+            <p class="realm-summoning" role="status">@HandleSummaryFormatter.Loading</p>
+        </div>
+    }
 </section>
 
 @code {
-    private bool _subscribed;
+    private ShellInterop? _shell;
+    private MinuteTicker? _ticker;
+    private ViewportInfo? _viewport;
+    private LayoutMode _mode = LayoutMode.Unknown;
+    private LayoutOverride _layoutOverride;
+    private SheetSize _size;
+    private Section _section = Section.Drivers;
+    private MapLayout _mapLayout = MapLayout.Compact;
+    private bool _started;
+    private bool _disposed;
 
     /// <summary>The circuit's session, cascaded by <c>RealmShell</c>.</summary>
     [CascadingParameter]
     public IRealmSession Session { get; set; } = default!;
 
-    /// <summary>The Appendix-B overrides of this circuit (<c>style</c> for now), cascaded by <c>RealmShell</c>.</summary>
+    /// <summary>The Appendix-B overrides of this circuit (<c>style</c>, <c>sheet</c> and <c>layout</c> here), cascaded by <c>RealmShell</c>.</summary>
     [CascadingParameter]
     public DemoUiOverrides? Overrides { get; set; }
 
@@ -43,25 +92,127 @@
 
     private string StyleId => Overrides?.Style ?? MapStyleIds.Night;
 
-    // Prerendering creates the page and discards it, so the subscription waits for the circuit's first render.
-    protected override void OnAfterRender(bool firstRender)
-    {
-        if (firstRender && !_subscribed)
+    // The layers button's accessible name (01 section 10.3); the hidden demo-offline style reads as "Demo".
+    private string StyleName =>
+        StyleId switch
         {
-            _subscribed = true;
-            Session.Changed += OnSessionChanged;
+            MapStyleIds.Day => "Day",
+            MapStyleIds.Streets => "Streets",
+            MapStyleIds.Satellite => "Satellite",
+            MapStyleIds.DemoOffline => "Demo",
+            _ => "Night",
+        };
+
+    // Prerendering runs this twice (the prerender scope, then the circuit); both only read the overrides.
+    protected override void OnInitialized()
+    {
+        _layoutOverride = LayoutResolver.ParseOverride(Overrides?.Layout);
+        _size = Overrides?.Sheet == "80" ? SheetSize.Tall : SheetSize.Peek;
+    }
+
+    // The circuit exists from the first render on: only now can the page subscribe, tick and talk to the browser.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _started)
+        {
+            return;
+        }
+
+        _started = true;
+        Session.Changed += OnSessionChanged;
+        _ticker = new MinuteTicker(Session.Time);
+        _ticker.Tick += OnMinute;
+        _ticker.Start();
+
+        try
+        {
+            _shell = await ShellInterop.CreateAsync(JS, new ShellCallbacks(OnViewportAsync));
+            var info = await _shell.InitAsync();
+            if (info is null || _disposed)
+            {
+                return;
+            }
+
+            await ApplyViewportAsync(info.Viewport);
+            await _shell.ObserveSheetAsync(ShellInterop.SheetSelector);
+        }
+        catch (Exception exception) when (exception is JSException or JSDisconnectedException or OperationCanceledException)
+        {
+            // Without the viewport the placeholder stays; the page never takes the circuit down with it.
+            Logger.LogError(exception, "The Location page could not start its browser shell.");
         }
     }
 
-    // Raised off the UI thread (IRealmSession.Changed): marshal back before rendering.
-    private void OnSessionChanged() => _ = InvokeAsync(StateHasChanged);
+    // A resize, a rotation or a fold, debounced by the script: the callback arrives off the renderer's context.
+    private Task OnViewportAsync(ViewportInfo viewport) => _disposed ? Task.CompletedTask : InvokeAsync(() => ApplyViewportAsync(viewport));
 
-    public void Dispose()
+    private async Task ApplyViewportAsync(ViewportInfo viewport)
     {
-        if (_subscribed)
+        var mode = LayoutResolver.Resolve(viewport.Width, viewport.Height, _layoutOverride);
+        if (mode != _mode && _shell is not null)
         {
-            _subscribed = false;
+            // The attribute first: the script reads it to decide whether a tall sheet hides the right stack, and the panel never does.
+            await _shell.SetLayoutAttrAsync(mode);
+        }
+
+        _viewport = viewport;
+        _mode = mode;
+        RefreshMapLayout();
+        StateHasChanged();
+    }
+
+    // What the layout contributes to the map padding (01 section 3.4.3): the mode, the safe insets, and whether the right stack takes room (it does not at Tall).
+    private void RefreshMapLayout() =>
+        _mapLayout = new MapLayout(
+            _mode == LayoutMode.Expanded ? MapLayoutMode.Expanded : MapLayoutMode.Compact,
+            PanelHidden: false,
+            StackVisible: !(_mode == LayoutMode.Compact && _size == SheetSize.Tall),
+            _viewport?.Safe ?? new Padding(0, 0, 0, 0));
+
+    // A tap or a key on the handle asked for the other state; S8's reducer will own this decision, the page accepts it as it is.
+    private Task OnSizeChangedAsync(SheetSize size)
+    {
+        _size = size;
+        RefreshMapLayout();
+        return Task.CompletedTask;
+    }
+
+    private Task OnSectionAsync(Section section)
+    {
+        _section = section;
+        return Task.CompletedTask;
+    }
+
+    // Raised off the UI thread (IRealmSession.Changed): marshal back before rendering.
+    private void OnSessionChanged() => Rerender();
+
+    private void OnMinute() => Rerender();
+
+    private void Rerender()
+    {
+        if (!_disposed)
+        {
+            _ = InvokeAsync(StateHasChanged);
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _disposed = true;
+        if (_started)
+        {
             Session.Changed -= OnSessionChanged;
+        }
+
+        if (_ticker is not null)
+        {
+            _ticker.Tick -= OnMinute;
+            _ticker.Dispose();
+        }
+
+        if (_shell is not null)
+        {
+            await _shell.DisposeAsync();
         }
     }
 }

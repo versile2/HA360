@@ -43,6 +43,7 @@ import {
   transformStyle,
 } from './mapStyles.js';
 import { installTestHooks, removeTestHooks } from './testHooks.js';
+import { readSheet, sheetHeightForPadding, sheetMetrics } from './realmShell.js';
 
 /**
  * The vendored entry by its plain relative URL, resolved against this module's own URL (see the header). It sits in a variable,
@@ -257,7 +258,7 @@ const PIN_TEMPLATE =
  * @property {PendingStyle | null} pending
  * @property {LayoutPayload} layout
  * @property {Padding | null} forcedPadding
- * @property {number | null} sheetHeightPx the measured sheet height; null until S7a feeds it (then the Peek height is assumed)
+ * @property {number | null} sheetHeightPx the measured sheet height (the sheetMetrics feed, S7a); null while there is no sheet (then the Peek height is assumed)
  * @property {Padding} appliedPadding
  * @property {MembersPayload | null} members
  * @property {VehiclesPayload | null} vehicles
@@ -1199,7 +1200,7 @@ function createRuntime(opts, dotnet, map, container) {
     pending: null,
     layout: { ...DEFAULT_LAYOUT, safe: { ...DEFAULT_LAYOUT.safe } },
     forcedPadding: null,
-    sheetHeightPx: null,
+    sheetHeightPx: sheetHeightForPadding(sheetMetrics.current().heightPx),
     appliedPadding: { top: 0, right: 0, bottom: 0, left: 0 },
     members: null, vehicles: null, zones: null, targets: null,
     versions: { members: -Infinity, vehicles: -Infinity, zones: -Infinity, targets: -Infinity },
@@ -1574,3 +1575,20 @@ export function getCamera() {
 
 // ---- S8a (selection and flights), S7a (sheet metrics), S9 (bubbles) add their exports and state below this line ----------------
 // One clearly commented region per slice; nothing above this line is edited by them (04 section 1.8).
+
+// ---- S7a: the sheet metrics feed and the `sheet` hook (03 sections 4.3 and 4.8, 01 section 3.4.3) -----------------------------------
+// The sheet's measured height is the live input of computePadding: realmShell.js observes the sheet element (client side, no server call) and
+// notifies `sheetMetrics` subscribers, and the one subscription below hands the number to the runtime that exists. The padding therefore follows a
+// drag or a toggle by itself, and AC-08 and AC-09 read `mapPadding()` after settled(). Selection flights (S8a) pass their own target padding and
+// never read this number. `createRuntime` seeds a new map from the current metrics, so a map that starts after the sheet needs no event.
+
+sheetMetrics.subscribe((metrics) => {
+  const r = rt;
+  if (!r) return;
+  const next = sheetHeightForPadding(metrics.heightPx);
+  if (next === r.sheetHeightPx) return;
+  r.sheetHeightPx = next;
+  scheduleRender();
+});
+
+extraHooks.sheet = () => readSheet();

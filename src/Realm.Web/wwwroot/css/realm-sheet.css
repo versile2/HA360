@@ -1,0 +1,366 @@
+/*
+ * The sheet and the right-hand button stack (03 sections 3.4 and 3.5; 01 sections 3.2 to 3.6). Tokens only: every colour is a var(--realm-*)
+ * from css/tokens.css (or a colour-mix() of them), and the no-colour-literals guard fails the build on a literal here. It loads last, after
+ * MudBlazor's and MudX's own CSS, so equal-specificity rules win by order.
+ *
+ * MudX renders the sheet as a MudPopover, which MudPopoverProvider draws outside every component scope: these rules are global. Every GEOMETRY rule
+ * on the popover carries !important, because MudBlazor's placePopover writes inline top, left, max-width and min-width on every placement
+ * (open, resize) and MudXSheet adds an inline height or width and min-width of its own (R-031). We never rely on MudX's 640 px cap.
+ *
+ * Which element is which:
+ *   div#popovercontent-*[mudsheet].mud-sheet-popover      the popover: the whole sheet, the handle row included. Its size is the sheet's size,
+ *                                                          it clips (overflow, radius) and it casts the shadow. realmShell.js observes it.
+ *   .mud-sheet-container[data-testid="sheet"]             the contract element (RealmSheetHost passes data-testid and data-state to MudXSheet,
+ *                                                          which puts them here). It draws the surface: MudX paints two opaque layers by default
+ *                                                          and Paper=false removes one; the handle row and the content are siblings inside it, so
+ *                                                          the surface cannot live on the content root without leaving the handle bare.
+ */
+
+:root {
+  /* The panel (01 section 3.6). MapLayout.PanelLeftPx and PanelWidthPx are the same two numbers, for the map padding. */
+  --realm-panel-left: 16px;
+  --realm-panel-w: 400px;
+  --realm-panel-gap: 16px;
+  --realm-panel-top: calc(env(safe-area-inset-top) + 76px);
+  --realm-sheet-radius: 24px;
+  /* Peek can never clip its content: 48 handle + 48 tabs + 8 padding above the navigation bar (01 section 3.2). */
+  --realm-peek-min: calc(var(--realm-nav-h) + env(safe-area-inset-bottom) + 104px);
+  --realm-shadow: color-mix(in srgb, var(--realm-scrim) 55%, transparent);
+}
+
+/* ---- the popover: Compact, a bottom sheet over the full width, flush with the viewport bottom (the navigation tucks over its lower 64 px) ---- */
+
+div[mudsheet].mud-sheet-popover {
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+div[mudsheet].mud-sheet-position-bottom.mud-sheet-popover {
+  position: fixed !important;
+  top: auto !important;
+  right: auto !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  min-height: var(--realm-peek-min);
+  border-radius: var(--realm-sheet-radius) var(--realm-sheet-radius) 0 0 !important;
+  box-shadow: 0 -4px 16px var(--realm-shadow);
+}
+
+/* ---- the popover: Expanded, the left panel, inset from the top and the navigation, 400 px at every width ---- */
+
+div[mudsheet].mud-sheet-position-left.mud-sheet-popover {
+  position: fixed !important;
+  top: var(--realm-panel-top) !important;
+  right: auto !important;
+  bottom: calc(var(--realm-nav-h) + env(safe-area-inset-bottom) + var(--realm-panel-gap)) !important;
+  left: var(--realm-panel-left) !important;
+  width: var(--realm-panel-w) !important;
+  max-width: var(--realm-panel-w) !important;
+  min-width: 0 !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  border-radius: var(--realm-sheet-radius) !important;
+  box-shadow: 0 8px 24px var(--realm-shadow);
+}
+
+/* ---- the contract element: the surface ---- */
+
+div[mudsheet] .mud-sheet-container[data-testid="sheet"],
+.realm-sheet-aside {
+  box-sizing: border-box;
+  border: 1px solid var(--realm-line) !important;
+  background: var(--realm-surface) !important;
+  color: var(--realm-text);
+}
+
+div[mudsheet] .mud-sheet-container[data-testid="sheet"] {
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  margin: 0;
+}
+
+div[mudsheet] .mud-sheet-container.mud-sheet-position-bottom[data-testid="sheet"] {
+  min-height: var(--realm-peek-min);
+}
+
+div[mudsheet] .mud-sheet-container.mud-sheet-position-left[data-testid="sheet"] {
+  border-radius: var(--realm-sheet-radius) !important;
+}
+
+/* Peek: the translucent surface (86 percent alpha) over a blurred map; solid where blur is missing or the user asks for contrast. */
+div[mudsheet] .mud-sheet-container[data-testid="sheet"][data-state="peek"] {
+  background: var(--realm-sheet-bg-peek) !important;
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  div[mudsheet] .mud-sheet-container[data-testid="sheet"][data-state="peek"] {
+    background: var(--realm-surface) !important;
+  }
+}
+
+@media (prefers-contrast: more) {
+  div[mudsheet] .mud-sheet-container[data-testid="sheet"][data-state="peek"] {
+    background: var(--realm-surface) !important;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+/* ---- the handle row: 48 px, no panel handle; a tap target only (no drag, D73), so no double-tap zoom delay ---- */
+
+div[mudsheet] .mud-sheet-container[data-testid="sheet"] .mud-sheet-handle {
+  box-sizing: border-box;
+  height: 48px;
+  min-height: 48px;
+  padding: 0;
+  color: var(--realm-text);
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+div[mudsheet] .mud-sheet-container.mud-sheet-position-left[data-testid="sheet"] .mud-sheet-handle {
+  display: none !important;
+}
+
+.realm-sheet-handle {
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: 100%;
+  height: 48px;
+  margin: 0;
+  padding: 0 16px 8px;
+  border: 0;
+  background: none;
+  color: var(--realm-text);
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.realm-sheet-handle-bar {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  width: 40px;
+  height: 4px;
+  transform: translateX(-50%);
+  border-radius: 2px;
+  background: var(--realm-line-strong);
+}
+
+.realm-sheet-summary {
+  overflow: hidden;
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 20px;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- the content area: MudX's flex alignment (bottom-aligned, centred, 16 px padding) is replaced by a plain column that fills the sheet ---- */
+
+div[mudsheet] .mud-sheet-container[data-testid="sheet"] .mud-sheet-content {
+  box-sizing: border-box;
+  align-items: stretch;
+  justify-content: flex-start;
+  min-width: 0;
+  min-height: 0;
+  /* The last row is never hidden under the navigation bar. */
+  padding: 0 0 calc(var(--realm-nav-h) + env(safe-area-inset-bottom));
+  overflow: hidden;
+}
+
+div[mudsheet] .mud-sheet-container.mud-sheet-position-left[data-testid="sheet"] .mud-sheet-content {
+  padding: 0;
+}
+
+/* MudXSheet wraps the content in an unknown inline <content> element when Paper is false. */
+div[mudsheet] .mud-sheet-container[data-testid="sheet"] .mud-sheet-content > content {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* ---- the aside fallback of the panel (Realm:Ui:SheetHost=aside): the same geometry as the popover ---- */
+
+.realm-sheet-aside {
+  position: fixed;
+  top: var(--realm-panel-top);
+  bottom: calc(var(--realm-nav-h) + env(safe-area-inset-bottom) + var(--realm-panel-gap));
+  left: var(--realm-panel-left);
+  z-index: 1201;
+  display: flex;
+  flex-direction: column;
+  width: var(--realm-panel-w);
+  max-width: var(--realm-panel-w);
+  overflow: hidden;
+  border-radius: var(--realm-sheet-radius);
+  box-shadow: 0 8px 24px var(--realm-shadow);
+}
+
+/* ---- SheetContent: the tabs, and the list under them ---- */
+
+.realm-sheet-content {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.realm-sheet-summary--panel {
+  box-sizing: border-box;
+  padding: 16px 16px 8px;
+}
+
+.realm-segments {
+  box-sizing: border-box;
+  display: flex;
+  flex: 0 0 auto;
+  gap: 4px;
+  height: 48px;
+  margin: 0 16px;
+  padding: 4px;
+  border: 1px solid var(--realm-line);
+  border-radius: 24px;
+  background: var(--realm-surface-2);
+}
+
+.realm-segment {
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 38px;
+  margin: 0;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 20px;
+  background: none;
+  color: var(--realm-text-2);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 20px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.realm-segment[aria-selected="true"] {
+  background: var(--realm-primary);
+  color: var(--realm-on-primary);
+}
+
+/* Icon-only below 360 px: the label stays in the DOM, for the accessible name. */
+@media (max-width: 359px) {
+  .realm-segment-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+.realm-sheet-list-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin-top: 8px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* At Peek the list is under the navigation bar: it is not shown and not in the tab order (AC-05: no list row is visible). */
+.mud-sheet-container[data-testid="sheet"][data-state="peek"] .realm-sheet-list-wrap {
+  visibility: hidden;
+}
+
+.realm-sheet-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.realm-sheet-row {
+  box-sizing: border-box;
+  min-height: 48px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--realm-line);
+  color: var(--realm-text);
+}
+
+.realm-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---- RightButtonStack: two 48 px circles, 12 px apart, the lower one 12 px above the sheet's top edge (01 section 3.5) ---- */
+
+.realm-right-stack {
+  position: fixed;
+  right: calc(12px + env(safe-area-inset-right));
+  /* --realm-sheet-h is written by realmShell.js (a ResizeObserver, no server call), so the stack follows the sheet's transition. Before the first
+     measurement the Peek height is assumed. */
+  bottom: calc(var(--realm-sheet-h, max(19vh, var(--realm-peek-min))) + 12px);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: opacity 150ms, visibility 0s;
+}
+
+/* Expanded: the stack stays above the navigation bar, always visible. */
+.realm-right-stack--panel {
+  bottom: calc(var(--realm-nav-h) + env(safe-area-inset-bottom) + 16px);
+}
+
+/* Hidden once the sheet covers half the viewport (the Tall state, and a transition that has passed the half): not shown, not clickable, not in the tab order. */
+.realm-right-stack--hidden,
+html[data-sheet-tall] .realm-right-stack:not(.realm-right-stack--panel) {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 150ms, visibility 0s linear 150ms;
+}
+
+.realm-stack-btn.mud-icon-button {
+  box-sizing: border-box;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 1px solid var(--realm-line);
+  border-radius: 50%;
+  background: var(--realm-control-bg);
+  color: var(--realm-control-icon);
+  box-shadow: 0 2px 6px var(--realm-shadow);
+}
+
+/* ---- the page-scroll lock MudX's non-modal overlay applies is harmless here: the page never scrolls (app.css), and it must not shift the body ---- */
+
+html:has(.realm-location) body.scroll-locked {
+  padding-right: 0 !important;
+}

@@ -1,0 +1,102 @@
+@using Realm.Domain
+
+@* The three-tab control under the handle (01 section 5.0; 03 section 3.4): Drivers, Vehicles, Places. role=tablist with a roving tabindex and arrow-key
+   focus; below 360 px only the icons show (the label stays for the accessible name). The count of the section that shows is announced politely
+   ("5 drivers"), because the summary line in the handle changes with it. *@
+<div class="realm-segments" role="tablist" aria-label="Sections" data-testid="sheet-segments">
+    @foreach (var segment in All)
+    {
+        var selected = segment.Section == Section;
+        <button @key="segment.Section"
+                @ref="_tabs[(int)segment.Section]"
+                type="button"
+                role="tab"
+                class="realm-segment"
+                id="@TabId(segment.Section)"
+                data-testid="@segment.TestId"
+                aria-selected="@(selected ? "true" : "false")"
+                aria-controls="@PanelId"
+                tabindex="@(selected ? 0 : -1)"
+                @onclick="() => SelectAsync(segment.Section)"
+                @onkeydown="args => KeyDownAsync(args, segment.Section)">
+            <MudIcon Icon="@segment.Icon" />
+            <span class="realm-segment-label">@segment.Label</span>
+        </button>
+    }
+</div>
+<span class="realm-sr-only" role="status" aria-live="polite" data-testid="sheet-announce">@Announcement</span>
+
+@code {
+    /// <summary>How many rows each section has.</summary>
+    public readonly record struct SegmentCounts(int Drivers, int Vehicles, int Places);
+
+    private sealed record Segment(Section Section, string Label, string Icon, string TestId);
+
+    /// <summary>The id the list panel carries (<c>aria-controls</c> of every tab, and the panel's own id in <c>SheetContent</c>).</summary>
+    public const string PanelId = "realm-sheet-panel";
+
+    private static readonly Segment[] All =
+    [
+        new(Section.Drivers, "Drivers", Icons.Material.Filled.Group, "tab-drivers"),
+        new(Section.Vehicles, "Vehicles", Icons.Material.Filled.DirectionsCar, "tab-vehicles"),
+        new(Section.Places, "Places", Icons.Material.Filled.Place, "tab-places"),
+    ];
+
+    private readonly ElementReference[] _tabs = new ElementReference[3];
+    private bool _focusSelected;
+
+    /// <summary>The selected section (Drivers by default).</summary>
+    [Parameter]
+    public Section Section { get; set; } = Section.Drivers;
+
+    /// <summary>The row counts, for the announcement.</summary>
+    [Parameter]
+    public SegmentCounts Counts { get; set; }
+
+    /// <summary>A tab was chosen, by tap or by the arrow keys.</summary>
+    [Parameter]
+    public EventCallback<Section> OnSection { get; set; }
+
+    /// <summary>The id of the tab of <paramref name="section"/>; the list panel is labelled by the selected one.</summary>
+    public static string TabId(Section section) => $"realm-tab-{section.ToString().ToLowerInvariant()}";
+
+    private string Announcement =>
+        Section switch
+        {
+            Section.Vehicles => $"{Counts.Vehicles} {(Counts.Vehicles == 1 ? "vehicle" : "vehicles")}",
+            Section.Places => $"{Counts.Places} {(Counts.Places == 1 ? "place" : "places")}",
+            _ => $"{Counts.Drivers} {(Counts.Drivers == 1 ? "driver" : "drivers")}",
+        };
+
+    private Task SelectAsync(Section section) => OnSection.InvokeAsync(section);
+
+    // Left and Right move to the neighbour (wrapping), Home and End to the ends; focus follows the selection, as in the ARIA tabs pattern with automatic activation.
+    private async Task KeyDownAsync(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs args, Section from)
+    {
+        var index = (int)from;
+        var target = args.Key switch
+        {
+            "ArrowRight" => (index + 1) % All.Length,
+            "ArrowLeft" => (index + All.Length - 1) % All.Length,
+            "Home" => 0,
+            "End" => All.Length - 1,
+            _ => -1,
+        };
+        if (target < 0)
+        {
+            return;
+        }
+
+        _focusSelected = true;
+        await OnSection.InvokeAsync(All[target].Section);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusSelected)
+        {
+            _focusSelected = false;
+            await _tabs[(int)Section].FocusAsync();
+        }
+    }
+}
