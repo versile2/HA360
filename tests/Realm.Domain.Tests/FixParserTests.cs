@@ -233,7 +233,7 @@ public class FixParserTests
                 ("battery_level", 19),
                 ("battery_charging", true),
                 ("driving", true),
-                ("address", "Street Name, Texas")),
+                ("address", "Street Name, Alabama")),
             FixSource.Life360,
             Now);
 
@@ -242,7 +242,7 @@ public class FixParserTests
         Assert.True(fix.Charging);
         Assert.Equal(At("2026-09-30T21:24:00-05:00"), fix.BatteryAsOfUtc);
         Assert.True(fix.Driving);
-        Assert.Equal("Street Name, Texas", fix.Address);
+        Assert.Equal("Street Name, Alabama", fix.Address);
     }
 
     // Home Assistant leaves the battery unknown when Life360 reports a negative one; then there is no charging flag either.

@@ -291,7 +291,7 @@ public sealed class MapPayloadFactoryTests
 
         Assert.Equal($"{DemoCast.King.Name}, {DemoCast.King.Lore}. At {home}. Battery 19 percent, charging.", members[DemoCast.King.Id].AriaLabel);
         Assert.Equal($"{DemoCast.Jester.Name}, {DemoCast.Jester.Lore}. At {hall}. Battery 12 percent, low.", members[DemoCast.Jester.Id].AriaLabel);
-        Assert.StartsWith($"{DemoCast.Queen.Name}, {DemoCast.Queen.Lore}. Driving on I-35.", members[DemoCast.Queen.Id].AriaLabel);
+        Assert.StartsWith($"{DemoCast.Queen.Name}, {DemoCast.Queen.Lore}. Driving on I-65.", members[DemoCast.Queen.Id].AriaLabel);
     }
 
     [Fact]

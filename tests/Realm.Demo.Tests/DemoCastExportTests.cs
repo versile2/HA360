@@ -12,9 +12,9 @@ public class DemoCastExportTests
     private static readonly (string Id, string Name, string Lore, string Color, string Kind, int SortOrder, string? PersonUserId, bool PhoneCapable, string? Address, string? StaticLabel)[] ExpectedMembers =
     [
         ("king", "Alden", "The King", "#E8BC4E", "live", 0, "demo-user-1", true, null, null),
-        ("queen", "Briar", "The Queen", "#C792EA", "live", 1, "demo-user-2", false, "I-35", null),
-        ("jester", "Cass", "The Royal Jester", "#5CC8FF", "live", 2, null, false, "48 Larkspur Lane, Millbrook, TX", null),
-        ("cryptid", "Dara", "The Court Cryptid", "#FF8FB1", "live", 3, null, false, "Eastgate Avenue, Pinebrook, TX", null),
+        ("queen", "Briar", "The Queen", "#C792EA", "live", 1, "demo-user-2", false, "I-65", null),
+        ("jester", "Cass", "The Royal Jester", "#5CC8FF", "live", 2, null, false, "48 Larkspur Lane, Millbrook, AL", null),
+        ("cryptid", "Dara", "The Court Cryptid", "#FF8FB1", "live", 3, null, false, "Eastgate Avenue, Pinebrook, AL", null),
         ("prince", "Elio", "Prince of the Peaks", "#7EE0A5", "static", 4, null, false, null, "Home · Highmeadow"),
     ];
 

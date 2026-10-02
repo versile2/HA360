@@ -5,11 +5,11 @@ namespace Realm.Domain.Tests;
 // The examples of 02 section 1.5, then the cases it names in words: a US state name, no city, a USA suffix, one part.
 public class AddressParserTests
 {
-    // "Street Name, Texas" gives a street and a region but no city; "Eastgate Avenue, Pinebrook, TX" gives all three.
+    // "Street Name, Alabama" gives a street and a region but no city; "Eastgate Avenue, Pinebrook, AL" gives all three.
     [Theory]
-    [InlineData("Street Name, Texas", "Street Name", null, "Texas", "Street Name, Texas")]
-    [InlineData("Eastgate Avenue, Pinebrook, TX", "Eastgate Avenue", "Pinebrook", "TX", "Eastgate Avenue, Pinebrook, TX")]
-    [InlineData("48 Larkspur Lane, Millbrook, TX", "48 Larkspur Lane", "Millbrook", "TX", "48 Larkspur Lane, Millbrook, TX")]
+    [InlineData("Street Name, Alabama", "Street Name", null, "Alabama", "Street Name, Alabama")]
+    [InlineData("Eastgate Avenue, Pinebrook, AL", "Eastgate Avenue", "Pinebrook", "AL", "Eastgate Avenue, Pinebrook, AL")]
+    [InlineData("48 Larkspur Lane, Millbrook, AL", "48 Larkspur Lane", "Millbrook", "AL", "48 Larkspur Lane, Millbrook, AL")]
     public void Examples_of_the_spec(string address, string street, string? city, string? region, string fullAddress)
     {
         var parsed = AddressParser.Parse(address);
@@ -39,8 +39,8 @@ public class AddressParserTests
 
     // No city: the street and a region only, so the UI cannot show "{street} · {City}, {ST}".
     [Theory]
-    [InlineData("Street Name, TX", "TX")]
-    [InlineData("Street Name, Texas", "Texas")]
+    [InlineData("Street Name, AL", "AL")]
+    [InlineData("Street Name, Alabama", "Alabama")]
     public void Street_and_region_only_has_no_city(string address, string region)
     {
         var parsed = AddressParser.Parse(address);
@@ -53,9 +53,9 @@ public class AddressParserTests
 
     // A trailing USA or United States is dropped, and FullAddress is the cleaned original.
     [Theory]
-    [InlineData("Eastgate Avenue, Pinebrook, TX, USA", "Pinebrook", "TX", "Eastgate Avenue, Pinebrook, TX")]
-    [InlineData("Eastgate Avenue, Pinebrook, TX, United States", "Pinebrook", "TX", "Eastgate Avenue, Pinebrook, TX")]
-    [InlineData("Street Name, Texas, USA", null, "Texas", "Street Name, Texas")]
+    [InlineData("Eastgate Avenue, Pinebrook, AL, USA", "Pinebrook", "AL", "Eastgate Avenue, Pinebrook, AL")]
+    [InlineData("Eastgate Avenue, Pinebrook, AL, United States", "Pinebrook", "AL", "Eastgate Avenue, Pinebrook, AL")]
+    [InlineData("Street Name, Alabama, USA", null, "Alabama", "Street Name, Alabama")]
     public void A_trailing_country_is_dropped(string address, string? city, string region, string fullAddress)
     {
         var parsed = AddressParser.Parse(address);
@@ -66,10 +66,10 @@ public class AddressParserTests
         Assert.Equal(fullAddress, parsed.FullAddress);
     }
 
-    // One part is only a street, even when it looks like a place: the fixture's queen is on "I-35".
+    // One part is only a street, even when it looks like a place: the fixture's queen is on "I-65".
     [Theory]
-    [InlineData("I-35")]
-    [InlineData("Texas")]
+    [InlineData("I-65")]
+    [InlineData("Alabama")]
     public void One_part_is_the_street(string address)
     {
         var parsed = AddressParser.Parse(address);
@@ -85,23 +85,23 @@ public class AddressParserTests
     [Fact]
     public void Several_middle_parts_are_joined_into_the_city()
     {
-        var parsed = AddressParser.Parse("Unit 4, Eastgate Avenue, Pinebrook, TX");
+        var parsed = AddressParser.Parse("Unit 4, Eastgate Avenue, Pinebrook, AL");
 
         Assert.NotNull(parsed);
         Assert.Equal("Unit 4", parsed.Street);
         Assert.Equal("Eastgate Avenue, Pinebrook", parsed.City);
-        Assert.Equal("TX", parsed.Region);
+        Assert.Equal("AL", parsed.Region);
     }
 
     [Fact]
     public void Surrounding_whitespace_is_trimmed()
     {
-        var parsed = AddressParser.Parse("  Street Name,  Texas ");
+        var parsed = AddressParser.Parse("  Street Name,  Alabama ");
 
         Assert.NotNull(parsed);
         Assert.Equal("Street Name", parsed.Street);
-        Assert.Equal("Texas", parsed.Region);
-        Assert.Equal("Street Name, Texas", parsed.FullAddress);
+        Assert.Equal("Alabama", parsed.Region);
+        Assert.Equal("Street Name, Alabama", parsed.FullAddress);
     }
 
     // 02 is silent when the last part is not a US state: the street is still part 0, and nothing else is guessed.

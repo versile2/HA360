@@ -151,7 +151,7 @@ public class DemoDataTests
         Assert.Null(king.StaticLabel);
     }
 
-    // The queen drives at 24.1 m/s (54 mph) on "I-35", her battery is not charging, and she is in no zone.
+    // The queen drives at 24.1 m/s (54 mph) on "I-65", her battery is not charging, and she is in no zone.
     [Fact]
     public void Queen_is_driving_at_24_1_metres_per_second_on_i_35()
     {
@@ -159,7 +159,7 @@ public class DemoDataTests
 
         Assert.True(queen.IsDriving);
         Assert.Equal(24.1, queen.SpeedMps);
-        Assert.Equal("I-35", queen.Street);
+        Assert.Equal("I-65", queen.Street);
         Assert.Null(queen.City);
         Assert.Null(queen.Region);
         Assert.False(queen.Charging);
@@ -171,10 +171,10 @@ public class DemoDataTests
     {
         var jester = Member("jester");
 
-        Assert.Equal("48 Larkspur Lane, Millbrook, TX", jester.FullAddress);
+        Assert.Equal("48 Larkspur Lane, Millbrook, AL", jester.FullAddress);
         Assert.Equal("48 Larkspur Lane", jester.Street);
         Assert.Equal("Millbrook", jester.City);
-        Assert.Equal("TX", jester.Region);
+        Assert.Equal("AL", jester.Region);
         Assert.False(jester.IsDriving);
         Assert.Null(jester.SpeedMps);
         Assert.Equal(Freshness.Fresh, jester.Freshness);
@@ -193,8 +193,8 @@ public class DemoDataTests
         Assert.Equal(Freshness.Stale, cryptid.Freshness);
         Assert.Equal("Eastgate Avenue", cryptid.Street);
         Assert.Equal("Pinebrook", cryptid.City);
-        Assert.Equal("TX", cryptid.Region);
-        Assert.Equal("Eastgate Avenue, Pinebrook, TX", cryptid.FullAddress);
+        Assert.Equal("AL", cryptid.Region);
+        Assert.Equal("Eastgate Avenue, Pinebrook, AL", cryptid.FullAddress);
         Assert.False(cryptid.IsDriving);
         Assert.Equal("Fresh,Fresh,Fresh,Stale,Static", string.Join(",", snapshot.Members.Select(m => m.Freshness)));
     }
@@ -831,7 +831,7 @@ public class DemoDataTests
         Assert.All(report.Events.Values, stat => Assert.Equal(StatSource.Derived, stat.Source));
     }
 
-    // 02 section 9.4 (d): the week-0 top speed is the king's 96 mph on I-35, Tuesday 29 September at 16:12.
+    // 02 section 9.4 (d): the week-0 top speed is the king's 96 mph on I-65, Tuesday 29 September at 16:12.
     [Fact]
     public async Task The_week_0_top_speed_is_the_kings_96_mph_on_i_35_on_tuesday_at_16_12()
     {
@@ -841,7 +841,7 @@ public class DemoDataTests
         Assert.Equal("king", top.MemberId);
         Assert.Equal(96, Mph(top.SpeedMps));
         Assert.Equal(42.91584, top.SpeedMps, 5);
-        Assert.Equal("I-35", top.Street);
+        Assert.Equal("I-65", top.Street);
         Assert.Equal(new DateTimeOffset(2026, 9, 29, 16, 12, 0, TimeSpan.FromHours(-5)), top.AtUtc);
     }
 
