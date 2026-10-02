@@ -300,6 +300,44 @@
   fill: var(--realm-primary);
 }
 
+/* The caret (D79): a 12 x 7 pointer on the edge of the chip that faces the pin, over the pin's centre. A clamped chip is shifted by --realm-chip-dx, so
+   realmMap.js gives the caret its own x (--realm-chip-caret-x, from the chip's left edge, kept off the rounded ends). Two triangles: the outline
+   in the border colour, and the fill 1 px up so the outline shows only on the slants and the chip's own border line is covered at the base. The caret
+   starts at the padding edge (1 px inside the border box) and so reaches 6 px into the 8 px gap, which stays 8 px between the chip and the pin. */
+.realm-chip__caret {
+  position: absolute;
+  top: 100%;
+  left: calc(var(--realm-chip-caret-x, 50% + 1px) - 1px);   /* x counts from the chip's border edge, `left` from its padding edge, 1 px further in */
+  width: 12px;
+  height: 7px;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.realm-chip__caret::before,
+.realm-chip__caret::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+
+.realm-chip__caret::before {
+  background: var(--realm-line-strong);
+}
+
+.realm-chip__caret::after {
+  background: color-mix(in srgb, var(--realm-surface-2) 96%, transparent);
+  transform: translateY(-1px);
+}
+
+/* Below the pin the caret points up, from the top edge; the flip turns the fill's 1 px offset toward the chip as well. */
+.realm-chip--below .realm-chip__caret {
+  top: auto;
+  bottom: 100%;
+  transform: translateX(-50%) scaleY(-1);
+}
+
 /* ---- zone names (HTML, from zoom 14) ----------------------------------------------------------------------------------------- */
 
 .realm-zone-label {

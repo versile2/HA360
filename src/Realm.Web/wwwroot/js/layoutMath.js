@@ -182,6 +182,8 @@ export const PLACE_FIT_GROWTH = 0.2;
 export const PLACE_FIT_MAX_ZOOM = 16;
 /** A pin chip keeps this far from the left and right edge of the map (D75). */
 export const CHIP_EDGE_PX = 8;
+/** The caret of a pin chip stays this far from either end of the chip: the radius of its rounded body (D79). */
+export const CHIP_CARET_INSET_PX = 18;
 
 const deg = (/** @type {number} */ radians) => (radians * 180) / Math.PI;
 
@@ -325,4 +327,18 @@ export function clampChipShift(centerX, chipWidthPx, room) {
   if (left < room.left) return room.left - left;
   const right = centerX + chipWidthPx / 2;
   return right > room.right ? room.right - right : 0;
+}
+
+/**
+ * Where the caret of a shifted chip sits (D79): over the pin centre, which the clamp shift moved the chip away from, so `shiftPx` the other way from the middle
+ * of the chip. It never goes closer than `insetPx` to an end of the chip, so it stays on the straight part of the rounded body; a chip narrower than twice the
+ * inset gets its caret in the middle.
+ * @param {number} chipWidthPx
+ * @param {number} shiftPx the shift {@link clampChipShift} gave the chip (negative: moved left, so the pin is right of the middle)
+ * @param {number} [insetPx]
+ * @returns {number} the x of the caret's centre, from the left edge of the chip
+ */
+export function chipCaretX(chipWidthPx, shiftPx, insetPx = CHIP_CARET_INSET_PX) {
+  const inset = Math.min(insetPx, chipWidthPx / 2);
+  return Math.min(chipWidthPx - inset, Math.max(inset, chipWidthPx / 2 - shiftPx));
 }

@@ -36,6 +36,7 @@ import {
   RECENTER_EASE_MS,
   RECENTER_SETTLE_MS,
   SELECTION_EASE_MS,
+  chipCaretX,
   chipRoom,
   clampChipShift,
   computePadding,
@@ -473,7 +474,7 @@ function applyChip(pin, text) {
     const chip = document.createElement('span');
     chip.className = 'realm-chip';
     chip.setAttribute('data-testid', 'chip-here-for');
-    chip.innerHTML = `${icon('place')}<span class="realm-chip__text"></span>`;
+    chip.innerHTML = `${icon('place')}<span class="realm-chip__text"></span><span class="realm-chip__caret" data-testid="chip-caret" aria-hidden="true"></span>`;
     pin.el.appendChild(chip);
     pin.chipEl = chip;
   }
@@ -1848,6 +1849,7 @@ function followMember(r) {
 /**
  * Hook of placeChips (D75): shifts a chip sideways, through the `--realm-chip-dx` custom property that realm-map.css adds to its centring transform, so it
  * stays inside the map: not past the left and right edge, and in Expanded not under the panel. This is the "Here for" chip and the selection chip alike.
+ * The chip's caret does not move with the chip: `--realm-chip-caret-x` keeps it over the pin centre (D79).
  * @param {Runtime} r
  * @param {Pin} pin
  * @param {{ x: number, y: number }} tip where the pin touches the map
@@ -1858,8 +1860,12 @@ function clampChip(r, pin, tip) {
   const width = chip.offsetWidth;
   if (width <= 0) return;
   const room = chipRoom(containerSize(r), r.layout, r.appliedPadding);
-  const shift = `${Math.round(clampChipShift(tip.x + pin.dx, width, room) * 2) / 2}px`;
+  const shiftPx = Math.round(clampChipShift(tip.x + pin.dx, width, room) * 2) / 2;
+  const shift = `${shiftPx}px`;
   if (chip.style.getPropertyValue('--realm-chip-dx') !== shift) chip.style.setProperty('--realm-chip-dx', shift);
+  // D79: the caret stays over the pin centre whatever the shift (`--realm-chip-caret-x`, from the chip's left edge; realm-map.css).
+  const caret = `${chipCaretX(width, shiftPx)}px`;
+  if (chip.style.getPropertyValue('--realm-chip-caret-x') !== caret) chip.style.setProperty('--realm-chip-caret-x', caret);
 }
 
 /**

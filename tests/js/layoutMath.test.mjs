@@ -6,6 +6,7 @@ import { EARTH_RADIUS_M, metersPerPixel } from '../../src/Realm.Web/wwwroot/js/g
 import {
   AT_DEFAULT_METERS,
   AT_DEFAULT_ZOOM,
+  CHIP_CARET_INSET_PX,
   CHIP_EDGE_PX,
   DEFAULT_LAYOUT,
   FAR_FLIGHT_MS,
@@ -17,6 +18,7 @@ import {
   RECENTER_SKIP_PX,
   SELECTION_EASE_MS,
   SELECTION_MIN_ZOOM,
+  chipCaretX,
   chipRoom,
   clampChipShift,
   computePadding,
@@ -417,6 +419,62 @@ test('clampChipShift: over every centre and width the shifted chip lies inside t
       assert.ok(left >= room.left - 1e-9 && right <= room.right + 1e-9, `width ${width}, centre ${centre}: ${left}..${right}`);
       if (centre - width / 2 >= room.left && centre + width / 2 <= room.right) assert.equal(shift, 0, `width ${width}, centre ${centre}`);
       else assert.ok(Math.abs(left - room.left) < 1e-9 || Math.abs(right - room.right) < 1e-9, 'it touches an edge, so the shift is the smallest one');
+    }
+  }
+});
+
+// ---- D79: the caret of a shifted chip stays over the pin ---------------------------------------------------------------------------------------
+
+const CHIP_AT_PHONE = 212; // "Here for 3 hrs, 33 mins" as the CI measured it at 412 px wide (the King's pin at x 340, the chip moved 42 px left)
+
+test('chipCaretX: a chip that is not moved has its caret in the middle', () => {
+  assert.equal(CHIP_CARET_INSET_PX, 18, 'the radius of the chip body');
+  assert.equal(chipCaretX(CHIP_AT_PHONE, 0), CHIP_AT_PHONE / 2);
+  assert.equal(chipCaretX(CHIP, 0), CHIP / 2);
+});
+
+test('chipCaretX: the AC-17 case at 412 px wide, the King at x 340, puts the caret on the pin', () => {
+  const room = { left: 8, right: 404 };
+  const shift = clampChipShift(340, CHIP_AT_PHONE, room);
+  assert.equal(shift, -42, 'the chip moves 42 px left');
+  const caret = chipCaretX(CHIP_AT_PHONE, shift);
+  assert.equal(caret, 148, 'the caret is 42 px right of the middle of the chip');
+  assert.equal(340 + shift - CHIP_AT_PHONE / 2 + caret, 340, 'chip left edge plus caret x is the pin x');
+});
+
+test('chipCaretX: it moves against the shift, a chip moved left has the caret right of the middle and the other way round', () => {
+  assert.equal(chipCaretX(200, -30), 130);
+  assert.equal(chipCaretX(200, 30), 70);
+});
+
+test('chipCaretX: it stays 18 px from either end, so a pin at the very edge keeps the caret on the straight part of the body', () => {
+  assert.equal(chipCaretX(200, -500), 182);
+  assert.equal(chipCaretX(200, 500), 18);
+  assert.equal(chipCaretX(200, -82), 182, 'exactly at the limit');
+  assert.equal(chipCaretX(200, -83), 182);
+  assert.equal(chipCaretX(200, 82), 18);
+  assert.equal(chipCaretX(200, 20, 10), 80, 'with another inset');
+  assert.equal(chipCaretX(200, 500, 10), 10);
+});
+
+test('chipCaretX: a chip narrower than twice the inset has its caret in the middle', () => {
+  assert.equal(chipCaretX(30, 0), 15);
+  assert.equal(chipCaretX(30, -40), 15);
+  assert.equal(chipCaretX(30, 40), 15);
+  assert.equal(chipCaretX(36, 10), 18);
+});
+
+test('chipCaretX: over every pin x and chip width the clamped chip has its caret exactly on the pin, unless the pin is too near an end of the chip', () => {
+  const room = { left: 8, right: 404 };
+  for (const width of [60, 120, 196, 212, 300, 396]) {
+    for (let pinX = -150; pinX <= 560; pinX += 7) {
+      const shift = Math.round(clampChipShift(pinX, width, room) * 2) / 2; // as realmMap.js rounds it
+      const left = pinX - width / 2 + shift;
+      const caret = chipCaretX(width, shift);
+      assert.ok(caret >= Math.min(18, width / 2) - 1e-9 && caret <= width - Math.min(18, width / 2) + 1e-9, `width ${width}, pin ${pinX}: caret ${caret} is off the body`);
+      const wanted = pinX - left; // where the pin is, from the chip's left edge
+      if (wanted >= 18 && wanted <= width - 18) assert.ok(Math.abs(left + caret - pinX) < 1e-9, `width ${width}, pin ${pinX}: the caret is ${left + caret - pinX} px from the pin`);
+      else assert.ok(Math.abs(caret - Math.min(width - 18, Math.max(18, wanted))) < 1e-9, `width ${width}, pin ${pinX}: the caret is held at the end of the body`);
     }
   }
 });
