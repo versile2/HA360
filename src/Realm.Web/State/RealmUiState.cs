@@ -112,7 +112,10 @@ public sealed class RealmUiState
         }
     }
 
-    /// <summary>The last camera JavaScript reported (it mirrors it to <c>sessionStorage["realm.camera"]</c> itself); null before the first report. Set by <see cref="RecordCamera"/>.</summary>
+    /// <summary>
+    /// The last camera the Location page kept: the one JavaScript reported (it reports only when the recentre state changes, <c>[X-07]</c>, and mirrors every settled camera to <c>sessionStorage["realm.camera"]</c>
+    /// itself) or the one the page read from it as it went away (R1-12); null before either. Set by <see cref="RecordCamera"/>.
+    /// </summary>
     public CameraState? LastCamera { get; private set; }
 
     /// <summary>The viewer's member id, resolved in SSR (03 section 5.5); null when unknown.</summary>
@@ -195,8 +198,8 @@ public sealed class RealmUiState
     }
 
     /// <summary>
-    /// Remembers the camera JavaScript just reported and when (the session's clock, never the wall clock). Raises nothing: no component renders the camera, and a
-    /// pan would otherwise re-render the page about eight times a second.
+    /// Remembers a camera and when (the session's clock, never the wall clock): the one JavaScript just reported, or the one the page read as it went away. Raises nothing: no component renders the
+    /// camera itself, and the page re-renders only for what it derives from it, the recentre state.
     /// </summary>
     public void RecordCamera(CameraState camera, DateTimeOffset at)
     {

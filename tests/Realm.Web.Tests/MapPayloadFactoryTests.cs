@@ -242,6 +242,213 @@ public sealed class MapPayloadFactoryTests
 
     private static string? Chip(MemberVm me, IReadOnlyList<PlaceVm> places) => Assert.Single(Members([me], places, meId: me.Id).Members).Chip;
 
+    // The chip follows the selection (01 section 4.4, review R1-03). [AC-17b] is AC-17's second sentence: "Selecting Briar shows `Driving · 54 mph` above her pin and removes Alden's chip."
+    private static readonly EntityRef King = new(EntityKind.Member, DemoCast.King.Id);
+    private static readonly EntityRef Queen = new(EntityKind.Member, DemoCast.Queen.Id);
+
+    [Fact(DisplayName = "[AC-17b] Selecting Briar gives her \"Driving · 54 mph\" and removes Alden's chip")]
+    public void Demo_SelectingBriar_ShowsHerDrivingChip_AndRemovesTheKingsChip()
+    {
+        var members = DemoMembersSelecting(Queen);
+
+        Assert.Equal("Driving · 54 mph", members[DemoCast.Queen.Id].Chip);
+        Assert.Equal([DemoCast.Queen.Id], members.Values.Where(member => member.Chip is not null).Select(member => member.Id));
+    }
+
+    [Fact(DisplayName = "[AC-17b] Every selected Demo member has the chip of the table in 01 section 4.4, and nobody else has one")]
+    public void Demo_ASelectedMember_HasTheChipOfTheTable_AndIsTheOnlyChip()
+    {
+        (EntityRef Who, string Chip)[] rows =
+        [
+            (King, "Here for 3 hrs, 33 mins"),
+            (Queen, "Driving · 54 mph"),
+            (new EntityRef(EntityKind.Member, DemoCast.Jester.Id), "Here for 19 mins"),
+            (new EntityRef(EntityKind.Member, DemoCast.Cryptid.Id), "Last seen 42 min ago"),
+            (new EntityRef(EntityKind.Member, DemoCast.Prince.Id), DemoCast.Prince.StaticLabel!),
+        ];
+
+        foreach (var (who, chip) in rows)
+        {
+            var members = DemoMembersSelecting(who);
+
+            Assert.Equal(chip, members[who.Id].Chip);
+            Assert.Equal([who.Id], members.Values.Where(member => member.Chip is not null).Select(member => member.Id));
+        }
+    }
+
+    [Fact]
+    public void Demo_TheStaticPrincesChip_IsHisLabel()
+    {
+        Assert.Equal("Home · Highmeadow", DemoMembersSelecting(new EntityRef(EntityKind.Member, DemoCast.Prince.Id))[DemoCast.Prince.Id].Chip);
+    }
+
+    [Fact]
+    public void MyChip_StaysWhileNothingIsSelected_AndWhileIAmTheSelection_ButGoesWhenAnythingElseIsSelected()
+    {
+        var since = Now.AddMinutes(-5);
+        var places = new[] { Place("park", 200) };
+        var me = Member("a", placeId: "park", since: since);
+        var other = Member("b", placeId: "park", since: since);
+
+        Assert.Equal("Here for 5 mins", ChipOf("a", [me, other], places, selection: null));
+        Assert.Equal("Here for 5 mins", ChipOf("a", [me, other], places, new EntityRef(EntityKind.Member, "a")));
+        Assert.Null(ChipOf("a", [me, other], places, new EntityRef(EntityKind.Member, "b")));
+        Assert.Null(ChipOf("a", [me, other], places, new EntityRef(EntityKind.Vehicle, "v")));
+        Assert.Null(ChipOf("a", [me, other], places, new EntityRef(EntityKind.Place, "park")));
+        Assert.Equal("Here for 5 mins", ChipOf("b", [me, other], places, new EntityRef(EntityKind.Member, "b")));
+    }
+
+    [Fact]
+    public void AnEntityOfAnotherKindWithTheSameId_IsNotTheSelectedMember()
+    {
+        var places = new[] { Place("park", 200) };
+        var me = Member("a", placeId: "park", since: Now.AddMinutes(-5));
+        var vehicle = Member("v", placeId: "park", since: Now.AddMinutes(-9));
+
+        Assert.Null(ChipOf("v", [me, vehicle], places, new EntityRef(EntityKind.Vehicle, "v")));
+        Assert.Equal("Here for 9 mins", ChipOf("v", [me, vehicle], places, new EntityRef(EntityKind.Member, "v")));
+    }
+
+    [Fact]
+    public void MyChip_WhileNothingIsSelected_IsTheAtAPlaceOneAndNoOther()
+    {
+        // 01 section 4.4: "Me, when nothing else is selected and I am at a place". Driving, out, stale or static, I carry no chip until I am selected myself.
+        var places = new[] { Place("park", 200) };
+
+        Assert.Null(ChipOf("a", [Member("a", isDriving: true, speedMps: 24, since: Now.AddMinutes(-5))], places, selection: null));
+        Assert.Null(ChipOf("a", [Member("a", since: Now.AddMinutes(-5))], places, selection: null));
+        Assert.Null(ChipOf("a", [Member("a", freshness: Freshness.Stale, lastUpdate: Now.AddMinutes(-42))], places, selection: null));
+        Assert.Equal("Driving · 54 mph", ChipOf("a", [Member("a", isDriving: true, speedMps: 24.1, since: Now.AddMinutes(-5))], places, new EntityRef(EntityKind.Member, "a")));
+    }
+
+    [Theory]
+    [InlineData(24.1, "Driving · 54 mph")]
+    [InlineData(0.4, "Driving · 1 mph")]
+    [InlineData(null, "Driving")]
+    public void ASelectedDrivingMember_ShowsOnlyAReportedSpeed(double? speedMps, string expected)
+    {
+        // R-112: "a speed implied from two fixes is never shown"; the view model's SpeedMps is the reported one, and null reads plain "Driving".
+        var member = Member("a", isDriving: true, speedMps: speedMps, placeId: "park");
+
+        Assert.Equal(expected, ChipOf("a", [member], [Place("park", 200)], new EntityRef(EntityKind.Member, "a")));
+    }
+
+    [Theory]
+    [InlineData(Freshness.Stale, 42, "Last seen 42 min ago")]
+    [InlineData(Freshness.Offline, 42, "Last seen 42 min ago")]
+    [InlineData(Freshness.Stale, 180, "Last seen 3 hr ago")]
+    [InlineData(Freshness.Offline, 20, "Last seen 20 min ago")]
+    public void ASelectedStaleOrOfflineMember_SaysWhenItWasLastSeen_WhateverItsPlaceOrDriving(Freshness freshness, int minutesAgo, string expected)
+    {
+        var member = Member("a", freshness: freshness, lastUpdate: Now.AddMinutes(-minutesAgo), isDriving: true, placeId: "park");
+
+        Assert.Equal(expected, ChipOf("a", [member], [Place("park", 200)], new EntityRef(EntityKind.Member, "a")));
+    }
+
+    [Fact]
+    public void ASelectedMember_WithoutTheFactItsChipNeeds_HasNoChip()
+    {
+        var places = new[] { Place("park", 200) };
+        var select = new EntityRef(EntityKind.Member, "a");
+
+        Assert.Null(ChipOf("a", [Member("a", placeId: "park", since: null)], places, select));                                      // at a place, arrival unknown
+        Assert.Null(ChipOf("a", [Member("a", freshness: Freshness.Stale, lastUpdate: null)], places, select));                         // stale, never heard
+        Assert.Null(ChipOf("a", [Member("a", placeId: null, since: Now.AddMinutes(-5))], places, select));                             // out and not driving
+        Assert.Null(ChipOf("a", [Member("a", freshness: Freshness.NoFix, lat: null, lon: null)], places, select));                    // no fix, no pin
+    }
+
+    [Fact]
+    public void ASelectedStaticMember_WithoutALabel_ReadsFixedPosition()
+    {
+        var prince = Member("p", kind: MemberKind.Static, freshness: Freshness.Static);
+
+        Assert.Equal("Fixed position", ChipOf("p", [prince], [], new EntityRef(EntityKind.Member, "p")));
+        Assert.Equal("Home · Highmeadow", ChipOf("p", [prince with { StaticLabel = "Home · Highmeadow" }], [], new EntityRef(EntityKind.Member, "p")));
+    }
+
+    [Fact]
+    public void TheChipsRelativeTime_FollowsTheSessionsClockAndZone_AtADayOrMore()
+    {
+        // Past 24 hours the relative time is a weekday and a clock time, in the session's zone and never the browser's (01 section 8.3).
+        var zone = TimeZoneInfo.FindSystemTimeZoneById("America/Chicago");
+        var seen = Now.AddHours(-30);
+        var member = Member("a", freshness: Freshness.Offline, lastUpdate: seen);
+
+        var chip = MapPayloadFactory.MemberChip(member, MemberStatus.Offline, isMe: true, new EntityRef(EntityKind.Member, "a"), Now, zone);
+
+        Assert.Equal("Last seen " + TimeFormatter.Relative(seen, Now, zone), chip);
+        Assert.NotEqual("Last seen " + TimeFormatter.Relative(seen, Now, TimeZoneInfo.Utc), chip);
+    }
+
+    // ---- the chip of a vehicle ---------------------------------------------------------------------------------------------------------------
+
+    [Fact]
+    public void Demo_TheSelectedWagon_ReadsParkedEngineOff_AndOnlyTheSelectedVehicleHasAChip()
+    {
+        var wagon = new EntityRef(EntityKind.Vehicle, DemoCast.Wagon.Id);
+
+        var selected = MapPayloadFactory.Vehicles(Demo.Vehicles, Demo.Places, 1, wagon, Now, TimeZoneInfo.Utc).Vehicles;
+        var none = MapPayloadFactory.Vehicles(Demo.Vehicles, Demo.Places, 1, selection: null, Now, TimeZoneInfo.Utc).Vehicles;
+        var chariot = MapPayloadFactory.Vehicles(Demo.Vehicles, Demo.Places, 1, new EntityRef(EntityKind.Vehicle, DemoCast.Chariot.Id), Now, TimeZoneInfo.Utc).Vehicles;
+
+        Assert.Equal("Parked · Engine off", selected.Single(vehicle => vehicle.Id == DemoCast.Wagon.Id).Chip);
+        Assert.Equal([DemoCast.Wagon.Id], selected.Where(vehicle => vehicle.Chip is not null).Select(vehicle => vehicle.Id));
+        Assert.All(none, vehicle => Assert.Null(vehicle.Chip));
+        Assert.All(chariot, vehicle => Assert.Null(vehicle.Chip));   // the placeholder has no pin, so no chip
+    }
+
+    [Theory]
+    [InlineData(Freshness.Stale, true, IgnitionState.On, 27.7, 60, "Last heard 1 hr ago")]    // "never Driving, whatever the engine says"
+    [InlineData(Freshness.Stale, false, IgnitionState.Off, null, 45, "Last heard 45 min ago")]
+    [InlineData(Freshness.Fresh, true, IgnitionState.On, 27.7165, 0, "Driving · 62 mph")]
+    [InlineData(Freshness.Fresh, true, IgnitionState.On, null, 0, "Driving")]
+    [InlineData(Freshness.Fresh, false, IgnitionState.Off, null, 0, "Parked · Engine off")]
+    [InlineData(Freshness.Fresh, false, IgnitionState.Accessory, null, 0, "Parked · Accessory on")]
+    [InlineData(Freshness.Fresh, false, IgnitionState.On, 0.0, 0, "Engine on")]
+    [InlineData(Freshness.Fresh, false, null, null, 0, "Parked")]
+    public void ASelectedVehicle_HasTheChipOfTheTable(Freshness freshness, bool isMoving, IgnitionState? ignition, double? speedMps, int minutesAgo, string expected)
+    {
+        var vehicle = Vehicle("v", freshness: freshness, isMoving: isMoving, ignition: ignition, speedMps: speedMps, lastUpdate: Now.AddMinutes(-minutesAgo));
+
+        var item = Assert.Single(MapPayloadFactory.Vehicles([vehicle], [], 1, new EntityRef(EntityKind.Vehicle, "v"), Now, TimeZoneInfo.Utc).Vehicles);
+
+        Assert.Equal(expected, item.Chip);
+    }
+
+    [Fact]
+    public void ARemoteStartedVehicle_ThatIsNotMoving_ReadsItsMinutesLeft_NotParked()
+    {
+        var vehicle = Vehicle("v", ignition: IgnitionState.RemoteStart, remoteStartSecondsLeft: 480);
+
+        Assert.Equal("Remote start · 8 min left", MapPayloadFactory.VehicleChip(vehicle, Now, TimeZoneInfo.Utc));
+    }
+
+    [Fact]
+    public void AVehicleWithoutAPin_OrAStaleOneNeverHeardFrom_HasNoChip()
+    {
+        var noFix = Vehicle("n", freshness: Freshness.NoFix, lat: null, lon: null);
+        var placeholder = Vehicle("w", isPlaceholder: true);
+        var stale = Vehicle("s", freshness: Freshness.Stale, lastUpdate: null);
+
+        Assert.Null(MapPayloadFactory.VehicleChip(noFix, Now, TimeZoneInfo.Utc));
+        Assert.Null(MapPayloadFactory.VehicleChip(placeholder, Now, TimeZoneInfo.Utc));
+        Assert.Null(MapPayloadFactory.VehicleChip(stale, Now, TimeZoneInfo.Utc));
+    }
+
+    [Fact]
+    public void AMemberSelectionDoesNotGiveAVehicleAChip_AndAVehicleSelectionDoesNotGiveAMemberOne()
+    {
+        var vehicle = Vehicle("v");
+
+        var vehicles = MapPayloadFactory.Vehicles([vehicle], [], 1, new EntityRef(EntityKind.Member, "v"), Now, TimeZoneInfo.Utc).Vehicles;
+
+        Assert.Null(Assert.Single(vehicles).Chip);
+    }
+
+    // One member's chip through the whole payload: "me" is the first id, the selection is as given.
+    private static string? ChipOf(string id, IReadOnlyList<MemberVm> members, IReadOnlyList<PlaceVm> places, EntityRef? selection) =>
+        MapPayloadFactory.Members(members, places, members[0].Id, Now, Options, 1, selection).Members.Single(item => item.Id == id).Chip;
+
     // ---- the static pin, avatars and strings ----------------------------------------------------------------------------------------------
 
     [Fact]
@@ -727,6 +934,9 @@ public sealed class MapPayloadFactoryTests
     private static Dictionary<string, MemberPayloadItem> DemoMembers() =>
         Members(Demo.Members, Demo.Places, meId: null).Members.ToDictionary(member => member.Id);
 
+    private static Dictionary<string, MemberPayloadItem> DemoMembersSelecting(EntityRef selection) =>
+        MapPayloadFactory.Members(Demo.Members, Demo.Places, null, Now, Options, 1, selection).Members.ToDictionary(member => member.Id);
+
     private static DefaultTargets Targets(IReadOnlyList<MemberVm> members, IReadOnlyList<VehicleVm> vehicles, IReadOnlyList<PlaceVm> places, string? meId, MapPayloadOptions? options = null) =>
         MapPayloadFactory.Targets(members, vehicles, places, meId, options ?? Options, 1) ?? throw new InvalidOperationException("The targets were null.");
 
@@ -768,7 +978,9 @@ public sealed class MapPayloadFactoryTests
         string? placeId = null,
         DateTimeOffset? since = null,
         string? avatarUrl = null,
-        int sortOrder = 0) =>
+        int sortOrder = 0,
+        double? speedMps = null,
+        DateTimeOffset? lastUpdate = null) =>
         new(
             Id: id,
             DisplayName: "Pat",
@@ -783,14 +995,14 @@ public sealed class MapPayloadFactoryTests
             Charging: null,
             BatteryAsOfUtc: null,
             IsDriving: isDriving,
-            SpeedMps: null,
+            SpeedMps: speedMps,
             Street: null,
             City: null,
             Region: null,
             FullAddress: null,
             PlaceId: placeId,
             SinceUtc: since,
-            LastUpdateUtc: null,
+            LastUpdateUtc: lastUpdate,
             SortOrder: sortOrder,
             Freshness: freshness,
             StaticLabel: null);
@@ -803,7 +1015,9 @@ public sealed class MapPayloadFactoryTests
         double? lat = MeLat,
         double? lon = MeLon,
         IgnitionState? ignition = null,
-        int? remoteStartSecondsLeft = null) =>
+        int? remoteStartSecondsLeft = null,
+        double? speedMps = null,
+        DateTimeOffset? lastUpdate = null) =>
         new(
             Id: id,
             Name: "Cart",
@@ -817,8 +1031,8 @@ public sealed class MapPayloadFactoryTests
             RemoteStartSecondsLeft: remoteStartSecondsLeft,
             FuelPct: null,
             OdometerM: null,
-            LastUpdateUtc: null,
-            SpeedMps: null,
+            LastUpdateUtc: lastUpdate,
+            SpeedMps: speedMps,
             IsMoving: isMoving,
             Freshness: freshness,
             IsPlaceholder: isPlaceholder,

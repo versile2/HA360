@@ -120,6 +120,30 @@ public sealed class MapInterop : IAsyncDisposable
     /// <summary>The selection flight to a place: its zone circle fitted into the Peek rectangle.</summary>
     public ValueTask FitPlaceAsync(string id) => CallAsync("fitPlace", id);
 
+    /// <summary>The recentre button (01 section 4.11): away from the default view the default camera, at it "me alone", from there the default camera again. The script computes the state; it comes back in the next camera report.</summary>
+    public ValueTask RecenterAsync() => CallAsync("recenter");
+
+    /// <summary>
+    /// The camera as the script sees it now (<c>getCamera</c>). The script reports a settled camera to .NET only when the recentre state changes (<c>[X-07]</c>), so a page that wants the position, as the
+    /// Location page does when it goes away (R1-12), asks for it here. Null after the dispose and when the circuit is gone.
+    /// </summary>
+    public async ValueTask<CameraState?> GetCameraAsync()
+    {
+        if (_disposed)
+        {
+            return null;
+        }
+
+        try
+        {
+            return await _module.InvokeAsync<CameraState>("getCamera");
+        }
+        catch (JSDisconnectedException)
+        {
+            return null;
+        }
+    }
+
     /// <summary>Tears the map down, then releases the module and the reference to <see cref="MapCallbacks"/>. Safe to call twice and after the circuit is gone.</summary>
     public async ValueTask DisposeAsync()
     {

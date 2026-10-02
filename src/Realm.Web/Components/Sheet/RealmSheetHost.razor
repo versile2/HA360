@@ -86,6 +86,10 @@ else if (Mode == LayoutMode.Expanded)
     [Parameter]
     public EventCallback OnToggle { get; set; }
 
+    /// <summary>The page's request to move the focus (01 section 10.2), handed to the handle: a new request that names the handle takes the focus there. The panel has no handle, and a request for it moves nothing.</summary>
+    [Parameter]
+    public FocusRequest? Focus { get; set; }
+
     /// <summary>The body: the same fragment goes to either container.</summary>
     [Parameter]
     public RenderFragment? ChildContent { get; set; }
@@ -101,7 +105,7 @@ else if (Mode == LayoutMode.Expanded)
     private string DataState => Compact ? (Size == SheetSize.Tall ? "80" : "peek") : "panel";
 
     private RenderFragment HandleFragment =>
-        @<SheetHandle Size="Size" Summary="@Summary" OnToggle="ToggleAsync" OnSet="SetAsync" />;
+        @<SheetHandle Size="Size" Summary="@Summary" Focus="Focus" OnToggle="ToggleAsync" OnSet="SetAsync" />;
 
     /// <inheritdoc />
     protected override void OnParametersSet()

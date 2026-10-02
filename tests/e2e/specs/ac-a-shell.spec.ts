@@ -1,9 +1,24 @@
 // Acceptance tests A of 01 section 11 (03 section 7.5): the shell. S6b writes AC-01 and AC-03; S7a adds AC-02, S7b AC-05 to AC-11 and S8c AC-12 to this file.
-// Both tests run in the default `phone` project (412 x 915, one device pixel per CSS pixel) and read the Demo app through the ingress proxy.
+// The tests run in the default `phone` project (412 x 915, one device pixel per CSS pixel) and read the Demo app through the ingress proxy; AC-12 resizes the window itself.
 // 01 section 11 states every geometry to within 2 px unless it says otherwise.
 import type { Locator } from '@playwright/test';
 
-import { INGRESS_PREFIX, demo, expect, expectApprox, expectRectApprox, test, type Rect } from '../fixtures.js';
+import {
+  INGRESS_PREFIX,
+  PEEK_CENTRE_TOLERANCE_PX,
+  castMember,
+  demo,
+  expect,
+  expectApprox,
+  expectRectApprox,
+  loadDemoCast,
+  mapReady,
+  pinDistanceFromPeekCentre,
+  readHook,
+  settled,
+  test,
+  type Rect,
+} from '../fixtures.js';
 
 const TOLERANCE_PX = 2;
 
@@ -101,5 +116,54 @@ test.describe('acceptance A: the shell', () => {
     // The boxes are real targets: nothing else sits over their centre or the middle of their edges.
     expect(await hitMisses(gear), 'points of btn-settings that something else receives').toEqual([]);
     expect(await hitMisses(attribution), 'points of map-attribution that something else receives').toEqual([]);
+  });
+
+  // [AC-12] D45 restated (R3-024): with Cass selected at Peek the layout changes under him. At 884 x 916 the Compact sheet becomes the Expanded panel, which has no Peek, so the header is
+  // replaced by his detail; the selection, the Drivers section and the map centre (within 0.0005 degrees) are kept. Back at 412 x 915 the sheet is at Peek again (SheetSize stays Peek in
+  // both layouts, so the way back is deterministic) with his header. The Drivers section is read from its summary, which only the Drivers section has, and from its tab.
+  test('[AC-12] resizing 412 × 915 to 884 × 916 with Cass selected keeps the selection, the Drivers section and the map centre, the panel shows his detail, and resizing back shows the Peek header again', async ({ page }) => {
+    test.slow(); // a selection flight, two layout changes and their re-centres: three times the 45 s budget of a plain test
+    await demo(page);
+    await mapReady(page);
+    const jester = castMember(loadDemoCast(), 'jester');
+    const header = page.getByTestId('sheet-selection-header');
+    const summary = page.getByTestId('sheet-summary');
+    const expectCentreKept = async (from: [number, number], label: string): Promise<void> => {
+      await settled(page);
+      const centre = (await readHook(page, 'camera')).center;
+      expectApprox(centre[0], from[0], 0.0005, `${label}: the map centre, longitude`);
+      expectApprox(centre[1], from[1], 0.0005, `${label}: the map centre, latitude`);
+    };
+
+    // Cass selected from his pin: Peek, his header, the camera on him.
+    await page.getByTestId('pin-member-jester').click();
+    await expect(header, 'the selection header shows at 412 x 915').toBeVisible();
+    await expect.poll(() => pinDistanceFromPeekCentre(page, 'member', 'jester'), { message: "the flight to Cass has not centred his pin", timeout: 10_000 }).toBeLessThanOrEqual(PEEK_CENTRE_TOLERANCE_PX);
+    await settled(page);
+    const centre = (await readHook(page, 'camera')).center;
+    await expect(summary, 'the Drivers summary at Peek').toHaveText('4 in the Realm · 1 driving');
+
+    // 884 x 916: the panel, his detail in place of the header, the same section, the same centre.
+    await page.setViewportSize({ width: 884, height: 916 });
+    await expect.poll(async () => (await readHook(page, 'sheet')).state, { message: 'sheet().state after the resize to 884 x 916' }).toBe('panel');
+    await expect(page.getByTestId('detail-back'), "the panel shows Cass's detail").toBeVisible();
+    await expect(page.locator('.realm-detail-name'), 'the detail is his').toHaveText(jester.name);
+    await expect(header, 'the Peek header is replaced by the detail').toHaveCount(0);
+    await expect(page.getByTestId('tab-drivers'), 'the Drivers section is kept').toHaveAttribute('aria-selected', 'true');
+    await expect(summary, 'the panel header is the Drivers summary').toHaveText('4 in the Realm · 1 driving');
+    await expectCentreKept(centre, 'at 884 x 916');
+
+    // Back to 412 x 915: Peek, his header again.
+    await page.setViewportSize({ width: 412, height: 915 });
+    await expect.poll(async () => (await readHook(page, 'sheet')).state, { message: 'sheet().state after the resize back to 412 x 915' }).toBe('peek');
+    await expect(header, 'the selection header is back').toBeVisible();
+    await expect(header.locator('.realm-row-name'), 'it is Cass\'s').toHaveText(jester.name);
+    await expect(page.getByTestId('detail-back'), 'no detail at Peek').toHaveCount(0);
+    await expect(summary, 'the Drivers summary at Peek again').toHaveText('4 in the Realm · 1 driving');
+    await expectCentreKept(centre, 'back at 412 x 915');
+
+    // The ✕ returns to the section that was kept: Drivers.
+    await page.getByTestId('sheet-selection-clear').click();
+    await expect(page.getByTestId('tab-drivers'), 'the Drivers tab is the selected one once the selection is cleared').toHaveAttribute('aria-selected', 'true');
   });
 });

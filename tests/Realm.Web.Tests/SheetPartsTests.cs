@@ -106,6 +106,43 @@ public sealed class SheetPartsTests : ComponentTestBase
         Assert.DoesNotContain("stoppropagation", markup, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void Handle_ARequestForTheHandle_TakesTheFocus_OncePerRequest()
+    {
+        var request = new FocusRequest(FocusTarget.Handle);
+        var cut = RenderWithProviders<SheetHandle>(handle => handle.Add(p => p.Focus, request));
+
+        cut.WaitForAssertion(() => Assert.Equal(1, FocusCalls()));
+
+        // The page renders again (a tick of the minute, a change of the lists) with the request it has not yet dropped: nothing moves.
+        cut.Render(handle => handle.Add(p => p.Summary, "5 in the Realm"));
+        cut.Render(handle => handle.Add(p => p.Focus, request));
+        Assert.Equal(1, FocusCalls());
+
+        // A new request is a new ask, though it names the same target.
+        cut.Render(handle => handle.Add(p => p.Focus, new FocusRequest(FocusTarget.Handle)));
+        cut.WaitForAssertion(() => Assert.Equal(2, FocusCalls()));
+    }
+
+    [Theory]
+    [InlineData(FocusTarget.None)]
+    [InlineData(FocusTarget.SectionTab)]
+    public void Handle_ARequestForSomethingElse_MovesNothing(FocusTarget target)
+    {
+        var cut = RenderWithProviders<SheetHandle>(handle => handle.Add(p => p.Focus, new FocusRequest(target)));
+
+        Assert.Single(cut.FindAll("button"));
+        AssertNothingFocused();
+    }
+
+    [Fact]
+    public void Handle_WithNoRequest_NeverTakesTheFocus()
+    {
+        RenderWithProviders<SheetHandle>();
+
+        AssertNothingFocused();
+    }
+
     // ---- the three tabs --------------------------------------------------------------------------------------------------------------------
 
     [Fact]
@@ -136,26 +173,41 @@ public sealed class SheetPartsTests : ComponentTestBase
         Assert.Single(tabs, tab => tab.GetAttribute("tabindex") == "0");
     }
 
-    [Theory]
-    [InlineData(Section.Drivers, "5 drivers")]
-    [InlineData(Section.Vehicles, "2 vehicles")]
-    [InlineData(Section.Places, "14 places")]
-    public void Segments_TheCountOfTheSectionThatShows_IsAnnouncedPolitely(Section section, string expected)
+    [Fact]
+    public void Segments_HaveNoLiveRegion_TheSheetContentHoldsTheOne()
     {
-        var cut = Segments(section, new SheetSegments.SegmentCounts(5, 2, 14));
+        // The count of a section is announced by the sheet's one live region (SheetContent), which stays while the selection header takes the tabs' place.
+        var cut = Segments(Section.Drivers);
 
-        var live = cut.Find("[data-testid='sheet-announce']");
-        Assert.Equal(expected, live.TextContent);
-        Assert.Equal("polite", live.GetAttribute("aria-live"));
-        Assert.Equal("status", live.GetAttribute("role"));
+        Assert.Empty(cut.FindAll("[aria-live]"));
+        Assert.Empty(cut.FindAll("[data-testid='sheet-announce']"));
+    }
+
+    [Fact]
+    public void Segments_ARequestForTheSectionTab_TakesTheFocus_OncePerRequest()
+    {
+        var request = new FocusRequest(FocusTarget.SectionTab);
+        var cut = Segments(Section.Vehicles, focus: request);
+
+        cut.WaitForAssertion(() => Assert.Equal(1, FocusCalls()));
+
+        // The page renders again with the request it has not yet dropped: nothing moves. A new request is a new ask, though it names the same target.
+        cut.Render(segments => segments.Add(p => p.Focus, request));
+        Assert.Equal(1, FocusCalls());
+        cut.Render(segments => segments.Add(p => p.Focus, new FocusRequest(FocusTarget.SectionTab)));
+        cut.WaitForAssertion(() => Assert.Equal(2, FocusCalls()));
     }
 
     [Theory]
-    [InlineData(Section.Drivers, "1 driver")]
-    [InlineData(Section.Vehicles, "1 vehicle")]
-    [InlineData(Section.Places, "1 place")]
-    public void Segments_OneRow_IsSingular(Section section, string expected) =>
-        Assert.Equal(expected, Segments(section, new SheetSegments.SegmentCounts(1, 1, 1)).Find("[data-testid='sheet-announce']").TextContent);
+    [InlineData(FocusTarget.None)]
+    [InlineData(FocusTarget.Handle)]
+    public void Segments_ARequestForSomethingElse_MovesNothing(FocusTarget target)
+    {
+        var cut = Segments(Section.Drivers, focus: new FocusRequest(target));
+
+        Assert.NotEmpty(cut.FindAll("[role='tab']"));
+        AssertNothingFocused();
+    }
 
     [Theory]
     [InlineData("tab-places", Section.Places)]
@@ -239,7 +291,7 @@ public sealed class SheetPartsTests : ComponentTestBase
         var cut = RenderWithProviders<SheetContent>();
 
         Assert.Empty(cut.FindAll("[data-testid='sheet-list'] li"));
-        Assert.Equal("0 drivers", cut.Find("[data-testid='sheet-announce']").TextContent);
+        Assert.Equal(string.Empty, cut.Find("[data-testid='sheet-announce']").TextContent);
     }
 
     // ---- the right button stack ------------------------------------------------------------------------------------------------------------
@@ -339,11 +391,22 @@ public sealed class SheetPartsTests : ComponentTestBase
 
     // ---- helpers ---------------------------------------------------------------------------------------------------------------------------
 
-    private IRenderedComponent<SheetSegments> Segments(Section section, SheetSegments.SegmentCounts? counts = null, Action<Section>? onSection = null) =>
+    // ElementReference.FocusAsync reaches the browser as this call; bUnit's own VerifyFocusAsyncInvoke counts it too, and raises when it was never made.
+    private const string FocusCall = "Blazor._internal.domWrapper.focus";
+
+    private int FocusCalls() => JSInterop.Invocations[FocusCall].Count();
+
+    private void AssertNothingFocused() => Assert.ThrowsAny<Exception>(() => JSInterop.VerifyFocusAsyncInvoke());
+
+    private IRenderedComponent<SheetSegments> Segments(Section section, Action<Section>? onSection = null, FocusRequest? focus = null) =>
         RenderWithProviders<SheetSegments>(segments =>
         {
             segments.Add(p => p.Section, section);
-            segments.Add(p => p.Counts, counts ?? new SheetSegments.SegmentCounts(5, 2, 14));
+            if (focus is not null)
+            {
+                segments.Add(p => p.Focus, focus);
+            }
+
             if (onSection is not null)
             {
                 segments.Add(p => p.OnSection, (Section chosen) =>

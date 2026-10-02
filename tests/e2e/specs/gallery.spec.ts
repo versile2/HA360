@@ -8,12 +8,12 @@
 // `saveShot`, the Demo's frozen clock (21:25 CDT, the default of `demo()`; the chip text below proves it), the hidden `demo-offline` style (no tiles, no
 // fonts), `settled()` and `document.fonts.ready` before the capture. Only SwiftShader's anti-aliasing can still differ between runs.
 //
-// S6b writes SC01. S7b appends SC02 to SC05 (the lists of the sheet). S9b appends SC15 at the end. Later slices append theirs (SC06 and SC07 at S8, SC08 and SC09 at S10, ...).
+// S6b writes SC01. S7b appends SC02 to SC05 (the lists of the sheet). S9b appends SC15 at the end. Later slices append theirs (SC06 and SC07 at S8c, SC08 and SC09 at S10, ...).
 import fs from 'node:fs';
 
 import type { Locator, Page } from '@playwright/test';
 
-import { castMember, castPlace, demo, expect, loadDemoCast, mapReady, onScreenPinTestIds, readHook, saveShot, test } from '../fixtures.js';
+import { PEEK_CENTRE_TOLERANCE_PX, castMember, castPlace, demo, expect, expectSelectionCentred, loadDemoCast, mapReady, onScreenPinTestIds, pinDistanceFromPeekCentre, readHook, saveShot, test } from '../fixtures.js';
 
 test.use({ reducedMotion: 'reduce' });
 
@@ -421,5 +421,61 @@ test.describe('[GAL] screenshot gallery: the Layers popover and the Settings dia
 
     const about = await saveShot(page, testInfo, 'SC09-settings-about');
     expectViewportPng(about, page, testInfo.project.name);
+  });
+});
+
+// ---- S8c: SC06-member-detail and SC07-peek-selection (03 section 8.5; D45). Their own describe block, appended at the end. ----------------------------------------------------------
+// A selection lands at Peek (D45), so both scenes start with a tap on the Jester's pin. SC06 then opens the detail the way a person does (the handle; in the Expanded panel the detail is already
+// there) and SC07 stays at Peek. The checklist for the reader (03 section 8.5): SC06: the detail header, the This-week tiles and the Full report link at 80 %, no timeline and no trail in v1; SC07:
+// the Peek selection header with its battery badge and the pin centred in the Peek rectangle (phone only: the panel has no Peek).
+test.describe('[GAL] screenshot gallery: the selection', () => {
+  test('[GAL] SC06-member-detail', { tag: ['@phone', '@unfolded'] }, async ({ page }, testInfo) => {
+    const jester = castMember(loadDemoCast(), 'jester');
+    const compact = viewportOf(page).width < EXPANDED_FROM;
+    await demo(page);
+    await mapReady(page);
+
+    await page.getByTestId('pin-member-jester').click();
+    if (compact) {
+      // D45: the pin selected at Peek; the handle then opens the detail at 80 %.
+      await expect(page.getByTestId('sheet-selection-header'), 'the Peek selection header').toBeVisible();
+      await page.getByTestId('sheet-handle').click();
+      await expect.poll(async () => (await readHook(page, 'sheet')).state, { message: 'sheet().state after the handle tap' }).toBe('80');
+    } else {
+      await expect.poll(async () => (await readHook(page, 'sheet')).state, { message: 'sheet().state in the Expanded layout' }).toBe('panel');
+    }
+
+    // The scene is in the state it is named for: Cass's detail, the week's tiles loaded, the link to the full report, and neither a timeline nor a trail button (v1.1).
+    await expect(page.getByTestId('detail-back'), 'the detail shows').toBeVisible();
+    await expect(page.locator('.realm-detail-name'), 'the detail is the Jester\'s').toHaveText(jester.name);
+    await expect(page.locator('.realm-detail-tile-value'), 'the This-week tiles').toHaveText(['18', '202.6', '88 mph']);
+    await expect(page.locator('.realm-detail-link'), 'the Full report link').toBeVisible();
+    await expect(page.getByTestId('btn-show-trail'), 'no Show trail button in v1').toHaveCount(0);
+    await expectSelectionCentred(page, { kind: 'member', id: 'jester' }, compact, 'the selected pin before the capture');
+
+    const file = await saveShot(page, testInfo, 'SC06-member-detail');
+    expectViewportPng(file, page, testInfo.project.name);
+  });
+
+  test('[GAL] SC07-peek-selection', { tag: ['@phone'] }, async ({ page }, testInfo) => {
+    const jester = castMember(loadDemoCast(), 'jester');
+    await demo(page);
+    await mapReady(page);
+
+    await page.getByTestId('pin-member-jester').click();
+    const header = page.getByTestId('sheet-selection-header');
+    await expect(header, 'the Peek selection header').toBeVisible();
+
+    // The scene is in the state it is named for: Peek, the header with the name, the lore title, the status line and the low battery badge, no tabs and no detail, and the pin centred in the Peek rectangle.
+    await expect(header.locator('.realm-row-name'), 'the name').toHaveText(jester.name);
+    await expect(header.locator('.realm-row-lore'), 'the lore title').toHaveText(jester.lore);
+    await expect(page.getByTestId('sheet-selection-battery'), 'the battery badge').toHaveText('12%');
+    await expect(page.getByTestId('sheet-segments'), 'the tab control is replaced by the header').toBeHidden();
+    await expect(page.getByTestId('detail-back'), 'no detail at Peek').toHaveCount(0);
+    expect((await readHook(page, 'sheet')).state, 'the sheet is at Peek').toBe('peek');
+    await expect.poll(() => pinDistanceFromPeekCentre(page, 'member', 'jester'), { message: 'the flight has not centred the pin in the Peek rectangle', timeout: 10_000 }).toBeLessThanOrEqual(PEEK_CENTRE_TOLERANCE_PX);
+
+    const file = await saveShot(page, testInfo, 'SC07-peek-selection');
+    expectViewportPng(file, page, testInfo.project.name);
   });
 });
