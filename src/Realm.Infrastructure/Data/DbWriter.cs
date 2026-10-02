@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Realm.Domain;
+using Realm.Infrastructure.Diagnostics;
 using Realm.Infrastructure.Hosting;
 
 namespace Realm.Infrastructure.Data;
@@ -78,6 +79,7 @@ public sealed class DbWriter : BackgroundService, IRealmWriter
     private readonly IDbContextFactory<RealmDb> _factory;
     private readonly TimeProvider _time;
     private readonly ILogger<DbWriter> _logger;
+    private readonly ServiceCounters? _counters;
     private readonly WriteQueue _queue = new(QueueCapacity);
     private readonly Channel<bool> _bell = Channel.CreateBounded<bool>(
         new BoundedChannelOptions(1) { FullMode = BoundedChannelFullMode.DropWrite, SingleReader = true });
@@ -89,11 +91,13 @@ public sealed class DbWriter : BackgroundService, IRealmWriter
     private long _lastDropLogMs;
     private int _subscriberFailureLogged;
 
-    public DbWriter(IDbContextFactory<RealmDb> factory, TimeProvider time, ILogger<DbWriter> logger)
+    /// <param name="counters">Where commits, the queue depth and the drops are counted for <c>diagnostics.json</c>; null counts nothing.</param>
+    public DbWriter(IDbContextFactory<RealmDb> factory, TimeProvider time, ILogger<DbWriter> logger, ServiceCounters? counters = null)
     {
         _factory = factory;
         _time = time;
         _logger = logger;
+        _counters = counters;
         _loop = new ResilientLoop(nameof(DbWriter), logger, time);
     }
 
@@ -164,7 +168,9 @@ public sealed class DbWriter : BackgroundService, IRealmWriter
     public async Task<bool> WriteTripAsync(string memberId, DetectedTrip trip, int algoVersion, string deriveHash, CancellationToken cancellationToken = default)
     {
         var done = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-        if (!_queue.TryAdd(new WriteCommand.Trip(memberId, trip, algoVersion, deriveHash, done)))
+        var accepted = _queue.TryAdd(new WriteCommand.Trip(memberId, trip, algoVersion, deriveHash, done));
+        PublishQueue();
+        if (!accepted)
         {
             throw new InvalidOperationException("The database writer has stopped");
         }
@@ -283,9 +289,17 @@ public sealed class DbWriter : BackgroundService, IRealmWriter
         }
     }
 
+    // The depth and the drop count (an eviction of a diagnostic row counts too) as the counters of diagnostics.json show them; read again at every change.
+    private void PublishQueue()
+    {
+        _counters?.SetWriterQueue(_queue.Count, _queue.Dropped);
+    }
+
     private bool Accept(WriteCommand command)
     {
-        if (!_queue.TryAdd(command))
+        var accepted = _queue.TryAdd(command);
+        PublishQueue();
+        if (!accepted)
         {
             NoteDrop();
             return false;
@@ -318,6 +332,7 @@ public sealed class DbWriter : BackgroundService, IRealmWriter
         try
         {
             var commands = _queue.TakeAll();
+            PublishQueue();
             var done = 0;
             try
             {
@@ -353,6 +368,7 @@ public sealed class DbWriter : BackgroundService, IRealmWriter
             catch
             {
                 _queue.PutBack(commands, done);
+                PublishQueue();
                 throw;
             }
         }
@@ -449,6 +465,7 @@ public sealed class DbWriter : BackgroundService, IRealmWriter
 
         Interlocked.Add(ref _committedRows, rows);
         Interlocked.Exchange(ref _lastCommitMs, _time.GetUtcNow().ToUnixTimeMilliseconds());
+        _counters?.RecordDbCommit(rows, _time.GetUtcNow());
         RaiseRowsCommitted(rows);
     }
 
@@ -574,6 +591,7 @@ public sealed class DbWriter : BackgroundService, IRealmWriter
     private int FailPending(Exception error)
     {
         var pending = _queue.TakeAll();
+        PublishQueue();
         foreach (var command in pending)
         {
             if (command is WriteCommand.Trip trip)

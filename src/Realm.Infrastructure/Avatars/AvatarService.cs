@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using Realm.Domain;
+using Realm.Infrastructure.Diagnostics;
 using Realm.Infrastructure.Ha;
 
 namespace Realm.Infrastructure.Avatars;
@@ -37,6 +38,7 @@ public sealed partial class AvatarService : IAvatarSource
     private readonly string _cacheDirectory;
     private readonly TimeProvider _time;
     private readonly ILogger _logger;
+    private readonly ServiceCounters? _counters;
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _gates = new(StringComparer.Ordinal);
 
     /// <param name="discovery">Who the members are and which picture each one shows.</param>
@@ -44,7 +46,16 @@ public sealed partial class AvatarService : IAvatarSource
     /// <param name="life360">Fetches the pictures of the Life360 kind. It must not follow redirects and must not carry any credential; it is never used for an HA path.</param>
     /// <param name="cacheDirectory">Where the one file per member lives (<c>/data/cache/avatars</c> in the add-on).</param>
     /// <param name="time">The clock of the 24 hour revalidation.</param>
-    public AvatarService(DiscoveryState discovery, IHaGateway gateway, HttpClient life360, string cacheDirectory, TimeProvider time, ILogger<AvatarService> logger)
+    /// <param name="logger">Where each refusal is logged once (the member id and a fixed reason).</param>
+    /// <param name="counters">Where fetches and failures are counted for <c>diagnostics.json</c>; null counts nothing.</param>
+    public AvatarService(
+        DiscoveryState discovery,
+        IHaGateway gateway,
+        HttpClient life360,
+        string cacheDirectory,
+        TimeProvider time,
+        ILogger<AvatarService> logger,
+        ServiceCounters? counters = null)
     {
         _discovery = discovery;
         _gateway = gateway;
@@ -52,6 +63,7 @@ public sealed partial class AvatarService : IAvatarSource
         _cacheDirectory = cacheDirectory;
         _time = time;
         _logger = logger;
+        _counters = counters;
     }
 
     /// <inheritdoc />
@@ -94,6 +106,7 @@ public sealed partial class AvatarService : IAvatarSource
 
     private async Task<AvatarImage?> FetchAsync(string memberId, string upstream, CancellationToken cancellationToken)
     {
+        _counters?.RecordAvatarFetch();
         try
         {
             Raw raw;
@@ -180,6 +193,7 @@ public sealed partial class AvatarService : IAvatarSource
 
     private AvatarImage? Refused(string memberId, string reason)
     {
+        _counters?.RecordAvatarFailure();
         _logger.LogWarning("The avatar of member {MemberId} was not served: {Reason}", memberId, reason);
         return null;
     }

@@ -1,3 +1,4 @@
+using Realm.Infrastructure.Diagnostics;
 using Realm.Infrastructure.Ha;
 using Realm.TestKit;
 
@@ -23,13 +24,13 @@ internal sealed class ConnectionRig : IAsyncDisposable
     private readonly List<(Func<bool> Ready, TaskCompletionSource Completion)> _waiters = [];
     private int _cursor;
 
-    private ConnectionRig(FakeHaServer server, HaWebSocketOptions options)
+    private ConnectionRig(FakeHaServer server, HaWebSocketOptions options, ServiceCounters? counters)
     {
         Server = server;
         Options = options;
         Time = new ManualTimeProvider(Start);
         Log = new RecordingLogger<HaWebSocketConnection>();
-        Connection = new HaWebSocketConnection(options, OnItem, Time, Log);
+        Connection = new HaWebSocketConnection(options, OnItem, Time, Log, counters);
         Connection.StatusChanged += OnStatus;
     }
 
@@ -71,16 +72,18 @@ internal sealed class ConnectionRig : IAsyncDisposable
     /// 10 s on the manual clock is a back-off wait or a pong wait and never the handshake budget).
     /// </param>
     /// <param name="start">False leaves the connection stopped, so the test can set a watch list first.</param>
+    /// <param name="counters">The counters the connection fills in; null counts nothing.</param>
     public static async Task<ConnectionRig> StartAsync(
         Action<FakeHaServer>? seed = null,
         string? token = Token,
         Func<HaWebSocketOptions, HaWebSocketOptions>? configure = null,
-        bool start = true)
+        bool start = true,
+        ServiceCounters? counters = null)
     {
         var server = await FakeHaServer.StartAsync(Token);
         seed?.Invoke(server);
         var options = new HaWebSocketOptions { Endpoint = server.WebSocketUri, Token = token, Jitter = () => 1.0, HandshakeTimeout = TimeSpan.FromMinutes(5) };
-        var rig = new ConnectionRig(server, configure is null ? options : configure(options));
+        var rig = new ConnectionRig(server, configure is null ? options : configure(options), counters);
         if (start)
         {
             await rig.Connection.StartAsync(CancellationToken.None);

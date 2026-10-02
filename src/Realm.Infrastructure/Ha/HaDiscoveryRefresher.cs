@@ -2,6 +2,7 @@ using System.Threading.Channels;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Realm.Domain;
+using Realm.Infrastructure.Diagnostics;
 using Realm.Infrastructure.Hosting;
 using Realm.Infrastructure.Ingestion;
 using Realm.Infrastructure.Options;
@@ -31,6 +32,7 @@ public sealed class HaDiscoveryRefresher : BackgroundService
     private readonly Func<IngestItem, CancellationToken, ValueTask> _sink;
     private readonly TimeProvider _time;
     private readonly ILogger _logger;
+    private readonly ServiceCounters? _counters;
     private readonly ResilientLoop _loop;
     private readonly HashSet<string> _warned = new(StringComparer.Ordinal);
     private readonly Channel<bool> _reconnected = Channel.CreateBounded<bool>(new BoundedChannelOptions(1)
@@ -48,13 +50,15 @@ public sealed class HaDiscoveryRefresher : BackgroundService
     /// has finished does not subscribe to all of Home Assistant. Hosted services are all constructed before the first one starts.
     /// </summary>
     /// <param name="sink">Receives <see cref="DiscoveryUpdated"/> and <see cref="ZonesUpdated"/>; the pipeline's queue.</param>
+    /// <param name="counters">Where the size of the watch list is kept for <c>diagnostics.json</c>; null counts nothing.</param>
     public HaDiscoveryRefresher(
         IHaGateway gateway,
         RealmOptions options,
         DiscoveryState state,
         Func<IngestItem, CancellationToken, ValueTask> sink,
         TimeProvider time,
-        ILogger<HaDiscoveryRefresher> logger)
+        ILogger<HaDiscoveryRefresher> logger,
+        ServiceCounters? counters = null)
     {
         _gateway = gateway;
         _options = options;
@@ -62,6 +66,7 @@ public sealed class HaDiscoveryRefresher : BackgroundService
         _sink = sink;
         _time = time;
         _logger = logger;
+        _counters = counters;
         _loop = new ResilientLoop(nameof(HaDiscoveryRefresher), logger, time);
         var seed = HaDiscovery.SeedWatchList(options);
         if (seed.Count > 0)
@@ -208,6 +213,7 @@ public sealed class HaDiscoveryRefresher : BackgroundService
     private void Done(int watched)
     {
         Volatile.Write(ref _watched, watched);
+        _counters?.SetWatchedEntities(watched);
         Interlocked.Exchange(ref _lastRefreshTicks, _time.GetUtcNow().UtcTicks);
     }
 }

@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Threading.Channels;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Realm.Infrastructure.Diagnostics;
 using Realm.Infrastructure.Hosting;
 
 namespace Realm.Infrastructure.Ha;
@@ -25,6 +26,7 @@ public sealed class HaWebSocketConnection : BackgroundService
     private readonly Func<HaFeedItem, CancellationToken, ValueTask> _sink;
     private readonly TimeProvider _time;
     private readonly ILogger _logger;
+    private readonly ServiceCounters? _counters;
     private readonly ResilientLoop _loop;
     private readonly HaEntityStore _store = new();
     private readonly SemaphoreSlim _sendGate = new(1, 1);
@@ -61,13 +63,21 @@ public sealed class HaWebSocketConnection : BackgroundService
     /// <param name="options">Endpoint, token and timings.</param>
     /// <param name="sink">Receives every <see cref="HaFeedItem"/> in order; a slow sink slows the socket reader.</param>
     /// <param name="time">The clock of every wait and timeout (the system clock in Live, a manual one in tests).</param>
-    public HaWebSocketConnection(HaWebSocketOptions options, Func<HaFeedItem, CancellationToken, ValueTask> sink, TimeProvider time, ILogger<HaWebSocketConnection> logger)
+    /// <param name="logger">Where the connection's lifecycle is logged (never a token or a frame).</param>
+    /// <param name="counters">Where connects, reconnects and messages are counted for <c>diagnostics.json</c>; null counts nothing.</param>
+    public HaWebSocketConnection(
+        HaWebSocketOptions options,
+        Func<HaFeedItem, CancellationToken, ValueTask> sink,
+        TimeProvider time,
+        ILogger<HaWebSocketConnection> logger,
+        ServiceCounters? counters = null)
     {
         ArgumentOutOfRangeException.ThrowIfZero(options.Backoff.Count);
         _options = options;
         _sink = sink;
         _time = time;
         _logger = logger;
+        _counters = counters;
         _loop = new ResilientLoop(nameof(HaWebSocketConnection), logger, time);
     }
 
@@ -480,6 +490,7 @@ public sealed class HaWebSocketConnection : BackgroundService
         foreach (var message in HaFrame.Messages(frame))
         {
             Interlocked.Increment(ref _messages);
+            _counters?.RecordWsMessage(receivedAt);
             switch (HaFrame.TypeOf(message))
             {
                 case "event":
@@ -733,6 +744,7 @@ public sealed class HaWebSocketConnection : BackgroundService
             _authFailureLogged = false;
         }
 
+        _counters?.RecordWsConnected();
         _logger.LogInformation("Connected to Home Assistant");
         SetState(HaConnectionState.Connected);
     }
@@ -773,6 +785,7 @@ public sealed class HaWebSocketConnection : BackgroundService
         if (wasConnected)
         {
             Interlocked.Increment(ref _reconnects);
+            _counters?.RecordWsReconnect();
         }
 
         // One Information line per outage; the attempts inside it log at Debug (a 502 while Core restarts is routine, 03 section 2.5).
