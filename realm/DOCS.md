@@ -25,10 +25,14 @@ repository or the image.
 
 ## Where the data comes from
 
-Home Assistant only. The app subscribes to the `device_tracker`, `person` and `zone` entities of Home Assistant's own
-Life360 integration and of the companion apps, and reads vehicle entities when you configure them. It never contacts
-Life360 itself and holds no Life360 login or token. It has no access to Home Assistant's configuration files: it talks
-to Home Assistant only through the Supervisor.
+Home Assistant, with one small exception. The app subscribes to the `device_tracker`, `person` and `zone` entities of
+Home Assistant's own Life360 integration and of the companion apps, and reads vehicle entities when you configure them.
+It holds no Life360 login or token and does not log in to or call Life360's API. The exception is member pictures: when
+the picture Home Assistant reports for a member is an HTTPS address on `life360.com`, the app downloads it without
+credentials and caches it under `/data/cache/avatars`. That happens when a member's `avatar` option is `life360`, and in
+the default `auto` mode when the person has no picture of their own in Home Assistant. Set `avatar` to `none` to show
+initials instead. The app has no access to Home Assistant's configuration files: it talks to Home Assistant only through
+the Supervisor.
 
 ## What is stored and where
 
@@ -36,9 +40,10 @@ to Home Assistant only through the Supervisor.
   are kept for 120 days by default (option `retention_fix_days`).
 - Avatar pictures are cached under `/data/cache/avatars`, which is excluded from backups. Home Assistant's frontend may
   also cache them in your browser for the same user.
-- Nothing leaves your Home Assistant box except map tiles, which your browser (not the app) fetches from public tile
-  servers (OpenFreeMap and, for the satellite style, the USGS National Map). Those servers see your IP address and the
-  area you are viewing, not who is on the map.
+- Nothing leaves your Home Assistant box except two things. Map tiles and style files, which your browser (not the app)
+  fetches from public map servers (OpenFreeMap and, for the satellite style, the USGS National Map): those servers see
+  your IP address and the area you are viewing, not who is on the map. And the member pictures described above, which
+  the app downloads from `life360.com` without credentials.
 - No analytics, no telemetry, no geocoding and no update checks. Ingress is the only door to the app: it publishes no
   port. There is no cloud service behind it.
 - Driving statistics are computed when a trip closes. If you change a `trips_*`, `driving_speeding_*` or
@@ -84,3 +89,9 @@ address opens a demo session while the app runs on real data.
   `ui_history_tokens` off in the **Configuration** tab and restart the app. Back then leaves the app at once, while Esc
   and the close button still work.
 - **The sidebar entry is missing.** Check that **Show in sidebar** is on for the app (see Setup).
+
+## Trademarks
+
+The Realm is an independent, unofficial project. It is not affiliated with, endorsed by or sponsored by Life360, Inc.,
+the Open Home Foundation or Nabu Casa. Life360 is a trademark of Life360, Inc. Home Assistant names and logos belong
+to their owners. These names are used only to say what the app works with.

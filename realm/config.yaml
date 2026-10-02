@@ -1,7 +1,7 @@
 name: "The Realm"
 version: "0.1.0"                  # equals the image tag; edited by hand only after the image exists; a CHANGELOG.md section of the same name must exist
 slug: realm
-description: "Life360-style family map and weekly driving reports, inside Home Assistant."
+description: "Map-first family map and weekly driving reports, inside Home Assistant."
 url: "https://github.com/Versile2/ha360"
 arch:
   - amd64

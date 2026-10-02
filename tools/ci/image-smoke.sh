@@ -16,6 +16,8 @@
 #   10 no forbidden path in docker export
 #   11 the Live start with Home Assistant unreachable (S13b, CR2-012): SUPERVISOR_TOKEN set, /data a volume with a valid options.json;
 #      /healthz 200 within 10 s, /data/realm.db and /data/dp-keys created, still running after a settle time, no crash in docker logs
+#   12 the licence notices ship in the image (FX2, licence audit 1 action 3): /app/LICENSE, /app/THIRD-PARTY-NOTICES.md,
+#      /app/LICENSES/Apache-2.0.txt and MapLibre's LICENSE.txt in /app/wwwroot/lib/maplibre-gl, plus an OFL-*.txt beside any font file
 # Items 5, 7 and 8 belong to S16a and item 6 to S10a: each adds its own block here and touches no other item.
 #
 # Environment: CI_OUT (default ci-out), SMOKE_PORT (host port, default 18099), SMOKE_HEALTHY_CAP_S (how long to wait for
@@ -521,6 +523,35 @@ else
   fi
 fi
 cleanup_live
+
+# --- Item 12: the licence notices ship in the image (licence audit 1, action 3) -----------------------------------------------------
+# The image redistributes MIT, BSD-3-Clause and Apache-2.0 components, so their texts travel with it: the project's LICENSE, the
+# THIRD-PARTY-NOTICES.md that names every component, the Apache-2.0 text it points to, and MapLibre's own LICENSE.txt beside the vendored
+# files. The SIL OFL asks for its text with every copy of a font, so while a .woff2 is in wwwroot/fonts an OFL-*.txt must sit there too.
+# A throw-away container of the same image (--entrypoint: the image's ENTRYPOINT is "dotnet Realm.Web.dll"); a file that is missing or empty fails.
+title="licence notices in the image"
+lic_out=$(docker run --rm --entrypoint sh "$image" -c '
+cd /app || exit 3
+for f in LICENSE THIRD-PARTY-NOTICES.md LICENSES/Apache-2.0.txt wwwroot/lib/maplibre-gl/LICENSE.txt; do
+  [ -s "$f" ] || echo "missing /app/$f"
+done
+if [ -n "$(find wwwroot/fonts -name "*.woff2" -print -quit 2>/dev/null)" ]; then
+  echo "fonts present"
+  [ -n "$(find wwwroot/fonts -name "OFL-*.txt" -size +0c -print -quit 2>/dev/null)" ] || echo "missing /app/wwwroot/fonts/OFL-*.txt (a font file is in the image)"
+fi
+' 2>"$work/licences.err")
+lic_status=$?
+lic_missing=$(grep '^missing ' <<<"$lic_out" | sed 's/^missing //' | tr '\n' ' ')
+lic_missing=${lic_missing% }
+if ((lic_status != 0)); then
+  record 12 FAIL "$title" "docker run failed (exit $lic_status): $(head -c 300 "$work/licences.err")"
+elif [[ -n $lic_missing ]]; then
+  record 12 FAIL "$title" "missing or empty in the image: $lic_missing"
+elif grep -q '^fonts present' <<<"$lic_out"; then
+  record 12 PASS "$title" "LICENSE, THIRD-PARTY-NOTICES.md, LICENSES/Apache-2.0.txt and wwwroot/lib/maplibre-gl/LICENSE.txt are in /app; the fonts have an OFL-*.txt beside them"
+else
+  record 12 PASS "$title" "LICENSE, THIRD-PARTY-NOTICES.md, LICENSES/Apache-2.0.txt and wwwroot/lib/maplibre-gl/LICENSE.txt are in /app (no font file in the image yet)"
+fi
 
 # ---------------------------------------------------------------------------------------------------------------------
 # Sizes for the table of 03 section 6.5 (recorded, not enforced: item 8 is S16a's) and the log of a failed run.

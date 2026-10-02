@@ -2,14 +2,17 @@
 
 ## What it is
 
-The Realm is a Home Assistant add-on (an "app" in current Home Assistant wording) that shows a Life360-style family
-map: people on a full-screen map, a bottom sheet with Drivers, Vehicles and Places, and weekly driving reports built
+The Realm is a Home Assistant add-on (an "app" in current Home Assistant wording) that shows a map-first family
+locator: people on a full-screen map, a bottom sheet with Drivers, Vehicles and Places, and weekly driving reports built
 from its own stored history. It appears as a sidebar panel through Ingress, so Home Assistant's login is the only login,
 and it works in the companion app. It publishes no port.
 
 Live positions come from Home Assistant's own entities (the Life360 trackers, the companion apps and zones). The
-add-on never calls Life360 itself. All personal configuration (names, entity ids, addresses) lives in the add-on's
-options on the user's own Home Assistant, never in this repository.
+add-on holds no Life360 login or token and never calls Life360's API. The one exception is member pictures: with the
+`avatar` option of a member set to `life360` (and in the default `auto` mode when the person has no picture of their own
+in Home Assistant), the add-on downloads the picture, without credentials, from the `life360.com` address Home Assistant
+reports for the member's tracker, and caches it under `/data/cache/avatars`. All personal configuration (names, entity
+ids, addresses) lives in the add-on's options on the user's own Home Assistant, never in this repository.
 
 ## Stack
 

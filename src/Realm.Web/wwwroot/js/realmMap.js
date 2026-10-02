@@ -57,7 +57,9 @@ import {
   STYLES,
   ZONE_SOURCE,
   appearanceOf,
+  attributionStartsExpanded,
   buildStyle,
+  createAttributionFold,
   isStyleId,
   overlaySpec,
   transformStyle,
@@ -1167,6 +1169,40 @@ function buildProbe() {
 // ---- lifecycle --------------------------------------------------------------------------------------------------------------
 
 /**
+ * The map credits (D81, the OSMF Attribution Guidelines). MapLibre builds a compact control that starts open and folds on the first drag.
+ * A style that draws third-party data keeps that and adds the rest of the guideline: the credits are open when the map opens and fold to the
+ * (i) button on the first pan or zoom by the person, the first click on the map, or 5 s after the map has loaded, whichever comes first.
+ * The countdown starts at `load`, not at creation, so a slow network cannot fold the credits before the OpenStreetMap credit, which arrives
+ * with the source data, has been shown. The (i) button still toggles the credits; using it ends the automatic fold. demo-offline draws no
+ * third-party data and starts as the 48 px (i) button (01 section 3.3, AC-03).
+ * @param {MapLibreMap} map
+ * @param {HTMLElement} container
+ * @param {StyleId} styleId the style the map opens with
+ */
+function bindAttribution(map, container, styleId) {
+  const control = container.querySelector('.maplibregl-ctrl-attrib');
+  const collapse = () => control?.classList.remove('maplibregl-compact-show');
+  if (!attributionStartsExpanded(styleId)) {
+    collapse();
+    control?.setAttribute('open', '');
+    return;
+  }
+  const fold = createAttributionFold({
+    schedule: (callback, delayMs) => setTimeout(callback, delayMs),
+    cancel: (handle) => clearTimeout(/** @type {ReturnType<typeof setTimeout>} */ (handle)),
+    collapse,
+  });
+  map.once('load', () => fold.arm());
+  // movestart carries the DOM event only when the person moved the map (drag, wheel, pinch, keys): a flight of ours has none.
+  map.on('movestart', (event) => {
+    if (event.originalEvent) fold.fold();
+  });
+  map.on('click', () => fold.fold());
+  container.querySelector('.maplibregl-ctrl-attrib-button')?.addEventListener('click', () => fold.release());
+  map.once('remove', () => fold.dispose());
+}
+
+/**
  * Builds the MapLibre map (03 section 4.4). Throws when WebGL2 is unavailable.
  * @param {InitOptions} opts
  * @param {HTMLElement} container
@@ -1202,10 +1238,7 @@ function createMap(opts, container, restore) {
   // own attributions (OpenFreeMap, USGS, the demo text) are collected into it as their styles load.
   map.addControl(new (lib().AttributionControl)({ compact: true, customAttribution: MAPLIBRE_CREDIT }), 'top-right');
   container.querySelector('.maplibregl-ctrl-attrib-button')?.setAttribute('data-testid', 'map-attribution');
-  // MapLibre starts a compact control expanded and folds it on the first drag; ours starts as the 48 px (i) button (01 section 3.3).
-  const attribution = container.querySelector('.maplibregl-ctrl-attrib');
-  attribution?.classList.remove('maplibregl-compact-show');
-  attribution?.setAttribute('open', '');
+  bindAttribution(map, container, opts.styleId);
   return map;
 }
 
