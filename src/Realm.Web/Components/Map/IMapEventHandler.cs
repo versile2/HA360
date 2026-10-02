@@ -20,7 +20,7 @@ public interface IMapEventHandler
     /// <summary>An edge bubble was tapped (not the viewer's own, which is the recenter): one member id for a single-member bubble, two or more for a cluster, whose camera fit the script has already run (03 section 4.6).</summary>
     Task BubbleTapAsync(IReadOnlyList<string> ids);
 
-    /// <summary>A camera move settled.</summary>
+    /// <summary>A settled camera whose recentre state is not the one .NET holds (the script reports nothing for a gesture that leaves it as it was, <c>[X-07]</c>); the position is read with <c>getCamera</c> when it is wanted.</summary>
     Task CameraChangedAsync(CameraState camera);
 
     /// <summary>The camera stopped following a driving member (a pan, zoom, bubble tap or recentre, a new selection, or the member stopped driving); raised only when Follow was running (01 section 4.14, R1-14).</summary>

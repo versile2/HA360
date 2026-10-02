@@ -322,7 +322,7 @@ const PIN_TEMPLATE =
  * @property {boolean} moveUser
  * @property {boolean} lastMoveUser
  * @property {ReturnType<typeof setTimeout> | null} cameraTimer
- * @property {{ center: LngLat, zoom: number, recenter: RecenterState } | null} lastReported
+ * @property {{ center: LngLat, zoom: number, recenter: RecenterState } | null} lastReported the position last mirrored to sessionStorage and the recentre state .NET holds (null until the first settled camera; .NET starts from 'default')
  * @property {ResizeObserver | null} resizeObserver
  * @property {() => void} onVisibility
  * @property {{ frames: number, setterCalls: number, callbacksSent: number }} stats
@@ -1051,7 +1051,13 @@ function cameraState(r) {
   };
 }
 
-/** OnCameraChanged, debounced 120 ms, only when something that matters moved (03 section 4.7). @param {Runtime} r */
+/**
+ * A settled camera (`moveend`, debounced 120 ms; 03 section 4.7). The page renders the camera in one place only, the recentre button, whose icon and name follow the recentre
+ * state (01 section 4.11), and every report re-renders the page on the server. So `OnCameraChanged` is sent only when that state is not the one .NET already holds ('default' at the start): a
+ * pan or a zoom that leaves it as it was, which is nearly every gesture, costs the circuit no frame at all ([X-07], 01 Appendix C item 10). The position itself is mirrored to
+ * sessionStorage here whenever it moved (the centre by 1 m or more, the zoom by 0.01), and .NET reads it with `getCamera` once, when the Location page goes away (R1-12), never per gesture.
+ * @param {Runtime} r
+ */
 function scheduleCameraReport(r) {
   if (r.cameraTimer !== null) clearTimeout(r.cameraTimer);
   r.cameraTimer = setTimeout(() => {
@@ -1059,14 +1065,18 @@ function scheduleCameraReport(r) {
     if (rt !== r) return;
     const state = cameraState(r);
     const last = r.lastReported;
-    if (last && haversine(last.center, state.center) < 1 && Math.abs(last.zoom - state.zoom) < 0.01 && last.recenter === state.recenter) return;
+    const moved = !last || haversine(last.center, state.center) >= 1 || Math.abs(last.zoom - state.zoom) >= 0.01;
+    const held = last ? last.recenter : 'default';
+    if (!moved && state.recenter === held) return;
     r.lastReported = { center: state.center, zoom: state.zoom, recenter: state.recenter };
-    try {
-      sessionStorage.setItem(CAMERA_STORAGE_KEY, JSON.stringify(state));
-    } catch {
-      // storage can be blocked; the camera is then simply not restored after a reload
+    if (moved) {
+      try {
+        sessionStorage.setItem(CAMERA_STORAGE_KEY, JSON.stringify(state));
+      } catch {
+        // storage can be blocked; the camera is then simply not restored after a reload
+      }
     }
-    notify('OnCameraChanged', state);
+    if (state.recenter !== held) notify('OnCameraChanged', state);
   }, CAMERA_DEBOUNCE_MS);
 }
 

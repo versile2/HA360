@@ -203,6 +203,25 @@ public sealed class MapViewTests : ComponentTestBase
         Assert.Equal(1, _cameras);
     }
 
+    [Fact(DisplayName = "[X-07] the camera is read from the script when the page asks, never as a side effect of rendering, and there is none once the map is gone")]
+    public async Task GetCameraAsync_ReadsTheCameraFromTheScript_AndAfterTheMapIsGoneThereIsNone()
+    {
+        var cut = RenderMap(selection: null);
+        Assert.Empty(Calls("getCamera"));
+
+        var camera = await cut.Instance.GetCameraAsync();
+
+        Assert.NotNull(camera);
+        Assert.Equal(RecenterState.Away, camera.Recenter);
+        Assert.Single(Calls("getCamera"));
+        Assert.Equal(0, _cameras);
+
+        await cut.Instance.DisposeAsync();
+
+        Assert.Null(await cut.Instance.GetCameraAsync());
+        Assert.Single(Calls("getCamera"));
+    }
+
     // ---- the way back from Driving (R1-12) -------------------------------------------------------------------------------------------------------------------
 
     [Fact]
@@ -272,7 +291,7 @@ public sealed class MapViewTests : ComponentTestBase
     {
         var cut = RenderMapWithData(selection: null);
         Assert.Equal([DemoCast.King.Id], ChipOwners(LastMembers()));
-        Assert.Empty(LastVehicles().Vehicles.Where(vehicle => vehicle.Chip is not null));
+        Assert.DoesNotContain(LastVehicles().Vehicles, vehicle => vehicle.Chip is not null);
         var sent = Calls("upsertMembers").Count;
 
         cut.Render(parameters => parameters.Add(map => map.Selection, Queen));
@@ -444,7 +463,12 @@ public sealed class MapViewTests : ComponentTestBase
         {
             calls.Add(new RecordedCall(identifier, args ?? []));
 
-            object? result = identifier == "init" ? new ReadyInfo("test", MapInterop.PayloadSchema, "6.11.2") : null;
+            object? result = identifier switch
+            {
+                "init" => new ReadyInfo("test", MapInterop.PayloadSchema, "6.11.2"),
+                "getCamera" => HomeCamera(),
+                _ => null,
+            };
             return new ValueTask<TValue>((TValue)result!);   // null-forgiving: a void call's result is never read
         }
 

@@ -128,6 +128,20 @@ public sealed class MapInteropTests
         Assert.Equal(["hall"], js.Module[6].Args);
     }
 
+    [Fact(DisplayName = "[X-07] GetCameraAsync reads the camera from the script with getCamera and no arguments, one call each time")]
+    public async Task GetCameraAsync_AsksTheScriptForTheCamera()
+    {
+        var js = new FakeJs();
+        await using var interop = await MapInterop.CreateAsync(js, new MapCallbacks(new RecordingHandler()));
+        await interop.InitAsync(Init);
+
+        var camera = await interop.GetCameraAsync();
+
+        Assert.Same(ScriptCamera, camera);
+        var call = Assert.Single(js.Module, call => call.Identifier == "getCamera");
+        Assert.Empty(call.Args);
+    }
+
     [Fact]
     public async Task DisposeAsync_TearsDownTheMap_ReleasesTheModuleAndTheReference_OnlyOnce()
     {
@@ -158,6 +172,7 @@ public sealed class MapInteropTests
         await interop.ResizeAsync();
         await interop.FitDefaultAsync(animate: true);
         await interop.SetPaddingAsync(null);
+        Assert.Null(await interop.GetCameraAsync());
 
         Assert.Equal(calls, js.Module.Count);
     }
@@ -172,6 +187,7 @@ public sealed class MapInteropTests
         Assert.Null(await interop.SetStyleAsync(MapStyleIds.Night));
         await interop.ResizeAsync();
         await interop.SetReducedMotionAsync(false);
+        Assert.Null(await interop.GetCameraAsync());
         await interop.DisposeAsync();
 
         var reference = (DotNetObjectReference<MapCallbacks>)js.Module.Single(call => call.Identifier == "init").Args[1]!;
@@ -227,6 +243,9 @@ public sealed class MapInteropTests
 
     // ---- fakes -----------------------------------------------------------------------------------------------------------------------------------------
 
+    // The camera the fake script answers `getCamera` with: a synthetic place, the zoom and the state are not positions the tests care about.
+    private static readonly CameraState ScriptCamera = new([-85.3, 31.1], 13, [[-85.4, 31.0], [-85.2, 31.2]], Animated: false, LastDurationMs: 0, RecenterState.Away, UserInitiated: true);
+
     private sealed record Call(string Identifier, object?[] Args);
 
     private sealed class FakeJs : IJSRuntime
@@ -272,6 +291,7 @@ public sealed class MapInteropTests
             {
                 "init" => new ReadyInfo("test", MapInterop.PayloadSchema, "6.11.2"),
                 "setStyle" => new StyleResult((string)args![0]!, true, null),
+                "getCamera" => ScriptCamera,
                 _ => null,
             };
             return new ValueTask<TValue>((TValue)result!);

@@ -375,8 +375,9 @@
     // The empty map was tapped: at 80 percent the sheet collapses with the selection kept, at Peek the selection clears, in the panel it always clears (01 section 4.13).
     private Task OnMapTapAsync() => ApplyAsync(new SheetEvent.MapTap());
 
-    // A camera move settled: kept for the way back from Driving (R1-12), and the recentre button's icon follows where the camera is (01 section 4.11: the filled crosshair at the default view or on me
-    // alone, the outlined one away).
+    // The script reports a settled camera only when its recentre state changed ([X-07]: every report re-renders this page, so a pan or a zoom that leaves the state alone says nothing). The recentre
+    // button's icon and name follow the state (01 section 4.11: the filled crosshair at the default view or on me alone, the outlined one away). The camera kept for the way back from Driving
+    // (R1-12) is the one read from the script when the page goes away (DisposeAsync); the report's is the fallback.
     private Task OnCameraChangedAsync(CameraState camera)
     {
         Ui.RecordCamera(camera, Session.Time.GetUtcNow());
@@ -479,20 +480,42 @@
         }
     }
 
+    // The ten minutes of R1-12 count from the moment the page goes away, not from the last report: the camera read from the script (else the last one reported) is stamped now. A circuit that is
+    // going, or a script that does not answer within two seconds, leaves the last report as it was.
+    private async Task RememberCameraAsync(Task<CameraState?>? leaving)
+    {
+        CameraState? camera = null;
+        if (leaving is not null)
+        {
+            try
+            {
+                camera = await leaving.WaitAsync(TimeSpan.FromSeconds(2));
+            }
+            catch (Exception exception) when (exception is JSException or JSDisconnectedException or OperationCanceledException or TimeoutException)
+            {
+                // Nothing to read: the circuit is gone or the browser is not answering.
+            }
+        }
+
+        if ((camera ?? Ui.LastCamera) is { } remembered)
+        {
+            Ui.RecordCamera(remembered, Session.Time.GetUtcNow());
+        }
+    }
+
     public async ValueTask DisposeAsync()
     {
         _disposed = true;
+        Task<CameraState?>? leaving = null;
         if (_started)
         {
             Session.Changed -= OnSessionChanged;
             Ui.Changed -= OnUiChanged;
             History.BackTaken -= OnBackTaken;
 
-            // R1-12: the ten minutes count from the moment the page goes away, not from the last camera move, so the camera is stamped again now.
-            if (Ui.LastCamera is { } camera)
-            {
-                Ui.RecordCamera(camera, Session.Time.GetUtcNow());
-            }
+            // R1-12: the script reports a camera only when the recentre state changes ([X-07]), so the position the person leaves the map at is read now, once. The call is made here, before this method
+            // awaits anything, so that it is queued ahead of the map's own dispose, which the renderer runs as soon as this method returns its first incomplete task.
+            leaving = _map?.GetCameraAsync();
         }
 
         if (_prefsSubscribed)
@@ -504,6 +527,11 @@
         {
             _ticker.Tick -= OnMinute;
             _ticker.Dispose();
+        }
+
+        if (_started)
+        {
+            await RememberCameraAsync(leaving);
         }
 
         if (_history is not null)

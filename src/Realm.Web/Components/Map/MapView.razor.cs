@@ -127,7 +127,11 @@ public sealed partial class MapView : IMapEventHandler, IAsyncDisposable
     [Parameter]
     public EventCallback OnMapTap { get; set; }
 
-    /// <summary>A camera move settled.</summary>
+    /// <summary>
+    /// A settled camera whose recentre state is not the one the page holds (<c>Default</c> at the start): a pan that took the view away from the default one, a recentre that brought it back,
+    /// "me alone". The script says nothing about a gesture that leaves the state as it was, because each report re-renders the page (<c>[X-07]</c>); a page that wants the position asks
+    /// for it with <see cref="GetCameraAsync"/>.
+    /// </summary>
     [Parameter]
     public EventCallback<CameraState> OnCameraChanged { get; set; }
 
@@ -263,6 +267,20 @@ public sealed partial class MapView : IMapEventHandler, IAsyncDisposable
         }
 
         await interop.RecenterAsync();
+    }
+
+    /// <summary>
+    /// The camera as the script sees it now, for the Location page to keep when it goes away (R1-12): a settled camera reaches <see cref="OnCameraChanged"/> only when the recentre state changes, so the
+    /// position is read here, once, not reported per gesture. Null before the map is ready, after it is gone, without WebGL and when the circuit is gone.
+    /// </summary>
+    public async Task<CameraState?> GetCameraAsync()
+    {
+        if (!_ready || _disposed || _webGlUnavailable || _interop is not { } interop)
+        {
+            return null;
+        }
+
+        return await interop.GetCameraAsync();
     }
 
     private async Task FlyAgainAsync(EntityRef? entity)
