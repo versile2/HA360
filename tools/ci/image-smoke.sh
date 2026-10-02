@@ -12,13 +12,14 @@
 #   2  base href with and without X-Ingress-Path, an invalid value is ignored
 #   3  Content-Type of the scripts and fonts (the Blazor script is requested under the name the page itself advertises)
 #   4  Set-Cookie on GET /: informational (D61), WARN with the cookie names, never FAIL
+#   6  GET diagnostics.json in the Demo container (S10a): 200, "mode": "demo" and "zoneDataOk": true (the zone data is in the image)
 #   9  the image runs as uid 0 (asserted, not assumed)
 #   10 no forbidden path in docker export
 #   11 the Live start with Home Assistant unreachable (S13b, CR2-012): SUPERVISOR_TOKEN set, /data a volume with a valid options.json;
 #      /healthz 200 within 10 s, /data/realm.db and /data/dp-keys created, still running after a settle time, no crash in docker logs
 #   12 the licence notices ship in the image (FX2, licence audit 1 action 3): /app/LICENSE, /app/THIRD-PARTY-NOTICES.md,
 #      /app/LICENSES/Apache-2.0.txt and MapLibre's LICENSE.txt in /app/wwwroot/lib/maplibre-gl, plus an OFL-*.txt beside any font file
-# Items 5, 7 and 8 belong to S16a and item 6 to S10a: each adds its own block here and touches no other item.
+# Items 5, 7 and 8 belong to S16a, which adds its own block here and touches no other item (item 6 is S10a's, after item 12).
 #
 # Environment: CI_OUT (default ci-out), SMOKE_PORT (host port, default 18099), SMOKE_HEALTHY_CAP_S (how long to wait for
 # the first 200 before giving up, default 30; the FAIL line stays at 10 s, the cap only lets a slow start still be measured).
@@ -367,7 +368,7 @@ else
   fi
 fi
 
-# Items 5 (healthcheck mode), 6 (diagnostics.json), 7 (docker logs) and 8 (image size) are added by S10a and S16a.
+# Items 5 (healthcheck mode), 7 (docker logs) and 8 (image size) are added by S16a; item 6 (diagnostics.json) is S10a's, after item 12.
 
 # --- Item 9: root --------------------------------------------------------------------------------------------------
 # --entrypoint: the image's ENTRYPOINT is "dotnet Realm.Web.dll", so "docker run <image> id -u" would start the app with two arguments.
@@ -551,6 +552,39 @@ elif grep -q '^fonts present' <<<"$lic_out"; then
   record 12 PASS "$title" "LICENSE, THIRD-PARTY-NOTICES.md, LICENSES/Apache-2.0.txt and wwwroot/lib/maplibre-gl/LICENSE.txt are in /app; the fonts have an OFL-*.txt beside them"
 else
   record 12 PASS "$title" "LICENSE, THIRD-PARTY-NOTICES.md, LICENSES/Apache-2.0.txt and wwwroot/lib/maplibre-gl/LICENSE.txt are in /app (no font file in the image yet)"
+fi
+
+# --- Item 6: diagnostics.json in Demo (S10a, 03 section 7.8 item 6) ----------------------------------------------------------------
+# The Demo container of item 1 answers GET /diagnostics.json (a relative URL in the app, so the root here and the Ingress prefix behind HA)
+# with the canned values of 03 section 2.11: "mode": "demo", and "zoneDataOk": true, which says the zone data is in the image. The text is
+# compacted before it is matched, so the check does not depend on how the serializer spaces its output. The file holds states and counts
+# only (no location, no name, no token), so the start of it is safe to print under a failing item. This block touches no other item.
+title="diagnostics.json in Demo"
+if ((healthy == 0)); then
+  record 6 SKIP "$title" "not run: the container never answered /healthz with 200 (item 1)"
+else
+  problems=()
+  diag_status=$(curl -s -o "$work/diagnostics.json" -D "$work/diagnostics.headers" -w '%{http_code}' --max-time 20 "$base_url/diagnostics.json")
+  diag_text=$(tr -d ' \t\r\n' <"$work/diagnostics.json" 2>/dev/null)
+  if [[ $diag_status != 200 ]]; then
+    problems+=("GET /diagnostics.json answered $diag_status (want 200)")
+    queue_request "GET /diagnostics.json -> $diag_status" "$work/diagnostics.headers"
+  else
+    if [[ $diag_text != *'"mode":"demo"'* ]]; then
+      problems+=('"mode" is not "demo"')
+    fi
+    if [[ $diag_text != *'"zoneDataOk":true'* ]]; then
+      problems+=('"zoneDataOk" is not true (the zone data is missing from the image)')
+    fi
+    if ((${#problems[@]} > 0)); then
+      queue_block "start of diagnostics.json" "${diag_text:0:600}"
+    fi
+  fi
+  if ((${#problems[@]} == 0)); then
+    record 6 PASS "$title" "GET /diagnostics.json answered 200 with \"mode\": \"demo\" and \"zoneDataOk\": true"
+  else
+    record 6 FAIL "$title" "$(join_problems)"
+  fi
 fi
 
 # ---------------------------------------------------------------------------------------------------------------------

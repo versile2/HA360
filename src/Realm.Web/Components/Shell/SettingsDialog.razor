@@ -1,0 +1,248 @@
+@using System.Reflection
+@using Realm.Web.Components.Driving
+@using Realm.Web.Formatting
+@using Realm.Web.Map
+@using Realm.Web.State
+@inject DevicePrefs Prefs
+
+@* The Settings dialog (01 sections 7.9 and 8.9; 03 section 3.4), opened from the gear with IDialogService.ShowAsync (TopControls). A full-screen dialog below 600 px with a top bar (the back
+   arrow, "Settings", "Royal decrees") and a centred 480 px dialog from 600 px up (realm-map.css). Four sections: Map (the style as a list, which is the popover's list shown for
+   discoverability, Show places, Default view), Appearance (Layout), Connections (read-only chips, one row per entry the session lists) and About (the version, the map credits and the
+   48 px Diagnostics row that opens diagnostics.json in a new tab). There is no Save button: every choice applies at once through DevicePrefs, which stores it per device. And there
+   are no Theme, Units, 12/24 h, Week starts on or Reset rows: dark and imperial are the only values in v1 (D35). Esc, the scrim and the back arrow close it. The title takes the
+   focus when the dialog opens (PopupTitle), and MudBlazor returns it to the gear. The stored values are read after the first render if no page has read them yet. *@
+<MudDialog Class="realm-settings"
+           TitleClass="realm-settings__head"
+           ContentClass="realm-settings__body"
+           DefaultFocus="DefaultFocus.None"
+           data-testid="settings-dialog">
+    <TitleContent>
+        <button type="button" class="realm-settings__back" aria-label="Close settings" @onclick="Close">
+            <MudIcon Icon="@Icons.Material.Filled.ArrowBack" />
+        </button>
+        <span class="realm-settings__titles">
+            <PopupTitle>Settings</PopupTitle>
+            <span class="realm-settings__subtitle">Royal decrees</span>
+        </span>
+    </TitleContent>
+    <DialogContent>
+        <section class="realm-settings__section" aria-labelledby="realm-settings-map">
+            <h3 id="realm-settings-map" class="realm-settings__heading">Map</h3>
+
+            <div class="realm-settings__block">
+                <span id="realm-settings-style" class="realm-settings__label">Map style</span>
+                <div class="realm-settings__options" role="radiogroup" aria-labelledby="realm-settings-style">
+                    @foreach (var styleId in DevicePrefs.MapStyles)
+                    {
+                        var selected = Prefs.MapStyle == styleId;
+                        <button @key="styleId"
+                                type="button"
+                                role="radio"
+                                class="realm-settings__option"
+                                aria-checked="@(selected ? "true" : "false")"
+                                @onclick="() => ChooseStyleAsync(styleId)">
+                            <span>@StyleName(styleId)</span>
+                            @if (selected)
+                            {
+                                <MudIcon Icon="@Icons.Material.Filled.Check" />
+                            }
+                        </button>
+                    }
+                </div>
+            </div>
+
+            <button type="button"
+                    role="switch"
+                    class="realm-switch-row realm-switch-row--settings"
+                    aria-checked="@(Prefs.ShowZones ? "true" : "false")"
+                    aria-describedby="realm-settings-places-help"
+                    @onclick="ToggleZonesAsync">
+                <span class="realm-switch-row__text">
+                    <span class="realm-switch-row__label">Show places</span>
+                    <span id="realm-settings-places-help" class="realm-settings__help">Draw your saved places as circles on the map.</span>
+                </span>
+                <span class="realm-switch" aria-hidden="true"><span class="realm-switch__thumb"></span></span>
+            </button>
+
+            <div class="realm-settings__block">
+                <span id="realm-settings-radius" class="realm-settings__label">Default view</span>
+                <div class="realm-settings__options realm-settings__options--chips" role="radiogroup" aria-labelledby="realm-settings-radius">
+                    @foreach (var choice in DevicePrefs.ViewRadiusChoices)
+                    {
+                        var selected = Prefs.ViewRadius == choice.Value;
+                        <button @key="choice.Value"
+                                type="button"
+                                role="radio"
+                                class="realm-settings__option"
+                                aria-checked="@(selected ? "true" : "false")"
+                                @onclick="() => ChooseRadiusAsync(choice.Value)">
+                            <span>@choice.Label</span>
+                        </button>
+                    }
+                </div>
+                <p class="realm-settings__help">@RadiusHelp</p>
+            </div>
+        </section>
+
+        <section class="realm-settings__section" aria-labelledby="realm-settings-appearance">
+            <h3 id="realm-settings-appearance" class="realm-settings__heading">Appearance</h3>
+            <div class="realm-settings__block">
+                <span id="realm-settings-layout" class="realm-settings__label">Layout</span>
+                <div class="realm-settings__options realm-settings__options--chips" role="radiogroup" aria-labelledby="realm-settings-layout">
+                    @foreach (var choice in DevicePrefs.LayoutChoices)
+                    {
+                        var selected = Prefs.Layout == choice.Value;
+                        <button @key="choice.Value"
+                                type="button"
+                                role="radio"
+                                class="realm-settings__option"
+                                aria-checked="@(selected ? "true" : "false")"
+                                @onclick="() => ChooseLayoutAsync(choice.Value)">
+                            <span>@choice.Label</span>
+                        </button>
+                    }
+                </div>
+            </div>
+        </section>
+
+        <section class="realm-settings__section" aria-labelledby="realm-settings-connections">
+            <h3 id="realm-settings-connections" class="realm-settings__heading">Connections</h3>
+            <ul class="realm-settings__connections">
+                @foreach (var connection in ConnectionRows())
+                {
+                    <li @key="connection.Name" class="realm-settings__connection">
+                        <span class="realm-settings__connection-name">@connection.Name</span>
+                        <span class="realm-settings__connection-detail">
+                            <span class="@("realm-settings__chip realm-settings__chip--" + connection.Kind)">@connection.Status</span>
+                            @if (connection.LastSync is not null)
+                            {
+                                <span class="realm-settings__help">@connection.LastSync</span>
+                            }
+                        </span>
+                    </li>
+                }
+            </ul>
+        </section>
+
+        <section class="realm-settings__section" aria-labelledby="realm-settings-about">
+            <h3 id="realm-settings-about" class="realm-settings__heading">About</h3>
+            <p class="realm-settings__about-row"><span class="realm-settings__label">Version</span><span>@Version</span></p>
+            <div class="realm-settings__block">
+                <span class="realm-settings__label">Map attribution and credits</span>
+                <p class="realm-settings__help">
+                    Map data from OpenStreetMap contributors, served by OpenFreeMap with OpenMapTiles. Satellite imagery from USGS The National Map.
+                    Maps drawn with MapLibre GL JS. Interface built with MudBlazor.
+                </p>
+            </div>
+            <a class="realm-settings__link" href="diagnostics.json" target="_blank" rel="noopener">
+                <span class="realm-settings__link-text">
+                    <span class="realm-settings__label">Diagnostics</span>
+                    <span class="realm-settings__help">States and counts only. No locations.</span>
+                </span>
+                <MudIcon Icon="@Icons.Material.Filled.OpenInNew" />
+            </a>
+        </section>
+    </DialogContent>
+</MudDialog>
+
+@code {
+    private static readonly string Version = ReadVersion();
+
+    /// <summary>The dialog this is the content of, cascaded by MudBlazor.</summary>
+    [CascadingParameter]
+    public IMudDialogInstance MudDialog { get; set; } = default!;
+
+    /// <summary>The circuit's session, cascaded by <c>RealmShell</c> (the dialog is drawn inside it); the Connections rows read it. Without one the section is empty.</summary>
+    [CascadingParameter]
+    private Realm.Domain.IRealmSession? Session { get; set; }
+
+    private string RadiusHelp =>
+        Prefs.ViewRadius == DevicePrefs.RadiusAll
+            ? "Everyone is on the map · no edge bubbles"
+            : "Me and anyone within " + DevicePrefs.RadiusOf(Prefs.ViewRadius).Label + " · others appear as edge bubbles";
+
+    // The stored values are read by the Location page when it starts; a dialog opened from another page reads them here, once the circuit can talk to the browser.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || Prefs.Loaded)
+        {
+            return;
+        }
+
+        await Prefs.EnsureLoadedAsync();
+        if (Prefs.Loaded)
+        {
+            StateHasChanged();
+        }
+    }
+
+    private Task ChooseStyleAsync(string styleId) => Prefs.SetMapStyleAsync(styleId);
+
+    private Task ToggleZonesAsync() => Prefs.SetShowZonesAsync(!Prefs.ShowZones);
+
+    private Task ChooseRadiusAsync(string value) => Prefs.SetViewRadiusAsync(value);
+
+    private Task ChooseLayoutAsync(string value) => Prefs.SetLayoutAsync(value);
+
+    private void Close() => MudDialog.Close();
+
+    private static string StyleName(string styleId) =>
+        styleId switch
+        {
+            MapStyleIds.Day => "Day",
+            MapStyleIds.Streets => "Streets",
+            MapStyleIds.Satellite => "Satellite",
+            _ => "Night",
+        };
+
+    // One row per entry the session lists, under the names of 01 section 8.9; a name this version does not know is ignored (ConnectionVm).
+    private IEnumerable<ConnectionRow> ConnectionRows()
+    {
+        if (Session is null)
+        {
+            yield break;
+        }
+
+        var now = Session.Time.GetUtcNow();
+        foreach (var connection in Session.Current.Connections)
+        {
+            var name = connection.Name switch
+            {
+                Realm.Domain.ConnectionNames.HomeAssistant => "Home Assistant",
+                Realm.Domain.ConnectionNames.Life360Trackers => "Life360",
+                Realm.Domain.ConnectionNames.FordPass => "FordPass",
+                Realm.Domain.ConnectionNames.VehiclePlaceholder => "Second vehicle (maker's app)",
+                _ => null,
+            };
+            if (name is null)
+            {
+                continue;
+            }
+
+            var (kind, status) = connection.State switch
+            {
+                Realm.Domain.ConnectionState.Connected => ("connected", "Connected"),
+                Realm.Domain.ConnectionState.Reconnecting => ("reconnecting", "Reconnecting…"),
+                Realm.Domain.ConnectionState.Unavailable => ("unavailable", "Unavailable"),
+                _ => ("notconnected", "Not connected"),
+            };
+            var lastSync = connection.LastSyncUtc is { } at ? "Last sync " + TimeFormatter.Relative(at, now, Session.Zone) : null;
+            yield return new ConnectionRow(name, kind, status, lastSync);
+        }
+    }
+
+    // The add-on version, which the build writes as "<version>+<revision>": the part before the plus.
+    private static string ReadVersion()
+    {
+        var informational = typeof(SettingsDialog).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+        if (string.IsNullOrEmpty(informational))
+        {
+            return "0.0.0-dev";
+        }
+
+        var plus = informational.IndexOf('+', StringComparison.Ordinal);
+        return plus < 0 ? informational : informational[..plus];
+    }
+
+    private sealed record ConnectionRow(string Name, string Kind, string Status, string? LastSync);
+}

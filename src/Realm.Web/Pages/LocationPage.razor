@@ -15,6 +15,8 @@
 @inject IConfiguration Configuration
 @inject IJSRuntime JS
 @inject ILogger<LocationPage> Logger
+@inject DevicePrefs Prefs
+@inject ISnackbar Snackbar
 
 @* The Location screen (01 section 3): the map fills the canvas, the sheet (a bottom sheet, or the left panel from 840 x 560) draws over it, and the right button
    stack floats above the sheet. The session comes from RealmShell's cascading value and its snapshot is read at render: the page re-renders on
@@ -46,6 +48,9 @@
                  Places="@places"
                  Now="@Session.Time.GetUtcNow()"
                  StyleId="@StyleId"
+                 ShowZones="@Prefs.ShowZones"
+                 Options="@_mapOptions"
+                 OnStyleFailed="OnStyleFailedAsync"
                  Layout="@_mapLayout"
                  ReducedMotion="@viewport.ReducedMotion"
                  TestHooks="@TestHooks" />
@@ -76,7 +81,13 @@
             <SheetSelectionHeader Header="pill" Pill="true" OnClear="OnClearAsync" />
         }
 
-        <RightButtonStack Hidden="@(!_mapLayout.StackVisible)" Panel="@panel" MapStyleName="@StyleName" />
+        <RightButtonStack Hidden="@(!_mapLayout.StackVisible)"
+                          Panel="@panel"
+                          MapStyleName="@StyleName"
+                          StyleId="@StyleId"
+                          ShowZones="@Prefs.ShowZones"
+                          OnStyleChosen="OnStyleChosenAsync"
+                          OnShowZonesChanged="OnShowZonesChangedAsync" />
     }
     else
     {
@@ -98,6 +109,11 @@
     private bool _started;
     private bool _disposed;
 
+    // S10a: the device preferences (01 section 7.9). A style chosen in the page, else the Demo URL's, else the stored one, else Night; the radius reaches the map as its default-view option.
+    private string? _chosenStyle;
+    private MapPayloadOptions _mapOptions = MapPayloadOptions.Default;
+    private bool _prefsSubscribed;
+
     /// <summary>The circuit's session, cascaded by <c>RealmShell</c>.</summary>
     [CascadingParameter]
     public IRealmSession Session { get; set; } = default!;
@@ -112,11 +128,13 @@
     // the hosting switch Realm:TestHooks (03 section 4.10). The style defaults to Night; Demo and CI ask for demo-offline with ?style=.
     private bool TestHooks => Session is DemoRealmSession || (bool.TryParse(Configuration["Realm:TestHooks"], out var on) && on);
 
-    private string StyleId => Overrides?.Style ?? MapStyleIds.Night;
+    private string StyleId => _chosenStyle ?? Overrides?.Style ?? Prefs.MapStyle;
 
     // The layers button's accessible name (01 section 10.3); the hidden demo-offline style reads as "Demo".
-    private string StyleName =>
-        StyleId switch
+    private string StyleName => NameOf(StyleId);
+
+    private static string NameOf(string styleId) =>
+        styleId switch
         {
             MapStyleIds.Day => "Day",
             MapStyleIds.Streets => "Streets",
@@ -128,7 +146,7 @@
     // Prerendering runs this twice (the prerender scope, then the circuit); both only read the overrides.
     protected override void OnInitialized()
     {
-        _layoutOverride = LayoutResolver.ParseOverride(Overrides?.Layout);
+        _layoutOverride = LayoutResolver.ParseOverride(Overrides?.Layout ?? Prefs.Layout);
         if (Overrides?.Sheet == "80")
         {
             _ui.Apply(new SheetEvent.HandleSet(SheetSize.Tall));
@@ -151,6 +169,13 @@
 
         try
         {
+            // The stored preferences first (S10a): the first layout and the map's first style are the person's own. A browser that refuses storage leaves the defaults.
+            await Prefs.EnsureLoadedAsync();
+            Prefs.Changed += OnPrefChanged;
+            _prefsSubscribed = true;
+            _layoutOverride = LayoutResolver.ParseOverride(Overrides?.Layout ?? Prefs.Layout);
+            _mapOptions = MapPayloadOptions.Default with { DefaultViewRadiusKm = Prefs.ViewRadiusKm };
+
             _shell = await ShellInterop.CreateAsync(JS, new ShellCallbacks(OnViewportAsync));
             var info = await _shell.InitAsync();
             if (info is null || _disposed)
@@ -229,6 +254,59 @@
         return Task.CompletedTask;
     }
 
+    // S10a: a tile of the Layers popover. The page applies the style at once (MapView sends it through the existing setStyle) and DevicePrefs stores it.
+    private async Task OnStyleChosenAsync(string styleId)
+    {
+        _chosenStyle = styleId;
+        await Prefs.SetMapStyleAsync(styleId);
+    }
+
+    private Task OnShowZonesChangedAsync(bool show) => Prefs.SetShowZonesAsync(show);
+
+    // A style the person chose did not load (realmMap.js gave up after 8 s and kept the last good one): back to the style before the choice, stored again as well (01 section 4.12).
+    // A style that failed at start-up was nobody's choice in this page, so it is left to the script's own fallback.
+    private async Task OnStyleFailedAsync(string failedStyleId)
+    {
+        if (_chosenStyle is null || failedStyleId != _chosenStyle)
+        {
+            return;
+        }
+
+        await Prefs.SetMapStyleAsync(Prefs.PreviousMapStyle);
+        Snackbar.Add($"That map style didn't load. Back to {NameOf(Prefs.MapStyle)}.", Severity.Warning);
+    }
+
+    // A preference changed (the Layers popover, or the Settings dialog): bring the page in line. Raised on the circuit's context, so no marshalling beyond InvokeAsync.
+    private void OnPrefChanged(string key)
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _ = InvokeAsync(async () =>
+        {
+            if (key == DevicePrefs.MapStyleKey)
+            {
+                _chosenStyle = Prefs.MapStyle;
+            }
+            else if (key == DevicePrefs.ViewRadiusKmKey)
+            {
+                _mapOptions = MapPayloadOptions.Default with { DefaultViewRadiusKm = Prefs.ViewRadiusKm };
+            }
+            else if (key == DevicePrefs.LayoutKey)
+            {
+                _layoutOverride = LayoutResolver.ParseOverride(Overrides?.Layout ?? Prefs.Layout);
+                if (_viewport is { } viewport)
+                {
+                    await ApplyViewportAsync(viewport);
+                }
+            }
+
+            StateHasChanged();
+        });
+    }
+
     // Raised off the UI thread (IRealmSession.Changed): marshal back before rendering.
     private void OnSessionChanged() => Rerender();
 
@@ -248,6 +326,11 @@
         if (_started)
         {
             Session.Changed -= OnSessionChanged;
+        }
+
+        if (_prefsSubscribed)
+        {
+            Prefs.Changed -= OnPrefChanged;
         }
 
         if (_ticker is not null)

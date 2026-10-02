@@ -1,6 +1,8 @@
+using Microsoft.AspNetCore.Components.Server.Circuits;
 using Realm.Demo;
 using Realm.Infrastructure.Hosting;
 using Realm.Web.Hosting;
+using Realm.Web.State;
 
 namespace Realm.Web;
 
@@ -18,6 +20,9 @@ public static class RealmAppServiceCollectionExtensions
     {
         services.AddSingleton(runtime);   // RealmShell reads the mode to decide whether the Demo-only URL parameters apply (03 section 2.1)
         services.AddRealmWeb(runtime);
+        services.AddSingleton<RealmCircuitHandler>();   // counts circuits for diagnostics.json (03 section 5.6)
+        services.AddSingleton<CircuitHandler>(provider => provider.GetRequiredService<RealmCircuitHandler>());
+        services.AddScoped<DevicePrefs>();   // the four device preferences of 01 section 7.9, one set per circuit (03 section 3.6)
         if (runtime.Mode == RealmMode.Live)
         {
             ArgumentNullException.ThrowIfNull(configuration);

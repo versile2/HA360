@@ -1,0 +1,162 @@
+@using Realm.Web.Map
+
+@* The map style switcher (01 section 4.12): a MudBlazor popover anchored to its parent element, which is the Layers button's wrapper in RightButtonStack, opening to the left of
+   the button and upward. 296 wide, a "Map style" title, a 2-column grid of four 128 x 96 tiles (a static SVG swatch in the palette's tokens, never a live map, and a 32 px
+   label row; the chosen tile has a 3 px gold ring and a check badge) and a 48 px "Show places" switch row. No Parchment in v1 (D35).
+
+   The component keeps no state of its own about the choice: it raises OnStyleChosen and OnShowZonesChanged and the page applies them (the existing StyleId and ShowZones
+   parameters of MapView, so realmMap.js is untouched) and stores them (DevicePrefs). A tile applies at once and the popover closes CloseDelayMs later, which shows the ring
+   on the new tile first and stays well inside the 200 ms of AC-21; the style change starts at the same moment as the delay, not after it. Esc (while the focus is in the
+   popover, where it moves when it opens), a tap anywhere outside (a transparent modal overlay, which also keeps that tap from reaching the map) and the owner's own handling of
+   the layers button close it through OnClose. The owner moves the focus back to the Layers button. *@
+<MudPopover Open="@Open"
+            Class="realm-style-popover"
+            AnchorOrigin="Origin.BottomLeft"
+            TransformOrigin="Origin.BottomRight"
+            Fixed="true">
+    <div @ref="_panel"
+         class="realm-style-panel"
+         role="dialog"
+         aria-label="Map style"
+         tabindex="-1"
+         data-testid="map-style-popover"
+         @onkeydown="OnKeyDownAsync">
+        <h2 class="realm-style-panel__title">Map style</h2>
+        <div class="realm-style-grid" role="radiogroup" aria-label="Map style">
+            @foreach (var style in Styles)
+            {
+                var selected = style.Id == StyleId;
+                <button @key="style.Id"
+                        type="button"
+                        role="radio"
+                        class="@("realm-style-tile" + (selected ? " realm-style-tile--selected" : string.Empty))"
+                        aria-checked="@(selected ? "true" : "false")"
+                        data-testid="@("map-style-tile-" + style.Id)"
+                        @onclick="() => ChooseAsync(style.Id)">
+                    <svg class="@("realm-swatch realm-swatch--" + style.Id)" viewBox="0 0 128 64" aria-hidden="true" focusable="false">
+                        <rect class="sw-ground" x="0" y="0" width="128" height="64" />
+                        <path class="sw-water" d="M0 46 C24 38 40 56 64 48 S104 36 128 44 L128 64 L0 64 Z" />
+                        <rect class="sw-park" x="80" y="8" width="34" height="20" rx="4" />
+                        <path class="sw-road" d="M-4 22 L52 14 L132 30" />
+                        <path class="sw-road sw-road--minor" d="M32 -2 L46 66" />
+                    </svg>
+                    <span class="realm-style-tile__label">@style.Name</span>
+                    @if (selected)
+                    {
+                        <span class="realm-style-tile__check" aria-hidden="true">
+                            <MudIcon Icon="@Icons.Material.Filled.Check" />
+                        </span>
+                    }
+                </button>
+            }
+        </div>
+        <button type="button"
+                role="switch"
+                class="realm-switch-row"
+                aria-checked="@(ShowZones ? "true" : "false")"
+                data-testid="map-show-zones"
+                @onclick="ToggleZonesAsync">
+            <span class="realm-switch-row__label">Show places</span>
+            <span class="realm-switch" aria-hidden="true"><span class="realm-switch__thumb"></span></span>
+        </button>
+    </div>
+</MudPopover>
+<MudOverlay Visible="@Open" Modal="true" AutoClose="true" OnClosed="CloseAsync" LockScroll="false" ZIndex="1250" />
+
+@code {
+    /// <summary>How long the popover stays after a tile is tapped (01 section 4.12 says 150 ms, AC-21 says within 200 ms; the margin is for the round trip).</summary>
+    public const int CloseDelayMs = 100;
+
+    private static readonly (string Id, string Name)[] Styles =
+    [
+        (MapStyleIds.Night, "Night"),
+        (MapStyleIds.Day, "Day"),
+        (MapStyleIds.Streets, "Streets"),
+        (MapStyleIds.Satellite, "Satellite"),
+    ];
+
+    private ElementReference _panel;
+    private bool _wasOpen;
+    private bool _closing;
+
+    /// <summary>Whether the popover is shown.</summary>
+    [Parameter]
+    public bool Open { get; set; }
+
+    /// <summary>The style in force: its tile carries the ring. The hidden <c>demo-offline</c> style selects none.</summary>
+    [Parameter]
+    public string StyleId { get; set; } = MapStyleIds.Night;
+
+    /// <summary>The state of the Show places switch.</summary>
+    [Parameter]
+    public bool ShowZones { get; set; } = true;
+
+    /// <summary>A tile was tapped; the value is its style id. The popover closes <see cref="CloseDelayMs"/> later.</summary>
+    [Parameter]
+    public EventCallback<string> OnStyleChosen { get; set; }
+
+    /// <summary>The Show places switch was tapped; the value is the new state. The popover stays open.</summary>
+    [Parameter]
+    public EventCallback<bool> OnShowZonesChanged { get; set; }
+
+    /// <summary>The popover asks to close: Esc, a tap outside, or the delay after a tile.</summary>
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!Open)
+        {
+            _wasOpen = false;
+            _panel = default;   // a reference to the removed panel must never be focused when the popover opens again
+            return;
+        }
+
+        if (_wasOpen)
+        {
+            return;
+        }
+
+        _wasOpen = true;
+        _closing = false;
+        await FocusPanelAsync();
+    }
+
+    // The popover's content is drawn by MudPopoverProvider, a render later than this component's, so the panel may not exist yet: try a few times, briefly apart.
+    private async Task FocusPanelAsync()
+    {
+        for (var attempt = 0; attempt < 8 && Open; attempt++)
+        {
+            await Task.Delay(30);
+            try
+            {
+                await _panel.FocusAsync();
+                return;
+            }
+            catch (Exception exception) when (exception is InvalidOperationException or Microsoft.JSInterop.JSException or Microsoft.JSInterop.JSDisconnectedException or TaskCanceledException)
+            {
+                // Not drawn yet, or the circuit is gone: try again, or give up quietly (the popover works without the focus, only Esc needs it).
+            }
+        }
+    }
+
+    private async Task ChooseAsync(string styleId)
+    {
+        if (_closing)
+        {
+            return;
+        }
+
+        _closing = true;
+        var delay = Task.Delay(CloseDelayMs);
+        await OnStyleChosen.InvokeAsync(styleId);
+        await delay;
+        await OnClose.InvokeAsync();
+    }
+
+    private Task ToggleZonesAsync() => OnShowZonesChanged.InvokeAsync(!ShowZones);
+
+    private Task CloseAsync() => OnClose.InvokeAsync();
+
+    private Task OnKeyDownAsync(KeyboardEventArgs args) => args.Key == "Escape" ? OnClose.InvokeAsync() : Task.CompletedTask;
+}

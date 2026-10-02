@@ -1,10 +1,13 @@
+@using Realm.Web.Components.Map
 @using Realm.Web.Map
 
 @* The right-hand button stack (01 section 3.5; 03 section 3.4): recenter above layers, two 48 px circles 12 px apart, right-aligned. In Compact its bottom edge
    sits 12 px above the sheet's top edge through --realm-sheet-h (written by realmShell.js from a ResizeObserver, so it follows the sheet's 250 ms transition with no server call);
    in the panel layout it stays above the navigation bar. Hidden (the sheet is Tall, D42) is visibility:hidden plus inert, so it leaves the focus order.
-   The reserved "+" slot (slot-add) renders nothing in v1. S7a only places the buttons: the recenter camera and the style popover belong to later slices,
-   so the callbacks are optional and the buttons do nothing without them. *@
+   The reserved "+" slot (slot-add) renders nothing in v1. The recenter camera belongs to a later slice, so OnRecenter is optional and the button does nothing without it.
+   The layers button toggles the style popover (S10a, 01 section 4.12): the popover is a MudPopover, which anchors to its parent element, so the button sits in a wrapper that is
+   exactly the button's box (realm-stack-anchor, no change to the stack's 12 px layout) and the popover is its second child. The owner passes the style and the Show places state
+   and applies the two callbacks; the button also raises OnLayers on every tap. *@
 <div class="@Classname" inert="@(Hidden && !Panel)">
     @* slot-add: reserved, intentionally not rendered (Features:TempBubble, 5.8). *@
     <MudIconButton Icon="@RecenterIcon"
@@ -13,15 +16,29 @@
                    title="@RecenterName"
                    data-testid="btn-recenter"
                    OnClick="RecenterAsync" />
-    <MudIconButton Icon="@Icons.Material.Filled.Layers"
-                   Class="realm-stack-btn"
-                   aria-label="@LayersName"
-                   title="@LayersName"
-                   data-testid="btn-layers"
-                   OnClick="LayersAsync" />
+    <div class="realm-stack-anchor">
+        <MudIconButton @ref="_layers"
+                       Icon="@Icons.Material.Filled.Layers"
+                       Class="realm-stack-btn"
+                       aria-label="@LayersName"
+                       aria-haspopup="dialog"
+                       aria-expanded="@(_open ? "true" : "false")"
+                       title="@LayersName"
+                       data-testid="btn-layers"
+                       OnClick="LayersAsync" />
+        <MapStylePopover Open="@_open"
+                         StyleId="@StyleId"
+                         ShowZones="@ShowZones"
+                         OnStyleChosen="OnStyleChosen"
+                         OnShowZonesChanged="OnShowZonesChanged"
+                         OnClose="CloseAsync" />
+    </div>
 </div>
 
 @code {
+    private MudIconButton? _layers;
+    private bool _open;
+
     /// <summary>Away from the default view (the outlined crosshair), at the default view or on me alone (the filled one).</summary>
     [Parameter]
     public RecenterState Recenter { get; set; } = RecenterState.Default;
@@ -38,6 +55,22 @@
     [Parameter]
     public string MapStyleName { get; set; } = "Night";
 
+    /// <summary>The id of the map style in force (its tile carries the ring in the popover).</summary>
+    [Parameter]
+    public string StyleId { get; set; } = MapStyleIds.Night;
+
+    /// <summary>The state of the Show places switch in the popover.</summary>
+    [Parameter]
+    public bool ShowZones { get; set; } = true;
+
+    /// <summary>A tile of the popover was tapped; the value is the style id. The popover closes itself shortly after.</summary>
+    [Parameter]
+    public EventCallback<string> OnStyleChosen { get; set; }
+
+    /// <summary>The Show places switch of the popover was tapped; the value is the new state.</summary>
+    [Parameter]
+    public EventCallback<bool> OnShowZonesChanged { get; set; }
+
     /// <summary>The recenter button was tapped.</summary>
     [Parameter]
     public EventCallback OnRecenter { get; set; }
@@ -48,7 +81,39 @@
 
     private Task RecenterAsync() => OnRecenter.InvokeAsync();
 
-    private Task LayersAsync() => OnLayers.InvokeAsync();
+    private Task LayersAsync()
+    {
+        _open = !_open;
+        return OnLayers.InvokeAsync();
+    }
+
+    // The popover asks to close (Esc, a tap outside, the delay after a tile): the focus goes back to the button that opened it.
+    private async Task CloseAsync()
+    {
+        _open = false;
+        if (_layers is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await _layers.FocusAsync();
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or Microsoft.JSInterop.JSException or Microsoft.JSInterop.JSDisconnectedException or TaskCanceledException)
+        {
+            // The button is gone or the circuit is: nothing to focus.
+        }
+    }
+
+    // A stack that disappears (the sheet went Tall) takes an open popover with it.
+    protected override void OnParametersSet()
+    {
+        if (Hidden && !Panel)
+        {
+            _open = false;
+        }
+    }
 
     private string Classname =>
         "realm-right-stack" + (Panel ? " realm-right-stack--panel" : string.Empty) + (Hidden && !Panel ? " realm-right-stack--hidden" : string.Empty);

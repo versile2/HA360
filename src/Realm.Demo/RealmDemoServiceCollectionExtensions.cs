@@ -16,6 +16,7 @@ public static class RealmDemoServiceCollectionExtensions
     public static IServiceCollection AddRealmDemo(this IServiceCollection services)
     {
         services.AddSingleton<IRealmSessionFactory, DemoRealmSessionFactory>();
+        services.AddSingleton<IDiagnostics, DemoDiagnostics>();   // canned diagnostics.json (03 section 2.11); the Live side registers its own (S13c)
         return services;
     }
 }

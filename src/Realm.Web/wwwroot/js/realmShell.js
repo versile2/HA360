@@ -406,3 +406,100 @@ export function readSheet() {
 }
 
 // ---- S7b (selection header focus), S8a (history and Escape), S15 (preferences, HA bridge) add their exports and state below this line ----------
+
+// ---- S10a: device preferences (01 section 7.9, 03 section 4.8) -----------------------------------------------------------------------------
+// localStorage is read and written only from here, and only after the first render (the circuit exists then; prerendering has no browser). Every access is in
+// a try/catch and every failure reads as "no stored value", so a private window or blocked site data leaves the defaults in force. Only keys that start with
+// `realm.` are ever touched: `realm.mapStyle`, `realm.showZones`, `realm.viewRadiusKm` and `realm.layout` (DevicePrefs.cs holds the list and the defaults).
+
+/** Every key of ours starts with this; anything else is refused. */
+const PREFS_PREFIX = 'realm.';
+
+/**
+ * localStorage, or null when the browser refuses it (the getter itself can throw in a private window or with blocked site data).
+ * @returns {Storage | null}
+ */
+function deviceStorage() {
+  try {
+    return globalThis.localStorage ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Whether `key` is one of ours.
+ * @param {unknown} key
+ * @returns {key is string}
+ */
+export function isPrefKey(key) {
+  return typeof key === 'string' && key.length > PREFS_PREFIX.length && key.startsWith(PREFS_PREFIX);
+}
+
+/** The stored device preferences. None of these throws; `set` says whether the value was stored. */
+export const prefs = {
+  /**
+   * Every stored `realm.*` value, by key. Empty when storage is unavailable.
+   * @returns {Record<string, string>}
+   */
+  getAll() {
+    /** @type {Record<string, string>} */
+    const all = {};
+    try {
+      const store = deviceStorage();
+      if (!store) return all;
+      for (let index = 0; index < store.length; index++) {
+        const key = store.key(index);
+        if (!isPrefKey(key)) continue;
+        const value = store.getItem(key);
+        if (value !== null) all[key] = value;
+      }
+    } catch {
+      // Unreadable storage is an empty one.
+    }
+    return all;
+  },
+
+  /**
+   * @param {string} key a `realm.*` key
+   * @param {string} value
+   * @returns {boolean} true when the value was stored (false for a foreign key, a full or blocked storage)
+   */
+  set(key, value) {
+    if (!isPrefKey(key)) return false;
+    try {
+      const store = deviceStorage();
+      if (!store) return false;
+      store.setItem(key, String(value));
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
+  /** @param {string} key a `realm.*` key */
+  remove(key) {
+    if (!isPrefKey(key)) return;
+    try {
+      deviceStorage()?.removeItem(key);
+    } catch {
+      // Nothing to remove from storage that cannot be reached.
+    }
+  },
+
+  /** Removes every `realm.*` value (the C# side has no caller in v1: "Reset device settings" is not in v1). */
+  reset() {
+    try {
+      const store = deviceStorage();
+      if (!store) return;
+      const keys = [];
+      for (let index = 0; index < store.length; index++) {
+        const key = store.key(index);
+        if (isPrefKey(key)) keys.push(key);
+      }
+      for (const key of keys) store.removeItem(key);
+    } catch {
+      // As above.
+    }
+  },
+};

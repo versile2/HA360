@@ -303,3 +303,102 @@ test.describe('[GAL] screenshot gallery: Driving popups, the driver week and the
     expectViewportPng(partial, page, testInfo.project.name);
   });
 });
+
+// ---- S10a: SC08-style-popover and SC09-settings (03 section 8.5). Their own describe block, so it merges next to the scenes of the other slices without touching them. ----
+test.describe('[GAL] screenshot gallery: the Layers popover and the Settings dialog', () => {
+  // SC08-style-popover (S10a): the Layers popover open over the Demo map, four tiles and the Show places switch (03 section 8.5, row SC08; 01 section 4.12). The gallery
+  // runs on the hidden demo-offline style, which no tile stands for, so no tile carries the ring here: the ring is AC-21's, which runs a real style choice.
+  test('[GAL] SC08-style-popover', { tag: ['@phone', '@unfolded'] }, async ({ page }, testInfo) => {
+    await demo(page);
+    await mapReady(page);
+    await page.getByTestId('btn-layers').click();
+
+    const popover = page.getByTestId('map-style-popover');
+    await expect(popover, 'the Layers popover is open').toBeVisible();
+    await expect(popover.getByRole('heading', { name: 'Map style' }), 'the popover title').toBeVisible();
+    await expect(popover.locator('[data-testid^="map-style-tile-"]'), 'four styles, no Parchment in v1').toHaveCount(4);
+    for (const id of ['night', 'day', 'streets', 'satellite']) {
+      await expect(page.getByTestId(`map-style-tile-${id}`), `map-style-tile-${id} is on screen`).toBeVisible();
+    }
+    await expect(page.getByTestId('map-show-zones'), 'the Show places switch is on by default').toHaveAttribute('aria-checked', 'true');
+
+    // Where it is: 296 wide, wholly inside the window, to the left of the Layers button and growing upward from it.
+    const shell = page.locator('.realm-style-popover');
+    await expect(shell, 'the popover is placed (MudBlazor marks it open once it is positioned)').toHaveClass(/mud-popover-open/);
+    const box = await shell.boundingBox();
+    const layers = await page.getByTestId('btn-layers').boundingBox();
+    expect(box, 'the popover has a box').not.toBeNull();
+    expect(layers, 'btn-layers has a box').not.toBeNull();
+    if (box !== null && layers !== null) {
+      const viewport = viewportOf(page);
+      expect(box.width, 'popover width (01 section 4.12: 296)').toBeGreaterThanOrEqual(295);
+      expect(box.width, 'popover width (01 section 4.12: 296)').toBeLessThanOrEqual(297);
+      expect(box.x, 'popover left edge is inside the window').toBeGreaterThanOrEqual(0);
+      expect(box.y, 'popover top edge is inside the window').toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width, 'popover right edge is inside the window').toBeLessThanOrEqual(viewport.width);
+      expect(box.x + box.width, 'popover opens to the left of btn-layers').toBeLessThanOrEqual(layers.x + 1);
+      expect(box.y + box.height, 'popover opens upward: its bottom is not below the bottom of btn-layers').toBeLessThanOrEqual(layers.y + layers.height + 2);
+      expect(box.y, 'popover is taller than the button and rises above it').toBeLessThan(layers.y);
+    }
+
+    const file = await saveShot(page, testInfo, 'SC08-style-popover');
+    expectViewportPng(file, page, testInfo.project.name);
+  });
+
+  // SC09-settings (S10a): the Settings dialog opened from the gear: full-screen below 600 px, 480 px wide and centred from there up (03 section 8.5, row SC09; 01 section 7.9).
+  // Map, Appearance, Connections and About, with the 48 px Diagnostics row and no Theme, Units, Week starts on or Reset rows (D35). The scene is taken twice: the top of the
+  // dialog (SC09-settings) and the bottom, scrolled to the About section (SC09-settings-about).
+  test('[GAL] SC09-settings', { tag: ['@phone', '@unfolded'] }, async ({ page }, testInfo) => {
+    await demo(page);
+    await mapReady(page);
+    await page.getByTestId('btn-settings').click();
+
+    // MudBlazor puts the dialog's attributes (the test id) on the content and its class on the dialog box that holds the title bar and the content.
+    const dialog = page.getByTestId('settings-dialog');
+    const frame = page.locator('.mud-dialog.realm-settings');
+    await expect(dialog, 'the Settings dialog is open').toBeVisible();
+    await expect(frame.locator('.realm-popup__title'), 'the title').toHaveText('Settings');
+    await expect(dialog.locator('.realm-settings__section h3'), 'the four sections, in order').toHaveText(['Map', 'Appearance', 'Connections', 'About']);
+
+    // Its size: the whole window below 600 px, a 480 px column in the middle from there up.
+    const viewport = viewportOf(page);
+    const box = await frame.boundingBox();
+    expect(box, 'the dialog has a box').not.toBeNull();
+    if (box !== null) {
+      if (viewport.width < 600) {
+        expect(box.width, 'a full-screen dialog is as wide as the window').toBeGreaterThanOrEqual(viewport.width - 1);
+        expect(box.height, 'a full-screen dialog is as high as the window').toBeGreaterThanOrEqual(viewport.height - 1);
+      } else {
+        expect(box.width, 'the dialog is 480 px wide from 600 px up').toBeGreaterThanOrEqual(479);
+        expect(box.width, 'the dialog is 480 px wide from 600 px up').toBeLessThanOrEqual(481);
+        expect(Math.abs(box.x + box.width / 2 - viewport.width / 2), 'the dialog is centred horizontally').toBeLessThanOrEqual(2);
+      }
+    }
+
+    // What it holds: the Map section's controls, the one Appearance row, the four connections of the Demo, and nothing of 01 section 7.9's dropped rows.
+    await expect(dialog.getByRole('radio', { name: 'Night' }), 'Night is the style when none was ever chosen').toHaveAttribute('aria-checked', 'true');
+    await expect(dialog.getByRole('switch', { name: /Show places/ }), 'Show places is on by default').toHaveAttribute('aria-checked', 'true');
+    await expect(dialog.getByRole('radio', { name: 'Auto' }), 'the layout is Auto by default').toHaveAttribute('aria-checked', 'true');
+    await expect(dialog.locator('.realm-settings__connection-name'), 'the four connections, by their names in Settings').toHaveText(['Home Assistant', 'Life360', 'FordPass', "Second vehicle (maker's app)"]);
+    await expect(dialog.locator('.realm-settings__chip'), 'their states in the Demo').toHaveText(['Connected', 'Connected', 'Connected', 'Not connected']);
+    for (const dropped of ['Theme', 'Units', 'Week starts', 'Reset']) {
+      await expect(dialog.getByText(dropped), `no "${dropped}" row in v1`).toHaveCount(0);
+    }
+
+    const file = await saveShot(page, testInfo, 'SC09-settings');
+    expectViewportPng(file, page, testInfo.project.name);
+
+    // The bottom: the version, the credits and the Diagnostics row that opens diagnostics.json in a new tab, 48 px high at least, with its promise under it.
+    const diagnostics = dialog.locator('a.realm-settings__link');
+    await diagnostics.scrollIntoViewIfNeeded();
+    await expect(diagnostics, 'the Diagnostics row is a link to the diagnostics file, by a relative URL').toHaveAttribute('href', 'diagnostics.json');
+    await expect(diagnostics, 'it opens in a new tab').toHaveAttribute('target', '_blank');
+    await expect(diagnostics, 'what the file holds').toContainText('States and counts only. No locations.');
+    const row = await diagnostics.boundingBox();
+    expect(row, 'the Diagnostics row has a box').not.toBeNull();
+    expect(row?.height ?? 0, 'the Diagnostics row is at least 48 px high').toBeGreaterThanOrEqual(47.5);
+
+    const about = await saveShot(page, testInfo, 'SC09-settings-about');
+    expectViewportPng(about, page, testInfo.project.name);
+  });
+});
