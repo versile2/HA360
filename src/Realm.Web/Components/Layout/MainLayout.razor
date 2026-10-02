@@ -7,7 +7,7 @@
    fragment, so a value reaches the sheet and every dialog only if the provider is below the cascade. The shell renders no element, so the DOM is
    unchanged: the popover provider still comes before the nav. *@
 <RealmShell>
-    <MudThemeProvider IsDarkMode="true" ObserveSystemDarkModeChange="false" />
+    <MudThemeProvider Theme="Realm.Web.Theme.RealmTheme.Create()" IsDarkMode="true" ObserveSystemDarkModeChange="false" />
     <MudPopoverProvider />
     <MudDialogProvider />
     <MudSnackbarProvider />

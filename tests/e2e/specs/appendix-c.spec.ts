@@ -69,4 +69,106 @@ test.describe('appendix C platform tests', () => {
     expect(zoomed.zoom, `a wheel turned forward (deltaY -300) zooms in: from ${panned.zoom} to ${zoomed.zoom}`).toBeGreaterThan(panned.zoom);
     await settled(page);
   });
+
+  // 01 Appendix C item 4, 03 section 3.5, R-035. The z-index order, low to high: the floating controls (10), the MudX sheet (a MudPopover: MudBlazor's popover layer is
+  // --mud-zindex-popover, 1200, plus one for the popover itself, so 1201), the bottom navigation (1210, css/app.css), MudBlazor's dialogs (--mud-zindex-dialog, 1400). The
+  // numbers are read from the page, and the order is also proved by what a tap would reach: the navigation bar hides the lower 64 px of the sheet, and a dialog hides the bar.
+  test('[X-12] the sheet is below the navigation bar, which is below the dialog layer', async ({ page }) => {
+    await demo(page);
+    await expect.poll(async () => (await readHook(page, 'sheet')).open, { message: 'window.__realm.sheet().open: the sheet must be open before its layer can be judged' }).toBe(true);
+
+    const layers = await page.evaluate(() => {
+      const zIndexOf = (selector: string): number => {
+        const element = document.querySelector(selector);
+        return element === null ? Number.NaN : Number.parseInt(getComputedStyle(element).zIndex, 10);
+      };
+      const rootStyle = getComputedStyle(document.documentElement);
+      const nav = document.querySelector('.realm-nav');
+      const bar = nav === null ? null : nav.getBoundingClientRect();
+      const hit = bar === null ? null : document.elementFromPoint(bar.left + bar.width / 2, bar.top + bar.height / 2);
+      return {
+        sheet: zIndexOf('div[mudsheet]'),
+        nav: zIndexOf('.realm-nav'),
+        popoverLayer: Number.parseInt(rootStyle.getPropertyValue('--mud-zindex-popover'), 10),
+        dialogLayer: Number.parseInt(rootStyle.getPropertyValue('--mud-zindex-dialog'), 10),
+        navigationReceivesTheTap: hit !== null && hit.closest('.realm-nav') !== null,
+      };
+    });
+    test.info().annotations.push({ type: 'info', description: `[X-12] z-index of the sheet ${layers.sheet}, the navigation ${layers.nav}; MudBlazor layers: popover ${layers.popoverLayer}, dialog ${layers.dialogLayer}` });
+
+    expect(layers.nav, 'the navigation bar is 1210 (css/app.css)').toBe(1210);
+    expect(layers.sheet, `the sheet is a popover layer, at least --mud-zindex-popover (${layers.popoverLayer})`).toBeGreaterThanOrEqual(layers.popoverLayer);
+    expect(layers.sheet, 'the sheet is below the navigation bar').toBeLessThan(layers.nav);
+    expect(layers.dialogLayer, 'MudBlazor dialogs are above the navigation bar').toBeGreaterThan(layers.nav);
+    expect(layers.navigationReceivesTheTap, 'the centre of the navigation bar hits the bar, not the sheet that extends under it').toBe(true);
+  });
+
+  test('[X-12] a dialog covers the navigation bar: its layer is above the bar and the bar does not receive the tap', async ({ page }) => {
+    // The popups grow and fade in; with reduced motion they are instant.
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await demo(page, { path: 'driving' });
+    await expect(page.getByTestId('stat-speeding'), 'the report has loaded').toBeVisible();
+    const dialog = page.getByRole('dialog');
+    // The page is prerendered, so a tap before the circuit is up does nothing; it is repeated until the popup is there, and never once it is open (the scrim would be in the way).
+    await expect(async () => {
+      if ((await dialog.count()) === 0) await page.getByTestId('stat-speeding').click({ timeout: 3_000 });
+      await expect(dialog.getByTestId('popup-speeding'), 'the Speeding popup is open').toBeVisible({ timeout: 1_500 });
+    }).toPass({ timeout: 20_000 });
+
+    const layers = await page.evaluate(() => {
+      const zIndexOf = (selector: string): number => {
+        const element = document.querySelector(selector);
+        return element === null ? Number.NaN : Number.parseInt(getComputedStyle(element).zIndex, 10);
+      };
+      const nav = document.querySelector('.realm-nav');
+      const bar = nav === null ? null : nav.getBoundingClientRect();
+      const hit = bar === null ? null : document.elementFromPoint(bar.left + bar.width / 2, bar.top + bar.height / 2);
+      return {
+        nav: zIndexOf('.realm-nav'),
+        dialog: zIndexOf('.mud-dialog-container'),
+        navigationReceivesTheTap: hit !== null && hit.closest('.realm-nav') !== null,
+      };
+    });
+    test.info().annotations.push({ type: 'info', description: `[X-12] z-index of the navigation ${layers.nav}, of the dialog container ${layers.dialog}` });
+
+    expect(layers.dialog, 'the dialog container has a z-index (.mud-dialog-container)').not.toBeNaN();
+    expect(layers.dialog, 'the dialog layer is above the navigation bar').toBeGreaterThan(layers.nav);
+    expect(layers.navigationReceivesTheTap, 'the centre of the navigation bar hits the dialog layer, not the bar').toBe(false);
+  });
+
+  // R-035: MudXSheet always renders a non-modal MudOverlay (LockScroll is what it is for). Non-modal means pointer-events: none on the overlay, and it must never be given a
+  // background (neither a scrim child nor a colour), or it would grey the map and swallow every gesture.
+  test('[X-12] the sheet\'s non-modal overlay computes pointer-events: none and has no background', async ({ page }) => {
+    await demo(page);
+    await expect.poll(async () => (await readHook(page, 'sheet')).open, { message: 'window.__realm.sheet().open: the sheet must be open before its overlay can be judged' }).toBe(true);
+
+    const overlays = await page.evaluate(() => {
+      // A point on the map, above the sheet at Peek: nothing of the overlay may be the element that receives it.
+      const hit = document.elementFromPoint(window.innerWidth / 2, 120);
+      return {
+        list: [...document.querySelectorAll('.mud-overlay')].map((overlay) => {
+          const style = getComputedStyle(overlay);
+          const scrim = overlay.querySelector('.mud-overlay-scrim');
+          return {
+            className: overlay.className,
+            pointerEvents: style.pointerEvents,
+            background: style.backgroundColor,
+            backgroundImage: style.backgroundImage,
+            scrim: scrim === null ? null : { className: scrim.className, background: getComputedStyle(scrim).backgroundColor },
+          };
+        }),
+        mapPointHitsAnOverlay: hit !== null && hit.closest('.mud-overlay') !== null,
+      };
+    });
+    test.info().annotations.push({ type: 'info', description: `[X-12] overlays ${JSON.stringify(overlays.list)}` });
+
+    expect(overlays.list.length, 'the open sheet renders its non-modal MudOverlay (.mud-overlay)').toBeGreaterThan(0);
+    for (const overlay of overlays.list) {
+      expect(overlay.pointerEvents, `overlay "${overlay.className}" computes pointer-events`).toBe('none');
+      expect(overlay.background, `overlay "${overlay.className}" has a transparent background colour`).toBe('rgba(0, 0, 0, 0)');
+      expect(overlay.backgroundImage, `overlay "${overlay.className}" has no background image`).toBe('none');
+      expect(overlay.scrim, `overlay "${overlay.className}" has no scrim child (no dark or light background)`).toBeNull();
+    }
+    expect(overlays.mapPointHitsAnOverlay, 'a point on the map above the sheet is not caught by an overlay').toBe(false);
+  });
 });

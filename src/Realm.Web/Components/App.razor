@@ -12,6 +12,11 @@
        would win every tie. Declaring the link here fixes its place: the provider only rewrites the href of this element (injectCssFromFile). Relative, no @Assets. *@
     <link rel="stylesheet" data-mudx-css="true" href="_content/MudX.MudBlazor.Extension/mudx.min.css" />
     <link rel="stylesheet" href="css/tokens.css" />
+    <link rel="stylesheet" href="css/fonts.css" />
+    @* The three self-hosted faces (03 section 3.8): relative hrefs resolve under <base>, and crossorigin is required for a font preload to be reused by the @font-face fetch. *@
+    <link rel="preload" as="font" type="font/woff2" crossorigin href="fonts/cinzel-latin-wght-normal.woff2" />
+    <link rel="preload" as="font" type="font/woff2" crossorigin href="fonts/atkinson-hyperlegible-latin-400-normal.woff2" />
+    <link rel="preload" as="font" type="font/woff2" crossorigin href="fonts/atkinson-hyperlegible-latin-700-normal.woff2" />
     <link rel="stylesheet" href="css/app.css" />
     <link rel="stylesheet" href="css/realm-sheet.css" />
     <link rel="stylesheet" href="css/realm-driving.css" />
