@@ -180,14 +180,41 @@ test.describe('acceptance B: the map', () => {
     await expect(chip).toBeVisible();
     await expect(chip).toHaveText(KING_CHIP_TEXT);
 
-    // Above the pin: centred on it, 8 px clear of its top (01 section 4.4), never below it.
+    // Above the pin, 8 px clear of its top (01 section 4.4), never below it. D79: centred on the pin unless that would clip, then clamped 8 px inside the
+    // visible map (D75) with the caret still over the pin's centre. At the phone default view the King's pin sits at x about 340 of 412, so the chip is clamped.
     const pinDom = await readPinDom(page, 'pin-member-king');
     const chipBox = await chip.boundingBox();
     expect(chipBox, 'the chip has a bounding box').not.toBeNull();
     if (chipBox === null) return;
-    expectApprox(chipBox.x + chipBox.width / 2, pinDom.box.x + pinDom.box.width / 2, 2, 'chip centre x against the pin');
+    const viewport = page.viewportSize();
+    expect(viewport, 'the page has a viewport size').not.toBeNull();
+    if (viewport === null) return;
+    const pinCentreX = pinDom.box.x + pinDom.box.width / 2;
     expectApprox(pinDom.box.y - (chipBox.y + chipBox.height), 8, 2, 'gap between the chip and the top of the pin');
     expect.soft(chipBox.y + chipBox.height, 'the chip ends above the pin').toBeLessThanOrEqual(pinDom.box.y);
+
+    // Inside the viewport, at least 8 px from both edges (the half pixel of the shift's rounding is allowed for).
+    const EDGE = 8;
+    expect.soft(chipBox.x, `the chip's left edge is at least ${EDGE} px from the left edge of the viewport`).toBeGreaterThanOrEqual(EDGE - 0.5);
+    expect.soft(viewport.width - (chipBox.x + chipBox.width), `the chip's right edge is at least ${EDGE} px from the right edge of the viewport`).toBeGreaterThanOrEqual(EDGE - 0.5);
+
+    // Centred on the pin whenever the centred chip fits; otherwise it is clamped, and the test says which of the two it checked.
+    const centredWouldClip = pinCentreX - chipBox.width / 2 < EDGE || pinCentreX + chipBox.width / 2 > viewport.width - EDGE;
+    test.info().annotations.push({ type: 'chip', description: centredWouldClip ? 'clamped' : 'centred' });
+    if (!centredWouldClip) expectApprox(chipBox.x + chipBox.width / 2, pinCentreX, 2, 'chip centre x against the pin (the centred chip fits)');
+
+    // The caret, one per chip, stays over the pin's centre whether or not the chip moved: just under the chip, pointing at the pin and not touching it.
+    const caret = kingPin.getByTestId('chip-caret');
+    await expect(caret, 'chip-caret elements in the chip').toHaveCount(1);
+    await expect(chip.getByTestId('chip-caret'), 'the caret belongs to the chip').toHaveCount(1);
+    const caretBox = await caret.boundingBox();
+    expect(caretBox, 'the caret has a bounding box').not.toBeNull();
+    if (caretBox === null) return;
+    expectApprox(caretBox.x + caretBox.width / 2, pinCentreX, 2, 'caret centre x against the pin');
+    expectApprox(caretBox.y, chipBox.y + chipBox.height, 2, 'caret top against the bottom edge of the chip');
+    expect.soft(caretBox.y + caretBox.height, 'the caret ends above the pin').toBeLessThanOrEqual(pinDom.box.y);
+    expect.soft(caretBox.x, "the caret is within the chip's width").toBeGreaterThanOrEqual(chipBox.x);
+    expect.soft(caretBox.x + caretBox.width, "the caret is within the chip's width").toBeLessThanOrEqual(chipBox.x + chipBox.width);
   });
 
   // [AC-18] The zones half of AC-18 that the map itself decides; "Show places" (`map-show-zones`, the Layers popover) is S10's and the

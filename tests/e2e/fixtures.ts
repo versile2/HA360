@@ -1,5 +1,6 @@
 // Fixtures of the E2E suite (03 section 7.5, 04 card S6a). Specs import `test` and `expect` from here, never from '@playwright/test':
-//   - `demo(page, opts)` opens the Demo app through the ingress proxy with the URL parameters of 01 Appendix B and waits until the map is settled;
+//   - `demo(page, opts)` opens the Demo app through the ingress proxy with the URL parameters of 01 Appendix B, waits until the circuit is interactive
+//     (every path) and, on Location, until the map is settled;
 //   - the GUARD fixture wraps every `page`: a test fails on a page error, on any console.error (which also catches the script's OnError reports,
 //     realmMap.js logs them as `[realmMap] ...`), and on any request or websocket whose host is not the proxy's (so no fonts or tiles leave in Demo).
 //     A test that expects an error says so with `test.use({ allowConsoleErrors: [{ pattern, reason }] })`; every entry needs a reason.
@@ -105,7 +106,35 @@ export function demoUrl(opts: DemoOptions = {}): string {
 }
 
 /**
- * Opens the Demo app through the proxy and waits until the map is settled.
+ * The element that proves the circuit is interactive: `<script data-mudx-js>` in `<head>`. MudXProvider (MainLayout renders it on every page) creates it from
+ * `OnAfterRenderAsync(firstRender)` through its `mudxProvider.js` (`injectJsFromFile`), and so does `ensureMudX` of realmShell.js on Location. Neither exists in the
+ * prerendered HTML: `App.razor` only declares `link[data-mudx-css]`, and a static prerender never runs `OnAfterRender` or any JS interop. Blazor sends the first
+ * render batch (which replaces the prerendered DOM) before the JS call that creates the element, over the one ordered circuit, so once the element is there the
+ * prerendered page is gone and what a locator finds is the circuit's own DOM. (`data-layout`, set by realmShell.js, would not do: only the Location page starts that
+ * script, so Driving never gets it.)
+ */
+export const INTERACTIVE_SELECTOR = 'script[data-mudx-js]';
+
+/**
+ * Waits until the page has been taken over by its circuit. A locator that matched the prerendered DOM can be detached a moment later, when the circuit replaces it,
+ * and `boundingBox()` then returns null on an element that `toBeVisible()` had just seen (the AC-35 failure of CI run d091ad2).
+ */
+export async function waitForInteractive(page: Page, url: string): Promise<void> {
+  await page
+    .waitForFunction((selector) => document.querySelector(selector) !== null, INTERACTIVE_SELECTOR, { timeout: 30_000 })
+    .catch((error: unknown) => {
+      throw new Error(
+        `the circuit did not become interactive within 30 s of opening ${url} (no ${INTERACTIVE_SELECTOR} in <head>: MudXProvider adds it from its first interactive render, ` +
+          `so the page is still the prerendered one, or the websocket never connected): ${String(error)}`,
+      );
+    });
+}
+
+/**
+ * Opens the Demo app through the proxy and waits until the page is interactive, on every path, and then (on Location) until the map is settled.
+ *
+ * The app prerenders (Interactive Server with prerendering): the HTML that `goto` returns is static, and when the circuit starts Blazor replaces it. A test that
+ * touches the page before that moment can hold an element that is detached a moment later, so `demo()` returns only after the circuit has rendered once.
  *
  * Re-open with demo(), never with the navigation links, when a test needs a fresh circuit (CR2-024): the Demo-only parameters are read once per
  * circuit, the bottom-nav links drop the query string, and so a `page.reload()` after an in-app navigation comes back without `variant`, `now` and
@@ -113,6 +142,7 @@ export function demoUrl(opts: DemoOptions = {}): string {
  */
 export async function demo(page: Page, opts: DemoOptions = {}): Promise<void> {
   await page.goto(demoUrl(opts));
+  await waitForInteractive(page, demoUrl(opts));
   if (opts.hooks ?? (opts.path ?? '') === '') {
     await page
       .waitForFunction(() => (window as RealmWindow).__realm !== undefined, undefined, { timeout: 30_000 })
