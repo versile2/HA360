@@ -1,0 +1,285 @@
+@implements IDisposable
+@using Microsoft.JSInterop
+@using Realm.Domain
+@using Realm.Web.Formatting
+@using Realm.Web.Map
+@using Realm.Web.Sheet
+@inject ILogger<MemberDetail> Logger
+
+@* The person detail (01 section 5.4; 03 section 3.4): what the sheet shows at 80 percent with a member selected, and in the Expanded panel whenever one is. Shown by SheetContent from the
+   body that BodyOf derives, never by this component's own judgement. A 48 px back button (the same step as the Android Back, BackStep.Detail: Peek with the selection kept), the 64 px
+   avatar with the name, the lore title as an eyebrow and "Updated 3 min ago", the freshness dot; then the status block (the row's L2 and L3, larger), the battery chip, the accuracy chip
+   when the fix is poor, the full address when the data layer sent one, and the week's three tiles with the link to the full report. The static member (the prince) has the header and the
+   status only: his distance, the sentence about his own counsel, and a street address only when the option shows it (D30); no battery, no week. No Today timeline and no Show-trail button
+   (v1.1, 01 section 13). Every string comes from VmFactory and SelectionHeaderFormatter, the row's own, so the detail and its row agree.
+   The week comes from the cascaded session (GetDriverWeekAsync, and the report's top speed), loaded when the member changes; the answer of a member that is no longer shown is dropped. A
+   Week given as a parameter is shown as it is and nothing is loaded. A week that cannot be read leaves the tiles at "—". FocusOnOpen moves the focus to the back button once, when the
+   detail was opened with the handle or a tap on the header (01 section 10.2); a detail that appears because a pin was tapped in the panel leaves the focus where it is. *@
+@{
+    var row = VmFactory.Member(Member, Facts);
+    var isStatic = Member.Kind == MemberKind.Static || row.Status == MemberStatus.Static;
+    var updated = SelectionHeaderFormatter.MemberUpdated(Member, row.Status, Facts);
+    var dot = DotClass(Member.Freshness);
+    var place = Facts.PlaceOf(Member.PlaceId);
+    var accuracy = SelectionHeaderFormatter.AccuracyChip(Member, row.Status, Facts);
+    var staticDistance = isStatic ? SelectionHeaderFormatter.StaticDistance(Member, Facts) : null;
+    var sentence = isStatic ? SelectionHeaderFormatter.StaticSentence(Member) : null;
+    var colorStyle = row.Color is { } hex ? "--realm-row-color:" + hex : null;
+}
+<section class="realm-detail realm-detail--member" aria-labelledby="realm-detail-title">
+    <header class="realm-detail-head">
+        <button type="button"
+                class="realm-detail-back"
+                data-testid="detail-back"
+                aria-label="@SelectionHeaderFormatter.BackLabel"
+                @ref="_back"
+                @onclick="OnBack">
+            <MudIcon Icon="@Icons.Material.Filled.ArrowBack" />
+        </button>
+        <span class="realm-detail-avatar" style="@colorStyle" aria-hidden="true">
+            <span class="realm-row-initial">@row.Initial</span>
+            @if (row.AvatarUrl is { } photo)
+            {
+                <img class="realm-row-photo" src="@photo" alt="" loading="lazy" />
+            }
+        </span>
+        <div class="realm-detail-heading">
+            <h2 id="realm-detail-title" class="realm-detail-name">@row.Name</h2>
+            @if (row.Lore is { } lore)
+            {
+                <p class="realm-detail-eyebrow">@lore</p>
+            }
+            @if (updated is not null)
+            {
+                <p class="@("realm-detail-updated" + RowClasses.Tone(row.DetailTone))">@updated</p>
+            }
+        </div>
+        @if (dot is not null)
+        {
+            <span class="@("realm-detail-dot " + dot)" aria-hidden="true"></span>
+        }
+    </header>
+    <div class="realm-detail-body">
+        <div class="realm-detail-status">
+            <div class="realm-detail-status-text">
+                <p class="realm-detail-status-line">@row.StatusLine</p>
+                @if (row.DetailLine.Length > 0)
+                {
+                    <p class="@("realm-detail-line" + RowClasses.Tone(row.DetailTone))">@row.DetailLine</p>
+                }
+                @if (staticDistance is not null)
+                {
+                    <p class="realm-detail-line">@staticDistance</p>
+                }
+            </div>
+            <span class="realm-detail-status-icon" aria-hidden="true">
+                <MudIcon Icon="@StatusIcon(row.Status, place)" />
+            </span>
+        </div>
+        @if (sentence is not null)
+        {
+            <p class="realm-detail-sentence">@sentence</p>
+        }
+        @if (row.Battery is not null || accuracy is not null)
+        {
+            <div class="realm-detail-chips">
+                @if (row.Battery is { } pill)
+                {
+                    <span class="@(pill.Low ? "realm-detail-chip realm-detail-chip--low" : "realm-detail-chip")"
+                          role="img"
+                          aria-label="@pill.AccessibleName"
+                          data-charging="@(pill.Charging ? "true" : null)"
+                          data-low="@(pill.Low ? "true" : null)">
+                        <MudIcon Icon="@SheetSelectionHeader.BatteryIcon(pill)" Class="realm-detail-chip-icon" />
+                        <span>@SelectionHeaderFormatter.BatteryChip(pill)</span>
+                    </span>
+                }
+                @if (accuracy is not null)
+                {
+                    <span class="realm-detail-chip">
+                        <MudIcon Icon="@Icons.Material.Filled.GpsNotFixed" Class="realm-detail-chip-icon" />
+                        <span>@accuracy</span>
+                    </span>
+                }
+            </div>
+        }
+        @if (!string.IsNullOrWhiteSpace(Member.FullAddress))
+        {
+            <p class="realm-detail-address">@Member.FullAddress</p>
+        }
+        @if (!isStatic)
+        {
+            <div class="realm-detail-week">
+                <div class="realm-detail-week-head">
+                    <h3 class="realm-detail-eyebrow realm-detail-week-title">@SelectionHeaderFormatter.ThisWeek</h3>
+                    <a class="realm-detail-link" href="@DrivingFormatter.DriverHref(Member.Id, 0)">@SelectionHeaderFormatter.FullReport <span aria-hidden="true">›</span></a>
+                </div>
+                <ul class="realm-detail-tiles">
+                    @foreach (var (value, label) in SelectionHeaderFormatter.WeekTiles(ShownWeek, ShownTopSpeed))
+                    {
+                        <li class="realm-detail-tile">
+                            <span class="realm-detail-tile-value">@value</span>
+                            <span class="realm-detail-tile-label">@label</span>
+                        </li>
+                    }
+                </ul>
+            </div>
+        }
+    </div>
+</section>
+
+@code {
+    private readonly CancellationTokenSource _lifetime = new();
+    private CancellationTokenSource? _load;
+    private ElementReference _back;
+    private DriverSummary? _week;
+    private double? _topSpeedMps;
+    private string? _loadedFor;
+    private bool _disposed;
+
+    /// <summary>The person shown.</summary>
+    [Parameter, EditorRequired]
+    public MemberVm Member { get; set; } = default!;
+
+    /// <summary>What the rows of this render share: the session's clock and zone, the thresholds, the viewer, the zones (built once by <c>SheetContent</c>).</summary>
+    [Parameter, EditorRequired]
+    public RowFacts Facts { get; set; } = default!;
+
+    /// <summary>The current week's summary, when the parent already has it: shown as it is, and nothing is loaded. Default: loaded from the cascaded session.</summary>
+    [Parameter]
+    public DriverSummary? Week { get; set; }
+
+    /// <summary>The top speed that goes with <see cref="Week"/>, in metres per second; null for "—".</summary>
+    [Parameter]
+    public double? TopSpeedMps { get; set; }
+
+    /// <summary>Move the focus to the back button when this first renders (the detail was opened by the handle or by a tap on the header).</summary>
+    [Parameter]
+    public bool FocusOnOpen { get; set; }
+
+    /// <summary>The back arrow: the same step as the Android Back (<c>BackStep.Detail</c>): Peek, the selection kept.</summary>
+    [Parameter]
+    public EventCallback OnBack { get; set; }
+
+    /// <summary>The circuit's session, cascaded by <c>RealmShell</c> (it reaches the popover the sheet is drawn in). Absent in a bare component test: the tiles then read "—".</summary>
+    [CascadingParameter]
+    public IRealmSession? Session { get; set; }
+
+    private DriverSummary? ShownWeek => Week ?? _week;
+
+    private double? ShownTopSpeed => Week is not null ? TopSpeedMps : _topSpeedMps;
+
+    /// <inheritdoc />
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Week is not null || Session is null || Member.Kind == MemberKind.Static || string.Equals(_loadedFor, Member.Id, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _loadedFor = Member.Id;
+        _week = null;
+        _topSpeedMps = null;
+        await LoadAsync(Session, Member.Id);
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || !FocusOnOpen)
+        {
+            return;
+        }
+
+        try
+        {
+            await _back.FocusAsync();
+        }
+        catch (Exception exception) when (exception is JSException or JSDisconnectedException or InvalidOperationException or TaskCanceledException)
+        {
+            // A circuit that is gone, or a detail that has already closed: there is nothing to focus.
+        }
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        _disposed = true;
+        _lifetime.Cancel();
+        _load?.Dispose();
+        _lifetime.Dispose();
+    }
+
+    // One load at a time: a newer one (another member) cancels the one in flight, whose answer is then dropped.
+    private async Task LoadAsync(IRealmSession session, string memberId)
+    {
+        _load?.Cancel();
+        _load?.Dispose();
+        var load = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
+        _load = load;
+        var token = load.Token;
+        var weekStart = session.Current.WeekStart;
+        DriverWeek? data = null;
+        double? topSpeed = null;
+        try
+        {
+            data = await session.GetDriverWeekAsync(memberId, 0, weekStart, token);
+            if (data is not null)
+            {
+                token.ThrowIfCancellationRequested();
+                topSpeed = await TopSpeedAsync(session, memberId, weekStart, token);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (Exception exception)
+        {
+            // The week cannot be read: the tiles stay at "—" and the rest of the detail is unaffected.
+            Logger.LogError(exception, "The driver week of {MemberId} could not be loaded for the detail.", memberId);
+        }
+
+        if (token.IsCancellationRequested || _disposed)
+        {
+            return;
+        }
+
+        _week = data?.Summary;
+        _topSpeedMps = topSpeed;
+    }
+
+    // The driver's top speed is the report's per-driver speed (01 section 6.8); the tile reads "—" when the report cannot be read.
+    private async Task<double?> TopSpeedAsync(IRealmSession session, string memberId, DayOfWeek weekStart, CancellationToken token)
+    {
+        try
+        {
+            return DrivingFormatter.TopSpeedOf(await session.GetWeekReportAsync(0, weekStart, token), memberId);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogWarning(exception, "The week report could not be read for the top speed of {MemberId} in the detail.", memberId);
+            return null;
+        }
+    }
+
+    // 01 section 5.4: green for Fresh, the warning colour for Stale, grey for Offline; no dot for NoFix and Static.
+    private static string? DotClass(Freshness freshness) =>
+        freshness switch
+        {
+            Freshness.Fresh => "realm-detail-dot--fresh",
+            Freshness.Stale => "realm-detail-dot--stale",
+            Freshness.Offline => "realm-detail-dot--offline",
+            _ => null,
+        };
+
+    // The 64 px icon at the right of the status block: the zone's own icon at a place, the car on the road, the pin otherwise, the crossed pin without a fix.
+    private static string StatusIcon(MemberStatus status, PlaceVm? place) =>
+        status switch
+        {
+            MemberStatus.AtPlace when place is not null => SheetSelectionHeader.PlaceIcon(place.Kind),
+            MemberStatus.Driving => Icons.Material.Filled.DirectionsCar,
+            MemberStatus.NoFix => Icons.Material.Filled.LocationOff,
+            _ => Icons.Material.Filled.Place,
+        };
+}

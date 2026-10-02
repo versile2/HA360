@@ -1,14 +1,31 @@
 @using Realm.Domain
+@using Realm.Web.Formatting
 @using Realm.Web.Sheet
+@using Realm.Web.State
 
-@* The body of the sheet (03 section 3.4): the three-tab control and the list of the section that shows. Container-agnostic: the same markup fills the MudX
-   bottom sheet, the MudX left panel and the aside fallback, and nothing here knows about MudX. In the bottom sheet the summary line lives in the handle;
-   in the panel, which has no handle, ShowSummary puts it here as the panel's header (01 section 3.6). The surface is drawn by the contract element
-   (css/realm-sheet.css), not by this root. The rows are MemberRow, VehicleRow and PlaceRow, identical in both layouts: their strings come from VmFactory, built
-   here once per render from the lists and the session's clock and zone (never the browser's). A tap raises OnSelect with the entity; S8 turns it into the selection.
-   S8 also adds the selection header and the detail views. At Peek the list is under the navigation bar and the CSS hides it. *@
+@* The body of the sheet (03 section 3.4): the three-tab control and the list of the section that shows, or, with something selected, the selection header or the detail. Container-agnostic: the
+   same markup fills the MudX bottom sheet, the MudX left panel and the aside fallback, and nothing here knows about MudX. In the bottom sheet the summary line lives in the handle; in the
+   panel, which has no handle, ShowSummary puts it here as the panel's header (01 section 3.6). The surface is drawn by the contract element (css/realm-sheet.css), not by this root.
+   What shows is Body, which the page takes from RealmUiState and which SheetBody.BodyOf derives from (selection, size, layout) (D45, 01 section 5.7): the List (the segments and the section's
+   list, at Peek under the navigation bar where the CSS hides it), the Header (at Peek the selection header takes the segments' place and nothing is below it), or the Detail (the segments,
+   then the person, vehicle or place detail; in the Expanded panel a selection is always the detail). A selection that is no longer in the lists has no header and no detail: the list shows.
+   The rows are MemberRow, VehicleRow and PlaceRow, identical in both layouts: their strings come from VmFactory, built here once per render from the lists and the session's clock and zone
+   (never the browser's). A tap raises OnSelect with the entity; the page turns it into the selection. The header's body raises OnToggle and its X raises OnClear (D46); the detail's back arrow
+   raises OnBack and a person in a place's Here-now list raises OnHereNow. The page wires OnToggle to the handler of the handle's own tap, so there is one code path; this component decides
+   nothing about sizes. FocusDetail asks a detail that has just opened to take the focus (01 section 10.2). *@
 @{
     var facts = RowFacts.Create(Members, Places, MeId, Moment, Zone ?? Session?.Zone ?? TimeZoneInfo.Utc);
+    var selected = Body switch
+    {
+        SheetBody.Header header => header.Entity,
+        SheetBody.Detail detail => detail.Entity,
+        _ => null,
+    };
+    var selectionHeader = Body is SheetBody.Header && selected is not null ? SelectionHeaderFormatter.For(selected, Members, Vehicles, Places, facts) : null;
+    var member = Body is SheetBody.Detail ? FindMember(selected) : null;
+    var vehicle = Body is SheetBody.Detail ? FindVehicle(selected) : null;
+    var place = Body is SheetBody.Detail ? FindPlace(selected) : null;
+    var showDetail = member is not null || vehicle is not null || place is not null;
 }
 <div class="realm-sheet-content" data-testid="sheet-content">
     @if (ShowSummary)
@@ -16,39 +33,66 @@
         <p class="realm-sheet-summary realm-sheet-summary--panel" data-testid="sheet-summary">@Summary</p>
     }
 
-    <SheetSegments Section="Section" Counts="Counts" OnSection="OnSection" />
+    @if (selectionHeader is not null)
+    {
+        <SheetSelectionHeader Header="selectionHeader" OnToggle="OnToggle" OnClear="OnClear" />
+    }
+    else
+    {
+        <SheetSegments Section="Section" Counts="Counts" OnSection="OnSection" />
+    }
 
-    <div class="realm-sheet-list-wrap" id="@SheetSegments.PanelId" role="tabpanel" aria-labelledby="@SheetSegments.TabId(Section)">
-        <ul class="realm-sheet-list" data-testid="sheet-list">
-            @if (Section == Section.Vehicles)
+    @if (showDetail)
+    {
+        <div class="realm-sheet-list-wrap realm-sheet-detail-wrap" id="@SheetSegments.PanelId" role="tabpanel" aria-labelledby="@SheetSegments.TabId(Section)">
+            @if (member is not null)
             {
-                foreach (var row in VmFactory.VehicleRows(Vehicles, facts))
-                {
-                    <li @key="row.Id" class="realm-sheet-item">
-                        <VehicleRow Row="row" OnClick="() => SelectAsync(EntityKind.Vehicle, row.Id)" />
-                    </li>
-                }
+                <MemberDetail @key="member.Id" Member="member" Facts="facts" FocusOnOpen="FocusDetail" OnBack="OnBack" />
             }
-            else if (Section == Section.Places)
+            else if (vehicle is not null)
             {
-                foreach (var row in VmFactory.PlaceRows(Places, facts))
-                {
-                    <li @key="row.Id" class="realm-sheet-item">
-                        <PlaceRow Row="row" OnClick="() => SelectAsync(EntityKind.Place, row.Id)" />
-                    </li>
-                }
+                <VehicleDetail @key="vehicle.Id" Vehicle="vehicle" Facts="facts" FocusOnOpen="FocusDetail" OnBack="OnBack" />
             }
-            else
+            else if (place is not null)
             {
-                foreach (var row in VmFactory.MemberRows(Members, facts))
-                {
-                    <li @key="row.Id" class="realm-sheet-item">
-                        <MemberRow Row="row" OnClick="() => SelectAsync(EntityKind.Member, row.Id)" />
-                    </li>
-                }
+                <PlaceDetail @key="place.Id" Place="place" Vehicles="Vehicles" Facts="facts" FocusOnOpen="FocusDetail" OnBack="OnBack" OnSelect="HereNowAsync" />
             }
-        </ul>
-    </div>
+        </div>
+    }
+    else if (selectionHeader is null)
+    {
+        <div class="realm-sheet-list-wrap" id="@SheetSegments.PanelId" role="tabpanel" aria-labelledby="@SheetSegments.TabId(Section)">
+            <ul class="realm-sheet-list" data-testid="sheet-list">
+                @if (Section == Section.Vehicles)
+                {
+                    foreach (var row in VmFactory.VehicleRows(Vehicles, facts))
+                    {
+                        <li @key="row.Id" class="realm-sheet-item">
+                            <VehicleRow Row="row" OnClick="() => SelectAsync(EntityKind.Vehicle, row.Id)" />
+                        </li>
+                    }
+                }
+                else if (Section == Section.Places)
+                {
+                    foreach (var row in VmFactory.PlaceRows(Places, facts))
+                    {
+                        <li @key="row.Id" class="realm-sheet-item">
+                            <PlaceRow Row="row" OnClick="() => SelectAsync(EntityKind.Place, row.Id)" />
+                        </li>
+                    }
+                }
+                else
+                {
+                    foreach (var row in VmFactory.MemberRows(Members, facts))
+                    {
+                        <li @key="row.Id" class="realm-sheet-item">
+                            <MemberRow Row="row" OnClick="() => SelectAsync(EntityKind.Member, row.Id)" />
+                        </li>
+                    }
+                }
+            </ul>
+        </div>
+    }
 </div>
 
 @code {
@@ -72,9 +116,33 @@
     [Parameter]
     public EventCallback<Section> OnSection { get; set; }
 
-    /// <summary>A row was tapped: the person, vehicle or place it stands for. The selection is S8's; until then nothing handles it. The chariot placeholder never raises it.</summary>
+    /// <summary>A row was tapped: the person, vehicle or place it stands for. The page turns it into the selection (a <c>RowTap</c>). The chariot placeholder never raises it.</summary>
     [Parameter]
     public EventCallback<EntityRef> OnSelect { get; set; }
+
+    /// <summary>What shows (D45): the list, the selection header or the detail, as <c>SheetBody.BodyOf</c> derives it. Default: the list.</summary>
+    [Parameter]
+    public SheetBody Body { get; set; } = new SheetBody.List();
+
+    /// <summary>A tap on the selection header anywhere but its X (D46). The page handles it as it does a tap on the handle (<c>HandleToggle</c>).</summary>
+    [Parameter]
+    public EventCallback OnToggle { get; set; }
+
+    /// <summary>The X of the selection header: clear the selection (<c>ClearTap</c>).</summary>
+    [Parameter]
+    public EventCallback OnClear { get; set; }
+
+    /// <summary>The back arrow of a detail: the same step as the Android Back (<c>BackStep.Detail</c>: Peek, the selection kept).</summary>
+    [Parameter]
+    public EventCallback OnBack { get; set; }
+
+    /// <summary>A person in a place detail's Here-now list was tapped: their id. The page moves the selection from the place to them, at Peek (<c>HereNowTap</c>).</summary>
+    [Parameter]
+    public EventCallback<string> OnHereNow { get; set; }
+
+    /// <summary>True while a detail that has just been opened by the handle or by a tap on the header should take the focus on its back button (01 section 10.2).</summary>
+    [Parameter]
+    public bool FocusDetail { get; set; }
 
     /// <summary>The summary line of 01 section 8.2, shown here only when <see cref="ShowSummary"/> is true.</summary>
     [Parameter]
@@ -106,4 +174,15 @@
     private DateTimeOffset Moment => Now ?? Session?.Time.GetUtcNow() ?? TimeProvider.System.GetUtcNow();
 
     private Task SelectAsync(EntityKind kind, string id) => OnSelect.InvokeAsync(new EntityRef(kind, id));
+
+    private Task HereNowAsync(EntityRef entity) => OnHereNow.InvokeAsync(entity.Id);
+
+    private MemberVm? FindMember(EntityRef? entity) =>
+        entity is { Kind: EntityKind.Member } selected ? Members.FirstOrDefault(member => string.Equals(member.Id, selected.Id, StringComparison.Ordinal)) : null;
+
+    private VehicleVm? FindVehicle(EntityRef? entity) =>
+        entity is { Kind: EntityKind.Vehicle } selected ? Vehicles.FirstOrDefault(vehicle => string.Equals(vehicle.Id, selected.Id, StringComparison.Ordinal)) : null;
+
+    private PlaceVm? FindPlace(EntityRef? entity) =>
+        entity is { Kind: EntityKind.Place } selected ? Places.FirstOrDefault(place => string.Equals(place.Id, selected.Id, StringComparison.Ordinal)) : null;
 }

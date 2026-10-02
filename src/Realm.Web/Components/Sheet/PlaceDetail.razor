@@ -1,0 +1,139 @@
+@using Microsoft.JSInterop
+@using Realm.Domain
+@using Realm.Web.Formatting
+@using Realm.Web.Sheet
+
+@* The place detail (01 section 5.6; 03 section 3.4): what the sheet shows at 80 percent with a place selected, and in the Expanded panel whenever one is. A 48 px back button (the same step
+   as the Android Back, BackStep.Detail), the 64 px icon avatar of the zone's kind, the display name, the subtitle (a plain clarifier or lore) and the radius ("Radius 328 ft"). Then the
+   heading "Here now (n)", n being people plus vehicles inside (the header's count), a 64 px row per person and then one per vehicle under the same heading, or "Nobody's here. The hall
+   stands empty." when nothing is inside, and the caption "Places are set up in Home Assistant." No edit controls (zones are managed in Home Assistant) and no comings and goings (v1.1).
+   A person's row selects that person like any row (D45): OnSelect, and the page moves the selection from the place to the member at Peek. A vehicle's row is not a button (01 section 5.7
+   gives no selection from it). People and vehicles come from the same lists as the rows; an id that is no longer in them has no row, but still counts. FocusOnOpen: as in MemberDetail. *@
+@{
+    var inside = SelectionHeaderFormatter.Occupants(Place);
+    var people = Place.MemberIdsInside.Select(Facts.MemberOf).OfType<MemberVm>().ToList();
+    var cars = Place.VehicleIdsInside.Select(id => Vehicles.FirstOrDefault(vehicle => string.Equals(vehicle.Id, id, StringComparison.Ordinal))).OfType<VehicleVm>().ToList();
+}
+<section class="realm-detail realm-detail--place" aria-labelledby="realm-detail-title">
+    <header class="realm-detail-head">
+        <button type="button"
+                class="realm-detail-back"
+                data-testid="detail-back"
+                aria-label="@SelectionHeaderFormatter.BackLabel"
+                @ref="_back"
+                @onclick="OnBack">
+            <MudIcon Icon="@Icons.Material.Filled.ArrowBack" />
+        </button>
+        <span class="realm-detail-avatar realm-detail-avatar--tile" aria-hidden="true">
+            <MudIcon Icon="@SheetSelectionHeader.PlaceIcon(Place.Kind)" />
+        </span>
+        <div class="realm-detail-heading">
+            <h2 id="realm-detail-title" class="realm-detail-name">@Place.DisplayName</h2>
+            @if (!string.IsNullOrWhiteSpace(Place.Subtitle))
+            {
+                <p class="realm-detail-updated">@Place.Subtitle</p>
+            }
+            <p class="realm-detail-updated">@UnitFormatter.Radius(Place.RadiusM, Facts.Units)</p>
+        </div>
+    </header>
+    <div class="realm-detail-body">
+        <h3 class="realm-detail-eyebrow realm-detail-here-title">@SelectionHeaderFormatter.HereNow(inside)</h3>
+        @if (inside == 0)
+        {
+            <p class="realm-detail-empty">@SelectionHeaderFormatter.NobodyHere</p>
+        }
+        else
+        {
+            <ul class="realm-detail-here">
+                @foreach (var person in people)
+                {
+                    var row = VmFactory.Member(person, Facts);
+                    <li @key="person.Id" class="realm-detail-here-item">
+                        <button type="button"
+                                class="realm-here-row"
+                                data-testid="@row.TestId"
+                                @onclick="() => SelectAsync(person.Id)">
+                            <span class="realm-here-avatar" style="@(row.Color is null ? null : "--realm-row-color:" + row.Color)" aria-hidden="true">
+                                <span class="realm-row-initial">@row.Initial</span>
+                                @if (row.AvatarUrl is { } photo)
+                                {
+                                    <img class="realm-row-photo" src="@photo" alt="" loading="lazy" />
+                                }
+                            </span>
+                            <span class="realm-here-text">
+                                <span class="realm-here-name">@row.Name</span>
+                                <span class="realm-here-line">@SelectionHeaderFormatter.HereSince(person, Facts)</span>
+                            </span>
+                        </button>
+                    </li>
+                }
+                @foreach (var car in cars)
+                {
+                    <li @key="car.Id" class="realm-detail-here-item">
+                        <div class="realm-here-row realm-here-row--static">
+                            <span class="realm-here-avatar realm-here-avatar--tile" aria-hidden="true">
+                                <MudIcon Icon="@SheetSelectionHeader.GlyphIcon(car.Glyph)" />
+                            </span>
+                            <span class="realm-here-text">
+                                <span class="realm-here-name">@car.Name</span>
+                                @if (!string.IsNullOrWhiteSpace(car.LoreTitle))
+                                {
+                                    <span class="realm-here-line">@car.LoreTitle</span>
+                                }
+                            </span>
+                        </div>
+                    </li>
+                }
+            </ul>
+        }
+        <p class="realm-detail-caption">@SelectionHeaderFormatter.PlacesCaption</p>
+    </div>
+</section>
+
+@code {
+    private ElementReference _back;
+
+    /// <summary>The place shown.</summary>
+    [Parameter, EditorRequired]
+    public PlaceVm Place { get; set; } = default!;
+
+    /// <summary>The vehicles, to find the ones inside by id (the people are found through <see cref="Facts"/>).</summary>
+    [Parameter]
+    public IReadOnlyList<VehicleVm> Vehicles { get; set; } = [];
+
+    /// <summary>What the rows of this render share: the session's clock and zone, the unit system, and the lookup of people (built once by <c>SheetContent</c>).</summary>
+    [Parameter, EditorRequired]
+    public RowFacts Facts { get; set; } = default!;
+
+    /// <summary>Move the focus to the back button when this first renders (the detail was opened by the handle or by a tap on the header).</summary>
+    [Parameter]
+    public bool FocusOnOpen { get; set; }
+
+    /// <summary>The back arrow: the same step as the Android Back (<c>BackStep.Detail</c>): Peek, the selection kept.</summary>
+    [Parameter]
+    public EventCallback OnBack { get; set; }
+
+    /// <summary>A person in the Here-now list was tapped: the entity to select (the page replaces the place with them, at Peek).</summary>
+    [Parameter]
+    public EventCallback<EntityRef> OnSelect { get; set; }
+
+    private Task SelectAsync(string memberId) => OnSelect.InvokeAsync(new EntityRef(EntityKind.Member, memberId));
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || !FocusOnOpen)
+        {
+            return;
+        }
+
+        try
+        {
+            await _back.FocusAsync();
+        }
+        catch (Exception exception) when (exception is JSException or JSDisconnectedException or InvalidOperationException or TaskCanceledException)
+        {
+            // A circuit that is gone, or a detail that has already closed: there is nothing to focus.
+        }
+    }
+}

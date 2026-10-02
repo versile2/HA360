@@ -1,0 +1,130 @@
+@using Realm.Domain
+@using Realm.Web.Formatting
+@using Realm.Web.Sheet
+
+@* The selection header (01 section 3.4.2, D45, D46; 03 section 3.4): the 48 px summary of the selected person, vehicle or place that takes the segmented control's place at Peek, and the
+   same component as the floating 48 px pill of the hidden Expanded panel (01 section 3.6). Every string is final in the SelectionHeaderVm (SelectionHeaderFormatter), which reuses the row's
+   formatters, so the header and its row cannot disagree.
+   D46: a tap anywhere on the header except the X raises OnToggle, which SheetContent wires to the handler of the handle's own tap (Peek to 80 percent, the selection kept);
+   the X raises OnClear and nothing else, because its handler stops the click before it reaches the header. The pill is inert but for its X (A-2): there is no size to toggle in the panel.
+   The body is pointer-only and is neither a tab stop nor a button (A-3): the keyboard reaches the detail through the handle. The group's name carries every fact the lines ellipsise
+   (01 section 10.3), so the lines and the battery pill inside it are hidden from screen readers and nothing is read twice. *@
+<div class="@RootClass"
+     role="group"
+     aria-label="@Header.AccessibleName"
+     data-testid="sheet-selection-header"
+     @onclick="ToggleAsync">
+    @if (Header.Entity.Kind == EntityKind.Member)
+    {
+        <span class="realm-sel-avatar" style="@ColorStyle" aria-hidden="true">
+            <span class="realm-row-initial">@Header.Initial</span>
+            @if (Header.AvatarUrl is { } photo)
+            {
+                <img class="realm-row-photo" src="@photo" alt="" loading="lazy" />
+            }
+        </span>
+    }
+    else
+    {
+        <span class="realm-sel-avatar realm-sel-avatar--tile" aria-hidden="true">
+            <MudIcon Icon="@TileIcon" />
+        </span>
+    }
+    <span class="realm-sel-body" aria-hidden="true">
+        <span class="realm-row-title realm-sel-title">
+            <span class="realm-row-name">@Header.Line1</span>
+            @if (Header.Line1Lore is { } lore)
+            {
+                <span class="realm-row-lore">@lore</span>
+            }
+        </span>
+        <span class="realm-sel-line">
+            <span class="realm-sel-lead">@Header.Line2Lead</span>
+            @if (Header.Line2Tail is { } tail)
+            {
+                <span class="realm-sel-tail"> · @tail</span>
+            }
+        </span>
+    </span>
+    @if (Header.Battery is { } battery)
+    {
+        <span class="@BatteryClass(battery)"
+              data-testid="sheet-selection-battery"
+              data-charging="@(battery.Charging ? "true" : null)"
+              data-low="@(battery.Low ? "true" : null)"
+              aria-hidden="true">
+            <MudIcon Icon="@BatteryIcon(battery)" Class="realm-battery-icon" />
+            <span class="realm-battery-text">@battery.Text</span>
+        </span>
+    }
+    <button type="button"
+            class="realm-sel-clear"
+            data-testid="sheet-selection-clear"
+            aria-label="@SelectionHeaderFormatter.ClearLabel"
+            @onclick="ClearAsync"
+            @onclick:stopPropagation="true">
+        <MudIcon Icon="@Icons.Material.Filled.Close" />
+    </button>
+</div>
+
+@code {
+    // A pickup truck seen from the side, facing right (the silhouette of the map pin and of VehicleRow, whose copy is private to it): open bed, cab with a windshield, two wheels. The window is
+    // wound the other way round, so the default non-zero fill rule cuts it out of the cab. MudIcon draws this markup in a 24 x 24 box. The detail views draw it from here too.
+    internal const string PickupGlyph =
+        "<path d=\"M2 9.5h9.5v-3H16l3.3 4H21.2c.44 0 .8.36.8.8V16H2z\"/>"
+        + "<path d=\"M13 8v2.2h4.6L15.8 8z\"/>"
+        + "<path d=\"M6.2 14.2a2.4 2.4 0 0 1 0 4.8 2.4 2.4 0 0 1 0-4.8z\"/>"
+        + "<path d=\"M17.6 14.2a2.4 2.4 0 0 1 0 4.8 2.4 2.4 0 0 1 0-4.8z\"/>";
+
+    /// <summary>What to draw: the view model of <see cref="SelectionHeaderFormatter"/>.</summary>
+    [Parameter, EditorRequired]
+    public SelectionHeaderVm Header { get; set; } = default!;
+
+    /// <summary>A tap anywhere on the header except the X (D46): the sheet toggles between Peek and 80 percent, like a tap on the handle. Never raised by the pill.</summary>
+    [Parameter]
+    public EventCallback OnToggle { get; set; }
+
+    /// <summary>The X: clear the selection. Raised by the X alone.</summary>
+    [Parameter]
+    public EventCallback OnClear { get; set; }
+
+    /// <summary>True for the floating pill of the hidden Expanded panel (01 section 3.6): the same content and X, but the body is inert (A-2).</summary>
+    [Parameter]
+    public bool Pill { get; set; }
+
+    private string RootClass => Pill ? "realm-sel realm-sel--pill" : "realm-sel";
+
+    private string? ColorStyle => Header.Color is { } color ? "--realm-row-color:" + color : null;
+
+    private string TileIcon => Header.Glyph is { } glyph ? GlyphIcon(glyph) : PlaceIcon(Header.ZoneKind ?? PlaceKind.Other);
+
+    private Task ToggleAsync() => Pill ? Task.CompletedTask : OnToggle.InvokeAsync();
+
+    private Task ClearAsync() => OnClear.InvokeAsync();
+
+    // The pickup is the silhouette, the hatchback the car icon (01 section 5.2).
+    internal static string GlyphIcon(VehicleGlyph glyph) => glyph == VehicleGlyph.Pickup ? PickupGlyph : Icons.Material.Filled.DirectionsCar;
+
+    // 01 section 5.3: home, work, family, fun, park, vet, cemetery; anything else is a pin. The same mapping as PlaceRow's, which keeps its own.
+    internal static string PlaceIcon(PlaceKind kind) =>
+        kind switch
+        {
+            PlaceKind.Home => Icons.Material.Filled.Home,
+            PlaceKind.Work => Icons.Material.Filled.Work,
+            PlaceKind.Family => Icons.Material.Filled.Cottage,
+            PlaceKind.Fun => Icons.Material.Filled.RollerSkating,
+            PlaceKind.Park => Icons.Material.Filled.Park,
+            PlaceKind.Vet => Icons.Material.Filled.Pets,
+            PlaceKind.Cemetery => Icons.Material.Filled.Church,
+            _ => Icons.Material.Filled.Place,
+        };
+
+    // The pill of the row, reused (01 section 3.4.2): the row's classes with a static position, which the header's own rule gives.
+    internal static string BatteryClass(BatteryBadgeVm battery) => battery.Low ? "realm-battery-pill realm-battery-pill--low" : "realm-battery-pill";
+
+    // Charging shows the bolt; low shows the alert; otherwise the full cell (01 section 7.7).
+    internal static string BatteryIcon(BatteryBadgeVm battery) =>
+        battery.Charging ? Icons.Material.Filled.BatteryChargingFull
+        : battery.Low ? Icons.Material.Filled.BatteryAlert
+        : Icons.Material.Filled.BatteryFull;
+}

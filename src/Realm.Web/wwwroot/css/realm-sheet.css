@@ -698,6 +698,576 @@ div[mudsheet] .mud-sheet-container[data-testid="sheet"] .mud-sheet-content > con
   white-space: nowrap;
 }
 
+/* ---- the selection header (01 section 3.4.2, D45, D46): the 48 px summary that takes the segmented control's place at Peek. Line 1 is the name, then the lore (which gives way first, the
+   .realm-row-title rules); line 2 is two parts, the lead that ellipsises and the tail (the time or update part) that keeps its room; the battery pill is the row's, in the flow; the X is a
+   48 px target. A tap on the body is pointer-only (D46, A-3), so the root shows the pointer cursor but is no tab stop. The pill of the hidden Expanded panel is the same element, fixed at
+   the bottom left above the navigation bar, with an inert body. ---- */
+
+.realm-sel {
+  box-sizing: border-box;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 12px;
+  height: 48px;
+  margin: 0 16px;
+  color: var(--realm-text);
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.realm-sel-avatar,
+.realm-here-avatar {
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--realm-row-color, var(--realm-surface-2));
+  color: var(--realm-bg);
+  font-size: 1.125rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* A vehicle or a place: the glyph or the kind icon in gold on plum, a rounded square (radius 12). */
+.realm-sel-avatar--tile,
+.realm-here-avatar--tile {
+  border-radius: 12px;
+  background: var(--realm-plum);
+  color: var(--realm-primary);
+}
+
+.realm-sel-avatar .mud-icon-root,
+.realm-here-avatar .mud-icon-root {
+  font-size: 24px;
+}
+
+.realm-sel-body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.realm-sel-title.realm-row-title {
+  height: 20px;
+  font-size: 0.9375rem;
+  line-height: 20px;
+}
+
+.realm-sel-line {
+  display: flex;
+  min-width: 0;
+  color: var(--realm-text-2);
+  font-size: 0.8125rem;
+  line-height: 18px;
+}
+
+.realm-sel-lead {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The " · " is in the text and kept (pre), so the tail never collapses against the lead. */
+.realm-sel-tail {
+  flex: 0 0 auto;
+  white-space: pre;
+}
+
+/* The row's pill, in the flow instead of hanging over an avatar. */
+.realm-sel .realm-battery-pill {
+  position: static;
+  flex: 0 0 auto;
+  transform: none;
+}
+
+.realm-sel-clear {
+  box-sizing: border-box;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  margin: 0 -12px 0 -4px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--realm-text-2);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.realm-sel-clear .mud-icon-root {
+  font-size: 24px;
+}
+
+.realm-sel-clear:focus-visible,
+.realm-detail-back:focus-visible,
+.realm-detail-link:focus-visible,
+.realm-here-row:focus-visible {
+  outline: 3px solid var(--realm-focus);
+  outline-offset: -3px;
+}
+
+.realm-sel--pill {
+  position: fixed;
+  bottom: calc(var(--realm-nav-h) + env(safe-area-inset-bottom) + 16px);
+  left: calc(16px + env(safe-area-inset-left));
+  z-index: 10;
+  width: max-content;
+  max-width: min(360px, calc(100vw - 32px));
+  margin: 0;
+  padding-left: 4px;
+  border: 1px solid var(--realm-line);
+  border-radius: 24px;
+  background: var(--realm-surface);
+  box-shadow: 0 2px 6px var(--realm-shadow);
+  cursor: default;
+}
+
+/* The pill's X sits inside its border, not in a gutter. */
+.realm-sel--pill .realm-sel-clear {
+  margin-right: 0;
+}
+
+/* ---- the detail views (01 sections 5.4 to 5.6): a head with the back arrow, a 64 px avatar, the name and its lines; then the body. The wrap is the list's own scrolling area. ---- */
+
+.realm-detail-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px 12px 4px;
+}
+
+.realm-detail-back {
+  box-sizing: border-box;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--realm-text);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.realm-detail-avatar {
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  overflow: hidden;
+  border-radius: 20px;
+  background: var(--realm-row-color, var(--realm-surface-2));
+  color: var(--realm-bg);
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.realm-detail-avatar--tile,
+.realm-detail-status-icon {
+  background: var(--realm-plum);
+  color: var(--realm-primary);
+}
+
+.realm-detail-avatar .mud-icon-root,
+.realm-detail-status-icon .mud-icon-root {
+  font-size: 32px;
+}
+
+.realm-detail-heading {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.realm-detail-name {
+  margin: 0;
+  font-family: var(--realm-font-display);
+  font-size: 1.375rem;
+  font-weight: 700;
+  line-height: 28px;
+  overflow-wrap: anywhere;
+}
+
+/* The lore title and the section headings: the display face, gold, drawn in capitals (the text in the DOM stays the bare title). */
+.realm-detail-eyebrow {
+  margin: 0;
+  color: var(--realm-primary);
+  font-family: var(--realm-font-display);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  line-height: 16px;
+  text-transform: uppercase;
+}
+
+.realm-detail-updated {
+  margin: 0;
+  color: var(--realm-text-2);
+  font-size: 0.8125rem;
+  line-height: 18px;
+}
+
+.realm-detail-updated.realm-row-detail--warning,
+.realm-detail-line.realm-row-detail--warning {
+  color: var(--realm-warning);
+}
+
+.realm-detail-updated.realm-row-detail--stale,
+.realm-detail-line.realm-row-detail--stale {
+  color: var(--realm-stale);
+}
+
+/* The freshness dot: green fresh, the warning colour stale, grey offline; not the only signal, the line beside it says it. */
+.realm-detail-dot {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.realm-detail-dot--fresh {
+  background: var(--realm-success);
+}
+
+.realm-detail-dot--stale {
+  background: var(--realm-warning);
+}
+
+.realm-detail-dot--offline {
+  background: var(--realm-stale);
+}
+
+.realm-detail-body {
+  padding: 0 16px 16px;
+  border-top: 1px solid var(--realm-line);
+}
+
+.realm-detail-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-top: 16px;
+}
+
+.realm-detail-status-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.realm-detail-status-icon {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 20px;
+}
+
+.realm-detail-status-line {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 28px;
+  overflow-wrap: anywhere;
+}
+
+.realm-detail-line {
+  margin: 0;
+  color: var(--realm-text-2);
+  font-size: 0.875rem;
+  line-height: 20px;
+}
+
+.realm-detail-sentence,
+.realm-detail-address,
+.realm-detail-caption {
+  margin: 12px 0 0;
+  color: var(--realm-text-2);
+  font-size: 0.875rem;
+  line-height: 20px;
+  overflow-wrap: anywhere;
+}
+
+/* The address is for copying (01 section 5.4). */
+.realm-detail-address {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.realm-detail-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.realm-detail-chip {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 12px 0 8px;
+  border: 1px solid var(--realm-line-strong);
+  border-radius: 16px;
+  background: var(--realm-surface-2);
+  color: var(--realm-text);
+  font-size: 0.9375rem;
+  font-weight: 700;
+  line-height: 20px;
+}
+
+.realm-detail-chip--low {
+  border-color: var(--realm-error);
+  background: color-mix(in srgb, var(--realm-error) 24%, var(--realm-surface-2));
+}
+
+.realm-detail-chip .realm-detail-chip-icon.mud-icon-root {
+  font-size: 18px;
+}
+
+.realm-detail-chip--low .realm-detail-chip-icon.mud-icon-root {
+  color: var(--realm-error);
+}
+
+.realm-detail-week {
+  margin-top: 16px;
+  border-top: 1px solid var(--realm-line);
+}
+
+.realm-detail-week-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 48px;
+}
+
+.realm-detail-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+  color: var(--realm-primary);
+  font-size: 0.9375rem;
+  font-weight: 700;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.realm-detail-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.realm-detail-tile {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 64px;
+  padding: 8px 12px;
+  border: 1px solid var(--realm-line);
+  border-radius: 16px;
+  background: var(--realm-surface-2);
+}
+
+.realm-detail-tile-value {
+  font-size: 1.25rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  line-height: 24px;
+}
+
+.realm-detail-tile-label {
+  color: var(--realm-text-2);
+  font-size: 0.8125rem;
+  line-height: 16px;
+}
+
+/* The vehicle's rows: 56 px, the label left and the value right; the fuel's bar is 8 px high, red under 15 percent. */
+.realm-detail-warning {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 16px 0 0;
+  color: var(--realm-warning);
+  font-size: 0.9375rem;
+  font-weight: 700;
+  line-height: 20px;
+}
+
+.realm-detail-warning .realm-detail-warning-icon.mud-icon-root {
+  flex: 0 0 auto;
+  font-size: 18px;
+}
+
+.realm-detail-rows {
+  margin: 0;
+  padding: 0;
+}
+
+.realm-detail-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 56px;
+  border-bottom: 1px solid var(--realm-line);
+}
+
+.realm-detail-row dt {
+  flex: 0 0 auto;
+  color: var(--realm-text-2);
+  font-size: 0.9375rem;
+  line-height: 20px;
+}
+
+.realm-detail-row dd {
+  min-width: 0;
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 22px;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.realm-detail-row .realm-detail-fuel {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.realm-detail-bar {
+  flex: 1 1 auto;
+  max-width: 160px;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--realm-bar-track);
+}
+
+.realm-detail-bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--realm-bar-fill);
+}
+
+.realm-detail-fuel--low .realm-detail-bar-fill {
+  background: var(--realm-error);
+}
+
+.realm-detail-fuel--low .realm-detail-fuel-text {
+  color: var(--realm-error);
+}
+
+/* The place's Here-now list: a 64 px row per person (a button, 40 px avatar, the name and "Since 5:52 pm") and one per vehicle (not a button). */
+.realm-detail-here-title {
+  padding-top: 16px;
+}
+
+.realm-detail-empty {
+  margin: 8px 0 0;
+  color: var(--realm-text-2);
+  font-size: 0.9375rem;
+  line-height: 22px;
+}
+
+.realm-detail-here {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.realm-detail-here-item {
+  border-bottom: 1px solid var(--realm-line);
+}
+
+.realm-here-row {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 64px;
+  margin: 0;
+  padding: 12px 0;
+  border: 0;
+  background: none;
+  color: var(--realm-text);
+  font: inherit;
+  text-align: left;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button.realm-here-row {
+  cursor: pointer;
+}
+
+button.realm-here-row:active {
+  background: color-mix(in srgb, var(--realm-text) 8%, transparent);
+}
+
+.realm-here-text {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.realm-here-name,
+.realm-here-line {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.realm-here-name {
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 22px;
+}
+
+.realm-here-line {
+  color: var(--realm-text-2);
+  font-size: 0.8125rem;
+  line-height: 18px;
+}
+
 /* ---- RightButtonStack: two 48 px circles, 12 px apart, the lower one 12 px above the sheet's top edge (01 section 3.5) ---- */
 
 .realm-right-stack {
