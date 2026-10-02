@@ -2,9 +2,8 @@
 @using Realm.Web.Layout
 
 @* The custom SheetHandleFragment of the bottom sheet (01 section 3.4.1; 03 section 3.4): one 48 px full-width button with the 40 x 4 bar and the summary.
-   A tap toggles Peek and Tall and never closes the sheet. The drag is MudX's own, bound on the wrapper div.mud-sheet-handle (a server round trip per
-   move, accepted for v1, D36), so this button must NEVER stop pointerdown from bubbling: that would kill the drag (R-033). The toggle is the click; the
-   keys are handled here. realmShell.js sends the click itself for a tap whose click MudX's pointer capture swallowed (the tap shim). *@
+   A tap toggles Peek and Tall and never closes the sheet. There is no drag (D73): MudXSheet runs with EnableDragToSize=false, so MudX takes no pointer
+   capture on the wrapper div.mud-sheet-handle and the browser's own click reaches this button. The toggle is the click; the keys are handled here. *@
 <button type="button"
         class="realm-sheet-handle"
         data-testid="sheet-handle"
@@ -25,7 +24,7 @@
     [Parameter]
     public string Summary { get; set; } = string.Empty;
 
-    /// <summary>A tap, Enter or Space: the host moves to the other state.</summary>
+    /// <summary>A tap, Enter or Space: the host asks the parent for the other state.</summary>
     [Parameter]
     public EventCallback OnToggle { get; set; }
 

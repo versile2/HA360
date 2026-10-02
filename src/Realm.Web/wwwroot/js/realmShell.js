@@ -1,6 +1,6 @@
 // @ts-check
 // realmShell.js: the entry module of ShellInterop (03 section 4.8), everything in the browser that is not the map. S7a owns the viewport
-// reports, the layout attribute, the sheet metrics and the handle tap shim; the preferences, history tokens, Escape handling, HA bridge and
+// reports, the layout attribute and the sheet metrics; the preferences, history tokens, Escape handling, HA bridge and
 // clipboard exports of 4.8 arrive with the slices that own them, in the commented region at the end of this file.
 //
 // Contract in brief: `init` is idempotent (a repeated call tears the previous state down first) and never rejects; every export catches its own
@@ -12,7 +12,6 @@
 /** @typedef {{ top: number, right: number, bottom: number, left: number }} Padding */
 /** @typedef {{ width: number, height: number, dpr: number, safe: Padding, reducedMotion: boolean, prefersContrast: boolean, orientation: 'portrait' | 'landscape' }} ViewportInfo */
 /** @typedef {{ invokeMethodAsync: (name: string, ...args: unknown[]) => Promise<unknown> }} DotNetRef */
-/** @typedef {{ x: number, y: number, t: number }} PointerSample */
 
 /** The MudX script, by the URL MudXProvider itself builds (a Release package ships only the minified file). It defines window.mudsheetHelper. */
 const MUDX_SCRIPT = './_content/MudX.MudBlazor.Extension/mudx.min.js';
@@ -22,34 +21,13 @@ const MUDX_POLL_MS = 25;
 
 /** A resize burst becomes one report (03 section 4.8). */
 export const VIEWPORT_DEBOUNCE_MS = 100;
-/** A press that moves at most this far and lasts at most {@link TAP_MAX_MS} is a tap, not a drag. */
-export const TAP_SLOP_PX = 10;
-export const TAP_MAX_MS = 600;
-/** How long a tap waits for the browser's own click on the handle button before the shim sends one. */
-export const CLICK_GRACE_MS = 80;
 /** The right stack hides once the sheet covers this fraction of the viewport height (01 section 3.5, AC-09). */
 export const TALL_FRACTION = 0.5;
 
-const HANDLE_SELECTOR = '.mud-sheet-handle';
-const HANDLE_BUTTON_SELECTOR = '[data-testid="sheet-handle"]';
 const SHEET_STATE_SELECTOR = '[data-testid="sheet"]';
 const MEDIA_QUERIES = ['(prefers-reduced-motion: reduce)', '(prefers-contrast: more)'];
 
 // ---- pure helpers (unit-tested in tests/js/realmShell.test.mjs) -------------------------------------------------------------------------------
-
-/**
- * Whether a press that went down at `down` and up at `up` was a tap on the handle: it stayed within the slop and was released quickly.
- * Anything else was a drag (or a long press), which MudX handles itself.
- * @param {PointerSample} down
- * @param {PointerSample} up
- * @param {number} [slopPx]
- * @param {number} [maxMs]
- */
-export function isTap(down, up, slopPx = TAP_SLOP_PX, maxMs = TAP_MAX_MS) {
-  const moved = Math.hypot(up.x - down.x, up.y - down.y);
-  const elapsed = up.t - down.t;
-  return Number.isFinite(moved) && Number.isFinite(elapsed) && moved <= slopPx && elapsed >= 0 && elapsed <= maxMs;
-}
 
 /**
  * Whether the sheet is at least half the viewport height tall, which hides the right button stack. A panel (Expanded) is never "tall": its
@@ -246,63 +224,10 @@ export function ensureMudX() {
   });
 }
 
-// ---- the handle tap shim ----------------------------------------------------------------------------------------------------------------------
-
-/**
- * MudX sets pointer capture on the handle wrapper from its own pointerdown handler, after a circuit round trip. A tap that is released after
- * that has its click retargeted to the wrapper, so the handle button never sees it (R-033's premise, that a click always follows the pointerup,
- * does not hold). The shim watches the pointer events on the handle: for a tap it waits CLICK_GRACE_MS for the button's own click and, when none
- * came, clicks the button itself. A tap that the browser delivered normally is left alone, so nothing toggles twice.
- * @returns {() => void} the remover
- */
-function installTapShim() {
-  /** @type {(PointerSample & { id: number }) | null} */
-  let down = null;
-  let lastButtonClickAt = Number.NEGATIVE_INFINITY;
-
-  /** @param {EventTarget | null} target */
-  const handleOf = (target) => (target instanceof Element ? target.closest(HANDLE_SELECTOR) : null);
-
-  /** @param {PointerEvent} event */
-  const onDown = (event) => {
-    down = handleOf(event.target) ? { x: event.clientX, y: event.clientY, t: performance.now(), id: event.pointerId } : null;
-  };
-
-  /** @param {PointerEvent} event */
-  const onUp = (event) => {
-    const start = down;
-    down = null;
-    if (!start || start.id !== event.pointerId) return;
-    const handle = handleOf(event.target);
-    if (!handle || !isTap(start, { x: event.clientX, y: event.clientY, t: performance.now() })) return;
-    const releasedAt = performance.now();
-    window.setTimeout(() => {
-      if (lastButtonClickAt >= releasedAt) return;
-      const button = handle.querySelector(HANDLE_BUTTON_SELECTOR);
-      if (button instanceof HTMLElement) button.click();
-    }, CLICK_GRACE_MS);
-  };
-
-  /** @param {MouseEvent} event */
-  const onClick = (event) => {
-    if (event.target instanceof Element && event.target.closest(HANDLE_BUTTON_SELECTOR)) lastButtonClickAt = performance.now();
-  };
-
-  const options = { capture: true };
-  document.addEventListener('pointerdown', onDown, options);
-  document.addEventListener('pointerup', onUp, options);
-  document.addEventListener('click', onClick, options);
-  return () => {
-    document.removeEventListener('pointerdown', onDown, options);
-    document.removeEventListener('pointerup', onUp, options);
-    document.removeEventListener('click', onClick, options);
-  };
-}
-
 // ---- init and dispose -------------------------------------------------------------------------------------------------------------------------
 
 /**
- * Starts the viewport reports, the handle shim and the MudX script, and returns the window as it is now (so the first layout needs no callback).
+ * Starts the viewport reports and the MudX script, and returns the window as it is now (so the first layout needs no callback).
  * Never rejects: a failed part is logged and the rest stands.
  * @param {DotNetRef} dotnet the DotNetObjectReference of ShellCallbacks
  * @returns {Promise<{ viewport: ViewportInfo }>}
@@ -332,7 +257,6 @@ export async function init(dotnet) {
         // an old browser without MediaQueryList events: the preference is read again on the next resize
       }
     }
-    state.cleanups.push(installTapShim());
 
     const viewport = readViewport();
     state.lastReport = JSON.stringify(viewport);

@@ -32,8 +32,7 @@ public sealed class RealmSheetHostTests : ComponentTestBase
         Assert.True(sheet.Open);
         Assert.Equal([19, 80], sheet.PresetSizes);
         Assert.Equal(19, sheet.CurrentSize);
-        Assert.True(sheet.SnapMode);
-        Assert.True(sheet.EnableDragToSize);
+        Assert.False(sheet.EnableDragToSize, "D73: the sheet is never dragged; the handle toggles Peek and 80 % by tap or key.");
         Assert.True(sheet.Standard);
         Assert.False(sheet.Paper);
         Assert.False(sheet.CloseOnEscapeKey);
@@ -74,47 +73,24 @@ public sealed class RealmSheetHostTests : ComponentTestBase
     }
 
     [Fact]
-    public async Task Compact_ASnapToThe80Preset_IsARequestForTall_AndTheParentsAnswerMovesTheSheet()
+    public async Task Compact_HasNoDrag_SoNothingMudXRaisesIsEverARequestForAState()
     {
+        // D73: with EnableDragToSize false MudX changes its own size only when the host passes it a new CurrentSize, so the only source of a request is the
+        // handle (a tap or a key). MudX still echoes every size it is given through CurrentSizeChanged; the host does not subscribe to it, because an echo
+        // that came back as a request could only ever ask for the state the page is already in.
         var cut = Host(LayoutMode.Compact, 412);
+        var sheet = Sheet(cut);
 
-        await cut.InvokeAsync(() => Sheet(cut).CurrentSizeChanged.InvokeAsync(80));
+        Assert.False(sheet.EnableDragToSize);
+        Assert.False(sheet.CurrentSizeChanged.HasDelegate);
 
-        Assert.Equal([SheetSize.Tall], cut.Instance.Requests);
+        await cut.InvokeAsync(() => cut.Instance.Set(SheetSize.Tall));
         Assert.Equal(80, Sheet(cut).CurrentSize);
-        Assert.Equal("80", Sheet(cut).UserAttributes["data-state"]);
-
-        await cut.InvokeAsync(() => Sheet(cut).CurrentSizeChanged.InvokeAsync(19));
-
-        Assert.Equal([SheetSize.Tall, SheetSize.Peek], cut.Instance.Requests);
-        Assert.Equal("peek", Sheet(cut).UserAttributes["data-state"]);
-    }
-
-    [Theory]
-    [InlineData(19)]   // the echo of the state the sheet is already in (MudX raises it once more for every size it was given)
-    [InlineData(20)]   // a drag in progress: MudX raises CurrentSizeChanged on every pointer move
-    [InlineData(37)]
-    [InlineData(55)]
-    [InlineData(79)]
-    [InlineData(95)]
-    public async Task Compact_AnythingButTheOtherPreset_IsNotARequest(int percent)
-    {
-        var cut = Host(LayoutMode.Compact, 412);
-
-        await cut.InvokeAsync(() => Sheet(cut).CurrentSizeChanged.InvokeAsync(percent));
+        await cut.InvokeAsync(() => cut.Instance.Set(SheetSize.Peek));
+        Assert.Equal(19, Sheet(cut).CurrentSize);
 
         Assert.Empty(cut.Instance.Requests);
-        Assert.Equal("peek", Sheet(cut).UserAttributes["data-state"]);
-    }
-
-    [Fact]
-    public async Task Compact_TheEchoOf80_WhenAlreadyTall_IsIgnored()
-    {
-        var cut = Host(LayoutMode.Compact, 412, SheetSize.Tall);
-
-        await cut.InvokeAsync(() => Sheet(cut).CurrentSizeChanged.InvokeAsync(80));
-
-        Assert.Empty(cut.Instance.Requests);
+        Assert.Same(sheet, Sheet(cut));   // the same MudXSheet moved between the two presets, nothing was rebuilt
     }
 
     [Fact]
@@ -123,7 +99,7 @@ public sealed class RealmSheetHostTests : ComponentTestBase
         var cut = Host(LayoutMode.Compact, 412);
         var sheet = Sheet(cut);
 
-        // MudX closed itself (a drag to the bottom edge, the escape key) and says so through both callbacks.
+        // MudX closed itself (an escape key, a programmatic close) and says so through both callbacks.
         await cut.InvokeAsync(() => sheet.OpenChanged.InvokeAsync(false));
         cut.WaitForAssertion(() => Assert.True(Sheet(cut).Open, "Open must be true again after OpenChanged(false): the sheet never closes."));
         Assert.Same(sheet, Sheet(cut));   // reopened, not rebuilt
@@ -151,7 +127,6 @@ public sealed class RealmSheetHostTests : ComponentTestBase
         Assert.True(sheet.Open);
         Assert.Equal(percent, sheet.CurrentSize);
         Assert.Equal([percent], sheet.PresetSizes);
-        Assert.False(sheet.SnapMode);
         Assert.False(sheet.EnableDragToSize);
         Assert.True(sheet.Standard);
         Assert.False(sheet.Paper);
@@ -161,13 +136,13 @@ public sealed class RealmSheetHostTests : ComponentTestBase
     }
 
     [Fact]
-    public async Task Expanded_ThePanelHasNoStates_ASizeFromMudXIsNeverARequest()
+    public async Task Expanded_ThePanelHasNoStates_ASizeFromTheParentChangesNothing()
     {
         var cut = Host(LayoutMode.Expanded, 884);
 
-        await cut.InvokeAsync(() => Sheet(cut).CurrentSizeChanged.InvokeAsync(80));
-        await cut.InvokeAsync(() => Sheet(cut).CurrentSizeChanged.InvokeAsync(19));
+        await cut.InvokeAsync(() => cut.Instance.Set(SheetSize.Tall));
 
+        Assert.Equal(45, Sheet(cut).CurrentSize);
         Assert.Empty(cut.Instance.Requests);
         Assert.Equal("panel", Sheet(cut).UserAttributes["data-state"]);
     }

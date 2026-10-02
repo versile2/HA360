@@ -120,9 +120,9 @@ test.describe('ingress platform tests', () => {
   });
 
   // 03 section 7.5, R-030 and 01 Appendix C item 10: the map does its per-frame work in the browser. A pan and a wheel zoom send a handful of
-  // frames at most (the camera report when the gesture ends), whatever the number of pointer events. The MudXSheet handle drag is the one server-driven
-  // gesture (D36): its frame count is recorded in the report and never limited.
-  test('[X-07] a map pan and a zoom send fewer than 6 websocket frames; a sheet handle drag is only counted', async ({ page }) => {
+  // frames at most (the camera report when the gesture ends), whatever the number of pointer events. The MudXSheet handle drag, the one server-driven
+  // gesture of D36 that used to be counted here, no longer exists (D73): the handle is a tap target.
+  test('[X-07] a map pan and a zoom send fewer than 6 websocket frames', async ({ page }) => {
     const sent: number[] = [];
     page.on('websocket', (socket) => socket.on('framesent', () => sent.push(Date.now())));
 
@@ -151,25 +151,19 @@ test.describe('ingress platform tests', () => {
     await page.mouse.down();
     await page.mouse.move(x - 140, 380, { steps: 30 });
     await page.mouse.up();
+    await settled(page);
+    const zoomBeforeWheel = (await readHook(page, 'camera')).zoom;
+    await page.mouse.move(x, 300);
     await page.mouse.wheel(0, -300);
+    // The wheel zooms 40 ms after the event and eases for about 200 ms, and settled() does not see that timer: wait for the zoom itself, so that the frames of
+    // the whole wheel gesture are inside the count.
+    await expect
+      .poll(async () => Math.abs((await readHook(page, 'camera')).zoom - zoomBeforeWheel), { message: `the wheel zoomed the map from ${zoomBeforeWheel}`, timeout: 8_000 })
+      .toBeGreaterThan(0.01);
     await settled(page);
     const mapFrames = sent.length - beforeMap;
     test.info().annotations.push({ type: 'info', description: `[X-07] websocket frames sent by the browser during a map pan and zoom: ${mapFrames} (limit: fewer than 6)` });
     expect(mapFrames, 'websocket frames sent by the browser during a map pan (30 pointer moves) and a wheel zoom').toBeLessThan(6);
-
-    // The handle drag: counted for the report, never asserted against a limit.
-    const handle = await page.getByTestId('sheet-handle').boundingBox();
-    if (handle !== null) {
-      const handleX = handle.x + handle.width / 2;
-      const handleY = handle.y + handle.height / 2;
-      const beforeDrag = sent.length;
-      await page.mouse.move(handleX, handleY);
-      await page.mouse.down();
-      await page.mouse.move(handleX, handleY - 300, { steps: 30 });
-      await page.mouse.up();
-      await expect.poll(async () => (await readHook(page, 'sheet')).state, { message: 'the sheet settled after the handle drag' }).toMatch(/^(peek|80)$/);
-      test.info().annotations.push({ type: 'info', description: `[X-07] websocket frames sent by the browser during a sheet handle drag: ${sent.length - beforeDrag} (informational, R-030: the drag is server-driven)` });
-    }
   });
 
   // 03 section 4.8, R-02: observeSheet follows `div[mudsheet], [data-testid="sheet"]`. A selector LIST matches every element of either kind, so the union

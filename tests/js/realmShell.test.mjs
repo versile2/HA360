@@ -1,20 +1,16 @@
 // Tests for wwwroot/js/realmShell.js (03 section 4.8): the pure helpers, the sheet metrics (observeSheet, --realm-sheet-h, data-sheet-tall, the
-// sheetMetrics subscription that feeds the map padding), the viewport report and the handle tap shim, run against a small fake DOM. The module touches
+// sheetMetrics subscription that feeds the map padding), the viewport report, run against a small fake DOM. The module touches
 // no global when it is imported, so the fakes are installed per test.
 import assert from 'node:assert/strict';
 import { afterEach, test } from 'node:test';
 
 import { DEFAULT_LAYOUT, computePadding } from '../../src/Realm.Web/wwwroot/js/layoutMath.js';
 import {
-  CLICK_GRACE_MS,
-  TAP_MAX_MS,
-  TAP_SLOP_PX,
   describeSheet,
   dispose,
   findSheetElement,
   init,
   isSheetTall,
-  isTap,
   observeSheet,
   readSheet,
   readViewport,
@@ -33,40 +29,12 @@ class FakeElement {
   constructor(attributes = {}, rect = { top: 0, height: 0 }) {
     this.attributes = { ...attributes };
     this.rect = rect;
-    this.clicks = 0;
-    this.children = [];
-    this.parent = null;
   }
   getAttribute(name) {
     return name in this.attributes ? this.attributes[name] : null;
   }
   getBoundingClientRect() {
     return { top: this.rect.top, height: this.rect.height, bottom: this.rect.top + this.rect.height, left: 0, right: 0, width: 0 };
-  }
-  closest(selector) {
-    for (let node = this; node; node = node.parent) if (node.matches(selector)) return node;
-    return null;
-  }
-  matches(selector) {
-    if (selector === '.mud-sheet-handle') return this.attributes.class === 'mud-sheet-handle';
-    if (selector === '[data-testid="sheet-handle"]') return this.attributes['data-testid'] === 'sheet-handle';
-    return false;
-  }
-  querySelector(selector) {
-    for (const child of this.children) {
-      if (child.matches(selector)) return child;
-      const deeper = child.querySelector(selector);
-      if (deeper) return deeper;
-    }
-    return null;
-  }
-  add(child) {
-    child.parent = this;
-    this.children.push(child);
-    return child;
-  }
-  click() {
-    this.clicks += 1;
   }
 }
 
@@ -164,6 +132,7 @@ function installDom({ width = PHONE.width, height = PHONE.height } = {}) {
     liveResizeObservers: () => resizeObservers.filter((o) => o.target).length,
     liveMutationObservers: () => mutationObservers.filter((o) => o.connected).length,
     listenerCount: () => [...listeners.document.values(), ...listeners.window.values()].reduce((n, set) => n + set.size, 0),
+    documentListenerTypes: () => [...listeners.document].filter(([, set]) => set.size > 0).map(([type]) => type),
     fire: (type, event) => dispatch('document', type, event),
     fireWindow: (type, event) => dispatch('window', type, event),
   };
@@ -176,19 +145,6 @@ afterEach(() => {
 });
 
 // ---- pure helpers -----------------------------------------------------------------------------------------------------------------------------
-
-test('isTap: a short, still press is a tap; a drag, a slow press and a bad sample are not', () => {
-  const down = { x: 100, y: 800, t: 0 };
-  assert.equal(isTap(down, { x: 100, y: 800, t: 80 }), true);
-  assert.equal(isTap(down, { x: 103, y: 804, t: 120 }), true, 'a few pixels of finger jitter');
-  assert.equal(isTap(down, { x: 100, y: 800 - TAP_SLOP_PX, t: 90 }), true, 'exactly at the slop');
-  assert.equal(isTap(down, { x: 100, y: 800 - TAP_SLOP_PX - 1, t: 90 }), false, 'just past the slop');
-  assert.equal(isTap(down, { x: 100, y: 700, t: 150 }), false, 'a 100 px drag');
-  assert.equal(isTap(down, { x: 100, y: 800, t: TAP_MAX_MS }), true);
-  assert.equal(isTap(down, { x: 100, y: 800, t: TAP_MAX_MS + 1 }), false, 'a long press');
-  assert.equal(isTap(down, { x: 100, y: 800, t: -5 }), false, 'time running backwards');
-  assert.equal(isTap(down, { x: Number.NaN, y: 800, t: 10 }), false);
-});
 
 test('isSheetTall: from half the viewport height up in Compact, never in the panel, never without a measurement', () => {
   assert.equal(isSheetTall(174, 915, 'compact'), false, 'Peek');
@@ -439,58 +395,13 @@ test('init adds the MudX script when the helper is missing, and waits for it', a
   assert.equal(resolved, true);
 });
 
-// ---- the handle tap shim ----------------------------------------------------------------------------------------------------------------------
+// ---- no drag (D73) ----------------------------------------------------------------------------------------------------------------------------
 
-function handleFixture() {
-  const handle = new FakeElement({ class: 'mud-sheet-handle' });
-  const button = handle.add(new FakeElement({ 'data-testid': 'sheet-handle' }));
-  const pointer = (target, x, y, id = 1) => ({ target, clientX: x, clientY: y, pointerId: id });
-  return { handle, button, pointer };
-}
-
-test('tap shim: a tap whose click never reached the button is clicked for it, once', async () => {
+test('init puts no pointer, mouse, touch or click listener on the document: the handle is a plain button, with no tap shim and no drag to compensate for', async () => {
   const dom = installDom();
   await init({ invokeMethodAsync: async () => {} });
-  const { handle, button, pointer } = handleFixture();
-  dom.fire('pointerdown', pointer(button, 200, 880));
-  dom.fire('pointerup', pointer(handle, 201, 881), 'MudX captured the pointer: the up event is retargeted to the wrapper');
-  await sleep(CLICK_GRACE_MS + 60);
-  assert.equal(button.clicks, 1);
-});
-
-test('tap shim: a tap that the browser delivered normally is left alone (no second toggle)', async () => {
-  const dom = installDom();
-  await init({ invokeMethodAsync: async () => {} });
-  const { button, pointer } = handleFixture();
-  dom.fire('pointerdown', pointer(button, 200, 880));
-  dom.fire('pointerup', pointer(button, 200, 880));
-  dom.fire('click', { target: button });
-  await sleep(CLICK_GRACE_MS + 60);
-  assert.equal(button.clicks, 0);
-});
-
-test('tap shim: a click that landed on the wrapper instead of the button does not count as delivered', async () => {
-  const dom = installDom();
-  await init({ invokeMethodAsync: async () => {} });
-  const { handle, button, pointer } = handleFixture();
-  dom.fire('pointerdown', pointer(button, 200, 880));
-  dom.fire('pointerup', pointer(handle, 200, 880));
-  dom.fire('click', { target: handle });
-  await sleep(CLICK_GRACE_MS + 60);
-  assert.equal(button.clicks, 1);
-});
-
-test('tap shim: a drag, another pointer, and a press elsewhere do nothing', async () => {
-  const dom = installDom();
-  await init({ invokeMethodAsync: async () => {} });
-  const { handle, button, pointer } = handleFixture();
-  dom.fire('pointerdown', pointer(button, 200, 880));
-  dom.fire('pointerup', pointer(handle, 200, 600));
-  dom.fire('pointerdown', pointer(button, 200, 880, 1));
-  dom.fire('pointerup', pointer(handle, 200, 880, 2));
-  const elsewhere = new FakeElement({ class: 'map' });
-  dom.fire('pointerdown', pointer(elsewhere, 100, 300));
-  dom.fire('pointerup', pointer(elsewhere, 100, 300));
-  await sleep(CLICK_GRACE_MS + 60);
-  assert.equal(button.clicks, 0);
+  assert.deepEqual(
+    dom.documentListenerTypes().filter((type) => /^(pointer|mouse|touch|click)/.test(type)),
+    [],
+  );
 });

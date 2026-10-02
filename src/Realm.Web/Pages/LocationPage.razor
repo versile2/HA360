@@ -169,7 +169,7 @@
             StackVisible: !(_mode == LayoutMode.Compact && _size == SheetSize.Tall),
             _viewport?.Safe ?? new Padding(0, 0, 0, 0));
 
-    // A tap, a key or a drag release asked for the other state; S8's reducer will own this decision, the page accepts it as it is.
+    // A tap or a key on the handle asked for the other state; S8's reducer will own this decision, the page accepts it as it is.
     private Task OnSizeChangedAsync(SheetSize size)
     {
         _size = size;

@@ -1,7 +1,7 @@
 @using Realm.Web.Map
 
 @* The right-hand button stack (01 section 3.5; 03 section 3.4): recenter above layers, two 48 px circles 12 px apart, right-aligned. In Compact its bottom edge
-   sits 12 px above the sheet's top edge through --realm-sheet-h (written by realmShell.js, so it follows the sheet during a drag with no server call);
+   sits 12 px above the sheet's top edge through --realm-sheet-h (written by realmShell.js from a ResizeObserver, so it follows the sheet's 250 ms transition with no server call);
    in the panel layout it stays above the navigation bar. Hidden (the sheet is Tall, D42) is visibility:hidden plus inert, so it leaves the focus order.
    The reserved "+" slot (slot-add) renders nothing in v1. S7a only places the buttons: the recenter camera and the style popover belong to later slices,
    so the callbacks are optional and the buttons do nothing without them. *@

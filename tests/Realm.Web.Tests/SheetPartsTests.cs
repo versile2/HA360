@@ -97,13 +97,13 @@ public sealed class SheetPartsTests : ComponentTestBase
     }
 
     [Fact]
-    public void Handle_NeverStopsThePointerDown_ThatWouldKillMudXsDrag()
+    public void Handle_IsAPlainButton_ATapIsItsClick_WithNoPointerHandlingOfItsOwn()
     {
-        // The drag is bound on MudX's wrapper div; a stopPropagation on the button's pointerdown would end it before it starts (R-033).
+        // D73: there is no drag, so no pointer capture and no pointer events here: the toggle is the browser's click (and the keys), nothing else.
         var markup = RenderWithProviders<SheetHandle>().Markup;
 
+        Assert.DoesNotContain("pointer", markup, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("stoppropagation", markup, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("pointerdown", markup, StringComparison.OrdinalIgnoreCase);
     }
 
     // ---- the three tabs --------------------------------------------------------------------------------------------------------------------

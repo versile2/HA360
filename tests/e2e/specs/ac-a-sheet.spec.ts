@@ -10,9 +10,8 @@
 // The numbers are those of the AC rows at 412 x 915 (phone) and are computed from the viewport for the other three sizes: Peek is 19 % of the height with
 // a floor of 168 px (174 at 915, 168 at 800), 80 % is 0.8 x the height (732 at 915), the navigation bar is 64 px high. The tolerance is 2 px.
 //
-// Dragging is MudX's own and server-driven (D36): the handle's pointerdown, pointermove and pointerup are Blazor events. The drag helpers wait for the
-// pointer capture that MudX's script takes (so the server has armed the drag), then move in steps, then wait until the sheet's own height follows the
-// pointer, and only then release; the release itself is what the snap acts on (HandlePointerUpAsync repeats the last move at the pointer's position).
+// There is no drag (D73, which supersedes the drag half of D42): MudXSheet runs with EnableDragToSize=false, the handle toggles Peek and 80 % by tap or
+// key only, and the sheet only ever settles at the two heights. AC-07 now asserts that a press-and-move on the handle resizes nothing.
 
 import type { Locator, Page } from '@playwright/test';
 
@@ -94,54 +93,6 @@ async function untilSettled(page: Page, state: SheetInfo['state'], what: string)
       return info.state === state && info.open && info.heightPx > 0 && Date.now() - since >= 300;
     },
   );
-}
-
-// ---- the drag, in the three steps that MudX's server-driven handling needs -----------------------------------------------------------------
-
-interface Drag {
-  x: number;
-  startY: number;
-  startPercent: number;
-  viewportHeight: number;
-}
-
-/** Presses the pointer on the handle and waits until MudX's script has taken the pointer capture, which means the server has armed the drag. */
-async function pressHandle(page: Page, startPercent: number): Promise<Drag> {
-  const box = await boxOf(handle(page), 'sheet-handle');
-  const x = box.x + box.width / 2;
-  const startY = box.y + box.height / 2;
-  await page.mouse.move(x, startY);
-  await page.mouse.down();
-  await until(
-    'the handle wrapper (.mud-sheet-handle) taking the pointer capture after pointerdown (MudX window.mudsheetHelper.startDrag)',
-    () => page.evaluate(() => document.querySelector('.mud-sheet-handle')?.hasPointerCapture(1) ?? false),
-    (captured) => captured,
-  );
-  return { x, startY, startPercent, viewportHeight: viewport(page).height };
-}
-
-/**
- * Moves the pointer so that the drag's size is `percent` of the viewport height (the middle of that whole percent: MudX truncates to an integer),
- * and waits until the sheet's own height has followed. The pointer is nudged by one pixel on every poll, because the server throttles pointermove to 16 ms
- * and may skip the last event of a burst.
- */
-async function dragToPercent(page: Page, drag: Drag, percent: number): Promise<SheetInfo> {
-  const y = drag.startY - ((percent - drag.startPercent + 0.5) / 100) * drag.viewportHeight;
-  const wanted = ((percent + 0.5) / 100) * drag.viewportHeight;
-  let nudge = 0;
-  await page.mouse.move(drag.x, y, { steps: 10 });
-  return until(
-    `the sheet following the pointer to ${percent}% (${wanted.toFixed(0)} px): the server-driven drag did not resize the sheet`,
-    async () => {
-      await page.mouse.move(drag.x, y + (nudge++ % 2));
-      return readHook(page, 'sheet');
-    },
-    (info) => Math.abs(info.heightPx - wanted) <= 0.02 * drag.viewportHeight,
-  );
-}
-
-async function release(page: Page): Promise<void> {
-  await page.mouse.up();
 }
 
 // ---- diagnostics on failure ----------------------------------------------------------------------------------------------------------------
@@ -282,7 +233,7 @@ test.describe('navigation, right stack, sheet and layout', () => {
 
   // ---- AC-06 -------------------------------------------------------------------------------------------------------------------------------
 
-  test('[AC-06] a tap toggles Peek, 80 %, Peek; the state hook and aria-expanded follow; the sheet stays open, also after Esc and after a drag beyond 80 %', async ({ page }) => {
+  test('[AC-06] a tap toggles Peek, 80 %, Peek; the state hook and aria-expanded follow; the sheet stays open, also after Esc', async ({ page }) => {
     await demo(page);
     const { height } = viewport(page);
     const settledHeights: number[] = [];
@@ -311,17 +262,10 @@ test.describe('navigation, right stack, sheet and layout', () => {
     await page.keyboard.press('Escape');
     const afterEscTall = await untilSettled(page, '80', 'after Esc at 80 %');
     expect(afterEscTall.open, 'the sheet is open after Esc at 80 %').toBe(true);
+    settledHeights.push(afterEscTall.heightPx);
     await handle(page).click();
-    await untilSettled(page, 'peek', 'back at Peek before the drag');
-
-    // A drag beyond 80 % settles at 80 % and the sheet is still there.
-    const drag = await pressHandle(page, PEEK_PERCENT);
-    await dragToPercent(page, drag, 92);
-    await release(page);
-    const afterDrag = await untilSettled(page, '80', 'after releasing a drag at 92 %');
-    settledHeights.push(afterDrag.heightPx);
-    expect(afterDrag.open, 'the sheet is open after a drag beyond 80 %').toBe(true);
-    await expect(popover(page), 'the sheet element is present after the drag').toHaveCount(1);
+    settledHeights.push((await untilSettled(page, 'peek', 'back at Peek after Esc')).heightPx);
+    await expect(popover(page), 'the sheet element is present at the end').toHaveCount(1);
 
     // No other height is ever settled on (no 512, no 842).
     const allowed = [peekHeight(height), tallHeight(height)];
@@ -370,28 +314,47 @@ test.describe('navigation, right stack, sheet and layout', () => {
 
   // ---- AC-07 -------------------------------------------------------------------------------------------------------------------------------
 
-  // The midpoint of the two states is 49.5 % of the viewport height; the drag starts at Peek. A release above 80 % settles at 80 %.
-  const SNAPS: Array<{ release: number; settles: 'peek' | '80' }> = [
-    { release: 25, settles: 'peek' },
-    { release: 45, settles: 'peek' },
-    { release: 55, settles: '80' },
-    { release: 75, settles: '80' },
-    { release: 92, settles: '80' },
+  // D73 supersedes the drag half of D42: MudXSheet runs with EnableDragToSize=false, so there is no drag to snap. What this row asserts now is the other
+  // side of the same ruling: a press on the handle that moves away (up at Peek, down at 80 %) resizes nothing and takes no pointer capture, and a release
+  // away from the handle toggles nothing (the pointerup does not land on the button, so no click).
+  const NO_DRAG: Array<{ at: 'peek' | '80'; dy: number; what: string }> = [
+    { at: 'peek', dy: -300, what: 'up 300 px at Peek' },
+    { at: '80', dy: 300, what: 'down 300 px at 80 %' },
   ];
-  for (const { release: releaseAt, settles } of SNAPS) {
-    test(`[AC-07] releasing the handle drag at ${releaseAt}% of the viewport height settles at ${settles === 'peek' ? 'Peek' : '80 %'}`, async ({ page }) => {
+  for (const { at, dy, what } of NO_DRAG) {
+    test(`[AC-07] a press on the handle that moves ${what} resizes nothing (no drag, D73): the sheet stays at ${at === 'peek' ? 'Peek' : '80 %'} and open`, async ({ page }) => {
       await demo(page);
       const { height } = viewport(page);
       await untilSettled(page, 'peek', 'on load');
+      if (at === '80') {
+        await handle(page).click();
+        await untilSettled(page, '80', 'before the press');
+      }
+      const wantedHeight = at === '80' ? tallHeight(height) : peekHeight(height);
 
-      const drag = await pressHandle(page, PEEK_PERCENT);
-      const during = await dragToPercent(page, drag, releaseAt);
-      expectNear(during.heightPx, ((releaseAt + 0.5) / 100) * height, 0.02 * height, `the sheet height just before the release (${releaseAt}% of ${height})`);
-      await release(page);
+      const box = await boxOf(handle(page), 'sheet-handle');
+      const x = box.x + box.width / 2;
+      const y = box.y + box.height / 2;
+      await page.mouse.move(x, y);
+      await page.mouse.down();
+      await page.mouse.move(x, y + dy, { steps: 12 });
+      // A server-driven drag would have armed itself (pointer capture) and followed the pointer within this time.
+      await page.waitForTimeout(600);
+      const during = await readHook(page, 'sheet');
+      expect(during.state, `window.__realm.sheet().state while the pointer is held ${what}`).toBe(at);
+      expectNear(during.heightPx, wantedHeight, TOL, `the sheet height while the pointer is held ${what}`);
+      expect(
+        await page.evaluate(() => document.querySelector('.mud-sheet-handle')?.hasPointerCapture(1) ?? false),
+        'MudX took no pointer capture on the handle wrapper (it has no drag)',
+      ).toBe(false);
+      await expect(contract(page), "the sheet container is not in MudX's dragging state").not.toHaveClass(/mud-sheet-dragging/);
+      await page.mouse.up();
 
-      const result = await untilSettled(page, settles, `after releasing at ${releaseAt}%`);
-      expectNear(result.heightPx, settles === 'peek' ? peekHeight(height) : tallHeight(height), TOL, `the settled height (${settles === 'peek' ? 'Peek 174' : '80 % 732'} at 915)`);
-      await expect(handle(page), 'aria-expanded after the snap').toHaveAttribute('aria-expanded', settles === '80' ? 'true' : 'false');
+      const after = await untilSettled(page, at, `after releasing away from the handle (${what})`);
+      expectNear(after.heightPx, wantedHeight, TOL, 'the settled height after the release');
+      expect(after.open, 'the sheet is open after the release').toBe(true);
+      await expect(handle(page), 'aria-expanded after the release').toHaveAttribute('aria-expanded', at === '80' ? 'true' : 'false');
+      await expect(popover(page).locator('.mud-sheet-handle'), 'the handle wrapper is not marked draggable').not.toHaveClass(/mud-draggable/);
     });
   }
 
@@ -415,17 +378,10 @@ test.describe('navigation, right stack, sheet and layout', () => {
 
     await follows('at Peek');
 
-    // During a drag the stack follows the sheet (--realm-sheet-h is written by the script from a ResizeObserver, no server call) while it is under 50 %.
-    const drag = await pressHandle(page, PEEK_PERCENT);
-    await dragToPercent(page, drag, 40);
-    await expect(layers, 'the stack is still visible at 40 % of the viewport height').toBeVisible();
-    await follows('during the drag at 40 %');
-
-    // From 50 % up it is hidden, mid-drag already.
-    await dragToPercent(page, drag, 55);
-    await expect(layers, 'the stack is hidden while the drag is above 50 %').toBeHidden();
-    await release(page);
-    await untilSettled(page, '80', 'after releasing at 55 %');
+    // The stack is under the ruling of 50 % of the viewport height: at 80 % it is hidden (--realm-sheet-h is written by the script from a ResizeObserver,
+    // no server call, so the stack follows the sheet through its 250 ms transition; there is no drag, D73, so no resting height in between).
+    await handle(page).click();
+    await untilSettled(page, '80', 'after the tap');
 
     // At 80 %: visibility hidden, inert, and not focusable (so not in the tab order).
     await expect(layers, 'btn-layers at 80 %').toBeHidden();

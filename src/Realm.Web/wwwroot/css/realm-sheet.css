@@ -114,7 +114,7 @@ div[mudsheet] .mud-sheet-container[data-testid="sheet"][data-state="peek"] {
   }
 }
 
-/* ---- the handle row: 48 px, no panel handle, and no touch gesture that would cancel a drag ---- */
+/* ---- the handle row: 48 px, no panel handle; a tap target only (no drag, D73), so no double-tap zoom delay ---- */
 
 div[mudsheet] .mud-sheet-container[data-testid="sheet"] .mud-sheet-handle {
   box-sizing: border-box;
@@ -122,7 +122,7 @@ div[mudsheet] .mud-sheet-container[data-testid="sheet"] .mud-sheet-handle {
   min-height: 48px;
   padding: 0;
   color: var(--realm-text);
-  touch-action: none;
+  touch-action: manipulation;
   -webkit-user-select: none;
   user-select: none;
 }
@@ -145,7 +145,7 @@ div[mudsheet] .mud-sheet-container.mud-sheet-position-left[data-testid="sheet"] 
   background: none;
   color: var(--realm-text);
   font: inherit;
-  cursor: grab;
+  cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -324,7 +324,7 @@ div[mudsheet] .mud-sheet-container[data-testid="sheet"] .mud-sheet-content > con
 .realm-right-stack {
   position: fixed;
   right: calc(12px + env(safe-area-inset-right));
-  /* --realm-sheet-h is written by realmShell.js (a ResizeObserver, no server call), so the stack follows the sheet during a drag. Before the first
+  /* --realm-sheet-h is written by realmShell.js (a ResizeObserver, no server call), so the stack follows the sheet's transition. Before the first
      measurement the Peek height is assumed. */
   bottom: calc(var(--realm-sheet-h, max(19vh, var(--realm-peek-min))) + 12px);
   z-index: 10;
@@ -339,7 +339,7 @@ div[mudsheet] .mud-sheet-container[data-testid="sheet"] .mud-sheet-content > con
   bottom: calc(var(--realm-nav-h) + env(safe-area-inset-bottom) + 16px);
 }
 
-/* Hidden once the sheet covers half the viewport (the Tall state and the upper half of a drag): not shown, not clickable, not in the tab order. */
+/* Hidden once the sheet covers half the viewport (the Tall state, and a transition that has passed the half): not shown, not clickable, not in the tab order. */
 .realm-right-stack--hidden,
 html[data-sheet-tall] .realm-right-stack:not(.realm-right-stack--panel) {
   opacity: 0;
