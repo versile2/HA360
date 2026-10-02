@@ -30,7 +30,26 @@
 // S9 the bubbles in the commented region at the end of this file, leaving the code above untouched (04 section 1.8).
 
 import { circlePolygon, metersPerPixel } from './geo.js';
-import { DEFAULT_LAYOUT, PIN_BODY_ALLOWANCE_PX, computePadding, haversine, isAtDefault, quantizeZoom } from './layoutMath.js';
+import {
+  DEFAULT_LAYOUT,
+  PIN_BODY_ALLOWANCE_PX,
+  RECENTER_EASE_MS,
+  RECENTER_SETTLE_MS,
+  SELECTION_EASE_MS,
+  chipRoom,
+  clampChipShift,
+  computePadding,
+  fitCircle,
+  haversine,
+  isAtDefault,
+  isCentered,
+  nextRecenter,
+  quantizeZoom,
+  refitNeeded,
+  selectionFlightPlan,
+  selectionPadding,
+  visibleRect,
+} from './layoutMath.js';
 import {
   FALLBACK_ZONE_APPEARANCE,
   HALO_SOURCE,
@@ -666,6 +685,7 @@ function placeChips(r) {
       pin.chipBelow = below;
       pin.chipEl.classList.toggle('realm-chip--below', below);
     }
+    clampChip(r, pin, tip); // S8a (D75): keep the chip inside the map
   }
 }
 
@@ -883,10 +903,12 @@ function samePadding(a, b) {
  * @param {Runtime} r
  */
 function applyPadding(r) {
+  if (paddingHeld(r)) return; // S8a: map.setPadding is a jumpTo and would stop a selection flight that is easing
   const next = r.forcedPadding ?? computePadding(containerSize(r), r.layout, r.sheetHeightPx);
   if (samePadding(next, r.appliedPadding)) return;
   r.map.setPadding(next);
   r.appliedPadding = { ...next };
+  paddingApplied(r); // S8a: a settled sheet change re-centres the selection
 }
 
 /** map.resize() with the centre kept (01 section 3.1; MapLibre alone may keep another anchor). @param {Runtime} r */
@@ -947,6 +969,7 @@ function fitNow(r, animate) {
   const pose = defaultPose(r);
   if (!pose) return false;
   moveCamera(r, pose, animate ? FIT_DURATION_MS : 0);
+  markAtDefault(r); // S8a (D75): a layout change refits while the camera stays here
   return true;
 }
 
@@ -1022,7 +1045,7 @@ function scheduleRender() {
 /** @param {Runtime} r @returns {boolean} */
 function hasPendingWork(r) {
   const d = r.dirty;
-  return d.resize || d.members || d.vehicles || d.zones || d.halos || r.wantFit !== null || r.raf !== 0;
+  return d.resize || d.members || d.vehicles || d.zones || d.halos || r.wantFit !== null || r.raf !== 0 || selectionPending(r); // S8a: the re-centre is armed
 }
 
 /** One coalesced frame: applies whatever the setters retained, in a fixed order. @param {number} timestamp */
@@ -1034,6 +1057,7 @@ function renderFrame(timestamp) {
   try {
     r.stats.frames += 1;
     flushLayout(r);
+    refitOnLayoutChange(r); // S8a (D75)
     if (r.wantFit) {
       const { animate } = r.wantFit;
       if (fitNow(r, animate)) r.wantFit = null;
@@ -1041,6 +1065,7 @@ function renderFrame(timestamp) {
     if (r.dirty.members) {
       r.dirty.members = false;
       reconcilePins(r, 'member');
+      followMember(r); // S8a (01 section 4.14)
     }
     if (r.dirty.vehicles) {
       r.dirty.vehicles = false;
@@ -1261,6 +1286,8 @@ function bindMap(r) {
     notify('OnMapTap');
   });
 
+  bindSelection(r); // S8a: gestures end Follow and leave the default view; a flight's end releases the padding
+
   r.resizeObserver = new ResizeObserver(() => {
     r.dirty.resize = true;
     scheduleRender();
@@ -1283,6 +1310,7 @@ function teardown() {
   if (r.raf) cancelAnimationFrame(r.raf);
   if (r.cameraTimer !== null) clearTimeout(r.cameraTimer);
   if (r.pending) clearTimeout(r.pending.timer);
+  releaseSelection(r); // S8a
   r.resizeObserver?.disconnect();
   document.removeEventListener('visibilitychange', r.onVisibility);
   for (const pin of r.pins.values()) pin.marker.remove();
@@ -1592,3 +1620,361 @@ sheetMetrics.subscribe((metrics) => {
 });
 
 extraHooks.sheet = () => readSheet();
+
+// ---- S8a: selection, the selection flights, Follow, the re-centre after a sheet change, the refit on a layout change, the chip clamp ----------------
+// (03 section 4.3, 01 sections 4.4, 4.11, 4.13 and 4.14; D45, D75). The per-map state of this region lives in a WeakMap, so the Runtime of S5a is untouched; the
+// S5a functions reach it through the one-line hooks marked `S8a:` (markAtDefault, paddingHeld, paddingApplied, refitOnLayoutChange, followMember, clampChip,
+// bindSelection, selectionPending, releaseSelection). The arithmetic is in layoutMath.js and tested there.
+//
+// Three facts of MapLibre 6.11.2 shape it (read in the vendored source):
+//   - `easeTo` and `flyTo` with a `padding` option store that padding in the transform, so a selection flight that eases to the Peek padding leaves the map with
+//     the Peek padding. The settled measured padding is equal to it (the sheet has collapsed by then), so nothing moves when the measured padding is applied after.
+//   - `map.setPadding` is `jumpTo({ padding })`, and `jumpTo` stops a running ease. The measured padding is therefore held back while a selection flight eases
+//     (`paddingHeld`), and applied when it ends (`endFlight`), whatever the sheet did meanwhile.
+//   - an ease of duration 0 finishes inside the call, so a flight counts as running only if `map.isMoving()` says so afterwards (`_moving` is cleared before
+//     `moveend` fires, so that is also how the end of a flight is told from the end of an ease that a new one stopped).
+
+/**
+ * @typedef {object} SelectionRuntime
+ * @property {boolean} atDefault the camera sits at the default view: it was fitted, and no gesture, flight or recentre has moved it away since
+ * @property {LayoutPayload} layout the layout the camera was last fitted for; `refitNeeded` compares the next layout with it
+ * @property {{ padding: Padding } | null} flight a selection flight is easing to this padding
+ * @property {string | null} followId the member the camera follows (01 section 4.14)
+ * @property {ReturnType<typeof setTimeout> | null} recentreTimer armed by a new measured padding while something is selected
+ */
+
+/** @type {WeakMap<Runtime, SelectionRuntime>} */
+const selectionRuntimes = new WeakMap();
+
+/** @param {Runtime} r @returns {SelectionRuntime} */
+function selectionState(r) {
+  let state = selectionRuntimes.get(r);
+  if (!state) {
+    state = { atDefault: false, layout: r.layout, flight: null, followId: null, recentreTimer: null };
+    selectionRuntimes.set(r, state);
+  }
+  return state;
+}
+
+/** Hook of bindMap: the listeners of this region. @param {Runtime} r */
+function bindSelection(r) {
+  selectionState(r);
+  r.map.on('movestart', (event) => {
+    if (!event.originalEvent) return; // only a gesture: a jump for the padding or a resize is not the user
+    selectionState(r).atDefault = false;
+    endFollow(r);
+  });
+  r.map.on('moveend', () => {
+    // `_moving` is already false when an ease ends or is stopped, but not for the moveend that map.resize() fires in the middle of a flight.
+    if (selectionState(r).flight && !r.map.isMoving()) endFlight(r);
+  });
+}
+
+/** Hook of teardown. @param {Runtime} r */
+function releaseSelection(r) {
+  const state = selectionRuntimes.get(r);
+  if (state?.recentreTimer) clearTimeout(state.recentreTimer);
+  selectionRuntimes.delete(r);
+}
+
+/** Hook of hasPendingWork: `settled()` waits for an armed re-centre. @param {Runtime} r @returns {boolean} */
+function selectionPending(r) {
+  return selectionState(r).recentreTimer !== null;
+}
+
+/** Hook of fitNow: the camera was just fitted to the default view. @param {Runtime} r */
+function markAtDefault(r) {
+  selectionState(r).atDefault = true;
+}
+
+/**
+ * Hook of renderFrame (D75): when the layout footprint changed (Compact to Expanded and back, the panel shown, hidden or resized) while the camera is at the
+ * default view, fit the default view again with the new padding, so no pin sits under the panel. It runs through the pending-fit path of S5a, without an
+ * animation: the camera report of the E2E contract says `animated` is false for the default fit.
+ * @param {Runtime} r
+ */
+function refitOnLayoutChange(r) {
+  const state = selectionState(r);
+  if (state.layout === r.layout) return;
+  if (!r.wantFit && refitNeeded(state.layout, r.layout, state.atDefault)) r.wantFit = { animate: false };
+  state.layout = r.layout;
+}
+
+/** Hook of applyPadding: true while a selection flight is easing. @param {Runtime} r @returns {boolean} */
+function paddingHeld(r) {
+  return selectionState(r).flight !== null;
+}
+
+/** Hook of applyPadding, after a new measured padding was applied: with a selection, re-centre it once the sheet has been stable for 120 ms. @param {Runtime} r */
+function paddingApplied(r) {
+  const state = selectionState(r);
+  if (r.selection === null) return;
+  if (state.recentreTimer !== null) clearTimeout(state.recentreTimer);
+  state.recentreTimer = setTimeout(() => {
+    state.recentreTimer = null;
+    if (rt !== r) return;
+    call('recentreSelection', () => recentreSelection(r));
+    scheduleRender();
+  }, RECENTER_SETTLE_MS);
+}
+
+/**
+ * Where the selected entity is, or null (nothing selected, or it has no position).
+ * @param {Runtime} r
+ * @returns {LngLat | null}
+ */
+function selectionPosition(r) {
+  const selection = /** @type {{ kind?: string, id?: string } | null} */ (r.selection);
+  if (!selection?.id) return null;
+  /** @type {{ lat: number | null, lon: number | null } | undefined} */
+  let item;
+  if (selection.kind === 'member') item = r.members?.members.find((member) => member.id === selection.id);
+  else if (selection.kind === 'vehicle') item = r.vehicles?.vehicles.find((vehicle) => vehicle.id === selection.id);
+  else if (selection.kind === 'place') item = r.zones?.zones.find((zone) => zone.id === selection.id);
+  return item && typeof item.lat === 'number' && typeof item.lon === 'number' ? [item.lon, item.lat] : null;
+}
+
+/**
+ * The re-centre after the sheet settled elsewhere (03 section 4.3, D45): ease the selection to the middle of the new visible rectangle over 250 ms (0 under
+ * reduced motion). Skipped while a flight or another move runs, and when the selection already sits within 2 px of the middle.
+ * @param {Runtime} r
+ */
+function recentreSelection(r) {
+  if (selectionState(r).flight || r.map.isMoving()) return;
+  const at = selectionPosition(r);
+  if (!at) return;
+  const rect = visibleRect(containerSize(r), r.appliedPadding);
+  const point = r.map.project(at);
+  if (isCentered({ x: point.x, y: point.y }, rect)) return;
+  const duration = r.reducedMotion ? 0 : RECENTER_EASE_MS;
+  r.cam.lastDurationMs = duration;
+  if (duration > 0) r.map.easeTo({ center: at, duration, essential: true });
+  else r.map.jumpTo({ center: at });
+}
+
+/**
+ * Runs a selection flight (03 section 4.3): to `center` at the plan's zoom, with the padding of the sheet at Peek (or the forced padding), never the measured one,
+ * so the entity ends centred in the Peek rectangle while the sheet is still collapsing. The target padding is stored by the ease; the measured padding is held
+ * back until it ends. The caller has called flushLayout, so the container size is current.
+ * @param {Runtime} r
+ * @param {LngLat} center
+ * @param {{ kind: 'ease' | 'fly', zoom: number, durationMs: number }} plan
+ */
+function runFlight(r, center, plan) {
+  const state = selectionState(r);
+  const padding = r.forcedPadding ?? selectionPadding(containerSize(r), r.layout);
+  const duration = r.reducedMotion ? 0 : plan.durationMs;
+  r.cam.lastDurationMs = duration;
+  state.atDefault = false;
+  state.flight = null;
+  if (duration > 0) {
+    const options = { center, zoom: plan.zoom, padding, duration, essential: true };
+    if (plan.kind === 'fly') r.map.flyTo(options);
+    else r.map.easeTo(options);
+    if (r.map.isMoving()) state.flight = { padding };
+  } else {
+    r.map.jumpTo({ center, zoom: plan.zoom, padding });
+  }
+  scheduleRender();
+}
+
+/**
+ * The flight is over: apply the measured padding again (a no-op in the normal case, where the sheet collapsed to the padding the flight used) and let the
+ * re-centre notice anything else. `appliedPadding` becomes what the transform really holds, so the next applyPadding compares with the truth.
+ * @param {Runtime} r
+ */
+function endFlight(r) {
+  selectionState(r).flight = null;
+  const held = r.map.getPadding();
+  r.appliedPadding = { top: held.top ?? 0, right: held.right ?? 0, bottom: held.bottom ?? 0, left: held.left ?? 0 };
+  scheduleRender();
+}
+
+/**
+ * @param {Runtime} r
+ * @param {LngLat} at
+ * @returns {boolean} the point is inside the map container
+ */
+function isOnScreen(r, at) {
+  const size = containerSize(r);
+  const point = r.map.project(at);
+  return point.x >= 0 && point.x <= size.width && point.y >= 0 && point.y <= size.height;
+}
+
+/**
+ * Starts Follow when the member is `drivingFresh` (01 section 4.14: never for a non-driving selection); otherwise stops it.
+ * @param {Runtime} r
+ * @param {string} id
+ */
+function beginFollow(r, id) {
+  const member = r.members?.members.find((item) => item.id === id);
+  selectionState(r).followId = member?.drivingFresh ? id : null;
+}
+
+/**
+ * Ends Follow (a user gesture, a bubble tap or recenter). S8c: tell .NET here once `MapCallbacks` has the follow-ended callback of 03 section 4.7; the
+ * callbacks contract test lists them exactly, so the call cannot be added before that method exists.
+ * @param {Runtime} r
+ */
+function endFollow(r) {
+  selectionState(r).followId = null;
+}
+
+/**
+ * Hook of renderFrame, after the member pins were reconciled (01 section 4.14): the camera keeps the followed member centred in the visible rectangle with an
+ * ease the length of the pin glide, zoom unchanged. Follow stops by itself when the member is no longer driving or has no fix.
+ * @param {Runtime} r
+ */
+function followMember(r) {
+  const state = selectionState(r);
+  if (state.followId === null) return;
+  const member = r.members?.members.find((item) => item.id === state.followId);
+  if (!member || !member.drivingFresh || typeof member.lat !== 'number' || typeof member.lon !== 'number') {
+    state.followId = null;
+    return;
+  }
+  if (state.flight) return;
+  /** @type {LngLat} */
+  const at = [member.lon, member.lat];
+  const point = r.map.project(at);
+  if (isCentered({ x: point.x, y: point.y }, visibleRect(containerSize(r), r.appliedPadding), 1)) return;
+  const duration = r.reducedMotion ? 0 : GLIDE_MS;
+  r.cam.lastDurationMs = duration;
+  state.atDefault = false;
+  if (duration > 0) r.map.easeTo({ center: at, duration, essential: true });
+  else r.map.jumpTo({ center: at });
+}
+
+/**
+ * Hook of placeChips (D75): shifts a chip sideways, through the `--realm-chip-dx` custom property that realm-map.css adds to its centring transform, so it
+ * stays inside the map: not past the left and right edge, and in Expanded not under the panel. This is the "Here for" chip and the selection chip alike.
+ * @param {Runtime} r
+ * @param {Pin} pin
+ * @param {{ x: number, y: number }} tip where the pin touches the map
+ */
+function clampChip(r, pin, tip) {
+  const chip = pin.chipEl;
+  if (!chip) return;
+  const width = chip.offsetWidth;
+  if (width <= 0) return;
+  const room = chipRoom(containerSize(r), r.layout, r.appliedPadding);
+  const shift = `${Math.round(clampChipShift(tip.x + pin.dx, width, room) * 2) / 2}px`;
+  if (chip.style.getPropertyValue('--realm-chip-dx') !== shift) chip.style.setProperty('--realm-chip-dx', shift);
+}
+
+/**
+ * The selection: draws the glow and the draw order of the selected pin (Peek ring, 60 px, z 4) and, for a driving member with `follow`, starts Follow. C# decides
+ * the selection (D45); this only mirrors it. `null` clears the glow and Follow. It does not move the camera: a flight command follows it.
+ * @param {{ kind: 'member' | 'vehicle' | 'place', id: string, follow?: boolean } | null} selection
+ */
+export function setSelection(selection) {
+  call('setSelection', () => {
+    const r = rt;
+    if (!r) return;
+    if (!selection || typeof selection.id !== 'string' || selection.id === '') {
+      r.selection = null;
+      endFollow(r);
+    } else {
+      r.selection = { selected: true, kind: selection.kind, id: selection.id };
+      if (selection.kind === 'member' && selection.follow === true) beginFollow(r, selection.id);
+      else endFollow(r);
+    }
+    r.dirty.members = true;
+    r.dirty.vehicles = true;
+    scheduleRender();
+  }, true);
+}
+
+/**
+ * Selection flight to a member (01 section 4.13): on screen, an `easeTo` to `max(current zoom, minZoom ?? 15)` over 600 ms; far and off screen, a `flyTo` to
+ * zoom 13 over 900 ms; durations 0 under reduced motion. The member ends centred in the visible rectangle of the Peek padding (D45). `follow: true` starts
+ * Follow when the member is `drivingFresh`.
+ * @param {string} id
+ * @param {{ minZoom?: number, follow?: boolean }} [opts]
+ */
+export function flyToMember(id, opts = {}) {
+  call('flyToMember', () => {
+    const r = rt;
+    if (!r) return;
+    const member = r.members?.members.find((item) => item.id === id);
+    if (!member || typeof member.lat !== 'number' || typeof member.lon !== 'number') return;
+    flushLayout(r);
+    /** @type {LngLat} */
+    const at = [member.lon, member.lat];
+    runFlight(r, at, selectionFlightPlan({
+      far: member.far,
+      onScreen: isOnScreen(r, at),
+      currentZoom: r.map.getZoom(),
+      minZoom: opts.minZoom,
+      reducedMotion: r.reducedMotion,
+    }));
+    if (opts.follow === true) beginFollow(r, id);
+  });
+}
+
+/**
+ * Selection flight to a vehicle (01 section 4.13): an `easeTo` to `max(current zoom, minZoom ?? 15)` over 600 ms with the Peek padding.
+ * @param {string} id
+ * @param {{ minZoom?: number }} [opts]
+ */
+export function flyToVehicle(id, opts = {}) {
+  call('flyToVehicle', () => {
+    const r = rt;
+    if (!r) return;
+    const vehicle = r.vehicles?.vehicles.find((item) => item.id === id);
+    if (!vehicle || typeof vehicle.lat !== 'number' || typeof vehicle.lon !== 'number') return;
+    flushLayout(r);
+    /** @type {LngLat} */
+    const at = [vehicle.lon, vehicle.lat];
+    runFlight(r, at, selectionFlightPlan({ far: false, onScreen: true, currentZoom: r.map.getZoom(), minZoom: opts.minZoom, reducedMotion: r.reducedMotion }));
+  });
+}
+
+/**
+ * Selection flight to a place (01 section 4.13): the zone circle, grown 20 % (or by `opts.grow`), fitted into the Peek visible rectangle with the 56 px pin
+ * allowance on top, `maxZoom` 16, over 600 ms.
+ * @param {string} zoneId
+ * @param {{ grow?: number }} [opts]
+ */
+export function fitPlace(zoneId, opts = {}) {
+  call('fitPlace', () => {
+    const r = rt;
+    if (!r) return;
+    const zone = r.zones?.zones.find((item) => item.id === zoneId);
+    if (!zone || typeof zone.lat !== 'number' || typeof zone.lon !== 'number') return;
+    flushLayout(r);
+    const padding = r.forcedPadding ?? selectionPadding(containerSize(r), r.layout);
+    const rect = visibleRect(containerSize(r), padding);
+    const pose = fitCircle([zone.lon, zone.lat], zone.radiusM, rect, { growth: opts.grow, minZoom: r.map.getMinZoom(), maxZoom: FIT_MAX_ZOOM });
+    runFlight(r, pose.center, { kind: 'ease', zoom: pose.zoom, durationMs: SELECTION_EASE_MS });
+  });
+}
+
+/**
+ * The recentre button (01 section 4.11): away from the default view it runs the default camera, at the default view it centres on "me alone", at "me alone" it
+ * goes back to the default camera (600 ms each). The selection is not touched; Follow ends. Returns the new state.
+ * @returns {RecenterState}
+ */
+export function recenter() {
+  return (
+    call('recenter', () => {
+      const r = rt;
+      if (!r) return 'away';
+      endFollow(r);
+      flushLayout(r);
+      const c = r.map.getCenter();
+      const me = r.targets?.me ?? null;
+      const next = nextRecenter(recenterState(r, [c.lng, c.lat], r.map.getZoom()), me !== null);
+      if (next === 'me' && me) {
+        moveCamera(r, { center: me.center, zoom: me.zoom }, FIT_DURATION_MS);
+        selectionState(r).atDefault = false;
+        return 'me';
+      }
+      if (!fitNow(r, true)) {
+        r.wantFit = { animate: true };
+        scheduleRender();
+      }
+      return 'default';
+    }) ?? 'away'
+  );
+}

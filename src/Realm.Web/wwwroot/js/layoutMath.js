@@ -5,7 +5,7 @@
 // S5a owns the region below. A later slice adds its exported functions in one commented region at the end of the file and leaves
 // the code above untouched (04 section 1.8): S8a adds `selectionPadding` there.
 
-import { EARTH_RADIUS_M } from './geo.js';
+import { EARTH_RADIUS_M, TILE_SIZE_PX, metersPerPixel } from './geo.js';
 
 /** @typedef {import('./geo.js').LngLat} LngLat */
 /** @typedef {{ top: number, right: number, bottom: number, left: number }} Padding */
@@ -157,4 +157,172 @@ export function isAtDefault(camera, target, tolerance = {}) {
   const meters = tolerance.meters ?? AT_DEFAULT_METERS;
   const zoom = tolerance.zoom ?? AT_DEFAULT_ZOOM;
   return haversine(camera.center, target.center) <= meters && Math.abs(camera.zoom - target.zoom) <= zoom;
+}
+
+// ---- S8a: selection flights, the refit on a layout change, the chip clamp (D45, D75; 03 section 4.3, 01 sections 4.4, 4.11 and 4.13) -----------------------------
+// Pure arithmetic only: realmMap.js owns every MapLibre call and passes these functions what it measured.
+
+/** A selection flight zooms in to at least this (01 section 4.13); a higher current zoom is kept. */
+export const SELECTION_MIN_ZOOM = 15;
+/** A far member that is off screen is flown to at this zoom (01 section 4.13). */
+export const FAR_FLIGHT_ZOOM = 13;
+/** The ease of a selection flight, and of `fitPlace`. */
+export const SELECTION_EASE_MS = 600;
+/** The `flyTo` of a far, off-screen member. */
+export const FAR_FLIGHT_MS = 900;
+/** The sheet height must be stable this long before the selection is re-centred (03 section 4.3). */
+export const RECENTER_SETTLE_MS = 120;
+/** The ease of that re-centre. */
+export const RECENTER_EASE_MS = 250;
+/** No re-centre when the selection is already this close to the centre of the settled rectangle. */
+export const RECENTER_SKIP_PX = 2;
+/** `fitPlace` fits the zone circle grown by this much (01 section 4.13). */
+export const PLACE_FIT_GROWTH = 0.2;
+/** `fitPlace` never zooms in past this (the `fitBounds` rule of 03 section 4.3). */
+export const PLACE_FIT_MAX_ZOOM = 16;
+/** A pin chip keeps this far from the left and right edge of the map (D75). */
+export const CHIP_EDGE_PX = 8;
+
+const deg = (/** @type {number} */ radians) => (radians * 180) / Math.PI;
+
+/**
+ * The padding that a selection flight aims at (D45; 03 section 4.3): in Compact the padding of the sheet at Peek with the right stack visible,
+ * `{ safe-top + 72, 72, peekHeight + 16, 16 + safe-left }` and so `{72, 72, 190, 16}` at 412 x 915, whatever the sheet measures right now (a row tapped at
+ * Tall starts the flight while the measured sheet is still Tall). In Expanded the panel padding, which is the measured one. The 48 px minimum visible height
+ * of 01 section 3.4.3 applies as in {@link computePadding}.
+ * @param {Viewport} viewport
+ * @param {LayoutPayload} layout
+ * @returns {Padding}
+ */
+export function selectionPadding(viewport, layout) {
+  const target = layout.mode === 'expanded' ? layout : { ...layout, stackVisible: true };
+  return computePadding(viewport, target, null);
+}
+
+/**
+ * How a member flight goes (03 section 4.3, 01 section 4.13): a far member who is off screen gets a `flyTo` to zoom 13 over 900 ms; everyone else an `easeTo`
+ * to `max(current zoom, minZoom ?? 15)` over 600 ms. Under reduced motion every duration is 0.
+ * @param {{ far?: boolean, onScreen: boolean, currentZoom: number, minZoom?: number | null, reducedMotion?: boolean }} input
+ * @returns {{ kind: 'ease' | 'fly', zoom: number, durationMs: number }}
+ */
+export function selectionFlightPlan(input) {
+  const far = input.far === true && !input.onScreen;
+  const zoom = far ? FAR_FLIGHT_ZOOM : Math.max(input.currentZoom, input.minZoom ?? SELECTION_MIN_ZOOM);
+  const durationMs = input.reducedMotion === true ? 0 : far ? FAR_FLIGHT_MS : SELECTION_EASE_MS;
+  return { kind: far ? 'fly' : 'ease', zoom, durationMs };
+}
+
+/**
+ * The MapLibre zoom at which a circle of this diameter, centred at this latitude, is `sidePx` CSS pixels across (Web Mercator, 512 px world). Infinity for a
+ * circle without a diameter.
+ * @param {number} diameterM
+ * @param {number} latDeg
+ * @param {number} sidePx
+ * @returns {number}
+ */
+export function zoomToFit(diameterM, latDeg, sidePx) {
+  if (!(diameterM > 0) || !(sidePx > 0)) return Number.POSITIVE_INFINITY;
+  return Math.log2(metersPerPixel(0, latDeg) / (diameterM / sidePx));
+}
+
+/** @param {number} lat @returns {number} the Web Mercator y of a latitude, 0 at the north edge of the world and 1 at the south edge */
+const mercatorY = (lat) => 0.5 - Math.log(Math.tan(Math.PI / 4 + rad(lat) / 2)) / (2 * Math.PI);
+/** @param {number} y @returns {number} */
+const latitudeOfMercatorY = (y) => deg(2 * Math.atan(Math.exp((0.5 - y) * 2 * Math.PI)) - Math.PI / 2);
+
+/**
+ * The camera that fits a zone circle, grown by `growth`, into a visible rectangle (`fitPlace`; 01 section 4.13): the largest zoom at which the grown circle fits
+ * the rectangle less `topAllowancePx` at the top (the pin body, 56 px; 03 section 4.3), at most `maxZoom`. The camera centre is the middle of the whole
+ * rectangle once the padding is applied, so it is placed `topAllowancePx / 2` above the circle's centre: the circle then sits in the part below the allowance.
+ * @param {import('./geo.js').LngLat} center the circle centre
+ * @param {number} radiusM
+ * @param {Rect} rect the visible rectangle of the target padding
+ * @param {{ growth?: number, topAllowancePx?: number, minZoom?: number, maxZoom?: number }} [options]
+ * @returns {CameraPose}
+ */
+export function fitCircle(center, radiusM, rect, options = {}) {
+  const growth = options.growth ?? PLACE_FIT_GROWTH;
+  const allowance = options.topAllowancePx ?? PIN_BODY_ALLOWANCE_PX;
+  const maxZoom = options.maxZoom ?? PLACE_FIT_MAX_ZOOM;
+  const minZoom = options.minZoom ?? 0;
+  const side = Math.max(1, Math.min(rect.right - rect.left, rect.bottom - rect.top - allowance));
+  const zoom = Math.min(maxZoom, Math.max(minZoom, zoomToFit(2 * Math.max(0, radiusM) * (1 + growth), center[1], side)));
+  const y = mercatorY(center[1]) - allowance / 2 / (TILE_SIZE_PX * 2 ** zoom);
+  return { center: [center[0], latitudeOfMercatorY(y)], zoom };
+}
+
+/**
+ * The part of a layout that decides where the default view fits (D75): the mode and the room the side panel takes. The sheet height, the right stack and the
+ * safe insets are not part of it, so a sheet that opens or closes never refits the camera.
+ * @param {LayoutPayload} layout
+ * @returns {{ mode: 'compact' | 'expanded', panelWidthPx: number }} `panelWidthPx` is 0 unless the panel is shown (Expanded and not hidden), else its left gutter plus its width
+ */
+export function layoutFootprint(layout) {
+  const panel = layout.mode === 'expanded' && !layout.panelHidden;
+  return { mode: layout.mode, panelWidthPx: panel ? layout.panelLeftPx + layout.panelWidthPx : 0 };
+}
+
+/**
+ * Whether the default view has to be fitted again (D75): the camera is at the default view and the layout switched between Compact and Expanded, or the side
+ * panel appeared, disappeared or changed width, so the old fit would leave pins under the panel or a gap where it was.
+ * @param {LayoutPayload | null | undefined} previous the layout the camera was last fitted for; none means nothing to compare with
+ * @param {LayoutPayload} next
+ * @param {boolean} atDefault the camera sits at the default view (it was fitted and nothing moved it away since)
+ * @returns {boolean}
+ */
+export function refitNeeded(previous, next, atDefault) {
+  if (!atDefault || !previous) return false;
+  const a = layoutFootprint(previous);
+  const b = layoutFootprint(next);
+  return a.mode !== b.mode || a.panelWidthPx !== b.panelWidthPx;
+}
+
+/**
+ * Where recentre goes next (01 section 4.11): away to the default view, the default view to "me alone" (when there is one), "me alone" back to the default.
+ * @param {'away' | 'default' | 'me'} state where the camera is now
+ * @param {boolean} hasMe a "me alone" target exists
+ * @returns {'default' | 'me'}
+ */
+export function nextRecenter(state, hasMe) {
+  return state === 'default' && hasMe ? 'me' : 'default';
+}
+
+/**
+ * Whether a point is within {@link RECENTER_SKIP_PX} of the middle of a rectangle (so the re-centre after a sheet change would move nothing).
+ * @param {{ x: number, y: number }} point
+ * @param {Rect} rect
+ * @param {number} [tolerancePx]
+ * @returns {boolean}
+ */
+export function isCentered(point, rect, tolerancePx = RECENTER_SKIP_PX) {
+  const centre = rectCenter(rect);
+  return Math.hypot(point.x - centre.x, point.y - centre.y) <= tolerancePx;
+}
+
+/**
+ * The horizontal room a pin chip may use (D75): the whole map less {@link CHIP_EDGE_PX} on each side, and in Expanded with the panel shown only the part right
+ * of the panel (the left map padding), so a chip never clips at the viewport edge or hides under the panel.
+ * @param {Viewport} viewport
+ * @param {LayoutPayload} layout
+ * @param {Padding} padding the map padding in force (its left side is the panel's right edge plus the gutter)
+ * @returns {{ left: number, right: number }}
+ */
+export function chipRoom(viewport, layout, padding) {
+  const panel = layout.mode === 'expanded' && !layout.panelHidden;
+  return { left: panel ? padding.left : CHIP_EDGE_PX, right: viewport.width - CHIP_EDGE_PX };
+}
+
+/**
+ * The horizontal shift that brings a chip, centred on `centerX`, inside the room. A chip that is wider than the room is centred in it.
+ * @param {number} centerX the x of the middle of the chip (the pin's x)
+ * @param {number} chipWidthPx
+ * @param {{ left: number, right: number }} room
+ * @returns {number} the shift in px: negative moves the chip left, 0 when it already fits
+ */
+export function clampChipShift(centerX, chipWidthPx, room) {
+  if (chipWidthPx >= room.right - room.left) return (room.left + room.right) / 2 - centerX;
+  const left = centerX - chipWidthPx / 2;
+  if (left < room.left) return room.left - left;
+  const right = centerX + chipWidthPx / 2;
+  return right > room.right ? room.right - right : 0;
 }

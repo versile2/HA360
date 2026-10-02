@@ -274,7 +274,7 @@
   gap: 6px;
   height: 36px;
   padding: 0 14px 0 8px;
-  transform: translateX(-50%);
+  transform: translateX(calc(-50% + var(--realm-chip-dx, 0px)));   /* realmMap.js sets the dx so the chip stays inside the map (D75) */
   border: 1px solid var(--realm-line-strong);
   border-radius: 18px;
   background: color-mix(in srgb, var(--realm-surface-2) 96%, transparent);
