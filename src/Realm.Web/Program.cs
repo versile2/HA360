@@ -1,4 +1,5 @@
 using Realm.Demo;
+using Realm.Infrastructure.Hosting;
 using Realm.Web;
 using Realm.Web.Components;
 using Realm.Web.Hosting;
@@ -19,8 +20,10 @@ if (args is ["export-demo-cast", ..])
 }
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Logging.AddRealmConsole();   // one line per entry, UTC (03 section 9.1); the category levels come from appsettings.json and the log_level option
+builder.Configuration.AddRealmOptionsFile();   // the add-on options on the 02 section 3.4 paths, just below the environment (03 section 2.1)
 var runtime = RuntimeOptions.Detect(builder.Configuration, builder.Environment);
-builder.Services.AddRealmApp(runtime);
+builder.Services.AddRealmApp(runtime, builder.Configuration);
 
 var app = builder.Build();
 app.UseRealmPipeline();
@@ -29,21 +32,3 @@ app.MapRealmEndpoints();
 app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
 app.Run();
 return 0;
-
-namespace Realm.Web
-{
-    /// <summary>
-    /// The one place that composes the application's services. <c>Program.cs</c> calls it, and so does the Kestrel test host
-    /// (<c>RealmTestHost</c>), so a service added here cannot be missing from the tests that render the real pages.
-    /// </summary>
-    public static class RealmAppServiceCollectionExtensions
-    {
-        public static IServiceCollection AddRealmApp(this IServiceCollection services, RuntimeOptions runtime)
-        {
-            services.AddSingleton(runtime);   // RealmShell reads the mode to decide whether the Demo-only URL parameters apply (03 section 2.1)
-            services.AddRealmWeb(runtime);
-            services.AddRealmDemo();   // until S13b wires the Live side, the Demo services are registered in every mode (R3-027)
-            return services;
-        }
-    }
-}

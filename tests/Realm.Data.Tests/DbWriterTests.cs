@@ -258,6 +258,49 @@ public class DbWriterTests
         Assert.Equal(2_000, writer.CommittedRows);
     }
 
+    // CR2-011: RowsCommitted is raised after the commit. A subscriber that throws used to turn the committed run into a failed flush: the rows were put back,
+    // committed again (idempotent) and the event threw again, so the writer faulted for ever. Now the failure is logged once and nothing else changes.
+    [Fact]
+    public async Task A_subscriber_that_throws_neither_faults_the_writer_nor_starves_the_other_subscribers()
+    {
+        await using var rig = await WriterRig.StartAsync();
+        var seen = new List<int>();
+        rig.Writer.RowsCommitted += _ => throw new InvalidOperationException("a bug in a subscriber");
+        rig.Writer.RowsCommitted += rows =>
+        {
+            lock (seen)
+            {
+                seen.Add(rows);
+            }
+        };
+
+        for (var i = 0; i < DbWriter.FlushRows; i++)
+        {
+            Assert.True(rig.Writer.EnqueueFix("king", TestData.Fix(i)));
+        }
+
+        Assert.Equal(DbWriter.FlushRows, await rig.NextCommitAsync());
+        await WriterRig.EventuallyAsync(() => SeenCount(seen) == 1);
+
+        // Past the 1 s back-off of a faulted loop and a 2 s flush: with the old code the rows would be committed again here.
+        rig.Time.Advance(TimeSpan.FromSeconds(5));
+        Assert.True(rig.Writer.EnqueueFix("king", TestData.Fix(DbWriter.FlushRows)));
+        rig.Time.Advance(DbWriter.FlushInterval);
+        await WriterRig.EventuallyAsync(() => SeenCount(seen) == 2);
+
+        Assert.False(rig.Writer.Health.IsFaulted);
+        Assert.Equal(0, rig.Writer.Health.FaultCount);
+        Assert.Equal(DbWriter.FlushRows + 1, rig.Writer.CommittedRows);
+        Assert.Equal(DbWriter.FlushRows + 1, rig.RowCount("fixes"));
+        Assert.Equal(0, rig.Writer.QueueDepth);
+        lock (seen)
+        {
+            Assert.Equal(new[] { DbWriter.FlushRows, 1 }, seen.ToArray());
+        }
+
+        Assert.Single(rig.Log.Messages, message => message.Contains("RowsCommitted subscriber failed", StringComparison.Ordinal));
+    }
+
     [Fact]
     public async Task Shutdown_drains_the_queue_marks_the_database_clean_and_checkpoints_the_wal()
     {
@@ -393,6 +436,14 @@ public class DbWriterTests
         Assert.Equal(
             "3",
             TestSql.Text(rig.FilePath, $"SELECT algo_version FROM trips WHERE member_id = 'king' AND start_ts = {TestData.Start.ToUnixTimeMilliseconds()}"));
+    }
+
+    private static int SeenCount(List<int> seen)
+    {
+        lock (seen)
+        {
+            return seen.Count;
+        }
     }
 
     private static string? ReasonAt(WriterRig rig, int second)

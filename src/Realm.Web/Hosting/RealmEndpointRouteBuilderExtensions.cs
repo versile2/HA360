@@ -1,5 +1,6 @@
 using System.Text;
 using Microsoft.Net.Http.Headers;
+using Realm.Domain;
 using Realm.Web.Theme;
 
 namespace Realm.Web.Hosting;
@@ -18,7 +19,26 @@ public static class RealmEndpointRouteBuilderExtensions
         // The theme tokens are an endpoint, not a file (03 sections 3.8 and 5.3): no-cache plus a strong ETag, so a revalidation costs a 304.
         endpoints.MapGet("css/tokens.css", TokensCss);
 
+        // The avatar proxy (03 section 10.4): the path carries a member id and nothing else, and the picture is the one the member's own option chose.
+        endpoints.MapGet("avatars/{memberId}", AvatarAsync);
+
         return endpoints;
+    }
+
+    // Demo registers no IAvatarSource (its members have no picture, R2-016), so it answers 404 like a member without one. A refusal or a failed
+    // upstream is a 404 with an empty body too; the service has logged why, and the UI draws initials.
+    private static async Task<IResult> AvatarAsync(string memberId, HttpContext context, CancellationToken cancellationToken)
+    {
+        var source = context.RequestServices.GetService<IAvatarSource>();
+        var image = source is null ? null : await source.GetAsync(memberId, cancellationToken);
+        if (image is null)
+        {
+            return Results.NotFound();
+        }
+
+        // Revalidation costs a 304 (the framework compares If-None-Match with the entity tag); the browser keeps the picture for 24 hours.
+        context.Response.Headers.CacheControl = "private, max-age=86400";
+        return Results.Bytes(image.Bytes, image.ContentType, entityTag: image.ETag is null ? null : new EntityTagHeaderValue(image.ETag));
     }
 
     private static IResult TokensCss(HttpContext context)

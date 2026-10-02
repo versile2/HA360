@@ -76,6 +76,7 @@ public sealed class DbWriter : BackgroundService, IRealmWriter
     private long _committedRows;
     private long _lastCommitMs;
     private long _lastDropLogMs;
+    private int _subscriberFailureLogged;
 
     public DbWriter(IDbContextFactory<RealmDb> factory, TimeProvider time, ILogger<DbWriter> logger)
     {
@@ -85,7 +86,10 @@ public sealed class DbWriter : BackgroundService, IRealmWriter
         _loop = new ResilientLoop(nameof(DbWriter), logger, time);
     }
 
-    /// <summary>Raised after each committed batch of rows with the number of rows in it, on the writer's thread. A trip close does not raise it.</summary>
+    /// <summary>
+    /// Raised after each committed batch of rows with the number of rows in it, on the writer's thread. A trip close does not raise it. A subscriber that
+    /// throws is logged once and does not affect the writer or the other subscribers: the rows are committed by then.
+    /// </summary>
     public event Action<int>? RowsCommitted;
 
     /// <summary>Whether the writer loop has failed and is waiting to start again (03 section 2.14).</summary>
@@ -359,7 +363,34 @@ public sealed class DbWriter : BackgroundService, IRealmWriter
 
         Interlocked.Add(ref _committedRows, rows);
         Interlocked.Exchange(ref _lastCommitMs, _time.GetUtcNow().ToUnixTimeMilliseconds());
-        RowsCommitted?.Invoke(rows);
+        RaiseRowsCommitted(rows);
+    }
+
+    // The rows are committed when this runs, so a subscriber's failure must not turn the run into a failed flush: that puts the rows back, commits them again
+    // (idempotent) and raises the event again, and the writer would fault for ever with CommittedRows growing (CR2-011). Each subscriber is called on its own,
+    // so one that throws does not starve the ones after it. The failure is logged once, with its type and never its message.
+    private void RaiseRowsCommitted(int rows)
+    {
+        var handlers = RowsCommitted;
+        if (handlers is null)
+        {
+            return;
+        }
+
+        foreach (var handler in handlers.GetInvocationList().Cast<Action<int>>())
+        {
+            try
+            {
+                handler(rows);
+            }
+            catch (Exception ex)
+            {
+                if (Interlocked.Exchange(ref _subscriberFailureLogged, 1) == 0)
+                {
+                    _logger.LogError("A RowsCommitted subscriber failed ({ErrorType}); the rows were committed and the writer carries on", ex.GetType().Name);
+                }
+            }
+        }
     }
 
     private async Task CommitTripAsync(WriteCommand.Trip command)

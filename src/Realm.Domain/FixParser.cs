@@ -180,8 +180,11 @@ public static class FixParser
                 // Attributes with the same last_seen are a battery or wifi change, not a new fix.
                 return ts == previous.Ts;
             case FixSource.Companion:
+                // A companion fix is the state's update time "when coordinates changed" (02 section 1.6): the same coordinates, however long after, are an
+                // attribute-only update (accuracy, altitude, battery) and not a new fix. Counting them would make a stationary phone look fresher than its
+                // last position report and bias the heartbeat estimate (02 section 4.7) low.
                 // Rule F0: on the first snapshot after a restart, a state within 1 m of the last stored fix is an echo.
-                return (samePosition && apart <= DuplicateWindow)
+                return samePosition
                     || (firstSnapshot && Geo.DistanceM(previous.Lat, previous.Lon, lat, lon) < RestartEchoMinDistanceM);
             default:
                 if (samePosition && apart <= DuplicateWindow)
