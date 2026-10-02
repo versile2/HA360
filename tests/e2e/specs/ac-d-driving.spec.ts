@@ -194,10 +194,10 @@ test.describe('acceptance D: driving', () => {
   test('[AC-34] the title and the four stat chips of the default fixture, with arrow colours and tooltips', async ({ page }) => {
     await openDriving(page);
 
-    // The title (H1, Cinzel) and the subtitle.
+    // The title (H1) and the subtitle.
     const title = page.getByRole('heading', { level: 1 });
     await expect(title).toHaveText('Weekly Driving Report');
-    expect(await title.evaluate((element) => getComputedStyle(element).fontFamily), 'the H1 is set in Cinzel').toMatch(/^"?Cinzel"?\s*(,|$)/);
+    // Typography is asserted by S10b (D77).
     await expect(page.getByText("The scribes' tally of the Realm's roads", { exact: true })).toBeVisible();
 
     // This week: Speeding 56 up, Phone use 60* down, accel and braking "—" with no arrow.

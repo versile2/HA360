@@ -32,7 +32,7 @@
 }
 
 .realm-driving__wordmark {
-  font-family: var(--realm-font-display);
+  font-family: var(--realm-font-display, Georgia, "Times New Roman", serif);
   font-size: 1rem;
   font-weight: 600;
   line-height: 24px;
