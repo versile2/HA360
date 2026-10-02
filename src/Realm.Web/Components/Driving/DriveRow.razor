@@ -1,0 +1,28 @@
+@* One drive of a driver's week (01 section 6.6): the time range, "From → To", "7.2 mi · Top 62 mph", and at the right a small chip (icon and count) for each event type
+   whose count is above zero (a zero or an unknown count draws nothing). At least 72 px high and not tappable in v1, so it is a plain list item. Every string is the
+   DriveLine the formatter built; the chips are one image each, named by their words ("4 speeding events"). *@
+<li class="realm-drive-row" data-testid="@("drive-row-" + Line.Index.ToString(CultureInfo.InvariantCulture))">
+    <span class="realm-drive-row__text">
+        <span class="realm-drive-row__time">@Line.Time</span>
+        <span class="realm-drive-row__route">@Line.Route</span>
+        <span class="realm-drive-row__detail">@Line.Detail</span>
+    </span>
+    @if (Line.Events.Count > 0)
+    {
+        <span class="realm-drive-row__events">
+            @foreach (var chip in Line.Events)
+            {
+                <span class="realm-drive-event realm-drive-event--@(chip.Key)" role="img" aria-label="@chip.Text">
+                    <MudIcon Icon="@DrivingIcons.For(chip.Key)" />
+                    <span class="realm-drive-event__count">@(chip.Count.ToString(CultureInfo.InvariantCulture))</span>
+                </span>
+            }
+        </span>
+    }
+</li>
+
+@code {
+    /// <summary>The drive, as the formatter built it.</summary>
+    [Parameter, EditorRequired]
+    public DriveLine Line { get; set; } = default!;
+}

@@ -4,13 +4,14 @@
 @using Realm.Web.Components.Driving
 @using Realm.Web.Formatting
 @inject NavigationManager Navigation
+@inject IDialogService Dialogs
 @inject ILogger<DrivingPage> Logger
 
 @* The Weekly Driving Report (01 section 6; 03 section 3.4): a full page, no map and no sheet. The session is RealmShell's cascading value. The selected week is the
    ?week= query (D69), read on every navigation through SupplyParameterFromQuery and written back with NavigationManager (a chip is a replace, so Back from Driving still
    leaves for Location), never taken from the Demo overrides. The report comes from IRealmSession.GetWeekReportAsync(week, snapshot.WeekStart); the page renders it and
    decides nothing: every figure, arrow, asterisk of 01 section 6.3 is the data layer's, built into strings by the formatters. The report is fetched again, in place, when
-   the snapshot's StatsVersion moves (never polled). The six openers raise OnOpen; the popups arrive with S11b. *@
+   the snapshot's StatsVersion moves (never polled). The six openers raise OnOpen and the page opens StatPopup with IDialogService (01 section 6.7). *@
 <section class="realm-driving" aria-busy="@(_loading ? "true" : "false")">
     <div class="realm-driving__column">
         <header class="realm-driving__header">
@@ -81,6 +82,15 @@
 </section>
 
 @code {
+    // Esc and the scrim close the popup; the scrim is the Realm's own (realm-driving.css), and the dialog has no header close button because the popup draws its own.
+    private static readonly DialogOptions PopupOptions = new()
+    {
+        CloseOnEscapeKey = true,
+        BackdropClick = true,
+        CloseButton = false,
+        BackgroundClass = "realm-popup-scrim",
+    };
+
     private readonly CancellationTokenSource _lifetime = new();
     private CancellationTokenSource? _load;
     private IReadOnlyList<WeekRef> _weeks = [];
@@ -220,8 +230,21 @@
         return Task.CompletedTask;
     }
 
-    // S11b mounts StatPopup here (01 section 6.7); until then the six openers are buttons that do nothing.
-    private Task OpenAsync(string key) => Task.CompletedTask;
+    // The popup of one of the six openers (01 section 6.7): a MudBlazor dialog with the week report the page shows. Esc and the scrim close it; MudBlazor returns the focus to the
+    // opener, which still has it when the dialog first renders. The popup renders from the report it was given, so the figures cannot change under it.
+    private async Task OpenAsync(string key)
+    {
+        IReadOnlyDictionary<string, MemberVm> members = _members;
+        var parameters = new DialogParameters<StatPopup>
+        {
+            { popup => popup.Key, key },
+            { popup => popup.Report, _report },
+            { popup => popup.Members, members },
+            { popup => popup.WeekOffset, _week },
+            { popup => popup.Zone, Session.Zone },
+        };
+        await Dialogs.ShowAsync<StatPopup>(null, parameters, PopupOptions);
+    }
 
     // Raised off the UI thread (IRealmSession.Changed): marshal back before touching state. The report is fetched again, in place, only when StatsVersion moved.
     private void OnSessionChanged()

@@ -103,28 +103,27 @@ public sealed class RetentionTests
     public async Task TheLog_IsCheckpointedOnTheFirstRun_AndThenOnceAWeek()
     {
         await using var rig = await StoreRig.StartAsync(ThirtyDays);
+        // SQLite deletes the -wal file when the last connection closes, and the pooled connections close whenever another rig in the process clears the pools.
+        // This one is never pooled and never in a transaction, so the file (and the frames in it) stay put for the whole test, and a checkpoint is not held up.
+        // It is declared after the rig, so it is disposed before it.
+        await using var logHolder = rig.HoldLogOpen();
         await rig.DiscoverAsync(Plans.Member("king", life360: Plans.KingTracker));
         var clock = new ManualTimeProvider(StoreRig.Start);
         var retention = rig.NewRetention(clock);
-        var wal = new FileInfo(rig.FilePath + "-wal");
         await rig.StoreFixesAsync("king", [Fix(StoreRig.Start.AddDays(-1))]);
-        wal.Refresh();
-        Assert.True(wal.Length > 0, "The write should be in the log");
+        Assert.True(rig.LogBytes() > 0, "The write should be in the log");
 
         await retention.PruneAsync(CancellationToken.None);
-        wal.Refresh();
-        Assert.Equal(0, wal.Length);   // wal_checkpoint(TRUNCATE)
+        Assert.Equal(0, rig.LogBytes());   // wal_checkpoint(TRUNCATE)
 
         clock.Advance(TimeSpan.FromDays(1));
         await rig.StoreFixesAsync("king", [Fix(StoreRig.Start.AddDays(-2))]);
         await retention.PruneAsync(CancellationToken.None);
-        wal.Refresh();
-        Assert.True(wal.Length > 0, "A day later the log is left alone");
+        Assert.True(rig.LogBytes() > 0, "A day later the log is left alone");
 
         clock.Advance(TimeSpan.FromDays(6));
         await retention.PruneAsync(CancellationToken.None);
-        wal.Refresh();
-        Assert.Equal(0, wal.Length);   // a week after the last checkpoint
+        Assert.Equal(0, rig.LogBytes());   // a week after the last checkpoint
     }
 
     [Fact]

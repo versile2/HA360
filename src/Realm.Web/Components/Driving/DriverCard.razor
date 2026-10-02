@@ -1,5 +1,5 @@
 @* A driver card (01 section 6.5): avatar with the member-colour ring, name, "18 drives • 202.6 miles", the events pill and a chevron. The whole card is one link to the
-   driver's week (driving/{memberId}?week=n, relative like every link here; DriverWeekPage arrives with S11b). Everything is built from the DriverSummary by the
+   driver's week (driving/{memberId}?week=n, relative like every link here; the target is DriverWeekPage). Everything is built from the DriverSummary by the
    formatter: the pill lists the tracked types only and carries its asterisk only when CoarseTrips > 0, never for a null count of one kind. *@
 <a class="realm-driver-card"
    href="@DrivingFormatter.DriverHref(Driver.MemberId, Week)"

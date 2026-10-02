@@ -1,5 +1,6 @@
 /*
- * The Weekly Driving Report (01 section 6; 03 section 3.4): the week chips, the stat chips, the Top Speed and Drives cards, the driver cards and the avatar they share.
+ * The Weekly Driving Report (01 section 6; 03 section 3.4): the week chips, the stat chips, the Top Speed and Drives cards, the driver cards and the avatar they share,
+ * the six popups with their bars, and the driver week (tiles, event row and drive list).
  * Tokens only: every colour is a var(--realm-*) from css/tokens.css or a colour-mix() of them, and the no-colour-literals guard fails the build on a literal here.
  * It loads after app.css, whose .realm-driving rule supplies the 16 px gutters and the room above the navigation bar, so equal-specificity rules here win by order.
  *
@@ -485,6 +486,11 @@
   border-radius: 20px;
 }
 
+.realm-skeleton--tile {
+  height: 72px;
+  border-radius: 20px;
+}
+
 @keyframes realm-driving-shimmer {
   from {
     background-position: 200% 0;
@@ -495,8 +501,513 @@
   }
 }
 
+/* ---- the popups (01 section 6.7): a MudBlazor dialog, so every rule names .mud-dialog as well and outranks MudBlazor's own (which sets padding, overflow and the surface) ---- */
+
+.mud-overlay.realm-popup-scrim .mud-overlay-scrim.mud-overlay-dark {
+  border-color: var(--realm-scrim);
+  background-color: var(--realm-scrim);
+}
+
+.mud-dialog.realm-popup {
+  position: relative;
+  box-sizing: border-box;
+  width: min(92vw, 420px);
+  max-height: 90vh;
+  max-height: 90dvh;
+  margin: 0;
+  border-radius: 28px;
+  background: var(--realm-surface-2);
+  color: var(--realm-text);
+  box-shadow: 0 24px 38px 3px var(--realm-driving-shadow);
+  animation: realm-popup-in 150ms ease-out both;
+}
+
+@media (min-width: 840px) {
+  .mud-dialog.realm-popup {
+    width: 440px;
+  }
+}
+
+@keyframes realm-popup-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+/* The header holds the icon circle and the title (the dialog is labelled by it); the Close button is drawn over its right end. */
+.mud-dialog.realm-popup .realm-popup__head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 24px 72px 0 24px;
+}
+
+.mud-dialog.realm-popup .realm-popup__body {
+  position: static;
+  overflow: visible;
+  padding: 4px 24px 24px;
+}
+
+.realm-popup__icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--realm-plum);
+  color: var(--realm-secondary);
+}
+
+.realm-popup__icon .mud-icon-root {
+  width: 28px;
+  height: 28px;
+  font-size: 28px;
+}
+
+.realm-popup__title {
+  margin: 0;
+  font-family: var(--realm-font-display, Georgia, "Times New Roman", serif);
+  font-size: 1.375rem;
+  line-height: 28px;
+  font-weight: 700;
+}
+
+.realm-popup__close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  width: 48px;
+  height: 48px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--realm-text);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.realm-popup__lore {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 18px;
+  color: var(--realm-text-2);
+}
+
+.realm-popup__summary {
+  margin: 16px 0 0;
+  font-size: 1rem;
+  line-height: 24px;
+  font-weight: 700;
+}
+
+.realm-popup__toggle {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.realm-popup__toggle-chip {
+  flex: 1 1 0;
+  box-sizing: border-box;
+  min-height: 48px;
+  margin: 0;
+  padding: 0 20px;
+  border: 1px solid var(--realm-line);
+  border-radius: 24px;
+  background: var(--realm-surface);
+  color: var(--realm-text);
+  font: inherit;
+  font-size: 0.9375rem;
+  line-height: 20px;
+  font-weight: 700;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.realm-popup__toggle-chip[aria-pressed="true"] {
+  border-color: var(--realm-primary);
+  background: var(--realm-primary);
+  color: var(--realm-on-primary);
+}
+
+.realm-popup__footnote {
+  margin: 16px 0 0;
+  font-size: 0.75rem;
+  line-height: 16px;
+  color: var(--realm-text-2);
+}
+
+.realm-popup__info-root.mud-tooltip-root {
+  display: inline-block;
+  vertical-align: middle;
+}
+
+/* A 48 px target with an 18 px glyph; the negative margins keep it from stretching the footnote's lines. */
+.realm-popup__info {
+  display: inline-grid;
+  place-items: center;
+  box-sizing: border-box;
+  width: 48px;
+  height: 48px;
+  margin: -16px -8px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--realm-text-2);
+  cursor: pointer;
+  vertical-align: middle;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.realm-popup__info .mud-icon-root {
+  width: 18px;
+  height: 18px;
+  font-size: 18px;
+}
+
+.realm-popup__gotit {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  height: 52px;
+  margin: 16px 0 0;
+  padding: 0 24px;
+  border: 0;
+  border-radius: 26px;
+  background: var(--realm-primary);
+  color: var(--realm-on-primary);
+  font: inherit;
+  font-size: 0.9375rem;
+  line-height: 20px;
+  font-weight: 700;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ---- the bars (01 section 6.7.1): rows of 56 px with 8 px gaps. The pill's width is a minimum (56 px, 72 px for miles and mph) and grows with its text ("366.0 mi" is wider than
+   72 px), so the row is a grid of the room and the pill: the fill is value / maximum of the room left of the pill as it is drawn (track - pill - 8 px, the 8 px being the pill's inset
+   from the track's right edge), floored at 56 px so the avatar always fits, and it can never run under the pill. An unavailable row sits at the floor too, with no colour. ---- */
+
+.realm-bars {
+  --realm-bar-pill: 56px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.realm-bars--wide {
+  --realm-bar-pill: 72px;
+}
+
+.realm-bar {
+  position: relative;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  height: 56px;
+  padding: 0 8px 0 0;
+  overflow: hidden;
+  border-radius: 28px;
+  background: var(--realm-bar-track);
+}
+
+.realm-bar__fill {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  width: max(56px, calc(var(--realm-bar-fraction, 0) * 100%));
+  height: 100%;
+  padding: 0 8px;
+  overflow: hidden;
+  border-radius: 28px;
+  background: var(--realm-bar-fill);
+  animation: realm-bar-grow 400ms ease-out both;
+}
+
+.realm-bar--unknown .realm-bar__fill {
+  background: transparent;
+}
+
+.realm-bar__fill .realm-avatar {
+  box-shadow: 0 0 0 2px var(--realm-surface-2);
+}
+
+@keyframes realm-bar-grow {
+  from {
+    width: 0;
+  }
+}
+
+.realm-bar__pill {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: var(--realm-bar-pill);
+  height: 40px;
+  padding: 0 4px;
+  border-radius: 20px;
+  background: var(--realm-surface);
+  color: var(--realm-text);
+  font-size: 1rem;
+  line-height: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.realm-bar__info {
+  display: inline-grid;
+  flex: none;
+  color: var(--realm-text-2);
+}
+
+.realm-bar__info .mud-icon-root {
+  width: 16px;
+  height: 16px;
+  font-size: 16px;
+}
+
+/* ---- the driver week (01 section 6.6): the header under the row the gear sits in, four tiles (2 x 2, four across from 720 px), the event row, the drives by day ---- */
+
+.realm-driver-week__bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.realm-driver-week__back {
+  flex: none;
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  color: var(--realm-text);
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.realm-driver-week__who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.realm-driver-week__name {
+  margin: 0;
+  font-family: var(--realm-font-display, Georgia, "Times New Roman", serif);
+  font-size: 1.125rem;
+  line-height: 24px;
+  font-weight: 600;
+}
+
+.realm-driver-week__lore,
+.realm-driver-week__week {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 18px;
+  color: var(--realm-text-2);
+}
+
+.realm-week-tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 16px;
+}
+
+@media (min-width: 720px) {
+  .realm-week-tiles {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.realm-week-tile-root.mud-tooltip-root {
+  display: block;
+  min-width: 0;
+}
+
+.realm-week-tile {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  height: 100%;
+  min-height: 72px;
+  padding: 12px 16px;
+  border: 1px solid var(--realm-line);
+  border-radius: 20px;
+  background: var(--realm-surface-2);
+}
+
+.realm-week-tile__label {
+  font-size: 0.8125rem;
+  line-height: 18px;
+  color: var(--realm-text-2);
+}
+
+.realm-week-tile__value {
+  font-size: 1.5rem;
+  line-height: 28px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The Events tile holds a sentence ("6 speeding · 60 phone"), not a figure. */
+.realm-week-tile__value--text {
+  font-size: 1rem;
+  line-height: 24px;
+}
+
+.realm-week-events {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 16px;
+}
+
+@media (min-width: 720px) {
+  .realm-week-events {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.realm-week-event {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  min-width: 0;
+}
+
+.realm-week-event__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.realm-week-event__count {
+  font-size: 1.125rem;
+  line-height: 24px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.realm-week-event__label,
+.realm-week-event__caption {
+  font-size: 0.75rem;
+  line-height: 16px;
+  color: var(--realm-text-2);
+}
+
+.realm-drive-day {
+  margin-top: 24px;
+}
+
+.realm-drive-day__header {
+  margin: 0 0 8px;
+  font-size: 0.9375rem;
+  line-height: 20px;
+  font-weight: 700;
+  color: var(--realm-text-2);
+}
+
+.realm-drive-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.realm-drive-row {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 72px;
+  padding: 12px 16px;
+  border: 1px solid var(--realm-line);
+  border-radius: 20px;
+  background: var(--realm-surface);
+}
+
+.realm-drive-row__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.realm-drive-row__time {
+  font-size: 1rem;
+  line-height: 22px;
+  font-weight: 700;
+}
+
+.realm-drive-row__route {
+  font-size: 0.9375rem;
+  line-height: 20px;
+  overflow-wrap: anywhere;
+}
+
+.realm-drive-row__detail {
+  font-size: 0.8125rem;
+  line-height: 18px;
+  color: var(--realm-text-2);
+}
+
+.realm-drive-row__events {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.realm-drive-event {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 28px;
+  padding: 0 8px 0 6px;
+  border-radius: 14px;
+  background: var(--realm-surface-2);
+  font-size: 0.8125rem;
+  line-height: 18px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.realm-drive-event .mud-icon-root {
+  width: 16px;
+  height: 16px;
+  font-size: 16px;
+  color: var(--realm-warning);
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .realm-skeleton {
+  .realm-skeleton,
+  .mud-dialog.realm-popup,
+  .realm-bar__fill {
     animation: none;
   }
 }
