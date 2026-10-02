@@ -43,7 +43,7 @@ export function removeTestHooks(win) {
 // realmMap.js owns the DOM and the camera; what can be decided from numbers and strings alone lives here, so that Node tests import it (S9 adds no module of
 // its own). `describeBubbles` is the content of the `bubbles` hook. Nothing here reads the DOM or MapLibre.
 
-import { FAN_PRIORITY } from './fanout.js';
+import { FAN_PRIORITY, fanOut } from './fanout.js';
 
 /** @typedef {import('./layoutMath.js').Rect} Rect */
 /** @typedef {{ left: number, top: number, right: number, bottom: number }} Edges */
@@ -90,6 +90,53 @@ export function keepOutRects(boxes, origin) {
   for (const box of boxes) {
     if (!box || !(box.right > box.left) || !(box.bottom > box.top)) continue;
     rects.push({ left: box.left - origin.left, top: box.top - origin.top, right: box.right - origin.left, bottom: box.bottom - origin.top });
+  }
+  return rects;
+}
+
+/** 01 section 4.2: the hit area of a pin is 56 x 56 centred on its body, never below the body itself (realm-map.css, `.realm-pin::after`). */
+export const PIN_HIT_PX = 56;
+/** The pointer under a pin's body (realmMap.js `POINTER_PX`): the marker's anchor, the true point, is the bottom of it. */
+export const PIN_POINTER_PX = 8;
+/** The most pin rectangles one frame hands to the layout (a family and its cars are a handful of pins). A larger input is cut, not walked in full. */
+export const MAX_PIN_KEEP_OUTS = 64;
+
+/**
+ * The hit area of one pin in container pixels: a square of `max(56, sizePx)` centred on the body, which sits `PIN_POINTER_PX` above the true point.
+ * @param {{ x: number, y: number, sizePx: number }} pin `x, y` is the true point (bottom centre of the marker) with the fan-out shift already in `x`
+ * @returns {Rect}
+ */
+export function pinHitRect(pin) {
+  const side = Math.max(PIN_HIT_PX, pin.sizePx);
+  const centreY = pin.y - PIN_POINTER_PX - pin.sizePx / 2;
+  return { left: pin.x - side / 2, top: centreY - side / 2, right: pin.x + side / 2, bottom: centreY + side / 2 };
+}
+
+/**
+ * D89 (1): every pin that is on screen is a keep-out for the edge bubbles, a fanned one where the fan-out puts it (01 section 4.8: the shift is applied here with the
+ * same `fanItems` and `fanOut` as the frame's own fan-out, from the TRUE anchors, so the rectangle is the one the pin will occupy). Members and vehicles alike; the
+ * caller lists only the pins that exist in this frame (a member that has a bubble has no pin). The result goes to `layoutBubbles` with the other keep-outs, which grows
+ * each by the same 8 px and slides a bubble along its edge until it is clear. Nothing here reads the DOM: the rectangles are arithmetic on projected points, rounded to the
+ * whole pixels the markers are drawn at.
+ * @param {ReadonlyArray<{ kind: 'member' | 'vehicle', id: string, x: number, y: number, driving: boolean, sizePx: number }>} pins true points in container pixels
+ * @param {string | null} selectedKey `kind:id` of the selected pin, or null (the selected pin keeps its place in a fan)
+ * @param {Rect} view the container: a pin whose hit area is entirely outside it is not on screen and is left out
+ * @param {{ fan?: boolean }} [opts] `fan: false` when the fan-out is switched off (the pins then stay on their true points)
+ * @returns {Rect[]} at most `MAX_PIN_KEEP_OUTS`, in the order of `pins`
+ */
+export function pinKeepOuts(pins, selectedKey, view, opts = {}) {
+  const bounded = pins.slice(0, MAX_PIN_KEEP_OUTS);
+  /** @type {Map<string, number>} */
+  const shifts = new Map();
+  if (opts.fan !== false) for (const result of fanOut(fanItems(bounded, selectedKey))) shifts.set(result.id, result.dx);
+  /** @type {Rect[]} */
+  const rects = [];
+  for (const pin of bounded) {
+    if (!Number.isFinite(pin.x) || !Number.isFinite(pin.y)) continue;
+    // MapLibre puts a marker at whole pixels once the camera is at rest (it rounds `project(point) + offset`), so the rectangle is the one of the DRAWN pin, not of the fractional point.
+    const rect = pinHitRect({ x: Math.round(pin.x + (shifts.get(`${pin.kind}:${pin.id}`) ?? 0)), y: Math.round(pin.y), sizePx: pin.sizePx });
+    if (rect.right <= view.left || rect.left >= view.right || rect.bottom <= view.top || rect.top >= view.bottom) continue;
+    rects.push(rect);
   }
   return rects;
 }

@@ -115,12 +115,42 @@ function slide(hit, towards, grown, box) {
 }
 
 /**
+ * Which anchors are off screen (01 section 4.10 step 1), by the hysteresis rule: an anchor with `wasOff === false` goes off only outside
+ * `rect` grown by `hysteresis`; one with `wasOff === true` comes back only inside `rect` shrunk by `hysteresis`; with `wasOff` absent the
+ * plain `rect` decides. An anchor with a non-finite coordinate is in neither list. The verdict does not depend on the keep-outs, so a
+ * caller that needs to know who has a pin (D89 (1): every on-screen pin is a keep-out) can ask before it builds them.
+ * @param {Rect} rect
+ * @param {BubbleAnchor[]} anchors
+ * @param {{ hysteresis?: number }} [opts]
+ * @returns {{ onScreen: string[], offScreen: string[], off: BubbleAnchor[] }} the ids in input order, and the off-screen anchors themselves
+ */
+export function partitionAnchors(rect, anchors, opts = {}) {
+  const hysteresis = opts.hysteresis ?? BUBBLE_DEFAULTS.hysteresis;
+  /** @param {BubbleAnchor} a @param {number} margin positive shrinks the rectangle, negative grows it */
+  const inside = (a, margin) => a.x >= rect.left + margin && a.x <= rect.right - margin && a.y >= rect.top + margin && a.y <= rect.bottom - margin;
+  /** @type {string[]} */
+  const onScreen = [];
+  /** @type {string[]} */
+  const offScreen = [];
+  /** @type {BubbleAnchor[]} */
+  const off = [];
+  for (const a of anchors) {
+    if (!Number.isFinite(a.x) || !Number.isFinite(a.y)) continue;
+    const isOff = a.wasOff === true ? !inside(a, hysteresis) : a.wasOff === false ? !inside(a, -hysteresis) : !inside(a, 0);
+    (isOff ? offScreen : onScreen).push(a.id);
+    if (isOff) off.push(a);
+  }
+  return { onScreen, offScreen, off };
+}
+
+/**
  * Places the bubbles of the members that are outside the visible rectangle (01 section 4.10, 03 section 4.6).
  *
  * `rect` is R of 01 section 4.10 step 1 (the caller applies `top = safe-top + 8`, left and right 8, and the panel in Expanded). A bubble
  * centre travels on `rect` inset by `radius`. Each keep-out is grown by `keepOutPad + radius`, so the bubble's own box stays `keepOutPad`
- * clear of the rectangle that was passed (the gear, the attribution, the right stack while visible). Pure: nothing is mutated, and the
- * same input in any order gives the same output.
+ * clear of the rectangle that was passed: the gear, the attribution, the right stack while visible and, D89 (1), the hit box of every pin
+ * that is on screen (a fanned one at its shifted place: see `pinKeepOuts` in testHooks.js). Pure: nothing is mutated, and the same input
+ * in any order gives the same output.
  *
  * 1. Hysteresis: an anchor with `wasOff === false` goes off only outside `rect` grown by `hysteresis`; one with `wasOff === true` comes
  *    back only inside `rect` shrunk by `hysteresis`; with `wasOff` absent the plain `rect` decides.
@@ -138,7 +168,6 @@ function slide(hit, towards, grown, box) {
  */
 export function layoutBubbles(rect, keepOuts, anchors, opts = {}) {
   const radius = opts.radius ?? BUBBLE_DEFAULTS.radius;
-  const hysteresis = opts.hysteresis ?? BUBBLE_DEFAULTS.hysteresis;
   const clusterGap = opts.clusterGap ?? BUBBLE_DEFAULTS.clusterGap;
   const growth = (opts.keepOutPad ?? BUBBLE_DEFAULTS.keepOutPad) + radius;
 
@@ -146,21 +175,7 @@ export function layoutBubbles(rect, keepOuts, anchors, opts = {}) {
   const box = insetBox(rect, radius);
   const grown = keepOuts.map((k) => ({ left: k.left - growth, top: k.top - growth, right: k.right + growth, bottom: k.bottom + growth }));
 
-  /** @param {BubbleAnchor} a @param {number} margin positive shrinks the rectangle, negative grows it */
-  const inside = (a, margin) => a.x >= rect.left + margin && a.x <= rect.right - margin && a.y >= rect.top + margin && a.y <= rect.bottom - margin;
-
-  /** @type {string[]} */
-  const onScreen = [];
-  /** @type {string[]} */
-  const offScreen = [];
-  /** @type {BubbleAnchor[]} */
-  const off = [];
-  for (const a of anchors) {
-    if (!Number.isFinite(a.x) || !Number.isFinite(a.y)) continue;
-    const isOff = a.wasOff === true ? !inside(a, hysteresis) : a.wasOff === false ? !inside(a, -hysteresis) : !inside(a, 0);
-    (isOff ? offScreen : onScreen).push(a.id);
-    if (isOff) off.push(a);
-  }
+  const { onScreen, offScreen, off } = partitionAnchors(rect, anchors, opts);
 
   /** @type {Member[]} */
   const members = [...off]

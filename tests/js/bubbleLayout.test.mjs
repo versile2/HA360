@@ -4,8 +4,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { BUBBLE_DEFAULTS, layoutBubbles } from '../../src/Realm.Web/wwwroot/js/bubbleLayout.js';
+import { BUBBLE_DEFAULTS, layoutBubbles, partitionAnchors } from '../../src/Realm.Web/wwwroot/js/bubbleLayout.js';
 import { DEFAULT_LAYOUT, PIN_BODY_ALLOWANCE_PX, computePadding } from '../../src/Realm.Web/wwwroot/js/layoutMath.js';
+import { pinHitRect, pinKeepOuts } from '../../src/Realm.Web/wwwroot/js/testHooks.js';
 
 // ---- the 412 x 915 Peek scene of 01 sections 3.3, 3.4.3 and 4.10 ----------------------------------------------------------------
 
@@ -69,7 +70,7 @@ function projectDemo() {
   return { zoom, project };
 }
 
-test('[AC-14] the Demo fixture at 412 x 915 Peek: Dara lands within 12 px of (384, 347) and Elio within 12 px of (28, 142)', () => {
+test('[AC-14] the Demo fixture at 412 x 915 Peek, with the gear, the attribution and the stack as the only keep-outs: Dara lands within 12 px of (384, 347) and Elio within 12 px of (28, 142)', () => {
   const { project } = projectDemo();
   const anchors = ['king', 'queen', 'jester', 'cryptid', 'prince'].map((id) => ({ id, ...project(id) }));
   const result = layoutBubbles(R, KEEP_OUTS, anchors);
@@ -106,6 +107,80 @@ test('[AC-14] the fixture bubbles are the same whether the previous frame had th
     const again = layoutBubbles(R, KEEP_OUTS, ids.map((id) => ({ id, ...project(id), wasOff: id === 'king' ? false : wasOff })));
     assert.deepEqual(again, first);
   }
+});
+
+// D89 (1) / R1-01: in the default view the wagon is fanned 48 px to the right of the King and sits at the right edge of the map, where Dara's bubble used to cover it. The
+// pins are keep-outs now (their hit areas, the wagon's at its shifted place), so Dara's bubble slides along the right edge until it is 8 px clear; Elio's, far from every pin,
+// is exactly where it was.
+test('[AC-14] [AC-16] the Demo fixture with the four pins as keep-outs: no bubble covers a pin, Elio stays within 12 px of (28, 142), Dara slides up the right edge past the King and the fanned wagon', () => {
+  const { project } = projectDemo();
+  const anchors = ['king', 'queen', 'jester', 'cryptid', 'prince'].map((id) => ({ id, ...project(id) }));
+  const tips = [
+    { kind: 'member', id: 'king', ...project('king'), driving: false, sizePx: 48 },
+    { kind: 'member', id: 'queen', ...project('queen'), driving: false, sizePx: 48 },
+    { kind: 'member', id: 'jester', ...project('jester'), driving: false, sizePx: 48 },
+    { kind: 'vehicle', id: 'wagon', ...project('wagon'), driving: false, sizePx: 44 },
+  ];
+  const view = { left: 0, top: 0, right: PHONE.width, bottom: PHONE.height };
+  const pins = pinKeepOuts(tips, null, view);
+  assert.equal(pins.length, 4, 'every pin of the default view is on screen');
+  // the wagon is fanned by the King (the same point, the member has priority): its rectangle is the shifted one
+  assert.deepEqual(pins[3], pinHitRect({ x: Math.round(tips[3].x) + 48, y: Math.round(tips[3].y), sizePx: 44 }));
+
+  const without = layoutBubbles(R, KEEP_OUTS, anchors);
+  const withPins = layoutBubbles(R, [...KEEP_OUTS, ...pins], anchors);
+  const darasNatural = bubbleOf(without, 'cryptid');
+  assert.ok(pins.some((pin) => gapTo(darasNatural, pin) < 0), 'precondition: without the pins, Dara\'s bubble covers a pin (the wagon)');
+
+  assert.deepEqual(withPins.onScreen, ['king', 'queen', 'jester']);
+  assert.deepEqual(withPins.offScreen, ['cryptid', 'prince']);
+  assert.equal(withPins.bubbles.length, 2, 'no merge: each of them finds a clear place on its edge');
+  const dara = bubbleOf(withPins, 'cryptid');
+  const elio = bubbleOf(withPins, 'prince');
+  for (const bubble of [dara, elio]) {
+    for (const pin of pins) assert.ok(gapTo(bubble, pin) >= 8, `${bubble.ids[0]} is ${gapTo(bubble, pin)} px from a pin`);
+    for (const keepOut of KEEP_OUTS) assert.ok(gapTo(bubble, keepOut) >= 8);
+  }
+  assert.equal(dara.x, BOX.right, 'still on the right edge');
+  assert.ok(dara.y < darasNatural.y, 'the member lies above the centre line: up');
+  assert.equal(dara.y, Math.min(...pins.filter((pin) => pin.right + 28 > dara.x && pin.left - 28 < dara.x).map((pin) => pin.top)) - 28, 'to the top of the highest pin it passed, grown by 8 + 20');
+  assert.ok(Math.hypot(elio.x - 28, elio.y - 142) <= 12, `prince at (${elio.x}, ${elio.y})`);
+  assert.deepEqual([elio.x, elio.y], [bubbleOf(without, 'prince').x, bubbleOf(without, 'prince').y], 'no pin is near Elio: his bubble did not move');
+  near(dara.angleDeg, darasNatural.angleDeg); // the chevron still follows the ray to the member
+});
+
+test('[AC-13] who is off screen does not depend on the keep-outs, and partitionAnchors is the verdict layoutBubbles uses', () => {
+  const { project } = projectDemo();
+  const anchors = ['king', 'queen', 'jester', 'cryptid', 'prince'].map((id) => ({ id, ...project(id) }));
+  const part = partitionAnchors(R, anchors);
+  assert.deepEqual(part.onScreen, ['king', 'queen', 'jester']);
+  assert.deepEqual(part.offScreen, ['cryptid', 'prince']);
+  assert.deepEqual(part.off.map((a) => a.id), ['cryptid', 'prince']);
+  const wall = [{ left: -100, top: -100, right: 600, bottom: 1100 }]; // everything is a keep-out: still the same verdict
+  for (const keepOuts of [[], KEEP_OUTS, wall]) {
+    const result = layoutBubbles(R, keepOuts, anchors);
+    assert.deepEqual([result.onScreen, result.offScreen], [part.onScreen, part.offScreen]);
+  }
+});
+
+test('[AC-19c] partitionAnchors keeps the 12 px hysteresis, takes the option, skips non-finite anchors and does not modify its input', () => {
+  const at = (id, x, wasOff) => ({ id, x, y: 300, ...(wasOff === undefined ? {} : { wasOff }) });
+  const input = [
+    at('plain', R.right + 5), // no memory: the plain rectangle, 5 px outside
+    at('wasOn', R.right + 11, false), // was on screen: goes off only more than 12 px outside
+    at('wasOnFar', R.right + 13, false),
+    at('wasOff', R.right - 11, true), // was off: comes back only more than 12 px inside
+    at('wasOffFar', R.right - 13, true),
+    { id: 'nan', x: Number.NaN, y: 300 },
+  ];
+  const copy = JSON.parse(JSON.stringify(input.map((a) => (Number.isNaN(a.x) ? { ...a, x: null } : a))));
+  const part = partitionAnchors(R, input);
+  assert.deepEqual(part.offScreen, ['plain', 'wasOnFar', 'wasOff']);
+  assert.deepEqual(part.onScreen, ['wasOn', 'wasOffFar']);
+  assert.ok(!part.onScreen.includes('nan') && !part.offScreen.includes('nan'));
+  assert.deepEqual(partitionAnchors(R, input, { hysteresis: 20 }).offScreen, ['plain', 'wasOff', 'wasOffFar'], 'a wider hysteresis keeps every remembered member in the state it was in');
+  assert.equal(input.length, copy.length);
+  assert.ok(!('wasOff' in input[0]) && input[2].wasOff === false);
 });
 
 test('the default camera of the fixture fits the four in-view pins (a check on the projection used above)', () => {
