@@ -18,6 +18,12 @@
         <span class="realm-reconnect-text"></span>
         <button type="button" class="realm-reconnect-retry" hidden>Try again</button>
     </div>
+    @* Blazor's own error UI (BootErrors.ts). An unhandled exception ends the circuit and the reconnect banner never shows for it, so this static
+       element is the only way out: Blazor shows it with style.display = "block" and wires the click of every ".reload" inside it to location.reload(). *@
+    <div id="blazor-error-ui" role="alert" hidden>
+        <p class="realm-error-text">Something went sideways in the castle. Try again.</p>
+        <button type="button" class="reload realm-error-reload">Reload</button>
+    </div>
     <Routes @rendermode="InteractiveServer" ViewerMemberId="@MeId" />
     <script src="@Assets["_content/MudBlazor/MudBlazor.min.js"]"></script>
     <script src="@Assets["_framework/blazor.web.js"]" autostart="false"></script>

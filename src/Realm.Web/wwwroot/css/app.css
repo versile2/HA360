@@ -82,6 +82,51 @@ html:has(.realm-location) body {
   cursor: pointer;
 }
 
+/*
+ * ---- The static error UI (App.razor). Blazor shows it when the circuit dies on an unhandled exception, by setting style.display = "block"
+ * on the element (BootErrors.ts). An inline style beats every rule here, so the rule only has to keep it hidden by default and its layout has
+ * to work as a block box; the card is therefore stacked, not a flex row. It sits above everything (dialogs 1400, snackbars 1500), keeps the
+ * banner geometry so it never covers the gear, and clears the notch at the top and both sides.
+ * ----
+ */
+
+#blazor-error-ui {
+  position: fixed;
+  top: max(12px, calc(env(safe-area-inset-top) + 12px));
+  left: 50%;
+  z-index: 1700;
+  box-sizing: border-box;
+  display: none;
+  width: min(calc(100% - 144px - 2 * max(env(safe-area-inset-left), env(safe-area-inset-right))), 520px);
+  padding: 12px 16px;
+  transform: translateX(-50%);
+  border: 1px solid var(--realm-line-strong);
+  border-left: 4px solid var(--realm-error);
+  border-radius: 16px;
+  background: var(--realm-surface-2);
+  color: var(--realm-text);
+  font-size: 0.875rem;
+  line-height: 1.25;
+  text-align: center;
+}
+
+.realm-error-text {
+  margin: 0 0 12px;
+}
+
+.realm-error-reload {
+  min-width: 48px;
+  min-height: 48px;
+  padding: 0 24px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--realm-primary);
+  color: var(--realm-on-primary);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 /* ---- TopControls: the settings gear, 48 x 48 at (12 + safe-left, max(12, safe-top + 12)) (03 section 3.4). ---- */
 
 .realm-gear.mud-icon-button {

@@ -2,14 +2,17 @@
 
 <PageTitle>The Realm</PageTitle>
 
-<MudThemeProvider IsDarkMode="true" ObserveSystemDarkModeChange="false" />
-<MudPopoverProvider />
-<MudDialogProvider />
-<MudSnackbarProvider />
-<MudXProvider />
-
-@* The providers come first (03 section 3.2); everything the user sees lives inside the shell, which owns the circuit's session. *@
+@* The shell is the outermost element and the five providers sit inside it (03 section 3.2 as amended by D67, CR2-001). A MudBlazor popover or
+   dialog renders its content inside its own provider, and Blazor resolves a cascading parameter by walking up from the component that renders the
+   fragment, so a value reaches the sheet and every dialog only if the provider is below the cascade. The shell renders no element, so the DOM is
+   unchanged: the popover provider still comes before the nav. *@
 <RealmShell>
+    <MudThemeProvider IsDarkMode="true" ObserveSystemDarkModeChange="false" />
+    <MudPopoverProvider />
+    <MudDialogProvider />
+    <MudSnackbarProvider />
+    <MudXProvider />
+
     <main id="realm-main" aria-label="The Realm">
         @Body
     </main>
