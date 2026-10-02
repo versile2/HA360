@@ -1,4 +1,5 @@
 using Microsoft.JSInterop;
+using Realm.Domain;
 using Realm.Web.Map;
 
 namespace Realm.Web.Components.Map;
@@ -103,6 +104,22 @@ public sealed class MapInterop : IAsyncDisposable
 
     public ValueTask SetReducedMotionAsync(bool on) => CallAsync("setReducedMotion", on);
 
+    /// <summary>
+    /// Mirrors the selection onto the map (the glow and the draw order; Follow for a driving member when <paramref name="follow"/>, which the script only honours for
+    /// a member that is driving with a fresh fix); null clears it. It does not move the camera: a flight call follows it (03 section 4.3).
+    /// </summary>
+    public ValueTask SetSelectionAsync(EntityRef? selection, bool follow) =>
+        CallAsync("setSelection", selection is null ? null : new { kind = KindName(selection.Kind), id = selection.Id, follow });
+
+    /// <summary>The selection flight to a member: the Peek padding, zoom 15 or more (zoom 13 over 900 ms for a far one), Follow when asked and driving (01 section 4.13).</summary>
+    public ValueTask FlyToMemberAsync(string id, bool follow) => CallAsync("flyToMember", id, new { follow });
+
+    /// <summary>The selection flight to a vehicle: the Peek padding, zoom 15 or more.</summary>
+    public ValueTask FlyToVehicleAsync(string id) => CallAsync("flyToVehicle", id);
+
+    /// <summary>The selection flight to a place: its zone circle fitted into the Peek rectangle.</summary>
+    public ValueTask FitPlaceAsync(string id) => CallAsync("fitPlace", id);
+
     /// <summary>Tears the map down, then releases the module and the reference to <see cref="MapCallbacks"/>. Safe to call twice and after the circuit is gone.</summary>
     public async ValueTask DisposeAsync()
     {
@@ -126,6 +143,14 @@ public sealed class MapInterop : IAsyncDisposable
             _callbacks.Dispose();
         }
     }
+
+    private static string KindName(EntityKind kind) =>
+        kind switch
+        {
+            EntityKind.Member => "member",
+            EntityKind.Vehicle => "vehicle",
+            _ => "place",
+        };
 
     private async ValueTask CallAsync(string identifier, params object?[] args)
     {

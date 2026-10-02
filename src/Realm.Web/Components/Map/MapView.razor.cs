@@ -12,7 +12,8 @@ namespace Realm.Web.Components.Map;
 /// (<see cref="object.ReferenceEquals"/> on the immutable lists; the "minute" of the chip is part of the members' input). All script work
 /// happens in <see cref="OnAfterRenderAsync"/>, which only runs in the circuit: prerendering renders the element and nothing else. The module
 /// is imported once, the map is created by an idempotent <c>init</c>, and <see cref="DisposeAsync"/> tears the map down and releases the
-/// <c>DotNetObjectReference</c>. Selection, the flights and the layers popover are S8's: this slice has no <c>Selection</c> parameter.
+/// <c>DotNetObjectReference</c>. A change of <see cref="Selection"/> is mirrored onto the map with <c>setSelection</c> and one flight command (03 section 3.4); who
+/// decides the selection (pins, rows, bubbles) is the page's, and the layers popover is S10's.
 /// </summary>
 public sealed partial class MapView : IMapEventHandler, IAsyncDisposable
 {
@@ -45,6 +46,7 @@ public sealed partial class MapView : IMapEventHandler, IAsyncDisposable
     private MapLayout? _layout;
     private Padding? _padding;
     private string? _style;
+    private EntityRef? _selection;
     private bool? _reducedMotion;
     private int _membersVersion;
     private int _vehiclesVersion;
@@ -99,9 +101,20 @@ public sealed partial class MapView : IMapEventHandler, IAsyncDisposable
     [Parameter]
     public bool TestHooks { get; set; }
 
+    /// <summary>
+    /// The selected member, vehicle or place (D45), decided by the page. When it changes the map is told (<c>setSelection</c>) and flies to it with the Peek padding;
+    /// a change to null only clears the glow.
+    /// </summary>
+    [Parameter]
+    public EntityRef? Selection { get; set; }
+
     /// <summary>A member pin, a vehicle pin or a zone was tapped.</summary>
     [Parameter]
     public EventCallback<EntityRef> OnPinTap { get; set; }
+
+    /// <summary>An edge bubble was tapped: the ids of its members, one for a single-member bubble (a selection, D84), two or more for a cluster (the script has fitted the camera).</summary>
+    [Parameter]
+    public EventCallback<IReadOnlyList<string>> OnBubbleTap { get; set; }
 
     /// <summary>The empty map was tapped.</summary>
     [Parameter]
@@ -177,6 +190,8 @@ public sealed partial class MapView : IMapEventHandler, IAsyncDisposable
         };
 
     Task IMapEventHandler.MapTapAsync() => InvokeAsync(() => OnMapTap.InvokeAsync());
+
+    Task IMapEventHandler.BubbleTapAsync(IReadOnlyList<string> ids) => InvokeAsync(() => OnBubbleTap.InvokeAsync(ids));
 
     Task IMapEventHandler.CameraChangedAsync(CameraState camera) => InvokeAsync(() => OnCameraChanged.InvokeAsync(camera));
 
@@ -312,6 +327,33 @@ public sealed partial class MapView : IMapEventHandler, IAsyncDisposable
             {
                 await interop.SetDefaultTargetsAsync(payload);
             }
+        }
+
+        // Last, so the script already holds the payloads the flight looks the entity up in.
+        if (_selection != Selection)
+        {
+            var selection = Selection;
+            _selection = selection;
+            await SendSelectionAsync(interop, selection);
+        }
+    }
+
+    // 03 section 3.4: whichever path changed the selection (a pin, a bubble or a row), the map gets setSelection and then one flight command. Follow is requested for a
+    // member and the script honours it only for one that is driving with a fresh fix (01 section 4.14).
+    private static async Task SendSelectionAsync(MapInterop interop, EntityRef? selection)
+    {
+        await interop.SetSelectionAsync(selection, follow: selection?.Kind == EntityKind.Member);
+        switch (selection)
+        {
+            case { Kind: EntityKind.Member } member:
+                await interop.FlyToMemberAsync(member.Id, follow: true);
+                break;
+            case { Kind: EntityKind.Vehicle } vehicle:
+                await interop.FlyToVehicleAsync(vehicle.Id);
+                break;
+            case { Kind: EntityKind.Place } place:
+                await interop.FitPlaceAsync(place.Id);
+                break;
         }
     }
 

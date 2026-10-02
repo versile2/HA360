@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.JSInterop;
 using Realm.Demo;
+using Realm.Domain;
 using Realm.Web.Components.Map;
 using Realm.Web.Map;
 using Xunit;
@@ -100,6 +101,34 @@ public sealed class MapInteropTests
     }
 
     [Fact]
+    public async Task SelectionCalls_CallTheSelectionExports_WithTheIdsAndFollow()
+    {
+        // 03 sections 3.4 and 4.3: setSelection mirrors the selection, then one flight command; the kinds are spelled as the script reads them.
+        var js = new FakeJs();
+        await using var interop = await MapInterop.CreateAsync(js, new MapCallbacks(new RecordingHandler()));
+
+        await interop.SetSelectionAsync(new EntityRef(EntityKind.Member, "dara"), follow: true);
+        await interop.SetSelectionAsync(new EntityRef(EntityKind.Vehicle, "van"), follow: false);
+        await interop.SetSelectionAsync(new EntityRef(EntityKind.Place, "hall"), follow: false);
+        await interop.SetSelectionAsync(null, follow: false);
+        await interop.FlyToMemberAsync("dara", follow: true);
+        await interop.FlyToVehicleAsync("van");
+        await interop.FitPlaceAsync("hall");
+
+        Assert.Equal(
+            ["setSelection", "setSelection", "setSelection", "setSelection", "flyToMember", "flyToVehicle", "fitPlace"],
+            js.Module.Select(call => call.Identifier));
+        Assert.Equal("""{"kind":"member","id":"dara","follow":true}""", JsonSerializer.Serialize(js.Module[0].Args[0], MapJson.Options));
+        Assert.Equal("""{"kind":"vehicle","id":"van","follow":false}""", JsonSerializer.Serialize(js.Module[1].Args[0], MapJson.Options));
+        Assert.Equal("""{"kind":"place","id":"hall","follow":false}""", JsonSerializer.Serialize(js.Module[2].Args[0], MapJson.Options));
+        Assert.Null(js.Module[3].Args[0]);
+        Assert.Equal("dara", js.Module[4].Args[0]);
+        Assert.Equal("""{"follow":true}""", JsonSerializer.Serialize(js.Module[4].Args[1], MapJson.Options));
+        Assert.Equal(["van"], js.Module[5].Args);
+        Assert.Equal(["hall"], js.Module[6].Args);
+    }
+
+    [Fact]
     public async Task DisposeAsync_TearsDownTheMap_ReleasesTheModuleAndTheReference_OnlyOnce()
     {
         var js = new FakeJs();
@@ -161,13 +190,15 @@ public sealed class MapInteropTests
         await callbacks.OnReady(new ReadyInfo("1", 1, "6.11.2"));
         await callbacks.OnPinTap("member", "king");
         await callbacks.OnMapTap();
+        await callbacks.OnBubbleTap(["king"]);
+        await callbacks.OnBubbleTap(["king", "queen"]);
         await callbacks.OnCameraChanged(camera);
         await callbacks.OnStyleResult(new StyleResult(MapStyleIds.Day, false, "offline"));
         await callbacks.OnWebGlUnavailable();
         await callbacks.OnError("setZones", "boom");
 
         Assert.Equal(
-            ["ready 1", "pinTap member king", "mapTap", "camera 12 Away True", "style day False offline", "webGlUnavailable", "error setZones boom"],
+            ["ready 1", "pinTap member king", "mapTap", "bubbleTap king", "bubbleTap king queen", "camera 12 Away True", "style day False offline", "webGlUnavailable", "error setZones boom"],
             handler.Events);
     }
 
@@ -187,7 +218,7 @@ public sealed class MapInteropTests
             Assert.Null(entry.Attribute.Identifier);   // the C# method name is the name the script uses
         });
         Assert.Equal(
-            ["OnCameraChanged", "OnError", "OnMapTap", "OnPinTap", "OnReady", "OnStyleResult", "OnWebGlUnavailable"],
+            ["OnBubbleTap", "OnCameraChanged", "OnError", "OnMapTap", "OnPinTap", "OnReady", "OnStyleResult", "OnWebGlUnavailable"],
             invokable.Select(entry => entry.Method.Name).Order(StringComparer.Ordinal));
         Assert.Empty(called.Except(invokable.Select(entry => entry.Method.Name)));
         Assert.Contains("OnReady", called);
@@ -264,6 +295,8 @@ public sealed class MapInteropTests
         public Task PinTapAsync(string kind, string id) => Record($"pinTap {kind} {id}");
 
         public Task MapTapAsync() => Record("mapTap");
+
+        public Task BubbleTapAsync(IReadOnlyList<string> ids) => Record($"bubbleTap {string.Join(' ', ids)}");
 
         public Task CameraChangedAsync(CameraState camera) => Record($"camera {camera.Zoom} {camera.Recenter} {camera.UserInitiated}");
 

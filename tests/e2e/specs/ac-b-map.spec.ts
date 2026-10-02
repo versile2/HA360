@@ -1,14 +1,15 @@
 // Acceptance tests B of 01 section 11 (03 section 7.5): the map. S6b writes the map-side halves that the S5 map already satisfies:
 // [AC-13a] the pins on screen, [AC-16a] pin anatomy, [AC-17] the Here-for chip and [AC-18] the zones. The halves that need later slices are the
 // `b` tests of S9 (bubbles, fan-out, the halo, off-screen pins gone) and the assertions that need a selection (S8) or the Layers popover (S10); each
-// test says below what it leaves to them. S8 adds AC-20, 22, 23, 24, S10 AC-21 to this file.
+// test says below what it leaves to them. S8 adds AC-20, 22, 23, 24, S10 AC-21 to this file. S9b adds [AC-13b], [AC-14], [AC-15] and [AC-16b] in the block
+// at the end ("S9b: the edge bubbles and the fan-out").
 //
 // Every name, place and zone comes from tests/e2e/fixtures/demo-cast.json (the DemoCast, written by `export-demo-cast`; 03 section 8.1 rule 2); a
 // role id (`king`, `queen`, `jester`, `wagon`, ...) is the only literal about the cast in this file. Numbers are those of 01 section 11 and 4.2 to 4.6.
 // The Demo style is `demo-offline`, whose appearance is `light` (01 section 4.12): the zone alpha below follows it (see ZONE_FILL_ALPHA).
 import type { Page } from '@playwright/test';
 
-import { castMember, castPlace, demo, expect, expectApprox, loadDemoCast, mapReady, onScreenPinTestIds, readHook, test, type PinInfo, type Rect, type ZoneInfo } from '../fixtures.js';
+import { DEFAULT_VIEW_PINS, castMember, castPlace, demo, expect, expectApprox, loadDemoCast, mapReady, onScreenPinTestIds, readHook, settled, test, type BubbleInfo, type PinInfo, type Rect, type ZoneInfo } from '../fixtures.js';
 
 // ---- the DOM of a pin, read in the page --------------------------------------------------------------------------------------------------
 
@@ -77,10 +78,176 @@ const ZONE_FILL_ALPHA: Record<'dark' | 'light' | 'imagery', { empty: number; occ
   imagery: { empty: 0.1, occupied: 0.22 },
 };
 
+// ---- S9b: the edge bubbles and the fan-out (01 sections 4.8 and 4.10) ----------------------------------------------------------------------------
+// The numbers are 01 section 11's AC-13 to AC-16 and section 3.4.3 (the Peek rectangle). Positions come from the `bubbles()` and `pins()` hooks and from the DOM, never from
+// a coordinate in this file, so the Demo fixture can move (D82, D85) without touching a test; names come from the cast. The screen-pixel numbers of the spec are at the phone
+// project's 412 x 915 (these tests carry no viewport tag, so they run there only).
+
+/** 01 section 3.4.3: the map padding at Peek, hence the visible rectangle a selection flight centres the pin in (x 16 to 340, y 72 to 725 at 412 x 915, centre (178, 399)). */
+const PEEK_INSET = { top: 72, right: 72, bottom: 190, left: 16 };
+/** 01 section 4.10 step 4: a bubble keeps 8 px clear of the gear, the attribution, the right stack and the sheet. */
+const KEEP_OUT_GAP_PX = 8;
+/** AC-15: the camera is at zoom 13 (+-0.1) within 1,000 ms of the tap; the flight itself is 900 ms (01 section 4.13). */
+const FAR_ZOOM = 13;
+const FAR_ZOOM_TOLERANCE = 0.1;
+const FAR_FLIGHT_MS = 900;
+const TAP_TO_ZOOM_MS = 1_000;
+/** The budget of AC-15 is a laptop's: the tap reaches the server over a websocket and the flight starts after the round trip, on a shared CI core with a software GL. The flight's own 900 ms is asserted exactly (`lastDurationMs`). */
+const CI_ROUND_TRIP_SLACK_MS = 500;
+/** 01 section 4.10 step 6: the cluster fit takes 700 ms and `maxZoom` 15. */
+const CLUSTER_FIT_MS = 700;
+const CLUSTER_FIT_MAX_ZOOM = 15;
+/** 01 section 4.8: the shift of a fanned-out pin, and the distance below which two anchors are fanned. */
+const FAN_STEP_PX = 48;
+const FAN_THRESHOLD_PX = 36;
+/** 02 section 9.5, `poor-accuracy`: the Jester's accuracy in metres, and so the halo's radius (01 section 11, AC-16). */
+const HALO_RADIUS_M = 800;
+/** MapLibre's 512 px world: metres per pixel at zoom 0 on the equator (the circumference over 512). */
+const METRES_PER_PIXEL_AT_ZOOM_0 = 78_271.516964;
+
+/** The bounding box of a set of pixels, and how many there are. */
+interface PixelBounds { minX: number; maxX: number; minY: number; maxY: number; count: number }
+
+interface BubbleDom {
+  /** The 48 x 48 button. */
+  hit: Rect;
+  /** The 40 px avatar (its ring and outline are painted around it): "the bubble's box" of AC-14. */
+  disc: Rect;
+  /** Where the chevron points, in degrees clockwise from east (y down): from the chevron's box against the avatar's. */
+  pointerDeg: number;
+  /** The Home badge: shown, and its colour next to the colour of `--realm-primary` (the gold) as the browser computes both. */
+  home: { shown: boolean; color: string; gold: string };
+  /** The count badge of a cluster: its text, or null while hidden. */
+  count: string | null;
+  tag: string;
+  tabIndex: number;
+  label: string | null;
+  tooltip: string;
+}
+
+/** What a person sees of one bubble: its boxes, where its chevron points, its badges and its accessible name. */
+async function readBubbleDom(page: Page, testId: string): Promise<BubbleDom> {
+  return page.getByTestId(testId).evaluate((element) => {
+    const rect = (target: Element) => {
+      const box = target.getBoundingClientRect();
+      return { x: box.x, y: box.y, width: box.width, height: box.height };
+    };
+    const part = (selector: string): HTMLElement => {
+      const found = element.querySelector<HTMLElement>(selector);
+      if (found === null) throw new Error(`the bubble has no ${selector}`);
+      return found;
+    };
+    const disc = rect(part('.realm-bubble__disc'));
+    const tip = rect(part('.realm-bubble__pointer svg'));
+    const home = part('.realm-bubble__badge--home');
+    const count = part('.realm-bubble__badge--count');
+    const probe = document.createElement('span');
+    probe.style.color = 'var(--realm-primary)';
+    document.body.appendChild(probe);
+    const gold = getComputedStyle(probe).color;
+    probe.remove();
+    return {
+      hit: rect(element),
+      disc,
+      pointerDeg: (Math.atan2(tip.y + tip.height / 2 - (disc.y + disc.height / 2), tip.x + tip.width / 2 - (disc.x + disc.width / 2)) * 180) / Math.PI,
+      home: { shown: !home.hidden && home.getBoundingClientRect().width > 0, color: getComputedStyle(home).color, gold },
+      count: count.hidden ? null : count.textContent,
+      tag: element.tagName,
+      tabIndex: (element as HTMLElement).tabIndex,
+      label: element.getAttribute('aria-label'),
+      tooltip: (element as HTMLElement).title,
+    };
+  });
+}
+
+const centreOf = (box: Rect) => ({ x: box.x + box.width / 2, y: box.y + box.height / 2 });
+
+/** The gap between two boxes: the larger of the gaps along each axis, negative when they overlap. */
+function gapBetween(a: Rect, b: Rect): number {
+  return Math.max(b.x - (a.x + a.width), a.x - (b.x + b.width), b.y - (a.y + a.height), a.y - (b.y + b.height));
+}
+
+const bubbleOf = (bubbles: BubbleInfo[], id: string): BubbleInfo => {
+  const found = bubbles.find((bubble) => bubble.id === id);
+  if (!found) throw new Error(`bubbles() has no '${id}' (it has ${bubbles.map((bubble) => bubble.id).join(', ') || 'none'})`);
+  return found;
+};
+
+/** The centre of the Peek visible rectangle in the page (01 section 3.4.3). */
+function peekCentre(viewport: { width: number; height: number }): { x: number; y: number } {
+  return { x: (PEEK_INSET.left + viewport.width - PEEK_INSET.right) / 2, y: (PEEK_INSET.top + viewport.height - PEEK_INSET.bottom) / 2 };
+}
+
+/**
+ * Arms a watch in the page that resolves when, after the next click, the camera first comes within `FAR_ZOOM_TOLERANCE` of zoom 13 (the time is the page's own clock, from the click
+ * event to an animation frame). It is started BEFORE the click and awaited after it, so the polling interval of a test cannot add to the measured time.
+ */
+function watchZoomAfterNextClick(page: Page): Promise<{ elapsedMs: number; zoom: number }> {
+  return page.evaluate(
+    ({ zoom, tolerance, timeoutMs }) =>
+      new Promise<{ elapsedMs: number; zoom: number }>((resolve, reject) => {
+        let clickedAt: number | null = null;
+        document.addEventListener('click', () => (clickedAt = performance.now()), { capture: true, once: true });
+        const hooks = (window as Window & { __realm?: { camera?: () => { zoom: number } } }).__realm;
+        const frame = () => {
+          const now = performance.now();
+          const current = hooks?.camera?.().zoom ?? Number.NaN;
+          if (clickedAt !== null && Math.abs(current - zoom) <= tolerance) return resolve({ elapsedMs: now - clickedAt, zoom: current });
+          if (clickedAt !== null && now - clickedAt > timeoutMs) return reject(new Error(`the camera was at zoom ${current} ${Math.round(now - clickedAt)} ms after the tap, not within ${tolerance} of ${zoom}`));
+          requestAnimationFrame(frame);
+        };
+        requestAnimationFrame(frame);
+      }),
+    { zoom: FAR_ZOOM, tolerance: FAR_ZOOM_TOLERANCE, timeoutMs: 8_000 },
+  );
+}
+
+/**
+ * The bounding box, in page pixels, of the pixels in `area` that differ between two viewport screenshots of the same page, or null when none does. The PNGs are decoded in the
+ * page (createImageBitmap on a Blob: no request leaves it), because the specs have no image library.
+ */
+async function changedBounds(page: Page, before: Buffer, after: Buffer, area: Rect): Promise<PixelBounds | null> {
+  return page.evaluate(
+    async ({ a, b, box }) => {
+      const decode = async (base64: string) => {
+        const bytes = Uint8Array.from(atob(base64), (character) => character.charCodeAt(0));
+        const bitmap = await createImageBitmap(new Blob([bytes], { type: 'image/png' }));
+        const context = new OffscreenCanvas(bitmap.width, bitmap.height).getContext('2d', { willReadFrequently: true });
+        if (context === null) throw new Error('no 2d context to read the screenshot with');
+        context.drawImage(bitmap, 0, 0);
+        return context.getImageData(0, 0, bitmap.width, bitmap.height);
+      };
+      const [first, second] = await Promise.all([decode(a), decode(b)]);
+      let minX = Number.POSITIVE_INFINITY;
+      let maxX = Number.NEGATIVE_INFINITY;
+      let minY = Number.POSITIVE_INFINITY;
+      let maxY = Number.NEGATIVE_INFINITY;
+      let count = 0;
+      const x0 = Math.max(0, Math.floor(box.x));
+      const y0 = Math.max(0, Math.floor(box.y));
+      const x1 = Math.min(first.width, Math.ceil(box.x + box.width));
+      const y1 = Math.min(first.height, Math.ceil(box.y + box.height));
+      for (let y = y0; y < y1; y += 1) {
+        for (let x = x0; x < x1; x += 1) {
+          const i = (y * first.width + x) * 4;
+          const difference = Math.abs(first.data[i] - second.data[i]) + Math.abs(first.data[i + 1] - second.data[i + 1]) + Math.abs(first.data[i + 2] - second.data[i + 2]);
+          if (difference <= 6) continue;
+          count += 1;
+          minX = Math.min(minX, x);
+          maxX = Math.max(maxX, x);
+          minY = Math.min(minY, y);
+          maxY = Math.max(maxY, y);
+        }
+      }
+      return count === 0 ? null : { minX, maxX, minY, maxY, count };
+    },
+    { a: before.toString('base64'), b: after.toString('base64'), box: area },
+  );
+}
+
 test.describe('acceptance B: the map', () => {
   // [AC-13a] The pins half of AC-13. The bubbles half (`bubble-cryptid`, `bubble-prince` exist) is S9b's [AC-13b], and with it the removal of the
-  // off-screen pins: until S9 the map still holds `pin-member-cryptid` and `pin-member-prince` far outside the viewport, so "do not exist" is asserted
-  // here as "not on screen" and the stricter form arrives with the bubbles.
+  // off-screen pins; this test keeps its own, weaker form ("not on screen") and [AC-13b] asserts that `pin-member-cryptid` and `pin-member-prince` do not exist.
   test('[AC-13a] on load no camera animation runs and exactly the four pins of the default view are on screen', async ({ page }) => {
     await demo(page);
     await mapReady(page);
@@ -256,5 +423,284 @@ test.describe('acceptance B: the map', () => {
       if (place.radiusM === 100) expect.soft(zone.radiusPx, `${label} (100 m) renders at the 14 px minimum`).toBeLessThanOrEqual(14.5);
     }
     expect(drawnPlaces.some((place) => place.radiusM === 100), 'the cast has 100 m places').toBe(true);
+  });
+
+  // ---- S9b: the edge bubbles and the fan-out ----------------------------------------------------------------------------------------------------
+
+  // [AC-13b] The bubbles half of AC-13: the two far members have bubbles and no pins. `pins()` lists every pin the map holds, so with the bubbles it is exactly the four pins of the
+  // default view; `bubbles()` is exactly the two, and `cluster` is the member COUNT (a number, 1 for a single bubble), never a boolean (O-10).
+  test('[AC-13b] bubble-cryptid and bubble-prince exist, pin-member-cryptid and pin-member-prince do not', async ({ page }) => {
+    await demo(page);
+    await mapReady(page);
+    const cast = loadDemoCast();
+
+    for (const id of ['cryptid', 'prince']) {
+      const who = `${castMember(cast, id).name} (${id})`;
+      await expect(page.getByTestId(`bubble-${id}`), `bubble-${id}: ${who} has a bubble`).toBeVisible();
+      await expect(page.getByTestId(`pin-member-${id}`), `pin-member-${id}: ${who} has no pin`).toHaveCount(0);
+    }
+    // Nobody else is off screen, and a vehicle never has a bubble.
+    for (const id of ['king', 'queen', 'jester', 'wagon']) await expect(page.getByTestId(`bubble-${id}`), `bubble-${id} does not exist`).toHaveCount(0);
+
+    const pins = await readHook(page, 'pins');
+    expect(pins.map((pin) => `${pin.kind}-${pin.id}`).sort(), 'the pins the map holds (__realm.pins())').toEqual([...DEFAULT_VIEW_PINS].sort());
+
+    const bubbles = await readHook(page, 'bubbles');
+    expect(bubbles.map((bubble) => bubble.id).sort(), 'the bubbles (__realm.bubbles())').toEqual(['cryptid', 'prince']);
+    for (const bubble of bubbles) {
+      expect(typeof bubble.cluster, `bubbles() ${bubble.id}: cluster is a number`).toBe('number');
+      expect(bubble.cluster, `bubbles() ${bubble.id}: a single bubble has a member count of 1`).toBe(1);
+      expect(bubble.ids, `bubbles() ${bubble.id}: the members it stands for`).toEqual([bubble.id]);
+    }
+  });
+
+  // [AC-14] Where the two fixture bubbles sit and what they look like. The centres are the spec's pixels (within 12 px); the clearances are measured on the boxes the browser draws.
+  test('[AC-14] the two bubbles sit at (384, 347) and (28, 142), 8 px clear of the gear, the right stack and the sheet, 48 px to hit, pointing at their members', async ({ page }) => {
+    await demo(page);
+    await mapReady(page);
+    const cast = loadDemoCast();
+    const bubbles = await readHook(page, 'bubbles');
+    const sheet = await readHook(page, 'sheet');
+    const viewport = page.viewportSize();
+    expect(viewport, 'the phone project').not.toBeNull();
+    if (viewport === null) return;
+    expect([viewport.width, viewport.height], 'the spec numbers are those of the phone project').toEqual([412, 915]);
+
+    // The keep-outs as the browser draws them: the gear, the attribution (i), the two buttons of the right stack; and the sheet's top edge from the `sheet()` hook.
+    const keepOuts: Array<[string, Rect]> = [];
+    for (const testId of ['btn-settings', 'map-attribution', 'btn-recenter', 'btn-layers']) {
+      await expect(page.getByTestId(testId), `${testId} is on screen at Peek`).toBeVisible();
+      const box = await page.getByTestId(testId).boundingBox();
+      expect(box, `${testId} has a bounding box`).not.toBeNull();
+      if (box !== null) keepOuts.push([testId, box]);
+    }
+    const sheetTop: Rect = { x: 0, y: sheet.topPx, width: viewport.width, height: viewport.height - sheet.topPx };
+
+    const wanted: Array<{ id: string; x: number; y: number }> = [
+      { id: 'cryptid', x: 384, y: 347 },
+      { id: 'prince', x: 28, y: 142 },
+    ];
+    for (const { id, x, y } of wanted) {
+      const who = `${castMember(cast, id).name} (${id})`;
+      const row = bubbleOf(bubbles, id);
+      const dom = await readBubbleDom(page, `bubble-${id}`);
+      const centre = centreOf(dom.disc);
+
+      // Position: the spec's pixels within 12 px, by the hook and by the box the browser draws.
+      expectApprox(row.x, x, 12, `${who} bubbles() x`);
+      expectApprox(row.y, y, 12, `${who} bubbles() y`);
+      expectApprox(centre.x, x, 12, `${who} avatar centre x in the page`);
+      expectApprox(centre.y, y, 12, `${who} avatar centre y in the page`);
+      expectApprox(centre.x, row.x, 1, `${who} the page against the hook, x`);
+      expectApprox(centre.y, row.y, 1, `${who} the page against the hook, y`);
+
+      // Size: a 48 x 48 hit area around a 40 px avatar, a button that the keyboard reaches.
+      expectApprox(dom.hit.width, 48, 0.5, `${who} hit area width`);
+      expectApprox(dom.hit.height, 48, 0.5, `${who} hit area height`);
+      expectApprox(dom.disc.width, 40, 0.5, `${who} avatar width`);
+      expect.soft(dom.tag, `${who} is a button`).toBe('BUTTON');
+      expect.soft(dom.tabIndex, `${who} is in the tab order`).toBe(0);
+
+      // Clearance: the avatar's box is at least 8 px from each keep-out (negative would be an overlap).
+      for (const [name, box] of [...keepOuts, ['the sheet top', sheetTop] as [string, Rect]]) {
+        expect.soft(gapBetween(dom.disc, box), `${who}: gap between the avatar and ${name}, at least ${KEEP_OUT_GAP_PX} px`).toBeGreaterThanOrEqual(KEEP_OUT_GAP_PX);
+      }
+
+      // Text: the accessible name and the tooltip carry the person's name from the cast (the distance is a fixture number and is not asserted).
+      expect.soft(dom.label, `${who} accessible name`).toMatch(new RegExp(`^${escapeRegExp(castMember(cast, id).name)}, [\\d.]+ (?:feet|miles?) (?:north|north-east|east|south-east|south|south-west|west|north-west), off screen\\. Double tap to include on the map\\.$`));
+      expect.soft(dom.tooltip, `${who} tooltip`).toMatch(new RegExp(`^${escapeRegExp(castMember(cast, id).name)} · .+ · tap to include on the map$`));
+      expect.soft(dom.count, `${who} is one person: no count badge`).toBeNull();
+    }
+
+    // The chevron faces the member: the cryptid east (within 10 degrees of horizontal), the prince up and to the left. The DOM and the hook agree.
+    const cryptid = await readBubbleDom(page, 'bubble-cryptid');
+    const prince = await readBubbleDom(page, 'bubble-prince');
+    expect.soft(Math.abs(cryptid.pointerDeg), `cryptid chevron points east: ${cryptid.pointerDeg.toFixed(1)} degrees from horizontal`).toBeLessThanOrEqual(10);
+    expect.soft(prince.pointerDeg, `prince chevron points up and to the left: ${prince.pointerDeg.toFixed(1)} degrees (east 0, south 90, west 180, north -90)`).toBeLessThan(-90);
+    expect.soft(prince.pointerDeg, `prince chevron points up and to the left: ${prince.pointerDeg.toFixed(1)} degrees`).toBeGreaterThan(-180);
+    expectApprox(cryptid.pointerDeg, bubbleOf(bubbles, 'cryptid').angleDeg, 1, 'cryptid chevron against bubbles() angleDeg');
+    expectApprox(prince.pointerDeg, bubbleOf(bubbles, 'prince').angleDeg, 1, 'prince chevron against bubbles() angleDeg');
+
+    // The Home badge: the static prince wears it, in gold; the cryptid does not.
+    expect.soft(prince.home.shown, 'bubble-prince shows the Home badge').toBe(true);
+    expect.soft(prince.home.color, 'the Home badge is gold (--realm-primary)').toBe(prince.home.gold);
+    expect.soft(cryptid.home.shown, 'bubble-cryptid has no Home badge').toBe(false);
+  });
+
+  // [AC-15] A single-member bubble selects (D45, D84): the tap reaches the server, the member is selected, the sheet stays at Peek and the camera flies to zoom 13 with her pin in the
+  // Peek rectangle. What is asserted here is what is on the map; the selection header (name, lore, line, battery) is the second test below, which waits for S8b. D86 rules on the
+  // sentence "`bubble-king` exists": it means the bubble whose member set includes `king` (the King, the Queen and the Jester are one group west of Dara, so that bubble is the
+  // cluster `queen-king-jester`), which the test finds in `bubbles()` by `ids`; the viewer is not exempt from clustering. "Within 1,000 ms" starts at the tap, so the round trip to
+  // the server is inside it (the slack above).
+  test('[AC-15] tapping bubble-cryptid selects Dara: Peek, zoom 13 within 1,000 ms, her pin in the Peek rectangle, her bubble gone and the King\'s bubble there', async ({ page }) => {
+    await demo(page);
+    await mapReady(page);
+    const cast = loadDemoCast();
+    const dara = castMember(cast, 'cryptid');
+    const viewport = page.viewportSize();
+    expect(viewport, 'the phone project').not.toBeNull();
+    if (viewport === null) return;
+    expect((await readHook(page, 'sheet')).state, 'the sheet starts at Peek').toBe('peek');
+
+    const arrival = watchZoomAfterNextClick(page);
+    await page.getByTestId('bubble-cryptid').click();
+    const { elapsedMs } = await arrival;
+    test.info().annotations.push({ type: 'info', description: `[AC-15] ms from the tap on bubble-cryptid to zoom ${FAR_ZOOM} +-${FAR_ZOOM_TOLERANCE}: ${Math.round(elapsedMs)} (limit ${TAP_TO_ZOOM_MS}, slack ${CI_ROUND_TRIP_SLACK_MS})` });
+    expect(elapsedMs, `ms from the tap to zoom ${FAR_ZOOM}`).toBeLessThanOrEqual(TAP_TO_ZOOM_MS + CI_ROUND_TRIP_SLACK_MS);
+    await settled(page);
+
+    // The flight: 900 ms, ending at zoom 13 with the sheet still at Peek (a selection never changes the size by itself).
+    const camera = await readHook(page, 'camera');
+    expect(camera.lastDurationMs, 'camera().lastDurationMs of the far flight').toBe(FAR_FLIGHT_MS);
+    expectApprox(camera.zoom, FAR_ZOOM, FAR_ZOOM_TOLERANCE, 'camera().zoom at the end of the flight');
+    expect((await readHook(page, 'sheet')).state, 'the sheet is at Peek after the tap').toBe('peek');
+
+    // Her pin: on the map, selected (60 px), in the Peek rectangle within 24 px of its centre; her ring is dashed grey with the clock badge (AC-16, stale).
+    await expect(page.getByTestId('bubble-cryptid'), `bubble-cryptid is removed: ${dara.name} is on screen`).toHaveCount(0);
+    await expect(page.getByTestId('pin-member-cryptid'), `pin-member-cryptid exists: ${dara.name}`).toBeVisible();
+    const pin = pinOf(await readHook(page, 'pins'), 'member', 'cryptid');
+    const centre = peekCentre(viewport);
+    expect(pin.anchorX, 'her true point is inside the Peek rectangle, x').toBeGreaterThanOrEqual(PEEK_INSET.left);
+    expect(pin.anchorX, 'her true point is inside the Peek rectangle, x').toBeLessThanOrEqual(viewport.width - PEEK_INSET.right);
+    expect(pin.anchorY, 'her true point is inside the Peek rectangle, y').toBeGreaterThanOrEqual(PEEK_INSET.top);
+    expect(pin.anchorY, 'her true point is inside the Peek rectangle, y').toBeLessThanOrEqual(viewport.height - PEEK_INSET.bottom);
+    expect(Math.hypot(pin.anchorX - centre.x, pin.anchorY - centre.y), `distance of her pin from the centre of the Peek rectangle (${centre.x}, ${centre.y})`).toBeLessThanOrEqual(24);
+    expect(pin.sizePx, 'a selected pin is 60 px').toBe(60);
+    expect(pin.dashed, 'her ring is dashed').toBe(true);
+    expect(pin.ring.toUpperCase(), 'her ring colour').toBe('#9AA0BD');
+    expect(pin.badge, 'her clock badge').toBe('stale');
+
+    // Alden is now far to the west: the bubble whose member set includes `king` exists (D86: alone as `bubble-king`, or with the people at home, a cluster such as `queen-king-jester`).
+    const bubbles = await readHook(page, 'bubbles');
+    const kings = bubbles.find((bubble) => bubble.ids.includes('king'));
+    expect(kings, `a bubble whose member set includes 'king' (bubbles(): ${bubbles.map((bubble) => `${bubble.id} [${bubble.ids.join(', ')}]`).join('; ')})`).toBeDefined();
+    if (kings === undefined) return;
+    expect(kings.id, 'its test id is its member ids joined (a single member: bubble-king)').toBe(kings.ids.join('-'));
+    await expect(page.getByTestId(`bubble-${kings.id}`), `bubble-${kings.id} is on screen`).toBeVisible();
+    test.info().annotations.push({ type: 'info', description: `[AC-15] the bubble that holds the King after the flight: bubble-${kings.id} (cluster of ${kings.cluster})` });
+  });
+
+  // [AC-15] The last sentence: a tap on a cluster selects nothing and leaves the sheet where it is; JavaScript runs the `fitBounds` of "me plus the members" (700 ms, maxZoom 15). The
+  // default fixture has no cluster, so the test makes one: after Dara is selected the three people at home are one group on the left edge.
+  test('[AC-15] a cluster bubble tap fits me and its members in 700 ms, selects nothing and leaves the sheet and the selection as they were', async ({ page }) => {
+    await demo(page);
+    await mapReady(page);
+    await page.getByTestId('bubble-cryptid').click();
+    await expect.poll(async () => Math.abs((await readHook(page, 'camera')).zoom - FAR_ZOOM) <= FAR_ZOOM_TOLERANCE, { message: 'the flight to Dara has not reached zoom 13' }).toBe(true);
+    await settled(page);
+
+    // The cluster the flight made: two or more people on one bubble, with a count badge that is that number.
+    await expect
+      .poll(async () => (await readHook(page, 'bubbles')).some((bubble) => bubble.cluster >= 2), { message: 'no cluster bubble appeared after the flight to Dara' })
+      .toBe(true);
+    const cluster = (await readHook(page, 'bubbles')).find((bubble) => bubble.cluster >= 2);
+    expect(cluster, 'a cluster bubble').toBeDefined();
+    if (cluster === undefined) return;
+    expect(cluster.cluster, 'the member count is the number of ids').toBe(cluster.ids.length);
+    expect(cluster.ids, 'the cluster holds me').toContain('king');
+    const clusterDom = await readBubbleDom(page, `bubble-${cluster.id}`);
+    expect(clusterDom.count, 'the count badge of the cluster').toBe(String(cluster.cluster));
+    expect(clusterDom.home.shown, 'a cluster has no Home badge').toBe(false);
+
+    const sheetBefore = await readHook(page, 'sheet');
+    await page.getByTestId(`bubble-${cluster.id}`).click();
+    await settled(page);
+
+    // The fit: 700 ms, never closer than zoom 15, and the viewer is on screen again with a pin.
+    const camera = await readHook(page, 'camera');
+    expect(camera.lastDurationMs, 'camera().lastDurationMs of the cluster fit').toBe(CLUSTER_FIT_MS);
+    expect(camera.zoom, `camera().zoom after the fit (maxZoom ${CLUSTER_FIT_MAX_ZOOM})`).toBeLessThanOrEqual(CLUSTER_FIT_MAX_ZOOM + 0.01);
+    expect(Math.abs(camera.zoom - FAR_ZOOM), 'the camera left the flight\'s zoom').toBeGreaterThan(FAR_ZOOM_TOLERANCE);
+    await expect(page.getByTestId('pin-member-king'), 'the viewer is on the map after the fit').toBeVisible();
+
+    // Nothing was selected and nothing changed in the sheet: Dara is still the selection (far away again, so her bubble carries the gold glow of the selected member).
+    expect(await readHook(page, 'sheet'), 'the sheet is as it was').toEqual(sheetBefore);
+    await expect(page.getByTestId('bubble-cryptid'), "Dara's bubble is back: she is still the selection").toHaveClass(/realm-bubble--selected/);
+    for (const id of cluster.ids) await expect(page.getByTestId(`bubble-${id}`).and(page.locator('.realm-bubble--selected')), `${id} was not selected by the tap`).toHaveCount(0);
+  });
+
+  // [AC-15] The header half of the sentence ("Dara", "The Court Cryptid", the line, the battery badge "10%" in the low style). The selection header (`sheet-selection-header`) is S8b's and
+  // the wiring of the page's selection to it is S8c's: neither is on this branch, so the test is fixme until they are merged, like the Back test of AC-38 in ac-d-driving.spec.ts.
+  // Un-fixme this test when the header lands. The line is built from the cast (the street, the city and the region of the member's address) and the frozen clock's 42 minutes.
+  test.fixme('[AC-15] the selection header of Dara reads her name, her lore, her line and her battery', async ({ page }) => {
+    await demo(page);
+    await mapReady(page);
+    const dara = castMember(loadDemoCast(), 'cryptid');
+    const [street, city, region] = (dara.address ?? '').split(', ');
+
+    await page.getByTestId('bubble-cryptid').click();
+    const header = page.getByTestId('sheet-selection-header');
+    await expect(header, 'the selection header').toBeVisible();
+    await expect(header, 'her name').toContainText(dara.name);
+    await expect(header, 'her lore title').toContainText(dara.lore);
+    await expect(header, 'her line: the street, the city and region, and when she was last seen').toContainText(`${street} · ${city}, ${region} · Last seen 42 min ago`);
+    await expect(page.getByTestId('sheet-selection-battery'), 'her battery badge').toHaveText(/10%/);
+    await expect(page.getByTestId('detail-back'), 'no detail at Peek').toHaveCount(0);
+    expect((await readHook(page, 'sheet')).state, 'the sheet is at Peek').toBe('peek');
+  });
+
+  // [AC-16b] The fan-out half of AC-16: the wagon is parked at the King's point, so it is drawn 48 px to the right of its true anchor and the King stays; no leader line joins them (D35, C-10).
+  test('[AC-16b] pin-vehicle-wagon is drawn 48 px (+-2) to the right of its true anchor, the King stays, and there is no leader line', async ({ page }) => {
+    await demo(page);
+    await mapReady(page);
+    const pins = await readHook(page, 'pins');
+    const wagon = pinOf(pins, 'vehicle', 'wagon');
+    const king = pinOf(pins, 'member', 'king');
+
+    // The cause: the two true points are closer than 36 px.
+    expect(Math.hypot(wagon.anchorX - king.anchorX, wagon.anchorY - king.anchorY), `distance between the true points of the wagon and the King (fan-out below ${FAN_THRESHOLD_PX} px)`).toBeLessThan(FAN_THRESHOLD_PX);
+    // The effect, by the hook: the wagon is fanned by 48 px to the right and not up or down; the King is not moved.
+    expect(wagon.fanned, 'the wagon is fanned out').toBe(true);
+    expectApprox(wagon.x - wagon.anchorX, FAN_STEP_PX, 2, 'wagon x against its true anchor');
+    expectApprox(wagon.y - wagon.anchorY, 0, 0.5, 'wagon y against its true anchor');
+    expect(king.fanned, 'the King stays on his true point').toBe(false);
+    expectApprox(king.x - king.anchorX, 0, 0.01, 'king x against his true anchor');
+
+    // The effect, by the DOM: the bottom centre of each pin button is where the hook says (the wagon 48 px right of its anchor, the King on his).
+    const wagonDom = await readPinDom(page, 'pin-vehicle-wagon');
+    const kingDom = await readPinDom(page, 'pin-member-king');
+    expectApprox(wagonDom.box.x + wagonDom.box.width / 2 - wagon.anchorX, FAN_STEP_PX, 2, 'wagon pin button: drawn right of its true anchor');
+    expectApprox(wagonDom.box.y + wagonDom.box.height, wagon.anchorY, 2, 'wagon pin button: tip on the anchor row');
+    expectApprox(kingDom.box.x + kingDom.box.width / 2, king.anchorX, 2, "king pin button: on his true point");
+
+    // No leader line in v1: nothing in the page is named for one.
+    const leaders = await page.evaluate(() => document.querySelectorAll('[class*="leader" i], [data-testid*="leader" i], [id*="leader" i]').length);
+    expect(leaders, 'elements named for a leader line').toBe(0);
+  });
+
+  // [AC-16b] The halo half: with `?variant=poor-accuracy` the Jester (800 m) shows a halo of that radius under the pin. The halo is a map layer, so the test reads pixels: it compares a
+  // screenshot of the default view with one of the variant (same camera, same pins) and looks at what changed BELOW the Jester's true point, where his pin does not cover the halo. The
+  // changed area is centred on the point and as wide as the halo is: 800 m over the metres per pixel of the camera's zoom (the latitude of the camera centre stands in for his; the
+  // difference is a ten-thousandth).
+  test('[AC-16b] with ?variant=poor-accuracy the Jester shows a halo of 800 m under his pin', async ({ page }) => {
+    const shoot = () => page.screenshot({ animations: 'disabled', caret: 'hide', scale: 'css' });
+
+    await demo(page);
+    await mapReady(page);
+    const baseline = await shoot();
+    const baselinePin = pinOf(await readHook(page, 'pins'), 'member', 'jester');
+
+    await demo(page, { variant: 'poor-accuracy' });
+    await mapReady(page);
+    const camera = await readHook(page, 'camera');
+    const pin = pinOf(await readHook(page, 'pins'), 'member', 'jester');
+    expectApprox(pin.anchorX, baselinePin.anchorX, 1, 'the Jester\'s true point x, variant against default (the same camera)');
+    expectApprox(pin.anchorY, baselinePin.anchorY, 1, 'the Jester\'s true point y, variant against default (the same camera)');
+    const radiusPx = HALO_RADIUS_M / ((METRES_PER_PIXEL_AT_ZOOM_0 * Math.cos((camera.center[1] * Math.PI) / 180)) / 2 ** camera.zoom);
+
+    // The area under the true point: from 2 px below it, so the pin's tip and body are out of it, as wide as the halo plus 20 px on each side.
+    const area = { x: pin.anchorX - radiusPx - 20, y: pin.anchorY + 2, width: 2 * (radiusPx + 20), height: radiusPx + 20 };
+    const found: { bounds: PixelBounds | null } = { bounds: null };
+    await expect(async () => {
+      found.bounds = await changedBounds(page, baseline, await shoot(), area);
+      expect(found.bounds, 'pixels that differ from the default view under the Jester\'s true point (the halo is not drawn yet, or at all)').not.toBeNull();
+    }).toPass({ timeout: 10_000 });
+    const changed = found.bounds;
+    if (changed === null) return;
+    const { minX, maxX, maxY } = changed;
+    test.info().annotations.push({ type: 'info', description: `[AC-16b] halo radius expected ${radiusPx.toFixed(1)} px; changed pixels x ${minX} to ${maxX}, bottom row ${maxY}, true point (${pin.anchorX.toFixed(1)}, ${pin.anchorY.toFixed(1)})` });
+    expectApprox(maxY - pin.anchorY, radiusPx, 3, 'halo: the lowest changed row below the true point (the radius)');
+    expectApprox((maxX - minX) / 2, radiusPx, 3, 'halo: half the width of the changed area (the radius)');
+    expectApprox((maxX + minX) / 2, pin.anchorX, 3, 'halo: the changed area is centred on the true point');
   });
 });

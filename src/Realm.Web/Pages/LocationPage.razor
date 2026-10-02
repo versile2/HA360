@@ -29,8 +29,9 @@
 
    The sheet's state (section, selection, size) is a RealmUiState (03 section 3.6) and every change goes through its reducer: a row, the handle, the header, the back arrow and the
    segments raise events and the sheet shows RealmUiState.Body (list, selection header or detail, D45). S8c registers the state for the circuit and adds the history tokens, Esc
-   and the pins and bubbles (D84); until then this page owns one. A tap on the selection header and a tap on the handle are the same event (D46). The floating pill of the hidden
-   Expanded panel (01 section 3.6) is drawn here when the layout says the panel is hidden, which nothing sets yet. *@
+   and the pin and map taps; until then this page owns one. The single-bubble tap (D84) is dispatched to this state and the map's Selection is read from it, so nothing else holds
+   a selection. A tap on the selection header and a tap on the handle are the same event (D46). The floating pill of the hidden Expanded panel (01 section 3.6) is drawn here when
+   the layout says the panel is hidden, which nothing sets yet. *@
 <section class="realm-location">
     @if (_viewport is { } viewport)
     {
@@ -53,7 +54,9 @@
                  OnStyleFailed="OnStyleFailedAsync"
                  Layout="@_mapLayout"
                  ReducedMotion="@viewport.ReducedMotion"
-                 TestHooks="@TestHooks" />
+                 TestHooks="@TestHooks"
+                 Selection="@_ui.Selection"
+                 OnBubbleTap="OnBubbleTapAsync" />
 
         <RealmSheetHost Mode="@_mode"
                         Size="@_ui.SheetSize"
@@ -244,6 +247,11 @@
     private Task OnHereNowAsync(string memberId) => ApplyAsync(new SheetEvent.HereNowTap(memberId));
 
     private Task OnClearAsync() => ApplyAsync(new SheetEvent.ClearTap());
+
+    // An edge bubble was tapped (D45, D84): the same reducer as a row, the handle and the header. One member id selects that member exactly like a pin tap (the selection is set and the
+    // sheet is left at Peek); a cluster (two or more ids) changes nothing here, its camera fit was the script's. MapView then sends setSelection and the flight with the target Peek
+    // padding because it reads Selection from this one state.
+    private Task OnBubbleTapAsync(IReadOnlyList<string> ids) => ApplyAsync(new SheetEvent.BubbleTap(ids));
 
     // The detail's back arrow is the Android Back from a detail (BackStep.Detail): Peek, the selection kept; in the panel the selection is cleared. The history entries are S8c's.
     private Task OnBackAsync()
