@@ -6,7 +6,7 @@
 //
 // --in     folder holding the downloaded artifacts (one sub-folder per job); it is searched
 //          recursively for errors.log, restore.log, build.log, guards.log, smoke.json, *.trx, results.json (Playwright), js-tests.tap,
-//          contract.tap, app.log, and the PNGs under a folder named shots. May be missing or empty.
+//          tsc.log, contract.tap, app.log, and the PNGs under a folder named shots. May be missing or empty.
 // --out    folder that receives the files above (default ci-out).
 // --needs  the JSON of the workflow's `needs` context: { "<job>": { "result": "success", ... } }.
 //          Without it the verdict comes from the logs alone.
@@ -39,6 +39,12 @@ export const MAX_CELL_CHARS = 400;
 export const MAX_REPORT_EXAMPLES = 3;
 export const MAX_OTHER_GUARD_LINES = 15;
 export const MIN_RANGE = 3;
+export const JS_JOB = 'js';
+export const MAX_JS_DETAIL_LINES = 40; // lines of the YAML block shown per failing JS test
+export const MAX_JS_FAILURES = 50; // failing JS tests shown in SUMMARY.md (the rest are in js/js-tests.tap)
+export const MAX_TYPE_ERRORS = 50;
+export const TSC_TAIL_LINES = 20;
+export const JS_KEPT_BYTES = 400 * 1024; // js/js-tests.tap and js/tsc.log are published cut to their last 400 KB
 
 // ---------------------------------------------------------------------------------------------
 // Pure helpers (exported for tests/js/make-summary.test.mjs)
@@ -391,14 +397,56 @@ export function parseTrxAcTests(xml) {
 
 const TAP_LINE_RE = /^(\s*)(not ok|ok)\s+\d+\s*-?\s*(.*)$/;
 const TAP_DIRECTIVE_RE = /\s+#\s*(?:SKIP|TODO)\b.*$/i;
+const TAP_YAML_START_RE = /^\s*---\s*$/;
+const TAP_YAML_END_RE = /^\s*\.\.\.\s*$/;
+const TAP_FILE_TITLE_RE = /\.[cm]?[jt]s$/;
+const TAP_PATH_SEPARATOR = ' \u203a '; // the separator Playwright titles use between a describe and its test
 
-// Node's TAP output (`node --test --test-reporter=tap`): { tests: [{ title, status }], pass, fail, failures: [{ title, detail }] }.
-// `pass` and `fail` are the top-level summary counters ("# pass 5"), null when the output has none. `failures` carry the YAML block that
-// follows a "not ok" line (error, expected, actual), cut to MAX_MESSAGE_LINES.
-export function parseTap(text) {
+const leadingSpaces = (line) => /^ */.exec(line)[0].length;
+
+// The YAML diagnostic block of a "not ok" line: { lines, last } (`last` is the index of the last line it covers). A block that is not
+// closed by "..." ends where a line that cannot belong to it begins (an entry or a counter at the same or a lower indent).
+function tapYamlBlock(lines, at, indent) {
+  const block = [];
+  let last = at;
+  for (let j = at + 1; j < lines.length; j += 1) {
+    if (TAP_YAML_END_RE.test(lines[j])) {
+      last = j;
+      break;
+    }
+    if (lines[j].trim() !== '' && leadingSpaces(lines[j]) < indent + 2) break;
+    block.push(lines[j]);
+    last = j;
+  }
+  return { lines: block, last };
+}
+
+// The "# ..." lines node prints right before the "# Subtest: <file>" header of a test FILE that failed as a whole (a syntax error, a
+// missing import, process.exit, an uncaught error after the last test): the reason is only there, the "not ok" entry says "test failed".
+function tapFileComments(lines, at) {
+  if (at < 1 || !/^# Subtest:/.test(lines[at - 1])) return [];
+  const comments = [];
+  for (let j = at - 2; j >= 0 && /^# /.test(lines[j]) && !/^# Subtest:/.test(lines[j]) && !/^# [a-z_]+ \d/.test(lines[j]); j -= 1) comments.unshift(lines[j].slice(2));
+  return comments;
+}
+
+// Node's TAP output (`node --test --test-reporter=tap`): { tests: [{ title, status }], pass, fail, failures: [{ title, detail, cancelled }] }.
+// `tests` has one entry per "ok" / "not ok" line at any depth, with the title of that line alone (the AC matrix reads it).
+// `pass` and `fail` are the top-level summary counters ("# pass 5"), null when the output has none. Node counts neither suites nor
+// cancelled tests in "fail", so a suite whose hook threw has "# fail 0": count `failures`, not the counter.
+// `failures` is what went wrong, with each cause once:
+//  - subtests are printed indented BEFORE the line of their parent, so a "not ok" line is attributed to its parent chain: the title is
+//    "describe › test" (the parents' titles, outermost first, joined by the separator Playwright titles use);
+//  - a parent that fails only because a subtest failed ("1 subtest failed", failureType subtestsFailed) is not listed: its subtest is;
+//  - a test file that failed as a whole is a top-level entry titled with the file name; its detail starts with the "# ..." lines that
+//    came before it (the error text and stack of the crash);
+//  - `cancelled` marks a test node cancelled because its parent finished first (failureType cancelledByParent): a consequence, not a cause.
+// `detail` is the YAML block that follows the "not ok" line (error, expected, actual, stack), at the indent of a top-level test, cut to
+// `detailLines` lines (default MAX_MESSAGE_LINES).
+export function parseTap(text, { detailLines = MAX_MESSAGE_LINES } = {}) {
   const lines = splitLines(text);
-  const tests = [];
-  const failures = [];
+  const entries = [];
+  let pending = []; // entries whose parent line has not been read yet
   let pass = null;
   let fail = null;
   for (let i = 0; i < lines.length; i += 1) {
@@ -410,17 +458,38 @@ export function parseTap(text) {
     }
     const match = TAP_LINE_RE.exec(lines[i]);
     if (!match) continue;
+    const indent = match[1].length;
     const skipped = TAP_DIRECTIVE_RE.test(match[3]);
     const title = match[3].replace(TAP_DIRECTIVE_RE, '').trim();
     const failed = match[2] === 'not ok' && !skipped;
-    tests.push({ title, status: failed ? 'failed' : skipped ? 'skipped' : 'passed' });
-    if (failed) {
-      const detail = [];
-      for (let j = i + 1; j < lines.length && !/^\s*\.\.\.\s*$/.test(lines[j]) && !TAP_LINE_RE.test(lines[j]); j += 1) detail.push(lines[j]);
-      failures.push({ title, detail: firstLines(detail.join('\n').replace(/^\s*---\s*\n?/, ''), MAX_MESSAGE_LINES) });
+    const entry = { title, status: failed ? 'failed' : skipped ? 'skipped' : 'passed', failed, indent, parent: null, children: pending.filter((p) => p.indent > indent), yaml: [], comments: [] };
+    for (const child of entry.children) child.parent = entry;
+    pending = [...pending.filter((p) => p.indent <= indent), entry];
+    entries.push(entry);
+    if (failed && indent === 0) entry.comments = tapFileComments(lines, i);
+    if (TAP_YAML_START_RE.test(lines[i + 1] ?? '')) {
+      // Whatever the block holds (a diff that looks like "ok 1 - x", say) is not a test line.
+      const block = tapYamlBlock(lines, i + 1, indent);
+      entry.yaml = failed ? block.lines : [];
+      i = block.last;
+    } else if (failed) {
+      for (let j = i + 1; j < lines.length && !TAP_YAML_END_RE.test(lines[j]) && !TAP_LINE_RE.test(lines[j]); j += 1) entry.yaml.push(lines[j]);
     }
   }
-  return { tests, pass, fail, failures };
+
+  const failures = [];
+  for (const entry of entries) {
+    if (!entry.failed) continue;
+    const yaml = entry.yaml.map((line) => line.slice(Math.min(entry.indent, leadingSpaces(line)))).join('\n');
+    const failureType = /^\s*failureType:\s*'?(\w+)'?\s*$/m.exec(yaml)?.[1];
+    if (failureType === 'subtestsFailed' && entry.children.some((child) => child.failed)) continue;
+    const isFile = entry.indent === 0 && (TAP_FILE_TITLE_RE.test(entry.title) || /^\s*exitCode:/m.test(yaml));
+    const parents = [];
+    for (let parent = entry.parent; parent !== null; parent = parent.parent) parents.unshift(parent.title);
+    const detail = [...(isFile ? entry.comments : []), ...(yaml === '' ? [] : [yaml])].join('\n');
+    failures.push({ title: [...parents, entry.title].join(TAP_PATH_SEPARATOR), detail: firstLines(detail, detailLines), cancelled: failureType === 'cancelledByParent' });
+  }
+  return { tests: entries.map(({ title, status }) => ({ title, status })), pass, fail, failures };
 }
 
 const ANSI_RE = /\u001b\[[0-9;]*[A-Za-z]/g;
@@ -574,6 +643,99 @@ export function e2eReport({ results, contract, appLog, jobResult }) {
   return { sections, problems, flaky };
 }
 
+// ---------------------------------------------------------------------------------------------
+// The js job: the type check (tsc.log) and the Node tests (js-tests.tap)
+// ---------------------------------------------------------------------------------------------
+
+// `text` with the workspace folder of the runner removed ("file:///home/runner/work/r/r/tests/js/a.test.mjs:3:1" -> "tests/js/a.test.mjs:3:1").
+function stripRootText(text, root) {
+  const base = (root ?? '').replace(/\/+$/, '');
+  if (base === '') return text;
+  return text.split(`file://${base}/`).join('').split(`${base}/`).join('');
+}
+
+const TSC_ERROR_RE = /\berror TS\d+\b/;
+
+// The distinct "error TS<n>" lines of a tsc log (`tsc --noEmit`), in order of first appearance. The indented lines that continue a
+// message are not kept; the whole log is published as js/tsc.log.
+export function parseTsc(text, root) {
+  const seen = new Set();
+  const errors = [];
+  for (const raw of splitLines(stripAnsi(text))) {
+    const line = stripRootText(raw.trimEnd(), root);
+    if (/^\s/.test(line) || !TSC_ERROR_RE.test(line) || seen.has(line)) continue;
+    seen.add(line);
+    errors.push(line);
+  }
+  return errors;
+}
+
+// The sections for the js job and what makes the run fail. `tap` is parseTap's value for js-tests.tap (null: none was found), `tsc` the text of
+// tsc.log (null: none), `jobResult` the js job's result from --needs (or undefined). The js job result alone adds nothing to `problems` (the
+// "job js: ..." reason is written by the caller); a js job that failed with nothing to show for it is said in the section.
+// Returns { sections: [markdown], problems: [one-line reasons: empty when the js results are clean] }.
+export function jsReport({ tap, tsc, jobResult, root = '' }) {
+  const problems = [];
+  const summary = [];
+  const details = [];
+  const failedJob = jobResult !== undefined && jobResult !== 'success' && jobResult !== 'skipped';
+  if (tap === null && tsc === null && (jobResult === undefined || jobResult === 'skipped')) return { sections: [], problems };
+  const verb = jobResult === 'failure' ? 'failed' : `ended as ${jobResult}`;
+
+  const typeErrors = tsc === null ? [] : parseTsc(tsc, root);
+  const emptyTap = tap !== null && tap.tests.length === 0 && tap.pass === null && tap.fail === null;
+  let testFailures = [];
+  if (tap !== null && emptyTap) {
+    summary.push('js-tests.tap holds no test result: node did not get as far as running the tests.');
+  } else if (tap !== null) {
+    // Causes first: the tests cancelled behind a failing parent come last, so the cap never hides the cause.
+    testFailures = [...tap.failures.filter((f) => !f.cancelled), ...tap.failures.filter((f) => f.cancelled)];
+    const failedCount = testFailures.length > 0 ? testFailures.length : tap.fail ?? 0;
+    const passedCount = tap.pass ?? tap.tests.filter((test) => test.status === 'passed').length;
+    summary.push(`Node tests (node --test of tests/js): ${passedCount} passed, ${failedCount} failed.`);
+    if (failedCount > 0) {
+      problems.push(`${failedCount} failed JS test(s)`);
+      if (testFailures.length === 0) {
+        summary.push('js-tests.tap counts failed tests but lists none of them as "not ok" (the output may be cut short); the file is published as js/js-tests.tap.');
+      } else {
+        const shown = testFailures.slice(0, MAX_JS_FAILURES);
+        const blocks = shown.map((failure) => `### ${stripRootText(failure.title, root)}\n\n${fenced(failure.detail === '' ? '(no detail in js-tests.tap)' : stripRootText(failure.detail, root))}`);
+        const more = testFailures.length > shown.length ? [`... and ${testFailures.length - shown.length} more failed JS tests (all of them are in js/js-tests.tap)`] : [];
+        details.push([`## Failed JS tests (${testFailures.length})`, ...blocks, ...more].join('\n\n'));
+      }
+    }
+  }
+
+  if (tsc !== null) {
+    if (typeErrors.length === 0) {
+      summary.push('Type check (tsc.log): no "error TS" line.');
+    } else {
+      problems.push(`${typeErrors.length} type error(s)`);
+      summary.push(`Type check (tsc.log): ${typeErrors.length} distinct type error${typeErrors.length === 1 ? '' : 's'}.`);
+      const shown = typeErrors.slice(0, MAX_TYPE_ERRORS);
+      const more = typeErrors.length > shown.length ? `\n... and ${typeErrors.length - shown.length} more distinct type errors (all of them are in js/tsc.log)` : '';
+      details.push(`## Type errors\n\n${fenced(shown.join('\n') + more)}`);
+    }
+  }
+
+  // The js job failed: say what is, and what is not, explained by the above.
+  const seeTsc = tsc !== null ? 'see tsc.log' : 'there is no tsc.log either, so the cause is in the raw job log of the workflow run';
+  if (tap === null) {
+    if (!failedJob) {
+      summary.push('No js-tests.tap was found.');
+    } else if (typeErrors.length > 0) {
+      summary.push(`The js job ${verb} and no js-tests.tap was produced: the Node tests run after the type check, which failed (the Type errors section lists them).`);
+    } else {
+      summary.push(`The js job ${verb} but no js-tests.tap was produced (the job stopped before the Node tests ran); ${seeTsc}.`);
+      if (tsc !== null && tsc.trim() !== '') summary.push(`Last lines of tsc.log:\n\n${fenced(stripRootText(tailLines(tsc, TSC_TAIL_LINES).join('\n'), root))}`);
+    }
+  } else if (failedJob && problems.length === 0) {
+    summary.push(`The js job ${verb} but js-tests.tap has no failing test; ${seeTsc}.`);
+  }
+
+  return { sections: [['## JS', ...summary].join('\n\n'), ...details], problems };
+}
+
 // Screenshots: the gallery (PNGs under a folder named shots, S6b) is copied to shots/<project>/<scene>.png, and the first MAX_FAILURE_SHOTS
 // screenshots of failing tests (Playwright's `screenshot: 'only-on-failure'`, found by the path its report records) to failures/.
 // -> [{ from, to }]
@@ -640,6 +802,20 @@ function readText(file) {
   return fs.readFileSync(file, 'utf8');
 }
 
+// The last part of a file that is bigger than `limit` bytes, starting at a line, behind a line that says it was cut (the whole is at most
+// `limit` bytes); null when the file fits as it is.
+export function keepTail(file, limit) {
+  const size = fs.statSync(file).size;
+  if (size <= limit) return null;
+  const note = `... make-summary.mjs kept the last part of this file (${size} bytes in the artifact, at most ${limit} bytes here)\n`;
+  const bytes = fs.readFileSync(file);
+  let start = size - (limit - Buffer.byteLength(note));
+  const newline = bytes.indexOf(0x0a, start);
+  if (newline !== -1 && newline + 1 < size) start = newline + 1; // begin at a line
+  while (start < size && (bytes[start] & 0xc0) === 0x80) start += 1; // never inside a multi-byte character
+  return note + bytes.subarray(start).toString('utf8');
+}
+
 export function collectInputs(inDir) {
   const files = walkFiles(inDir);
   const named = (base) => files.filter((f) => path.basename(f) === base);
@@ -652,6 +828,7 @@ export function collectInputs(inDir) {
     trxFiles: files.filter((f) => f.toLowerCase().endsWith('.trx')),
     resultsJsons: named('results.json'),
     jsTaps: named('js-tests.tap'),
+    tscLogs: named('tsc.log'),
     contractTaps: named('contract.tap'),
     appLogs: named('app.log'),
     pngs: files.filter((f) => f.toLowerCase().endsWith('.png')),
@@ -731,11 +908,13 @@ export function buildReport({ inDir, needsText, root, meta }) {
     }
   }
 
-  // The e2e job (S6a): Playwright's report, the payload contract TAP, the app log; and the node TAP of the js job, which only feeds the AC matrix.
+  // The e2e job (S6a): Playwright's report, the payload contract TAP, the app log. The js job (FX4): the node TAP and tsc.log, reported in "## JS"; the TAP also feeds the AC matrix.
   const e2eJob = needs.jobs.find((job) => job.name === E2E_JOB);
   const e2eResults = inputs.resultsJsons.length > 0 ? parsePlaywright(readText(inputs.resultsJsons[0])) : null;
   const contract = inputs.contractTaps.length > 0 ? parseTap(inputs.contractTaps.map(readText).join('\n')) : null;
-  const jsTap = inputs.jsTaps.length > 0 ? parseTap(inputs.jsTaps.map(readText).join('\n')) : null;
+  const jsTap = inputs.jsTaps.length > 0 ? parseTap(inputs.jsTaps.map(readText).join('\n'), { detailLines: MAX_JS_DETAIL_LINES }) : null;
+  const jsJob = needs.jobs.find((job) => job.name === JS_JOB);
+  const js = jsReport({ tap: jsTap, tsc: inputs.tscLogs.length > 0 ? inputs.tscLogs.map(readText).join('\n') : null, jobResult: jsJob?.result, root });
   const appLog = inputs.appLogs.length > 0 ? readText(inputs.appLogs[0]) : null;
   const e2e = e2eReport({ results: e2eResults, contract, appLog, jobResult: e2eJob?.result });
   const e2eMissing = e2eResults === null && e2eJob !== undefined && e2eJob.result === 'success';
@@ -763,6 +942,7 @@ export function buildReport({ inDir, needsText, root, meta }) {
   if (errors.length > 0) why.push(`${errors.length} distinct compiler error(s)`);
   if (trx.failed > 0) why.push(`${trx.failed} failed test(s)`);
   for (const mismatch of trxMismatches) why.push(mismatch);
+  why.push(...js.problems);
   if (smoke !== null && smoke.problem !== null) why.push(smoke.problem);
   if (smokeMissing && smokeJob.result === 'success') why.push('job docker-smoke succeeded but left no smoke.json');
   why.push(...e2e.problems);
@@ -815,6 +995,7 @@ export function buildReport({ inDir, needsText, root, meta }) {
     }
   }
 
+  sections.push(...js.sections);
   sections.push(...e2e.sections);
   if (e2e.flaky.length > 0) {
     sections.push(`## Flaky tests (${e2e.flaky.length}, passed on retry)\n\nA flaky test is investigated at once; two flaky runs in three consecutive runs block the merge (04 section 1.6).\n\n${fenced(e2e.flaky.join('\n'))}`);
@@ -848,7 +1029,8 @@ export function buildReport({ inDir, needsText, root, meta }) {
     sections.push(`## Notes\n\n${guardsWhy}. ${cause}${behind}`);
   }
 
-  const failedJobs = needs.jobs.filter((job) => job.result !== 'success' && !explained(job));
+  // A js job that failed with failing JS tests or type errors is explained by the JS sections, which name them.
+  const failedJobs = needs.jobs.filter((job) => job.result !== 'success' && !explained(job) && !(job.name === JS_JOB && js.problems.length > 0));
   if (failedJobs.length > 0 && errors.length === 0 && trx.failed === 0 && trxMismatches.length === 0 && e2e.problems.length === 0) {
     const where = meta.url ? ` (${meta.url})` : '';
     sections.push(
@@ -857,12 +1039,19 @@ export function buildReport({ inDir, needsText, root, meta }) {
   }
 
   // Small files the orchestrator reads over git, published beside SUMMARY.md (03 section 7.4): the Playwright JSON, the contract TAP, the app
-  // log, the gallery under shots/ and the first screenshots of failing tests under failures/.
+  // log, the js job's js-tests.tap and tsc.log under js/, the gallery under shots/ and the first screenshots of failing tests under failures/.
   const copies = [];
   const writes = [];
   if (inputs.resultsJsons.length > 0) copies.push({ from: inputs.resultsJsons[0], to: 'e2e/results.json' });
   if (inputs.contractTaps.length > 0) copies.push({ from: inputs.contractTaps[0], to: 'e2e/contract.tap' });
   if (appLog !== null) writes.push({ to: 'e2e/app.log', text: tailLines(appLog, APP_LOG_KEPT_LINES).join('\n') + '\n' });
+  // A file over JS_KEPT_BYTES is published as its last part (the report above was read from the whole file).
+  for (const [files, to] of [[inputs.jsTaps, 'js/js-tests.tap'], [inputs.tscLogs, 'js/tsc.log']]) {
+    if (files.length === 0) continue;
+    const kept = keepTail(files[0], JS_KEPT_BYTES);
+    if (kept === null) copies.push({ from: files[0], to });
+    else writes.push({ to, text: kept });
+  }
   const shots = screenshotCopies(inputs.pngs, e2eResults);
   copies.push(...shots);
   if (shots.length > 0) sections.push(screenshotIndex(shots));

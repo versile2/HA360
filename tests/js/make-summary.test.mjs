@@ -12,6 +12,8 @@ import {
   crashReport,
   distinctDiagnostics,
   e2eReport,
+  jsReport,
+  keepTail,
   normalizeDiagnostic,
   parseGuardsLog,
   parsePlaywright,
@@ -19,6 +21,7 @@ import {
   parseTap,
   parseTrx,
   parseTrxAcTests,
+  parseTsc,
   reportLine,
   screenshotCopies,
   smokeSection,
@@ -925,4 +928,295 @@ test('helpers: screenshotCopies ignores PNGs outside a shots folder and numbers 
 test('helpers: e2eReport with nothing to report is empty', () => {
   assert.deepEqual(e2eReport({ results: null, contract: null, appLog: null, jobResult: undefined }), { sections: [], problems: [], flaky: [] });
   assert.deepEqual(e2eReport({ results: null, contract: null, appLog: null, jobResult: 'skipped' }), { sections: [], problems: [], flaky: [] });
+});
+
+// ---------------------------------------------------------------------------------------------
+// FX4: the js job (js-tests.tap and tsc.log) in SUMMARY.md
+// ---------------------------------------------------------------------------------------------
+
+const jsNeeds = (js, dotnet = 'success') => JSON.stringify({ guards: { result: 'success', outputs: {} }, dotnet: { result: dotnet, outputs: {} }, js: { result: js, outputs: {} } });
+const PASSING_TAP = 'TAP version 13\nok 1 - a\n1..1\n# tests 12\n# pass 12\n# fail 0\n';
+const TSC_CLEAN = '\n> realm-dev-tools@ typecheck\n> tsc -p tsconfig.json --noEmit\n\n';
+
+test('helpers: parseTap names a nested failure by its describe chain, lists the cause and not the parents that only roll it up, and keeps a crashed file with its crash text', () => {
+  const parsed = parseTap(fixture('js-tests.failed.tap'), { detailLines: 40 });
+  assert.deepEqual(
+    parsed.failures.map((f) => f.title),
+    [
+      'tests/js/brokenImport.test.mjs',
+      'layout solver › slides a bubble along the edge',
+      'layout solver › clusters › merges close bubbles',
+      'shell › closes the sheet',
+    ],
+  );
+  assert.ok(parsed.failures.every((f) => f.cancelled === false));
+  assert.equal(parsed.pass, 3);
+  assert.equal(parsed.fail, 5, "node's counter includes the parents of failing subtests; the failures do not");
+  // `tests` keeps every line, each with its own title: the AC matrix reads the titles from it.
+  assert.deepEqual(
+    parsed.tests.filter((t) => t.status === 'failed').map((t) => t.title),
+    ['tests/js/brokenImport.test.mjs', 'slides a bubble along the edge', 'merges close bubbles', 'clusters', 'layout solver', 'closes the sheet', 'shell'],
+  );
+  const [file, slides, merges] = parsed.failures;
+  assert.match(file.detail, /^node:internal\/modules\/esm\/resolve:275\n/, 'the lines node printed before the file entry come first');
+  assert.match(file.detail, /Cannot find module '\/home\/runner\/work\/ha360\/ha360\/tests\/js\/helpers\/missing\.mjs'/);
+  assert.match(file.detail, /\n {2}exitCode: 1\n/);
+  assert.match(slides.detail, /^ {2}duration_ms: 1\.5\n {2}type: 'test'/, 'the YAML block of a nested test is shown at the indent of a top-level one');
+  assert.match(slides.detail, / {4}\+ {3}y: 2\n {4}- {3}y: 3/);
+  assert.doesNotMatch(slides.detail, /^\s*\.\.\.\s*$/m);
+  assert.match(merges.detail, /error: 'cluster size was 1, expected 2'/);
+  assert.doesNotMatch(slides.detail, /more lines/, 'under 40 lines: nothing is cut');
+  assert.match(parseTap(fixture('js-tests.failed.tap')).failures[1].detail, /\n\.\.\. \(\d+ more lines\)$/, 'the default is 15 lines');
+});
+
+test('helpers: parseTap lists a suite whose hook threw although node counts "fail 0", and flags the tests cancelled behind it', () => {
+  const tap = [
+    'TAP version 13',
+    '# Subtest: with hook',
+    '    # Subtest: first',
+    '    not ok 1 - first',
+    '      ---',
+    "      failureType: 'cancelledByParent'",
+    "      error: 'test did not finish before its parent and was cancelled'",
+    '      ...',
+    '    1..1',
+    'not ok 1 - with hook',
+    '  ---',
+    "  type: 'suite'",
+    "  failureType: 'hookFailed'",
+    "  error: 'hook exploded'",
+    '  ...',
+    '1..1',
+    '# tests 1',
+    '# suites 1',
+    '# pass 0',
+    '# fail 0',
+    '# cancelled 1',
+    '',
+  ].join('\n');
+  const parsed = parseTap(tap);
+  assert.deepEqual(parsed.failures.map((f) => [f.title, f.cancelled]), [['with hook › first', true], ['with hook', false]]);
+  assert.equal(parsed.fail, 0);
+  assert.match(parsed.failures[1].detail, /error: 'hook exploded'/);
+});
+
+test('helpers: parseTap does not read the lines of a YAML block as tests, and ends a block that is not closed at the next entry', () => {
+  const tap = [
+    'not ok 1 - diff',
+    '  ---',
+    '  error: |-',
+    '    ok 2 - a line of a diff that looks like a test',
+    '    not ok 3 - another one',
+    '  ...',
+    'ok 2 - next',
+    'not ok 3 - unclosed',
+    '  ---',
+    '  error: boom',
+    'ok 4 - after',
+    '# pass 2',
+    '# fail 2',
+    '',
+  ].join('\n');
+  const parsed = parseTap(tap);
+  assert.deepEqual(parsed.tests, [
+    { title: 'diff', status: 'failed' },
+    { title: 'next', status: 'passed' },
+    { title: 'unclosed', status: 'failed' },
+    { title: 'after', status: 'passed' },
+  ]);
+  assert.match(parsed.failures[0].detail, /ok 2 - a line of a diff that looks like a test\n {4}not ok 3 - another one/);
+  assert.equal(parsed.failures[1].detail, '  error: boom');
+});
+
+test('helpers: parseTsc keeps the distinct "error TS" lines, without continuation lines and without the runner path', () => {
+  assert.deepEqual(parseTsc(fixture('tsc.failed.log'), WORKSPACE), [
+    "src/Realm.Web/wwwroot/js/realmShell.js(306,16): error TS2304: Cannot find name 'document'.",
+    "src/Realm.Web/wwwroot/js/layoutMath.js(12,5): error TS2322: Type 'string' is not assignable to type 'number'.",
+    "src/Realm.Web/wwwroot/js/geo.js(40,9): error TS2339: Property 'lng' does not exist on type 'Point'.",
+  ]);
+  assert.deepEqual(parseTsc(TSC_CLEAN, WORKSPACE), []);
+  assert.deepEqual(parseTsc('error TS18003: No inputs were found in config file.\nFound 1 error.\n', ''), ['error TS18003: No inputs were found in config file.']);
+});
+
+test('helpers: jsReport has nothing to say without a TAP, a tsc.log or a js job that ran', () => {
+  assert.deepEqual(jsReport({ tap: null, tsc: null, jobResult: undefined }), { sections: [], problems: [] });
+  assert.deepEqual(jsReport({ tap: null, tsc: null, jobResult: 'skipped' }), { sections: [], problems: [] });
+  assert.deepEqual(jsReport({ tap: null, tsc: null, jobResult: 'success' }).sections, ['## JS\n\nNo js-tests.tap was found.']);
+});
+
+test('js: failing Node tests are named in SUMMARY.md: counts, one block per failure under its describe, the why line, and the order of the sections', () => {
+  const run = summarize({
+    files: {
+      'dotnet/trx/r.trx': fixture('results.passed.trx'),
+      'js/js-tests.tap': fixture('js-tests.failed.tap'),
+      'js/tsc.log': TSC_CLEAN,
+      'e2e/e2e/results.json': playwrightOf([{ title: '[X-01] fine', status: 'expected' }]),
+    },
+    needs: jsNeeds('failure'),
+  });
+  assert.equal(run.status, 0, run.stderr);
+  assert.match(run.summary, /^- result: failure$/m);
+  assert.match(run.summary, /^- why: job js: failure; 4 failed JS test\(s\)$/m);
+  const js = section(run.summary, 'JS');
+  assert.match(js, /^Node tests \(node --test of tests\/js\): 3 passed, 4 failed\.$/m, 'the counts are those of the tests, not of the parents');
+  assert.match(js, /^Type check \(tsc\.log\): no "error TS" line\.$/m);
+  assert.doesNotMatch(js, /The js job failed/, 'a failing test explains the failed job');
+  const failed = section(run.summary, 'Failed JS tests \\(4\\)');
+  assert.ok(failed, 'the failures have their own section');
+  assert.deepEqual(
+    [...failed.matchAll(/^### (.*)$/gm)].map((m) => m[1]),
+    [
+      'tests/js/brokenImport.test.mjs',
+      'layout solver › slides a bubble along the edge',
+      'layout solver › clusters › merges close bubbles',
+      'shell › closes the sheet',
+    ],
+  );
+  assert.doesNotMatch(run.summary, /^### (layout solver|clusters|shell)$/m, 'the parents of a failing subtest are not listed');
+  assert.match(failed, /Cannot find module 'tests\/js\/helpers\/missing\.mjs' imported from tests\/js\/brokenImport\.test\.mjs/, 'the crash of a test file is shown');
+  assert.match(failed, /location: 'tests\/js\/layoutSolver\.test\.mjs:6:3'/);
+  assert.match(failed, /error: 'sheet still open'/);
+  assert.ok(!run.summary.includes(WORKSPACE), 'the runner path is stripped');
+  assert.doesNotMatch(run.summary, /did not succeed, yet no compiler error/, 'the generic note is for jobs the report cannot explain');
+  assert.equal(section(run.summary, 'Type errors'), null);
+  const at = (heading) => run.summary.indexOf(`\n## ${heading}`);
+  assert.ok(at('Tests') > 0 && at('Tests') < at('JS') && at('JS') < at('Failed JS tests (4)') && at('Failed JS tests (4)') < at('E2E') && at('E2E') < at('Acceptance criteria'), 'JS follows Tests and comes before E2E');
+});
+
+test('js: a job that failed next to a failing js job is still reported as unexplained, the js job is not named in the note', () => {
+  const run = summarize({ files: { 'js/js-tests.tap': fixture('js-tests.failed.tap') }, needs: jsNeeds('failure', 'failure') });
+  assert.match(run.summary, /^- why: job dotnet: failure; job js: failure; 4 failed JS test\(s\)$/m);
+  assert.match(run.summary, /^Job dotnet did not succeed, yet no compiler error/m);
+});
+
+test('js: the detail of a failing test is its first 40 lines', () => {
+  const tap = ['not ok 1 - long', '  ---', '  error: |-', ...Array.from({ length: 60 }, (_, i) => `    diff line ${i + 1}`), '  ...', '# pass 0', '# fail 1', ''].join('\n');
+  const run = summarize({ files: { 'js/js-tests.tap': tap }, needs: jsNeeds('failure') });
+  const lines = section(run.summary, 'Failed JS tests \\(1\\)').split('\n');
+  assert.ok(lines.includes('    diff line 39'), 'line 40 is the 39th diff line (the first line is "error: |-")');
+  assert.ok(!lines.includes('    diff line 40'));
+  assert.ok(lines.includes('... (21 more lines)'));
+});
+
+test('js: more than 50 failing tests: the first 50 are shown, the count is the whole, causes come before the tests cancelled behind them', () => {
+  const cancelled = Array.from({ length: 60 }, (_, i) => [`    not ok ${i + 1} - t${i + 1}`, '      ---', "      failureType: 'cancelledByParent'", '      ...']).flat();
+  const tap = ['# Subtest: suite', ...cancelled, 'not ok 1 - suite', '  ---', "  failureType: 'hookFailed'", "  error: 'hook exploded'", '  ...', '# pass 0', '# fail 0', ''].join('\n');
+  const run = summarize({ files: { 'js/js-tests.tap': tap }, needs: jsNeeds('failure') });
+  assert.match(run.summary, /^- why: job js: failure; 61 failed JS test\(s\)$/m);
+  const failed = section(run.summary, 'Failed JS tests \\(61\\)');
+  const titles = [...failed.matchAll(/^### (.*)$/gm)].map((m) => m[1]);
+  assert.equal(titles.length, 50);
+  assert.equal(titles[0], 'suite', 'the hook that threw is the first block');
+  assert.equal(titles[1], 'suite › t1');
+  assert.match(failed, /^\.\.\. and 11 more failed JS tests \(all of them are in js\/js-tests\.tap\)$/m);
+});
+
+test('js: type errors of tsc.log are listed once each and counted in the why line; with them, a js job without a TAP is explained', () => {
+  const run = summarize({ files: { 'js/tsc.log': fixture('tsc.failed.log') }, needs: jsNeeds('failure') });
+  assert.match(run.summary, /^- result: failure$/m);
+  assert.match(run.summary, /^- why: job js: failure; 3 type error\(s\)$/m);
+  const js = section(run.summary, 'JS');
+  assert.match(js, /^Type check \(tsc\.log\): 3 distinct type errors\.$/m);
+  assert.match(js, /^The js job failed and no js-tests\.tap was produced: the Node tests run after the type check, which failed/m);
+  const errors = section(run.summary, 'Type errors');
+  assert.ok(errors, 'the type errors have their own section');
+  const lines = errors.split('\n');
+  assert.deepEqual(lines.filter((l) => l.includes('error TS')), [
+    "src/Realm.Web/wwwroot/js/realmShell.js(306,16): error TS2304: Cannot find name 'document'.",
+    "src/Realm.Web/wwwroot/js/layoutMath.js(12,5): error TS2322: Type 'string' is not assignable to type 'number'.",
+    "src/Realm.Web/wwwroot/js/geo.js(40,9): error TS2339: Property 'lng' does not exist on type 'Point'.",
+  ]);
+  assert.ok(!lines.includes("  Type 'string' is not assignable to type 'number'."), 'a continuation line is not an error of its own');
+  assert.ok(!errors.includes(WORKSPACE), 'the runner path is stripped');
+  assert.doesNotMatch(run.summary, /did not succeed, yet no compiler error/, 'the type errors explain the failed job');
+});
+
+test('js: at most 50 type errors are shown; the why line counts all of them', () => {
+  const log = Array.from({ length: 60 }, (_, i) => `src/a.js(${i + 1},1): error TS2304: Cannot find name 'n${i + 1}'.`).join('\n') + '\n';
+  const run = summarize({ files: { 'js/tsc.log': log }, needs: jsNeeds('failure') });
+  assert.match(run.summary, /^- why: job js: failure; 60 type error\(s\)$/m);
+  const errors = section(run.summary, 'Type errors');
+  assert.equal(errors.split('\n').filter((l) => l.includes('error TS')).length, 50);
+  assert.match(errors, /^\.\.\. and 10 more distinct type errors \(all of them are in js\/tsc\.log\)$/m);
+});
+
+test('js: a failed js job with no failing test and no type error says so, and the generic note stays', () => {
+  const withTap = summarize({ files: { 'js/js-tests.tap': PASSING_TAP, 'js/tsc.log': TSC_CLEAN }, needs: jsNeeds('failure') });
+  assert.match(withTap.summary, /^- why: job js: failure$/m);
+  assert.match(section(withTap.summary, 'JS'), /^Node tests \(node --test of tests\/js\): 12 passed, 0 failed\.$/m);
+  assert.match(section(withTap.summary, 'JS'), /^The js job failed but js-tests\.tap has no failing test; see tsc\.log\.$/m);
+  assert.match(withTap.summary, /^Job js did not succeed, yet no compiler error/m);
+
+  const noTap = summarize({ files: { 'dotnet/errors.log': '' }, needs: jsNeeds('failure') });
+  assert.match(noTap.summary, /^- why: job js: failure$/m);
+  assert.match(section(noTap.summary, 'JS'), /^The js job failed but no js-tests\.tap was produced \(the job stopped before the Node tests ran\); there is no tsc\.log either, so the cause is in the raw job log of the workflow run\.$/m);
+
+  const tscCrash = summarize({ files: { 'js/tsc.log': '> realm-dev-tools@ typecheck\nnpm error Missing script: "typecheck"\n' }, needs: jsNeeds('failure') });
+  assert.match(tscCrash.summary, /^- why: job js: failure$/m);
+  assert.match(section(tscCrash.summary, 'JS'), /^The js job failed but no js-tests\.tap was produced \(the job stopped before the Node tests ran\); see tsc\.log\.$/m);
+  assert.match(section(tscCrash.summary, 'JS'), /Last lines of tsc\.log:\n\n```text\n> realm-dev-tools@ typecheck\nnpm error Missing script: "typecheck"\n```/);
+
+  const empty = summarize({ files: { 'js/js-tests.tap': '' }, needs: jsNeeds('failure') });
+  assert.match(section(empty.summary, 'JS'), /^js-tests\.tap holds no test result/m);
+  assert.match(section(empty.summary, 'JS'), /^The js job failed but js-tests\.tap has no failing test/m);
+});
+
+test('js: a clean js job: counts, no failure section, success', () => {
+  const run = summarize({ files: { 'js/js-tests.tap': PASSING_TAP, 'js/tsc.log': TSC_CLEAN }, needs: jsNeeds('success') });
+  assert.match(run.summary, /^- result: success$/m);
+  assert.equal(section(run.summary, 'JS').trimEnd(), '## JS\n\nNode tests (node --test of tests/js): 12 passed, 0 failed.\n\nType check (tsc.log): no "error TS" line.');
+  assert.equal(section(run.summary, 'Failed JS tests'), null);
+  assert.equal(section(run.summary, 'Type errors'), null);
+});
+
+test('js: without --needs a failing test or a type error still fails the run; a TAP that counts failures but lists none is a failure with a note', () => {
+  const tests = summarize({ files: { 'js/js-tests.tap': 'not ok 1 - x\n# pass 0\n# fail 1\n' } });
+  assert.match(tests.summary, /^- result: failure$/m);
+  assert.match(tests.summary, /^- why: 1 failed JS test\(s\)$/m);
+  const types = summarize({ files: { 'js/tsc.log': 'src/a.js(1,1): error TS2304: Cannot find name \'n\'.\n' } });
+  assert.match(types.summary, /^- why: 1 type error\(s\)$/m);
+  const counted = summarize({ files: { 'js/js-tests.tap': '# pass 3\n# fail 2\n' }, needs: jsNeeds('success') });
+  assert.match(counted.summary, /^- why: 2 failed JS test\(s\)$/m);
+  assert.match(section(counted.summary, 'JS'), /^Node tests \(node --test of tests\/js\): 3 passed, 2 failed\.$/m);
+  assert.match(section(counted.summary, 'JS'), /counts failed tests but lists none of them as "not ok"/);
+  assert.equal(section(counted.summary, 'Failed JS tests'), null);
+});
+
+test('js: a section appears only when there is a TAP, a tsc.log or a js job that ran', () => {
+  assert.equal(section(summarize({ files: { 'dotnet/errors.log': '' }, needs: NEEDS_OK }).summary, 'JS'), null, 'no js job, no files');
+  assert.equal(section(summarize({ files: { 'dotnet/errors.log': '' }, needs: jsNeeds('skipped') }).summary, 'JS'), null, 'a skipped js job');
+  const succeeded = summarize({ files: { 'dotnet/errors.log': '' }, needs: jsNeeds('success') });
+  assert.equal(section(succeeded.summary, 'JS').trimEnd(), '## JS\n\nNo js-tests.tap was found.');
+  assert.match(succeeded.summary, /^- result: success$/m, 'that alone does not fail the run');
+});
+
+test('js: js-tests.tap and tsc.log are published beside SUMMARY.md, and a file over 400 KB is cut to its last part', () => {
+  const small = fixture('tsc.failed.log');
+  const lines = Array.from({ length: 30000 }, (_, i) => `line ${i} ${'x'.repeat(20)}`);
+  const big = lines.join('\n') + '\n';
+  const run = summarize({ files: { 'js/js-tests.tap': big, 'js/tsc.log': small }, needs: jsNeeds('success') });
+  assert.equal(fs.readFileSync(path.join(run.outDir, 'js', 'tsc.log'), 'utf8'), small, 'a small file is copied as it is');
+  const kept = fs.readFileSync(path.join(run.outDir, 'js', 'js-tests.tap'));
+  assert.ok(Buffer.byteLength(big) > 800 * 1024);
+  assert.ok(kept.length <= 400 * 1024 && kept.length > 390 * 1024, `kept ${kept.length} bytes`);
+  const text = kept.toString('utf8');
+  const [note, first] = text.split('\n');
+  assert.match(note, /^\.\.\. make-summary\.mjs kept the last part of this file \(\d+ bytes in the artifact, at most 409600 bytes here\)$/);
+  assert.match(first, /^line \d+ x{20}$/, 'the kept part starts at a line');
+  assert.ok(text.endsWith(`${lines[lines.length - 1]}\n`), 'the end of the file is kept');
+
+  const none = summarize({ files: { 'dotnet/errors.log': '' }, needs: NEEDS_OK });
+  assert.ok(!fs.existsSync(path.join(none.outDir, 'js')), 'nothing is published for a run without js files');
+});
+
+test('helpers: keepTail returns null for a file that fits and never cuts a character in two', () => {
+  const dir = tempDir('keep-tail');
+  const file = path.join(dir, 'a.log');
+  writeFile(file, 'é'.repeat(200)); // 400 bytes, no line break
+  assert.equal(keepTail(file, 400), null);
+  for (const limit of [296, 297, 298, 299, 300, 301, 302, 303]) {
+    const kept = keepTail(file, limit);
+    assert.ok(!kept.includes('�'), `limit ${limit}: no broken character`);
+    assert.ok(Buffer.byteLength(kept) <= limit, `limit ${limit}: ${Buffer.byteLength(kept)} bytes`);
+  }
 });
