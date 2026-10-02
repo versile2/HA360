@@ -485,13 +485,52 @@ public sealed class MapPayloadFactoryTests
         Assert.Equal(new ZoneItem(DemoPlaces.Home.Id, DemoPlaces.Home.Name, DemoPlaces.Home.Lat, DemoPlaces.Home.Lon, DemoPlaces.Home.RadiusM, Occupied: true), home);
     }
 
-    [Fact]
-    public void AZoneWithOnlyAVehicleInsideIsOccupied()
+    // R2-01. 01 section 5.3, "What counts as here (R2-009)": "A place is occupied when at least one person is inside it (PlaceVm.MemberIdsInside, which includes stale members,
+    // 02 §4.5); a vehicle never makes a place occupied. The row's "n here", the mini avatars, the occupied-first sort, the zone's occupied fill (4.6) and the "{m} occupied"
+    // summary (8.2) all count people only". The zone's `occupied` flag is that fill, so only a person sets it.
+    [Theory]
+    [InlineData(0, 0, false)]
+    [InlineData(0, 1, false)]     // only the wagon: not occupied
+    [InlineData(0, 2, false)]     // the wagon and the chariot: still not occupied
+    [InlineData(1, 0, true)]
+    [InlineData(1, 1, true)]      // a member and the wagon: occupied
+    [InlineData(2, 2, true)]
+    public void AZoneIsOccupiedWhenAPersonIsInside_WhateverVehiclesAreToo(int people, int vehicles, bool occupied)
     {
-        var parked = new PlaceVm("garage", "Garage", string.Empty, PlaceKind.Other, 31.0, -85.0, 50, [], ["wagon"]);
+        var place = Demo.Places.Single(candidate => candidate.Id == DemoPlaces.Work.Id) with
+        {
+            MemberIdsInside = [.. DemoCast.Members.Take(people).Select(member => member.Id)],
+            VehicleIdsInside = [.. DemoCast.Vehicles.Take(vehicles).Select(vehicle => vehicle.Id)],
+        };
 
-        var zone = Assert.Single(MapPayloadFactory.Zones([parked], show: true, Options, 1).Zones);
+        var zone = Assert.Single(MapPayloadFactory.Zones([place], show: true, Options, 1).Zones);
 
+        Assert.Equal(occupied, zone.Occupied);
+    }
+
+    [Fact]
+    public void Demo_TheWagonAloneAtHearthHaven_LeavesItsZoneEmpty_AndOnlyTheJestersHallOccupied()
+    {
+        // The Demo's Hearth Haven holds Alden and the pickup; take Alden away and only the pickup is left inside.
+        var places = Demo.Places.Select(place => place.Id == DemoPlaces.Home.Id ? place with { MemberIdsInside = [] } : place).ToList();
+
+        var payload = MapPayloadFactory.Zones(places, show: true, Options, 1);
+
+        Assert.Equal(DemoCast.Wagon.Id, Assert.Single(places.Single(place => place.Id == DemoPlaces.Home.Id).VehicleIdsInside));
+        Assert.False(payload.Zones.Single(zone => zone.Id == DemoPlaces.Home.Id).Occupied);
+        Assert.Equal([DemoPlaces.JesterHall.Id], payload.Zones.Where(zone => zone.Occupied).Select(zone => zone.Id));
+    }
+
+    // 01 section 5.3 names no exception for a static member: "at least one person ... (PlaceVm.MemberIdsInside ...)", and 02 §4.5 lists under a zone every member whose PlaceId is that
+    // zone, the static prince included; only the Drivers summary leaves him out (8.2). A zone that lists the prince is occupied, as its list row ("1 here") says.
+    [Fact]
+    public void AZoneThatListsAStaticMemberIsOccupied()
+    {
+        var place = Demo.Places.Single(candidate => candidate.Id == DemoPlaces.Work.Id) with { MemberIdsInside = [DemoCast.Prince.Id], VehicleIdsInside = [] };
+
+        var zone = Assert.Single(MapPayloadFactory.Zones([place], show: true, Options, 1).Zones);
+
+        Assert.Contains(Demo.Members, member => member.Id == DemoCast.Prince.Id && member.Kind == MemberKind.Static);
         Assert.True(zone.Occupied);
     }
 

@@ -178,18 +178,65 @@ public sealed class FormatterTests
 
     // ---- places ----------------------------------------------------------------------------------------------------------------------------
 
+    // R2-01. 01 section 5.3, "What counts as here (R2-009)": "A place is occupied when at least one person is inside it (PlaceVm.MemberIdsInside, which includes stale members,
+    // 02 §4.5); a vehicle never makes a place occupied. The row's "n here", the mini avatars, the occupied-first sort, the zone's occupied fill (4.6) and the "{m} occupied"
+    // summary (8.2) all count people only". The rows below pin that rule, not the implementation.
     [Fact]
-    public void Places_OccupiedMeansAPersonOrAVehicleInside()
+    public void Places_OccupiedMeansAPersonInside_AVehicleNeverMakesAPlaceOccupied()
     {
         var places = new[]
         {
-            Place("a", memberIds: ["king"], vehicleIds: []),
-            Place("b", memberIds: [], vehicleIds: ["wagon"]),
-            Place("c", memberIds: ["queen", "jester"], vehicleIds: ["chariot"]),
+            Place("a", memberIds: [DemoCast.King.Id], vehicleIds: []),
+            Place("b", memberIds: [], vehicleIds: [DemoCast.Wagon.Id]),
+            Place("c", memberIds: [DemoCast.Queen.Id, DemoCast.Jester.Id], vehicleIds: [DemoCast.Chariot.Id]),
             Place("d", memberIds: [], vehicleIds: []),
         };
 
-        Assert.Equal("4 places · 3 occupied", HandleSummaryFormatter.Places(places));
+        Assert.Equal("4 places · 2 occupied", HandleSummaryFormatter.Places(places));
+    }
+
+    [Theory]
+    [InlineData(0, 0, "1 place · all quiet")]
+    [InlineData(0, 1, "1 place · all quiet")]     // only the wagon: not occupied
+    [InlineData(0, 2, "1 place · all quiet")]     // the wagon and the chariot: still not occupied
+    [InlineData(1, 0, "1 place · 1 occupied")]
+    [InlineData(1, 1, "1 place · 1 occupied")]    // a member and the wagon: occupied
+    [InlineData(2, 2, "1 place · 1 occupied")]    // two people and two vehicles: still one occupied place
+    public void Places_OnePlace_OccupiedWhenAPersonIsInside_WhateverVehiclesAreToo(int people, int vehicles, string expected)
+    {
+        var place = Place(
+            "p",
+            memberIds: [.. DemoCast.Members.Take(people).Select(member => member.Id)],
+            vehicleIds: [.. DemoCast.Vehicles.Take(vehicles).Select(vehicle => vehicle.Id)]);
+
+        Assert.Equal(expected, HandleSummaryFormatter.Places([place]));
+    }
+
+    [Fact]
+    public void Places_TheWagonAloneAtHearthHaven_DoesNotOccupyIt_AndItsRowSaysEmpty()
+    {
+        // The Demo's Hearth Haven holds Alden and the pickup; take Alden away and only the pickup is left inside. The summary, the Format entry and the row must agree.
+        var places = Demo.Places.Select(place => place.Id == DemoPlaces.Home.Id ? place with { MemberIdsInside = [] } : place).ToList();
+        var home = places.Single(place => place.Id == DemoPlaces.Home.Id);
+
+        Assert.Equal(DemoCast.Wagon.Id, Assert.Single(home.VehicleIdsInside));
+        Assert.Equal("14 places · 1 occupied", HandleSummaryFormatter.Places(places));
+        Assert.Equal("14 places · 1 occupied", HandleSummaryFormatter.Format(Section.Places, Demo.Members, Demo.Vehicles, places, DemoNow));
+        Assert.Equal(PlaceTextFormatter.Empty, VmFactory.Place(home, Facts()).CountText);
+    }
+
+    // 01 section 5.3 names no exception for a static member: the rule is "at least one person ... (PlaceVm.MemberIdsInside ...)", and 02 §4.5 lists under a zone every member whose
+    // PlaceId is that zone, the static prince included (his PlaceId is the own-geometry result like anyone's, 02 section 1.5). Only the Drivers line leaves him out (8.2, "the static
+    // prince is not counted"). So a place that lists the prince is occupied, exactly as its row reads "1 here": the summary follows MemberIdsInside, the data layer's call.
+    [Fact]
+    public void Places_AStaticMemberListedInsideAPlace_IsAPerson_SoThePlaceIsOccupiedAsItsRowSays()
+    {
+        var work = Demo.Places.Single(place => place.Id == DemoPlaces.Work.Id) with { MemberIdsInside = [DemoCast.Prince.Id], VehicleIdsInside = [] };
+        var places = new[] { work };
+
+        Assert.Contains(Demo.Members, member => member.Id == DemoCast.Prince.Id && member.Kind == MemberKind.Static);
+        Assert.Equal("1 place · 1 occupied", HandleSummaryFormatter.Places(places));
+        Assert.Equal("1 here", VmFactory.Place(work, RowFacts.Create(Demo.Members, places, null, DemoNow, Session.Zone)).CountText);
     }
 
     [Theory]

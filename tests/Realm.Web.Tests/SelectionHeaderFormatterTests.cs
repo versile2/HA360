@@ -297,6 +297,19 @@ public sealed class SelectionHeaderFormatterTests
         Assert.Equal("1 here", VmFactory.Place(home, Facts).CountText);
     }
 
+    // 01 section 5.3 (R2-009): the place header and the detail heading "Here now ({n})" count people and vehicles (5.6), where the row's "n here", the zone's occupied flag and the
+    // "{m} occupied" summary count people only. A place that holds only the pickup therefore reads "Here now (1)" in its header, "Empty" in its row, and is not occupied.
+    [Fact]
+    public void APlaceWithOnlyThePickup_ReadsHereNowOne_WhereItsRowReadsEmptyAndItIsNotOccupied()
+    {
+        var garage = PlaceOf(DemoPlaces.Work.Id) with { MemberIdsInside = [], VehicleIdsInside = [DemoCast.Wagon.Id] };
+
+        Assert.Equal(1, SelectionHeaderFormatter.Occupants(garage));
+        Assert.Equal("Here now (1)", SelectionHeaderFormatter.Place(garage).Line2);
+        Assert.Equal(PlaceTextFormatter.Empty, VmFactory.Place(garage, Facts).CountText);
+        Assert.Equal("1 place · all quiet", HandleSummaryFormatter.Places([garage]));
+    }
+
     [Fact]
     public void APlaceWithThreePeople_ReadsHereNowThree()
     {
