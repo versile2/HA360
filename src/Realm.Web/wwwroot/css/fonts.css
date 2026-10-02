@@ -1,0 +1,31 @@
+/*
+ * The self-hosted faces (01 section 7.4, 03 section 3.8): Cinzel for display text and Atkinson Hyperlegible for everything else, both SIL OFL.
+ * The files live in ../fonts/ (relative to this stylesheet, so the URLs resolve under <base> and behind Ingress) and are placed there by
+ * tools/fonts/update-fonts.sh. No request ever goes to Google Fonts (AC-43). The two font stacks, --realm-font-display and --realm-font-body,
+ * are declared in css/app.css; they name these families first.
+ */
+
+/* Cinzel is a variable font; the range keeps display text at the weights 01 section 7.4 uses (600 for H3 and eyebrows, 700 for H1 and H2). */
+@font-face {
+  font-family: "Cinzel";
+  font-style: normal;
+  font-weight: 600 700;
+  font-display: swap;
+  src: url("../fonts/cinzel-latin-wght-normal.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Atkinson Hyperlegible";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../fonts/atkinson-hyperlegible-latin-400-normal.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Atkinson Hyperlegible";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../fonts/atkinson-hyperlegible-latin-700-normal.woff2") format("woff2");
+}

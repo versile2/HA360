@@ -194,10 +194,12 @@ test.describe('acceptance D: driving', () => {
   test('[AC-34] the title and the four stat chips of the default fixture, with arrow colours and tooltips', async ({ page }) => {
     await openDriving(page);
 
-    // The title (H1) and the subtitle.
+    // The title (H1, Cinzel) and the subtitle.
     const title = page.getByRole('heading', { level: 1 });
     await expect(title).toHaveText('Weekly Driving Report');
-    // Typography is asserted by S10b (D77).
+    expect(await title.evaluate((element) => getComputedStyle(element).fontFamily), 'the H1 is set in Cinzel').toMatch(/^"?Cinzel"?\s*(,|$)/);
+    // The wordmark above the title is display text too (01 section 7.4, D77).
+    expect(await page.locator('.realm-driving__wordmark').evaluate((element) => getComputedStyle(element).fontFamily), 'the wordmark is set in Cinzel').toMatch(/^"?Cinzel"?\s*(,|$)/);
     await expect(page.getByText("The scribes' tally of the Realm's roads", { exact: true })).toBeVisible();
 
     // This week: Speeding 56 up, Phone use 60* down, accel and braking "—" with no arrow.
