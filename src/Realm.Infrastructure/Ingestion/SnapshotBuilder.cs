@@ -36,11 +36,9 @@ internal sealed class BuildInput
 internal static class SnapshotBuilder
 {
     private const double VehicleStreetMaxDistanceM = 75;
-    private const double MovingMinMps = 1.0;
     private const string AvatarRoute = "avatars/";
 
     private static readonly TimeSpan VehicleStreetMaxAge = TimeSpan.FromMinutes(10);
-    private static readonly TimeSpan VehicleSpeedMaxAge = TimeSpan.FromSeconds(600);
     private static readonly TimeSpan Life360UnavailableAfter = TimeSpan.FromMinutes(5);
 
     /// <summary>The fused position of a live member (02 section 4), or null for a static member and a member without a fix.</summary>
@@ -231,7 +229,7 @@ internal static class SnapshotBuilder
         }
 
         var lastUpdate = state.LastUpdateUtc;
-        double? speed = state.SpeedMps is { } reported && lastUpdate is { } at && input.Now - at <= VehicleSpeedMaxAge ? reported : null;
+        var speed = VehicleRules.FreshSpeedMps(state.SpeedMps, lastUpdate, input.Now);
         return new VehicleVm(
             Id: plan.Id,
             Name: plan.Name,
@@ -247,7 +245,7 @@ internal static class SnapshotBuilder
             OdometerM: state.OdometerM,
             LastUpdateUtc: lastUpdate,
             SpeedMps: speed,
-            IsMoving: state.Ignition == IgnitionState.On && speed > MovingMinMps,
+            IsMoving: VehicleRules.IsMoving(state.Ignition, state.SpeedMps, lastUpdate, input.Now),
             Freshness: FreshnessRules.ForVehicle(input.Now, lastUpdate, input.Options.UiVehicleStaleAfterMinutes),
             IsPlaceholder: false,
             PlaceholderNote: null);

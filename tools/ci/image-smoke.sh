@@ -14,10 +14,14 @@
 #   4  Set-Cookie on GET /: informational (D61), WARN with the cookie names, never FAIL
 #   9  the image runs as uid 0 (asserted, not assumed)
 #   10 no forbidden path in docker export
+#   11 the Live start with Home Assistant unreachable (S13b, CR2-012): SUPERVISOR_TOKEN set, /data a volume with a valid options.json;
+#      /healthz 200 within 10 s, /data/realm.db and /data/dp-keys created, still running after a settle time, no crash in docker logs
 # Items 5, 7 and 8 belong to S16a and item 6 to S10a: each adds its own block here and touches no other item.
 #
 # Environment: CI_OUT (default ci-out), SMOKE_PORT (host port, default 18099), SMOKE_HEALTHY_CAP_S (how long to wait for
 # the first 200 before giving up, default 30; the FAIL line stays at 10 s, the cap only lets a slow start still be measured).
+# Item 11 runs a second container: SMOKE_LIVE_PORT (host port, default SMOKE_PORT + 1) and SMOKE_LIVE_SETTLE_S (seconds the
+# container must stay up after its first 200, so that the first attempts to reach Home Assistant have failed and been logged; default 3).
 # When an item fails on a request, the response headers of that request (and, for the Blazor script, what the image holds for
 # static web assets) are printed under the item's line and kept in smoke.json as failing_requests (make-summary.mjs shows them).
 # No `set -e` on purpose: every item runs and reports; the exit status comes from the items.
@@ -35,7 +39,9 @@ warn_ms=3000
 fail_ms=10000
 base_url="http://127.0.0.1:${port}"
 container="realm-smoke-$$"
+live_container="${container}-live"   # item 11
 work=$(mktemp -d)
+live_dir="$work/live-data"           # item 11: what the Live container sees as /data
 # A fixed 43-character token, the length of a real Ingress token (research ha-addon section 2).
 ingress_token="AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-AbCdE"
 
@@ -160,10 +166,21 @@ write_json() {
   } >"$out_dir/smoke.json"
 }
 
+# cleanup_live: removes the Live container of item 11 and what it wrote into its bind mount. The container runs as root (item 9), so the
+# directories it created in $live_dir belong to root and the runner's own rm cannot empty them; a throwaway container of the same image can.
+cleanup_live() {
+  docker rm -f "$live_container" >/dev/null 2>&1
+  if [[ -d $live_dir ]]; then
+    docker run --rm -v "$live_dir:/d" --entrypoint find "$image" /d -mindepth 1 -delete >/dev/null 2>&1
+    rm -rf "$live_dir" 2>/dev/null
+  fi
+}
+
 # shellcheck disable=SC2317
 on_exit() {
   local status=$?
   docker rm -f "$container" >/dev/null 2>&1
+  cleanup_live
   rm -rf "$work"
   write_json
   exit "$status"
@@ -385,6 +402,125 @@ fi
 if [[ -n $created ]]; then
   docker rm "$created" >/dev/null 2>&1
 fi
+
+# --- Item 11: the Live start with Home Assistant unreachable (CR2-012) ----------------------------------------------
+# The way the add-on really starts: SUPERVISOR_TOKEN set, /data a volume that holds options.json (02 section 3.5, demo_mode false, one
+# member and one vehicle with fictional ids) and no Home Assistant to talk to (the Supervisor's own "supervisor" host does not resolve
+# outside it). It is the longest start the app has (the SQLite schema, the Data Protection key ring, the three services that dial Home
+# Assistant) and none of it runs in the Demo start of item 1. The schema bootstrap runs before the listener opens (03 section 2.4), so the
+# 10 s limit on the first /healthz also bounds it, on a new database. Not a failure: "fail:" lines (the connection loops log an
+# unreachable Home Assistant at Error and retry); a failure: a crash line, a container that stops, a missing file.
+title="Live start, Home Assistant unreachable"
+live_port=${SMOKE_LIVE_PORT:-$((port + 1))}
+live_url="http://127.0.0.1:${live_port}"
+live_settle_s=${SMOKE_LIVE_SETTLE_S:-3}
+mkdir -p "$live_dir"
+cat >"$live_dir/options.json" <<'EOF'
+{
+  "log_level": "information",
+  "ui_stale_after_minutes": 30,
+  "ui_offline_after_hours": 24,
+  "ui_vehicle_stale_after_minutes": 45,
+  "ui_low_battery_percent": 15,
+  "ui_poor_accuracy_meters": 500,
+  "ui_default_view_radius_km": 40,
+  "ui_max_zone_radius_km": 5,
+  "ui_far_away_km": 80,
+  "ui_history_tokens": true,
+  "features_temp_bubble": false,
+  "features_add_rows": false,
+  "fusion_stale_grace_minutes": 10,
+  "trips_start_speed_mph": 15,
+  "trips_stop_merge_seconds": 180,
+  "trips_min_distance_miles": 0.3,
+  "trips_min_duration_seconds": 120,
+  "driving_week_start": "monday",
+  "driving_speeding_mph": 80,
+  "driving_speeding_min_seconds": 30,
+  "driving_phone_min_seconds": 10,
+  "retention_fix_days": 120,
+  "backfill_days": 10,
+  "privacy_log_positions": false,
+  "demo_mode": false,
+  "allow_demo_param": false,
+  "ignore_entities": [],
+  "members": [
+    { "id": "king", "display_name": "Alden", "person": "person.alden", "life360_tracker": "device_tracker.alden_life360" }
+  ],
+  "vehicles": [
+    { "id": "truck", "name": "The Truck", "glyph": "pickup", "integration": "none" }
+  ],
+  "places": []
+}
+EOF
+problems=()
+live_start_ms=$(now_ms)
+if ! docker run -d --init --name "$live_container" -e SUPERVISOR_TOKEN=x -v "$live_dir:/data" -p "127.0.0.1:${live_port}:8099" "$image" >/dev/null 2>"$work/run-live.err"; then
+  record 11 FAIL "$title" "docker run failed: $(head -c 300 "$work/run-live.err")"
+else
+  live_healthy_ms=-1
+  live_state=running
+  live_code=000
+  while :; do
+    live_code=$(curl -s -o /dev/null -w '%{http_code}' --connect-timeout 1 --max-time 2 "$live_url/healthz")
+    elapsed=$(($(now_ms) - live_start_ms))
+    if [[ $live_code == 200 ]]; then
+      live_healthy_ms=$elapsed
+      break
+    fi
+    if ((elapsed > fail_ms)); then
+      break
+    fi
+    live_state=$(docker inspect --format '{{.State.Status}}' "$live_container" 2>/dev/null || echo gone)
+    if [[ $live_state != running ]]; then
+      break
+    fi
+    sleep 0.1
+  done
+  if ((live_healthy_ms < 0)); then
+    if [[ $live_state != running ]]; then
+      live_exit=$(docker inspect --format '{{.State.ExitCode}}' "$live_container" 2>/dev/null || echo '?')
+      problems+=("the container is $live_state (exit code $live_exit) and /healthz never answered 200")
+    else
+      problems+=("no 200 from /healthz within $((fail_ms / 1000)) s (last status $live_code)")
+    fi
+  else
+    add_number live_time_to_healthy_s "$(fmt_s "$live_healthy_ms")"
+    if ((live_healthy_ms > fail_ms)); then
+      problems+=("first /healthz 200 after $(fmt_s "$live_healthy_ms") s, over the $((fail_ms / 1000)) s limit")
+    fi
+    # Let the first attempts to reach Home Assistant fail and be logged: the loops must back off and carry on, not stop the host.
+    sleep "$live_settle_s"
+    live_state=$(docker inspect --format '{{.State.Status}}' "$live_container" 2>/dev/null || echo gone)
+    if [[ $live_state != running ]]; then
+      live_exit=$(docker inspect --format '{{.State.ExitCode}}' "$live_container" 2>/dev/null || echo '?')
+      problems+=("the container is $live_state (exit code $live_exit) $live_settle_s s after the first 200")
+    fi
+  fi
+  live_db_bytes=0
+  if [[ -s $live_dir/realm.db ]]; then
+    live_db_bytes=$(stat -c %s "$live_dir/realm.db" 2>/dev/null || echo 0)
+  else
+    problems+=("/data/realm.db was not created")
+  fi
+  if [[ ! -d $live_dir/dp-keys ]]; then
+    problems+=("/data/dp-keys was not created (the Data Protection key ring of 03 section 5.7)")
+  fi
+  live_log=$(docker logs "$live_container" 2>&1)
+  # An unhandled exception, a crashed hosted service (the host stops on it), a start that failed, any critical line. "fail:" is not one of them.
+  crashes=$(grep -E 'Unhandled exception|BackgroundService failed|Application startup exception|Host terminated unexpectedly|Hosting failed to start|(^|[[:space:]])crit: ' <<<"$live_log" | head -n 3 | cut -c1-200)
+  if [[ -n $crashes ]]; then
+    problems+=("the log shows a crash: $(tr '\n' '|' <<<"$crashes")")
+  fi
+  if ((${#problems[@]} == 0)); then
+    live_lines=$(wc -l <<<"$live_log" | tr -d ' ')
+    record 11 PASS "$title" "/healthz 200 after $(fmt_s "$live_healthy_ms") s, realm.db $live_db_bytes bytes and dp-keys in /data, still running ${live_settle_s} s later, no crash among $live_lines log lines"
+  else
+    queue_block "container log of the Live start, last 10 lines" "$(tail -n 10 <<<"$live_log" | cut -c1-150)"
+    record 11 FAIL "$title" "$(join_problems)"
+  fi
+fi
+cleanup_live
 
 # ---------------------------------------------------------------------------------------------------------------------
 # Sizes for the table of 03 section 6.5 (recorded, not enforced: item 8 is S16a's) and the log of a failed run.

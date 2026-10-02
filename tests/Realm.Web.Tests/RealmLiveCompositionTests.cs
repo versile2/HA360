@@ -1,10 +1,12 @@
 using System.Net;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Realm.Domain;
 using Realm.Infrastructure.Data;
 using Realm.Infrastructure.Ha;
+using Realm.Infrastructure.Hosting;
 using Realm.Infrastructure.Ingestion;
 using Realm.TestKit;
 using Xunit;
@@ -66,6 +68,47 @@ public sealed class RealmLiveCompositionTests
         Assert.Contains(logs.Entries, entry => entry.Level == LogLevel.Error && entry.Message.Contains("ui_offline_after_hours", StringComparison.Ordinal));
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
+
+    // AddRealmLive is complete on its own (03 section 2.1): the clock its services take is registered by it, and a clock that the host registered first stays.
+    [Fact]
+    public void AddRealmLive_RegistersTheSystemClock_WhenNoneIsThere()
+    {
+        var services = new ServiceCollection();
+
+        services.AddRealmLive(Configure(("SUPERVISOR_TOKEN", FictionalToken)));
+
+        using var provider = services.BuildServiceProvider();
+        Assert.Same(TimeProvider.System, provider.GetRequiredService<TimeProvider>());
+    }
+
+    [Fact]
+    public void AddRealmLive_KeepsTheClockThatWasRegisteredFirst()
+    {
+        var clock = new OtherClock();
+        var services = new ServiceCollection().AddSingleton<TimeProvider>(clock);
+
+        services.AddRealmLive(Configure(("SUPERVISOR_TOKEN", FictionalToken)));
+
+        using var provider = services.BuildServiceProvider();
+        Assert.Same(clock, provider.GetRequiredService<TimeProvider>());
+        Assert.Single(services, descriptor => descriptor.ServiceType == typeof(TimeProvider));
+    }
+
+    // The database path of 03 section 2.1, which the avatar cache and the Data Protection keys follow: the environment beats Realm:Db, which beats the default.
+    [Fact]
+    public void TheDatabasePath_IsTheEnvironmentVariable_ThenRealmDb_ThenTheDefault()
+    {
+        Assert.Equal("/env/realm.db", RealmLiveServiceCollectionExtensions.ResolveDatabasePath(Configure(("REALM_DB", "/env/realm.db"), ("Realm:Db", "/config/realm.db"))));
+        Assert.Equal("/config/realm.db", RealmLiveServiceCollectionExtensions.ResolveDatabasePath(Configure(("REALM_DB", ""), ("Realm:Db", "/config/realm.db"))));
+
+        var fallback = RealmLiveServiceCollectionExtensions.ResolveDatabasePath(Configure());   // /data in the add-on, the working directory on a development machine
+        Assert.Equal(Directory.Exists("/data") ? "/data/realm.db" : "./realm.db", fallback);
+    }
+
+    private static IConfiguration Configure(params (string Key, string Value)[] values) =>
+        new ConfigurationBuilder().AddInMemoryCollection(values.ToDictionary(pair => pair.Key, pair => (string?)pair.Value)).Build();
+
+    private sealed class OtherClock : TimeProvider;
 
     private static Dictionary<string, string?> LiveSettings() => new() { ["SUPERVISOR_TOKEN"] = FictionalToken };
 

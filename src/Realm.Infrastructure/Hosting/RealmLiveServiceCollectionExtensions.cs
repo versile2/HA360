@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Configuration.EnvironmentVariables;
 using Microsoft.Extensions.Configuration.Memory;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Realm.Domain;
@@ -85,6 +86,7 @@ public static class RealmLiveServiceCollectionExtensions
     {
         var settings = LiveSettings.Read(configuration);
 
+        services.TryAddSingleton(TimeProvider.System);   // the state, the REST client, the connection, the refresher and the avatar service all take one
         services.AddRealmData(settings.DatabasePath);
         services.AddSingleton(settings.Options);
         services.AddSingleton(provider => RealmState.CreateInitial(settings.Options, provider.GetRequiredService<TimeProvider>()));
@@ -154,6 +156,15 @@ public static class RealmLiveServiceCollectionExtensions
             Timeout = AvatarTimeout,
         };
 
+    /// <summary>
+    /// The path of the SQLite file: env <c>REALM_DB</c>, else <c>Realm:Db</c>, else <c>/data/realm.db</c> where the add-on's <c>/data</c> exists, else
+    /// <c>./realm.db</c> for local development (03 section 2.1). The files that belong beside it (the avatar cache, the Data Protection keys of 03 section
+    /// 5.7) are kept in its directory.
+    /// </summary>
+    public static string ResolveDatabasePath(IConfiguration configuration) =>
+        FirstNonEmpty(configuration["REALM_DB"], configuration["Realm:Db"])
+        ?? (Directory.Exists(DefaultDataDirectory) ? DefaultDatabasePath : DevelopmentDatabasePath);
+
     private static string? FirstNonEmpty(params string?[] values) => values.FirstOrDefault(value => !string.IsNullOrEmpty(value));
 
     /// <summary>What <see cref="AddRealmLive"/> reads from the configuration.</summary>
@@ -190,8 +201,7 @@ public static class RealmLiveServiceCollectionExtensions
             var validation = OptionsValidator.Validate(options);
             errors.AddRange(validation.Errors);
 
-            var database = FirstNonEmpty(configuration["REALM_DB"], configuration["Realm:Db"])
-                ?? (Directory.Exists(DefaultDataDirectory) ? DefaultDatabasePath : DevelopmentDatabasePath);
+            var database = ResolveDatabasePath(configuration);
             var cache = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(database)) ?? ".", "cache", "avatars");
 
             return new LiveSettings(

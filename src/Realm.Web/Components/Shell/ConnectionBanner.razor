@@ -88,7 +88,19 @@
         else if (homeAssistant == Realm.Domain.ConnectionState.Connected && _homeAssistantWasDown)
         {
             _homeAssistantWasDown = false;
-            Snackbar.Add("The messengers are back.", Severity.Success, options => options.VisibleStateDuration = 3000);
+
+            // One toast per outage (01 section 8.6) is the latch above, so MudBlazor's own duplicate guard is switched off for it. Left on (the
+            // SnackbarConfiguration default), Add(string) uses the text as the key and drops a message whose key is still in the list, so a second outage
+            // that ends while the first toast has not yet left the screen showed nothing (Add returns null). In the page that window is the toast's 3 s
+            // plus its transitions; with no MudSnackbarProvider rendered, as in the component test, nothing ever removes the first one.
+            Snackbar.Add(
+                "The messengers are back.",
+                Severity.Success,
+                options =>
+                {
+                    options.VisibleStateDuration = 3000;
+                    options.DuplicatesBehavior = SnackbarDuplicatesBehavior.Allow;
+                });
         }
 
         _banner = homeAssistant == Realm.Domain.ConnectionState.Unavailable

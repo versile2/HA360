@@ -440,16 +440,18 @@ public class FixParserTests
 
     // ---- duplicates within 2 s ------------------------------------------------------------------------------
 
-    // Identical coordinates within 2 s of the previous accepted fix are skipped (inclusive of 2 s).
+    // 02 section 1.6: a companion fix is the state's update time "when coordinates changed", so the same coordinates are never a new fix, however long
+    // after the previous one (CR1-006). The 2 s duplicate window belongs to FordPass (below).
     [Theory]
-    [InlineData(0, false)]
-    [InlineData(1, false)]
-    [InlineData(2, false)]
-    [InlineData(3, true)]
-    [InlineData(60, true)]
-    public void A_companion_duplicate_within_two_seconds_is_skipped(int secondsAfterPrevious, bool accepted)
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(60)]
+    [InlineData(3600)]
+    public void A_companion_state_with_unchanged_coordinates_is_never_a_new_fix(int secondsAfterPrevious)
     {
-        var previous = Previous(FixSource.Companion, Now.AddMinutes(-5), HomeLat, HomeLon);
+        var previous = Previous(FixSource.Companion, Now.AddHours(-2), HomeLat, HomeLon);
 
         var fix = FixParser.ParseTracker(
             Companion(previous.Ts.AddSeconds(secondsAfterPrevious), ("latitude", HomeLat), ("longitude", HomeLon)),
@@ -457,7 +459,29 @@ public class FixParserTests
             Now,
             previous: previous);
 
-        Assert.Equal(accepted, fix is not null);
+        Assert.Null(fix);
+    }
+
+    // The attribute-only update the review names: accuracy, altitude and battery changed, the position did not.
+    [Fact]
+    public void A_companion_attribute_only_update_is_not_a_new_fix_but_the_next_move_is()
+    {
+        var previous = Previous(FixSource.Companion, Now.AddMinutes(-30), HomeLat, HomeLon);
+
+        var attributesOnly = FixParser.ParseTracker(
+            Companion(Now.AddMinutes(-10), ("latitude", HomeLat), ("longitude", HomeLon), ("gps_accuracy", 8), ("altitude", 211.0), ("battery_level", 54)),
+            FixSource.Companion,
+            Now,
+            previous: previous);
+        var moved = FixParser.ParseTracker(
+            Companion(Now.AddMinutes(-5), ("latitude", NorthOfHome(30)), ("longitude", HomeLon), ("gps_accuracy", 8)),
+            FixSource.Companion,
+            Now,
+            previous: previous);
+
+        Assert.Null(attributesOnly);
+        Assert.NotNull(moved);
+        Assert.Equal(Now.AddMinutes(-5), moved.Ts);
     }
 
     [Fact]

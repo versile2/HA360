@@ -156,6 +156,30 @@ public sealed class IngestionPipelineTests : IDisposable
         Assert.Equal(2, rig.Writer.Fixes.Count);
     }
 
+    // 02 section 1.6 (CR1-006): a companion fix counts only when the coordinates changed, so a state that only changes its attributes (accuracy, altitude)
+    // minutes later is neither stored nor does it make the member look fresher than the last position report.
+    [Fact]
+    public async Task ACompanionStateWithUnchangedCoordinates_IsNotANewFix()
+    {
+        var rig = NewRig();
+        await rig.DiscoverAsync(Plans.Member("king", companion: Plans.KingPhone));
+        var first = rig.Time.GetUtcNow();
+        await rig.FeedAsync(Companion(Plans.KingPhone, first, HomeLat + 0.02, HomeLon));
+
+        rig.Time.Advance(TimeSpan.FromMinutes(10));
+        var later = rig.Time.GetUtcNow();
+        await rig.FeedAsync(Entity(Plans.KingPhone, "not_home", later, ("latitude", HomeLat + 0.02), ("longitude", HomeLon), ("gps_accuracy", 4.0), ("altitude", 212.0)));
+
+        Assert.Single(rig.Writer.Fixes);
+        Assert.Equal(first, rig.State.Current.Members.Single().LastUpdateUtc);
+
+        rig.Time.Advance(TimeSpan.FromMinutes(1));
+        await rig.FeedAsync(Companion(Plans.KingPhone, rig.Time.GetUtcNow(), HomeLat + 0.021, HomeLon));
+
+        Assert.Equal(2, rig.Writer.Fixes.Count);
+        Assert.Equal(rig.Time.GetUtcNow(), rig.State.Current.Members.Single().LastUpdateUtc);
+    }
+
     [Fact]
     public async Task AStaticMember_IsAPinThatIsNeverStale_AndHasNoDetector()
     {
@@ -558,6 +582,50 @@ public sealed class IngestionPipelineTests : IDisposable
         Assert.Equal("wagon", sample.VehicleId);
         Assert.Equal(refreshed, sample.Ts);
         Assert.Equal(62, sample.FuelPct);
+    }
+
+    // T23 (02 section 5.10) through the whole path: the sensors, the parser and the snapshot's IsMoving (Domain VehicleRules, CR1-002).
+    [Fact]
+    public async Task AVehicleIsMovingOnlyWithTheIgnitionOn_AndAFreshSpeed_T23()
+    {
+        var car = new ResolvedVehicle(
+            "wagon",
+            "Wagon",
+            null,
+            VehicleGlyph.Car,
+            false,
+            null,
+            0,
+            "fordpass_test",
+            "device_tracker.fordpass_test",
+            ["sensor.fordpass_test_ignitionstatus", "sensor.fordpass_test_speed", "sensor.fordpass_test_lastrefresh"]);
+        var rig = NewRig();
+        await rig.DiscoverWithAsync(null, [car], Plans.Member("king", life360: Plans.KingTracker));
+        var refreshed = Start.AddMinutes(-3);
+        HaEntitySnapshot Speed(string mph) => Entity("sensor.fordpass_test_speed", mph, refreshed, ("unit_of_measurement", "mph"));
+
+        // Parked with the brake on: the ignition reads ON and the speed 0.
+        await rig.FeedAsync(
+            Entity("sensor.fordpass_test_ignitionstatus", "ON", refreshed),
+            Speed("0"),
+            Entity("sensor.fordpass_test_lastrefresh", refreshed.ToString("O"), refreshed));
+        var parked = Assert.Single(rig.State.Current.Vehicles);
+
+        // 25 mph in a sample three minutes old.
+        await rig.FeedAsync(Speed("25"));
+        var driving = Assert.Single(rig.State.Current.Vehicles);
+
+        // The same sample is twelve minutes old after nine more minutes: older than the 600 s of Vehicle.SpeedMaxAgeS.
+        rig.Time.Advance(TimeSpan.FromMinutes(9));
+        rig.Pipeline.Tick();
+        var old = Assert.Single(rig.State.Current.Vehicles);
+
+        Assert.False(parked.IsMoving);
+        Assert.Equal(0, parked.SpeedMps);
+        Assert.True(driving.IsMoving);
+        Assert.Equal(11.176, driving.SpeedMps ?? double.NaN, 3);
+        Assert.False(old.IsMoving);
+        Assert.Null(old.SpeedMps);
     }
 
     [Fact]
