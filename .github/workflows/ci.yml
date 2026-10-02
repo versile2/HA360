@@ -72,8 +72,9 @@ jobs:
       - run: mkdir -p ci-out
       - run: npm run typecheck 2>&1 | tee ci-out/tsc.log
       - run: node --test --test-reporter=tap "tests/js/**/*.test.mjs" 2>&1 | tee ci-out/js-tests.tap
-      - name: Validate map styles (third-party fetch is soft)
-        continue-on-error: true
+      # 03 section 4.9: a spec error in a style we build or ship (FAIL line, exit 1) breaks the build; a third-party fetch that fails or is refused is only
+      # a WARN line and exit 0, decided inside the script. So the step itself is NOT continue-on-error (R3-02). styles.log is read by make-summary.mjs.
+      - name: Validate map styles (our own styles fail the build, a third-party fetch only warns)
         run: node tools/ci/validate-styles.mjs 2>&1 | tee ci-out/styles.log
       - if: always()
         uses: actions/upload-artifact@v7
