@@ -1,3 +1,259 @@
 @page "/driving"
+@implements IAsyncDisposable
+@using Realm.Domain
+@using Realm.Web.Components.Driving
+@using Realm.Web.Formatting
+@inject NavigationManager Navigation
+@inject ILogger<DrivingPage> Logger
 
-<section class="realm-driving"></section>
+@* The Weekly Driving Report (01 section 6; 03 section 3.4): a full page, no map and no sheet. The session is RealmShell's cascading value. The selected week is the
+   ?week= query (D69), read on every navigation through SupplyParameterFromQuery and written back with NavigationManager (a chip is a replace, so Back from Driving still
+   leaves for Location), never taken from the Demo overrides. The report comes from IRealmSession.GetWeekReportAsync(week, snapshot.WeekStart); the page renders it and
+   decides nothing: every figure, arrow, asterisk of 01 section 6.3 is the data layer's, built into strings by the formatters. The report is fetched again, in place, when
+   the snapshot's StatsVersion moves (never polled). The six openers raise OnOpen; the popups arrive with S11b. *@
+<section class="realm-driving" aria-busy="@(_loading ? "true" : "false")">
+    <div class="realm-driving__column">
+        <header class="realm-driving__header">
+            <span class="realm-driving__wordmark">@DrivingFormatter.Wordmark</span>
+        </header>
+
+        <WeekChips Weeks="@_weeks" Selected="@_week" SelectedChanged="OnWeekAsync" />
+
+        <h1 class="realm-h1 realm-driving__title">@DrivingFormatter.Title</h1>
+        <p class="realm-driving__subtitle">@DrivingFormatter.Subtitle</p>
+        <p class="realm-driving__range" role="status">@RangeLine</p>
+
+        @if (_failed)
+        {
+            <p class="realm-driving__banner" role="status">@DrivingFormatter.ReportUnavailableBanner</p>
+        }
+
+        @if (_loading)
+        {
+            <div class="realm-driving__skeleton" aria-hidden="true">
+                <div class="realm-stat-grid">
+                    @for (var i = 0; i < StatNameFormatter.ChipKeys.Count; i++)
+                    {
+                        <div class="realm-skeleton realm-skeleton--chip"></div>
+                    }
+                </div>
+                <div class="realm-card-row">
+                    <div class="realm-skeleton realm-skeleton--card"></div>
+                    <div class="realm-skeleton realm-skeleton--card"></div>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="realm-stat-grid">
+                @foreach (var key in StatNameFormatter.ChipKeys)
+                {
+                    <StatChip Key="@key" Stat="@StatOf(key)" WeekOffset="@_week" OnOpen="OpenAsync" />
+                }
+            </div>
+
+            <div class="realm-card-row">
+                <TopSpeedCard TopSpeed="@_report?.TopSpeed" Driver="@MemberOf(_report?.TopSpeed?.MemberId)" OnOpen="@(() => OpenAsync(StatNameFormatter.TopSpeedKey))" />
+                <DrivesCard Totals="@Totals" OnOpen="@(() => OpenAsync(StatNameFormatter.DrivesKey))" />
+            </div>
+
+            @if (_report is { } report)
+            {
+                @if (ShowQuietWeek(report))
+                {
+                    <p class="realm-driving__quiet">@DrivingFormatter.NoDrivesCurrentWeek</p>
+                }
+
+                <div class="realm-driver-list">
+                    @foreach (var driver in report.Drivers)
+                    {
+                        <DriverCard @key="driver.MemberId" Driver="@driver" Member="@MemberOf(driver.MemberId)" Week="@_week" />
+                    }
+                </div>
+
+                @if (ShowDistanceCaption(report))
+                {
+                    <p class="realm-driving__caption">@(StatNameFormatter.DistanceCaption + ".")</p>
+                }
+            }
+        }
+    </div>
+</section>
+
+@code {
+    private readonly CancellationTokenSource _lifetime = new();
+    private CancellationTokenSource? _load;
+    private IReadOnlyList<WeekRef> _weeks = [];
+    private Dictionary<string, MemberVm> _members = new(StringComparer.Ordinal);
+    private WeekReportVm? _report;
+    private int _week;
+    private int _loadedWeek = -1;
+    private int _statsVersion = -1;
+    private bool _loading = true;
+    private bool _failed;
+    private bool _subscribed;
+    private bool _disposed;
+
+    /// <summary>The circuit's session, cascaded by <c>RealmShell</c>.</summary>
+    [CascadingParameter]
+    public IRealmSession Session { get; set; } = default!;
+
+    /// <summary><c>?week=0..3</c>: an ordinary route query, honoured in every mode (01 Appendix B, D69). Anything else is This week.</summary>
+    [SupplyParameterFromQuery(Name = "week")]
+    public string? WeekQuery { get; set; }
+
+    // The Drives card reads "—" for a week nobody was recorded in: nothing was counted, which is not the same as no drives.
+    private WeekTotals? Totals => _report is null || _report.Coverage == WeekCoverage.NoRecord ? null : _report.Totals;
+
+    // While the report loads the line is empty; when it cannot be read the plain range of the chip stands in for it.
+    private string RangeLine =>
+        _report is not null ? DrivingFormatter.RangeLine(_report, Session.Zone)
+        : _loading || _week >= _weeks.Count ? string.Empty
+        : DrivingFormatter.RangeText(_weeks[_week].Start, _weeks[_week].End);
+
+    private EventStat? StatOf(string key) => _report is not null && _report.Events.TryGetValue(key, out var stat) ? stat : null;
+
+    private MemberVm? MemberOf(string? id) => id is not null && _members.TryGetValue(id, out var member) ? member : null;
+
+    // 01 section 8.7: the current week with nothing driven yet. A week nobody was recorded in says so in the range line instead.
+    private static bool ShowQuietWeek(WeekReportVm report) => report.IsCurrent && report.Coverage != WeekCoverage.NoRecord && report.Totals.Drives == 0;
+
+    // 01 section 6.4 (R-111): the caption follows the distance basis, GPS in v1, and has nothing to say about a week without distances.
+    private static bool ShowDistanceCaption(WeekReportVm report) =>
+        report.Coverage != WeekCoverage.NoRecord && report.DistanceBasis is DistanceBasis.Gps or DistanceBasis.Mixed;
+
+    // Prerendering runs this twice (the prerender scope, then the circuit); both only read the session and the query.
+    protected override async Task OnParametersSetAsync()
+    {
+        RefreshChips();
+        var week = DrivingFormatter.ParseWeek(WeekQuery);
+        _week = week;
+        if (week == _loadedWeek)
+        {
+            return;
+        }
+
+        _loadedWeek = week;
+        _report = null;
+        _loading = true;
+        _failed = false;
+        await LoadAsync(week, blank: true);
+    }
+
+    // The circuit exists from the first render on: only now can the page listen for the snapshot's StatsVersion.
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (!firstRender || _subscribed || _disposed)
+        {
+            return;
+        }
+
+        _subscribed = true;
+        Session.Changed += OnSessionChanged;
+
+        // A trip may have been closed between the load and the subscription.
+        OnSessionChanged();
+    }
+
+    private void RefreshChips()
+    {
+        var snapshot = Session.Current;
+        _weeks = WeekMath.Chips(Session.Time.GetUtcNow(), snapshot.WeekStart, Session.Zone);
+        _members = snapshot.Members.ToDictionary(member => member.Id, StringComparer.Ordinal);
+    }
+
+    // One load at a time: a newer one (another week, or a new StatsVersion) cancels the one in flight, whose result is then dropped.
+    private async Task LoadAsync(int week, bool blank)
+    {
+        _load?.Cancel();
+        _load?.Dispose();
+        var load = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
+        _load = load;
+        var token = load.Token;
+        var snapshot = Session.Current;
+        try
+        {
+            var report = await Session.GetWeekReportAsync(week, snapshot.WeekStart, token);
+            if (token.IsCancellationRequested || _disposed)
+            {
+                return;
+            }
+
+            _report = report;
+            _statsVersion = snapshot.StatsVersion;
+            _failed = false;
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (Exception exception)
+        {
+            // 01 section 6.9: the report cannot be read. The banner says so and every chip reads "—"; the page keeps what it had unless it was blanked for a new week.
+            Logger.LogError(exception, "The weekly driving report could not be loaded for week {Week}.", week);
+            if (token.IsCancellationRequested || _disposed)
+            {
+                return;
+            }
+
+            // The version is taken as seen, so a persistent failure is not retried on every snapshot: the next trip written asks again.
+            _statsVersion = snapshot.StatsVersion;
+            _failed = true;
+            if (blank)
+            {
+                _report = null;
+            }
+        }
+
+        _loading = false;
+    }
+
+    // A chip: write the choice back to the query (replace, so Back from Driving still leaves for Location). This week is the default and leaves no parameter.
+    private Task OnWeekAsync(int week)
+    {
+        if (week != _week)
+        {
+            var value = week == 0 ? null : week.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            Navigation.NavigateTo(Navigation.GetUriWithQueryParameter("week", value), replace: true);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    // S11b mounts StatPopup here (01 section 6.7); until then the six openers are buttons that do nothing.
+    private Task OpenAsync(string key) => Task.CompletedTask;
+
+    // Raised off the UI thread (IRealmSession.Changed): marshal back before touching state. The report is fetched again, in place, only when StatsVersion moved.
+    private void OnSessionChanged()
+    {
+        if (_disposed || _loadedWeek < 0 || Session.Current.StatsVersion == _statsVersion)
+        {
+            return;
+        }
+
+        _ = InvokeAsync(async () =>
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            await LoadAsync(_loadedWeek, blank: false);
+            StateHasChanged();
+        });
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        _disposed = true;
+        if (_subscribed)
+        {
+            Session.Changed -= OnSessionChanged;
+        }
+
+        _lifetime.Cancel();
+        _load?.Dispose();
+        _lifetime.Dispose();
+        return ValueTask.CompletedTask;
+    }
+}

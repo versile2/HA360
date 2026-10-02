@@ -1,0 +1,83 @@
+@* One of the four stat chips (01 section 6.3; 03 section 3.4): a 64 px button that renders ONE EventStat and does no arithmetic. The value is Total ("—" when it is
+   null, never 0), the asterisk is Partial (never on an unavailable type), the arrow is the sign of TrendDelta (more events is worse, so up is the error colour), the
+   info icon marks an unavailable value, and the tooltip is the unavailable sentence, the partial sentence and the Note (StatNameFormatter). The tooltip opens on
+   hover and keyboard focus, not on a tap, because a tap opens the popup. The text of the tooltip is also the accessible description, never part of the name. *@
+<MudTooltip Text="@Tooltip" Placement="Placement.Bottom" Inline="false" RootClass="realm-stat-chip-root">
+    <button type="button"
+            class="realm-stat-chip"
+            data-testid="@("stat-" + Key)"
+            aria-label="@StatNameFormatter.ChipAccessibleName(Key, Stat, WeekOffset)"
+            aria-describedby="@(Tooltip is null ? null : DescriptionId)"
+            @onclick="OpenAsync">
+        <span class="realm-stat-chip__icon realm-stat-chip__icon--@(Key)" aria-hidden="true">
+            <MudIcon Icon="@Icon" />
+        </span>
+        <span class="realm-stat-chip__text">
+            <span class="realm-stat-chip__value">
+                <span class="realm-stat-chip__number">@StatNameFormatter.ChipNumber(Stat)</span>
+                @if (StatNameFormatter.IsUnavailable(Stat))
+                {
+                    <span class="realm-stat-chip__info" aria-hidden="true">
+                        <MudIcon Icon="@Icons.Material.Outlined.Info" />
+                    </span>
+                }
+            </span>
+            <span class="realm-stat-chip__label">@StatNameFormatter.Label(Key)</span>
+        </span>
+        @if (Trend != TrendDirection.None)
+        {
+            <span class="realm-stat-chip__trend realm-stat-chip__trend--@(Trend.ToString().ToLowerInvariant())"
+                  data-testid="@("trend-" + Key)"
+                  aria-hidden="true">
+                <MudIcon Icon="@TrendIcon" />
+            </span>
+        }
+    </button>
+    @if (Tooltip is not null)
+    {
+        <span id="@DescriptionId" class="realm-sr-only">@Tooltip</span>
+    }
+</MudTooltip>
+
+@code {
+    /// <summary>The key of the stat: <c>speeding</c>, <c>phone</c>, <c>accel</c> or <c>braking</c> (<see cref="EventKeys"/>).</summary>
+    [Parameter, EditorRequired]
+    public string Key { get; set; } = EventKeys.Speeding;
+
+    /// <summary>The stat of the week's report; null reads as unavailable ("—").</summary>
+    [Parameter]
+    public EventStat? Stat { get; set; }
+
+    /// <summary>The week offset (0 to 3), only for the period words of the accessible name ("this week", "last week", "that week").</summary>
+    [Parameter]
+    public int WeekOffset { get; set; }
+
+    /// <summary>The chip was tapped or activated: the page opens the popup of this key (S11b).</summary>
+    [Parameter]
+    public EventCallback<string> OnOpen { get; set; }
+
+    private TrendDirection Trend => StatNameFormatter.Trend(Stat);
+
+    private string? Tooltip => StatNameFormatter.ChipTooltip(Stat);
+
+    private string DescriptionId => "realm-stat-desc-" + Key;
+
+    private string Icon =>
+        Key switch
+        {
+            EventKeys.Phone => Icons.Material.Filled.PhoneAndroid,
+            EventKeys.Accel => Icons.Material.Filled.Bolt,
+            EventKeys.Braking => Icons.Material.Filled.PanTool,
+            _ => Icons.Material.Filled.Speed,
+        };
+
+    private string TrendIcon =>
+        Trend switch
+        {
+            TrendDirection.Up => Icons.Material.Filled.TrendingUp,
+            TrendDirection.Down => Icons.Material.Filled.TrendingDown,
+            _ => Icons.Material.Filled.TrendingFlat,
+        };
+
+    private Task OpenAsync() => OnOpen.InvokeAsync(Key);
+}

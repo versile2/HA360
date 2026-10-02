@@ -1,0 +1,502 @@
+/*
+ * The Weekly Driving Report (01 section 6; 03 section 3.4): the week chips, the stat chips, the Top Speed and Drives cards, the driver cards and the avatar they share.
+ * Tokens only: every colour is a var(--realm-*) from css/tokens.css or a colour-mix() of them, and the no-colour-literals guard fails the build on a literal here.
+ * It loads after app.css, whose .realm-driving rule supplies the 16 px gutters and the room above the navigation bar, so equal-specificity rules here win by order.
+ *
+ * MudTooltip wraps the chips and cards in a div.mud-tooltip-root; that root is the grid or flex item, so it is sized here (RootClass) and the control inside fills it.
+ */
+
+:root {
+  --realm-driving-shadow: color-mix(in srgb, var(--realm-scrim) 55%, transparent);
+}
+
+/* ---- the page: a column of at most 720 px, centred; the header row (56 px) holds the wordmark beside the gear, which TopControls fixes at (12, 12) ---- */
+
+.realm-driving {
+  padding-top: env(safe-area-inset-top);
+}
+
+.realm-driving__column {
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.realm-driving__header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  height: 56px;
+  padding: 0 60px;
+}
+
+.realm-driving__wordmark {
+  font-family: var(--realm-font-display);
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 24px;
+  color: var(--realm-text-2);
+}
+
+/* ---- the week chips: one row that scrolls sideways, snaps, and fades 16 px at both edges ---- */
+
+.realm-week-chips {
+  display: flex;
+  gap: 8px;
+  margin: 8px -16px 0;
+  padding: 4px 16px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  scroll-padding-inline: 16px;
+  scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(to right, transparent, black 16px, black calc(100% - 16px), transparent);
+  mask-image: linear-gradient(to right, transparent, black 16px, black calc(100% - 16px), transparent);
+}
+
+.realm-week-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.realm-week-chip {
+  flex: none;
+  box-sizing: border-box;
+  min-height: 48px;
+  margin: 0;
+  padding: 0 20px;
+  border: 1px solid var(--realm-line);
+  border-radius: 24px;
+  background: var(--realm-surface-2);
+  color: var(--realm-text);
+  font: inherit;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  line-height: 20px;
+  white-space: nowrap;
+  cursor: pointer;
+  scroll-snap-align: center;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.realm-week-chip[aria-checked="true"] {
+  border-color: var(--realm-primary);
+  background: var(--realm-primary);
+  color: var(--realm-on-primary);
+  box-shadow: 0 1px 4px var(--realm-driving-shadow);
+}
+
+/* ---- the title block ---- */
+
+.realm-driving__title {
+  margin: 16px 0 4px;
+  text-align: center;
+}
+
+.realm-driving__subtitle,
+.realm-driving__range,
+.realm-driving__quiet,
+.realm-driving__caption {
+  margin: 0;
+  text-align: center;
+  color: var(--realm-text-2);
+}
+
+.realm-driving__subtitle {
+  font-size: 0.875rem;
+  line-height: 20px;
+}
+
+.realm-driving__range {
+  min-height: 18px;
+  margin-bottom: 16px;
+  font-size: 0.8125rem;
+  line-height: 18px;
+}
+
+.realm-driving__quiet {
+  margin-top: 16px;
+}
+
+.realm-driving__caption {
+  margin-top: 16px;
+  font-size: 0.75rem;
+  line-height: 16px;
+}
+
+.realm-driving__banner {
+  margin: 0 0 8px;
+  padding: 12px 16px;
+  border: 1px solid var(--realm-line);
+  border-left: 4px solid var(--realm-warning);
+  border-radius: 16px;
+  background: var(--realm-surface-2);
+  color: var(--realm-text);
+}
+
+/* ---- the stat chips: 2 x 2 below 720 px (about 186 x 64 at 412), four across from 720 px; 8 px gaps ---- */
+
+.realm-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+@media (min-width: 720px) {
+  .realm-stat-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.realm-stat-chip-root.mud-tooltip-root {
+  display: block;
+  min-width: 0;
+}
+
+.realm-stat-chip {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 64px;
+  margin: 0;
+  padding: 0 12px;
+  border: 1px solid var(--realm-line);
+  border-radius: 32px;
+  background: var(--realm-surface-2);
+  color: var(--realm-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* The decorative circle: a pastel of the category, the glyph in the dark on-primary colour (01 section 7.8). */
+.realm-stat-chip__icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  color: var(--realm-on-primary);
+}
+
+.realm-stat-chip__icon--speeding {
+  background: color-mix(in srgb, var(--realm-error) 75%, var(--realm-warning));
+}
+
+.realm-stat-chip__icon--phone {
+  background: color-mix(in srgb, var(--realm-info) 70%, var(--realm-text));
+}
+
+.realm-stat-chip__icon--accel {
+  background: color-mix(in srgb, var(--realm-secondary) 60%, var(--realm-text));
+}
+
+.realm-stat-chip__icon--braking {
+  background: color-mix(in srgb, var(--realm-primary) 75%, var(--realm-text));
+}
+
+.realm-stat-chip__text {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.realm-stat-chip__value {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.realm-stat-chip__number,
+.realm-card__number {
+  font-size: 1.5rem;
+  line-height: 28px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.realm-stat-chip__label {
+  overflow: hidden;
+  font-size: 0.75rem;
+  line-height: 16px;
+  color: var(--realm-text-2);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The 16 px information icon of an unavailable value (01 section 6.3). */
+.realm-stat-chip__info {
+  display: inline-grid;
+  flex: none;
+  color: var(--realm-text-2);
+}
+
+.realm-stat-chip__info .mud-icon-root {
+  width: 16px;
+  height: 16px;
+  font-size: 16px;
+}
+
+.realm-stat-chip__trend {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+}
+
+/* More events is worse for all four stats: up is the error colour, down is the success colour, flat is the stale colour (01 section 6.3). */
+.realm-stat-chip__trend--up {
+  color: var(--realm-error);
+}
+
+.realm-stat-chip__trend--down {
+  color: var(--realm-success);
+}
+
+.realm-stat-chip__trend--flat {
+  color: var(--realm-stale);
+}
+
+/* ---- the Top Speed and Drives cards, side by side ---- */
+
+.realm-card-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.realm-card-root.mud-tooltip-root {
+  display: block;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.realm-card {
+  box-sizing: border-box;
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-height: 96px;
+  margin: 0;
+  padding: 16px;
+  border: 1px solid var(--realm-line);
+  border-radius: 20px;
+  background: var(--realm-surface-2);
+  color: var(--realm-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.realm-card--topspeed {
+  align-items: center;
+  gap: 12px;
+}
+
+.realm-card--drives {
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+}
+
+.realm-card__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.realm-card__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.realm-card__value {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.realm-card__label {
+  font-size: 0.8125rem;
+  line-height: 18px;
+  color: var(--realm-text-2);
+}
+
+.realm-card__number {
+  white-space: nowrap;
+}
+
+.realm-card__glyph {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--realm-error) 75%, var(--realm-warning));
+  color: var(--realm-on-primary);
+}
+
+/* ---- the driver cards, one per row ---- */
+
+.realm-driver-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.realm-driver-card {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 104px;
+  padding: 16px;
+  border: 1px solid var(--realm-line);
+  border-radius: 24px;
+  background: var(--realm-surface);
+  color: var(--realm-text);
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.realm-driver-card__text {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+}
+
+.realm-driver-card__name {
+  font-size: 1.125rem;
+  line-height: 24px;
+  font-weight: 700;
+}
+
+.realm-driver-card__line {
+  font-size: 0.9375rem;
+  line-height: 20px;
+  color: var(--realm-text-2);
+}
+
+.realm-driver-card__chevron {
+  flex: none;
+  display: grid;
+  color: var(--realm-text-2);
+}
+
+.realm-pill-root.mud-tooltip-root {
+  max-width: 100%;
+  margin-top: 6px;
+}
+
+.realm-pill {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 16px;
+  background: var(--realm-surface-2);
+  color: var(--realm-text);
+  font-size: 0.875rem;
+  line-height: 20px;
+  font-weight: 700;
+}
+
+.realm-pill .mud-icon-root {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  font-size: 18px;
+}
+
+.realm-pill--events .mud-icon-root {
+  color: var(--realm-warning);
+}
+
+.realm-pill--clear .mud-icon-root {
+  color: var(--realm-success);
+}
+
+.realm-pill--unknown .mud-icon-root {
+  color: var(--realm-text-2);
+}
+
+/* ---- the avatar: a circle with the photo or the initial on the member colour (01 section 7.5); the ring is the driver card's ---- */
+
+.realm-avatar {
+  flex: none;
+  box-sizing: border-box;
+  display: inline-grid;
+  place-items: center;
+  width: var(--realm-avatar-size, 40px);
+  height: var(--realm-avatar-size, 40px);
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--realm-member-color, var(--realm-plum));
+  color: var(--realm-bg);
+  font-size: calc(var(--realm-avatar-size, 40px) * 0.42);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.realm-avatar--ring {
+  box-shadow: 0 0 0 3px var(--realm-member-color, var(--realm-line));
+}
+
+.realm-avatar img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ---- the skeleton shown until the report arrives ---- */
+
+.realm-skeleton {
+  border-radius: 32px;
+  background: linear-gradient(90deg, var(--realm-surface-2), color-mix(in srgb, var(--realm-surface-2) 65%, var(--realm-line)), var(--realm-surface-2));
+  background-size: 200% 100%;
+  animation: realm-driving-shimmer 1.2s linear infinite;
+}
+
+.realm-skeleton--chip {
+  height: 64px;
+}
+
+.realm-skeleton--card {
+  flex: 1 1 0;
+  height: 96px;
+  border-radius: 20px;
+}
+
+@keyframes realm-driving-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .realm-skeleton {
+    animation: none;
+  }
+}

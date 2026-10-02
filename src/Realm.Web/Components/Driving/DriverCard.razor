@@ -1,0 +1,51 @@
+@* A driver card (01 section 6.5): avatar with the member-colour ring, name, "18 drives • 202.6 miles", the events pill and a chevron. The whole card is one link to the
+   driver's week (driving/{memberId}?week=n, relative like every link here; DriverWeekPage arrives with S11b). Everything is built from the DriverSummary by the
+   formatter: the pill lists the tracked types only and carries its asterisk only when CoarseTrips > 0, never for a null count of one kind. *@
+<a class="realm-driver-card"
+   href="@DrivingFormatter.DriverHref(Driver.MemberId, Week)"
+   data-testid="@("driver-card-" + Driver.MemberId)"
+   aria-label="@DrivingFormatter.DriverAccessibleName(Name, Driver)">
+    <DriverAvatar Name="@Name" MemberColor="@Member?.Color" AvatarUrl="@Member?.AvatarUrl" Diameter="56" Ring="true" />
+    <div class="realm-driver-card__text">
+        <span class="realm-driver-card__name">@Name</span>
+        <span class="realm-driver-card__line">@DrivingFormatter.DriverLine(Driver)</span>
+        @if (Pill is { } pill)
+        {
+            <MudTooltip Text="@pill.Tooltip" Placement="Placement.Bottom" Inline="true" RootClass="realm-pill-root">
+                <span class="realm-pill realm-pill--@(pill.Tone.ToString().ToLowerInvariant())" data-testid="@("driver-pill-" + Driver.MemberId)">
+                    <MudIcon Icon="@PillIcon(pill.Tone)" />
+                    <span class="realm-pill__text">@pill.Text</span>
+                </span>
+            </MudTooltip>
+        }
+    </div>
+    <span class="realm-driver-card__chevron" aria-hidden="true">
+        <MudIcon Icon="@Icons.Material.Filled.ChevronRight" />
+    </span>
+</a>
+
+@code {
+    /// <summary>The driver's week summary (<c>WeekReportVm.Drivers</c>).</summary>
+    [Parameter, EditorRequired]
+    public DriverSummary Driver { get; set; } = default!;
+
+    /// <summary>The member of the driver, for the name, colour and photo; null falls back to the id and the plum surface.</summary>
+    [Parameter]
+    public MemberVm? Member { get; set; }
+
+    /// <summary>The week offset the card was shown for; the link carries it as <c>?week=</c>.</summary>
+    [Parameter]
+    public int Week { get; set; }
+
+    private string Name => Member?.DisplayName ?? Driver.MemberId;
+
+    private DriverPill? Pill => DrivingFormatter.Pill(Driver);
+
+    private static string PillIcon(PillTone tone) =>
+        tone switch
+        {
+            PillTone.Clear => Icons.Material.Filled.CheckCircle,
+            PillTone.Unknown => Icons.Material.Outlined.Info,
+            _ => Icons.Material.Filled.Warning,
+        };
+}
