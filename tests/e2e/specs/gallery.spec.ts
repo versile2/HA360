@@ -69,7 +69,7 @@ test.describe('[GAL] screenshot gallery: Driving', () => {
     // The scene is in the state it is named for: This week, the report loaded (the four chips and the two cards of the default fixture), and nothing mid-load.
     await expect(page.getByRole('heading', { level: 1 }), 'the title').toHaveText('Weekly Driving Report');
     await expect(page.getByTestId('week-chip-0'), 'This week is selected').toHaveAttribute('aria-checked', 'true');
-    await expect(page.getByTestId('stat-speeding'), 'the Speeding chip of the default fixture').toHaveText(/^56\s*Speeding$/);
+    await expect(page.getByTestId('stat-speeding'), 'the Speeding chip of the default fixture').toHaveText(/^\s*56\s*Speeding\s*$/);
     await expect(page.getByTestId('card-topspeed'), 'the Top Speed card').toContainText('96 mph');
     await expect(page.locator('[data-testid^="driver-card-"]'), 'the four driver cards').toHaveCount(4);
     await expect(page.getByText('Sep 28 – Oct 4 · so far', { exact: true }), 'the range line at the frozen clock').toBeVisible();

@@ -41,9 +41,13 @@ async function boxOf(locator: Locator, label: string): Promise<Rect> {
   return box as Rect;
 }
 
-/** `^<value>\s*<label>$`: the number or dash of a chip, then its label (the text of the button, whitespace normalised by Playwright). */
+/**
+ * `^\s*<value>\s*<label>\s*$`: the number or dash of a chip, then its label. Playwright normalises whitespace only when it is given a string; a RegExp is matched against
+ * the raw `textContent`, and the chip's text starts with the whitespace-only text node Razor keeps between the icon span and the text span ("\n        56\n   Speeding").
+ * So the pattern allows whitespace at both ends as well as between the two; it still rejects any other text (a leaked icon name, a stray asterisk, a wrong number).
+ */
 function chipText(value: string, label: string): RegExp {
-  return new RegExp(`^${value.replace(/[*.]/g, '\\$&')}\\s*${label.replace(/[*.]/g, '\\$&')}$`);
+  return new RegExp(`^\\s*${value.replace(/[*.]/g, '\\$&')}\\s*${label.replace(/[*.]/g, '\\$&')}\\s*$`);
 }
 
 /** The week offset the URL asks for, or null when there is no `week` parameter (This week is the default and leaves none). */
