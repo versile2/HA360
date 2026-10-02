@@ -65,7 +65,7 @@ import {
   transformStyle,
 } from './mapStyles.js';
 import { fanOut } from './fanout.js';
-import { layoutBubbles } from './bubbleLayout.js';
+import { layoutBubbles, partitionAnchors } from './bubbleLayout.js';
 import {
   BUBBLE_FADE_MS,
   BUBBLE_HIT_PX,
@@ -82,6 +82,7 @@ import {
   installTestHooks,
   isOwnBubble,
   keepOutRects,
+  pinKeepOuts,
   removeTestHooks,
   reseedAnchors,
 } from './testHooks.js';
@@ -2150,6 +2151,17 @@ function selectedId(r, kind) {
 }
 
 /**
+ * The `kind:id` key of the selected pin (the fan-out's own key), or null.
+ * @param {Runtime} r
+ * @returns {string | null}
+ */
+function selectedPinKey(r) {
+  const memberId = selectedId(r, 'member');
+  const vehicleId = selectedId(r, 'vehicle');
+  return memberId !== null ? `member:${memberId}` : vehicleId !== null ? `vehicle:${vehicleId}` : null;
+}
+
+/**
  * @param {Runtime} r
  * @param {BubbleRuntime} state
  * @returns {HTMLElement | null} the bubbles' container, or null when the page has none (the bubbles then stay off and every member keeps its pin)
@@ -2190,6 +2202,35 @@ function measureKeepOuts(r, state) {
 }
 
 /**
+ * The pins of this frame as the keep-outs see them (D89 (1)): every vehicle with a fix and every member with a fix that is not off screen in this frame's verdict (an
+ * off-screen member has a bubble and no pin, and a member that comes back gets its pin in this same frame). A point is where the pin is drawn, `pin.shown` while a glide
+ * runs, in container pixels like the anchors; the size is the pin's own, or the size it will get. Pure arithmetic on projections: no DOM is read here.
+ * @param {Runtime} r
+ * @param {import('./bubbleLayout.js').BubbleAnchor[]} anchors the members' projected anchors of this frame
+ * @param {ReadonlySet<string>} offIds the members that are off screen in this frame
+ * @returns {Array<{ kind: 'member' | 'vehicle', id: string, x: number, y: number, driving: boolean, sizePx: number }>}
+ */
+function framePins(r, anchors, offIds) {
+  /** @type {Array<{ kind: 'member' | 'vehicle', id: string, x: number, y: number, driving: boolean, sizePx: number }>} */
+  const pins = [];
+  const at = new Map(anchors.map((anchor) => [anchor.id, anchor]));
+  const selectedMember = selectedId(r, 'member');
+  for (const member of r.members?.members ?? []) {
+    const anchor = at.get(member.id);
+    if (!anchor || offIds.has(member.id)) continue;
+    const sizePx = r.pins.get(`member:${member.id}`)?.sizePx ?? (member.id === selectedMember ? MEMBER_SELECTED_SIZE_PX : MEMBER_SIZE_PX);
+    pins.push({ kind: 'member', id: member.id, x: anchor.x, y: anchor.y, driving: member.status === 'driving', sizePx });
+  }
+  for (const vehicle of r.vehicles?.vehicles ?? []) {
+    if (typeof vehicle.lat !== 'number' || typeof vehicle.lon !== 'number') continue;
+    const pin = r.pins.get(`vehicle:${vehicle.id}`);
+    const here = r.map.project(pin?.shown ?? [vehicle.lon, vehicle.lat]);
+    pins.push({ kind: 'vehicle', id: vehicle.id, x: here.x, y: here.y, driving: false, sizePx: pin?.sizePx ?? VEHICLE_SIZE_PX });
+  }
+  return pins;
+}
+
+/**
  * Hook of renderFrame, after the camera commands and before the pins are reconciled: projects the members, lays the bubbles out in R, remembers who is off screen
  * (asking for a pin reconcile when that changed) and writes the bubble DOM. A member with no fix has neither pin nor bubble; vehicles never get a bubble.
  * @param {Runtime} r
@@ -2218,7 +2259,12 @@ function layoutBubblesFrame(r) {
       state.reseed = false;
       anchors = reseedAnchors(anchors, rect);
     }
-    result = layoutBubbles(rect, measureKeepOuts(r, state), anchors);
+    // D89 (1): the pins that are on screen, a fanned one at its shifted place, are keep-outs like the gear (read first, then the layout and the writes below).
+    const keepOuts = measureKeepOuts(r, state);
+    const offIds = new Set(partitionAnchors(rect, anchors).offScreen);
+    const view = { left: 0, top: 0, right: size.width, bottom: size.height };
+    keepOuts.push(...pinKeepOuts(framePins(r, anchors, offIds), selectedPinKey(r), view, { fan: r.opts.features?.fanout !== false }));
+    result = layoutBubbles(rect, keepOuts, anchors);
   }
   const off = new Set(result.offScreen);
   let flipped = off.size !== state.off.size;
@@ -2472,12 +2518,9 @@ function fanOutFrame(r) {
       entries.push({ kind: pin.kind, id: pin.id, x: at.x, y: at.y, driving: member?.status === 'driving' });
     }
   }
-  const memberId = selectedId(r, 'member');
-  const vehicleId = selectedId(r, 'vehicle');
-  const selectedKey = memberId !== null ? `member:${memberId}` : vehicleId !== null ? `vehicle:${vehicleId}` : null;
   /** @type {Map<string, number>} */
   const shifts = new Map();
-  for (const result of fanOut(fanItems(entries, selectedKey))) shifts.set(result.id, result.dx);
+  for (const result of fanOut(fanItems(entries, selectedPinKey(r)))) shifts.set(result.id, result.dx);
   for (const pin of r.pins.values()) {
     const dx = shifts.get(`${pin.kind}:${pin.id}`) ?? 0;
     if (pin.dx === dx) continue;

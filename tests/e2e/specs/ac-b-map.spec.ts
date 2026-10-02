@@ -87,6 +87,8 @@ const ZONE_FILL_ALPHA: Record<'dark' | 'light' | 'imagery', { empty: number; occ
 const PEEK_INSET = { top: 72, right: 72, bottom: 190, left: 16 };
 /** 01 section 4.10 step 4: a bubble keeps 8 px clear of the gear, the attribution, the right stack and the sheet. */
 const KEEP_OUT_GAP_PX = 8;
+/** What the browser's own 1/64 px layout units and the 0.01 px rounding of a bubble's position may take off a measured gap (the layout places the bubble to the pixel). */
+const GAP_NOISE_PX = 0.1;
 /** AC-15: the camera is at zoom 13 (+-0.1) within 1,000 ms of the tap; the flight itself is 900 ms (01 section 4.13). */
 const FAR_ZOOM = 13;
 const FAR_ZOOM_TOLERANCE = 0.1;
@@ -165,6 +167,33 @@ const centreOf = (box: Rect) => ({ x: box.x + box.width / 2, y: box.y + box.heig
 /** The gap between two boxes: the larger of the gaps along each axis, negative when they overlap. */
 function gapBetween(a: Rect, b: Rect): number {
   return Math.max(b.x - (a.x + a.width), a.x - (b.x + b.width), b.y - (a.y + a.height), a.y - (b.y + b.height));
+}
+
+/** One pin as it is drawn: its button (the body and the pointer) and its 56 x 56 hit area (the `::after` box, which is what the bubbles keep clear of, D89 (1)). */
+interface PinBoxes { id: string; body: Rect; hit: Rect }
+/** One bubble as it is drawn: the 48 x 48 button and the 40 px avatar. */
+interface BubbleBoxes { id: string; hit: Rect; disc: Rect }
+
+/** The boxes of every pin that is on screen (its button meets the viewport) and of every bubble that is not leaving, read in the page in one pass (no sleeps, no hook arithmetic). */
+async function readPinAndBubbleBoxes(page: Page): Promise<{ pins: PinBoxes[]; bubbles: BubbleBoxes[] }> {
+  return page.evaluate(() => {
+    const rect = (box: DOMRect) => ({ x: box.x, y: box.y, width: box.width, height: box.height });
+    const pins = [...document.querySelectorAll<HTMLElement>('button.realm-pin[data-testid^="pin-"]')]
+      .map((pin) => {
+        const body = pin.getBoundingClientRect();
+        const after = getComputedStyle(pin, '::after');
+        const move = new DOMMatrixReadOnly(after.transform);
+        const hit = { x: body.x + Number.parseFloat(after.left) + move.m41, y: body.y + Number.parseFloat(after.top) + move.m42, width: Number.parseFloat(after.width), height: Number.parseFloat(after.height) };
+        return { id: pin.getAttribute('data-testid') ?? '', body: rect(body), hit };
+      })
+      .filter((pin) => pin.body.x + pin.body.width > 0 && pin.body.y + pin.body.height > 0 && pin.body.x < window.innerWidth && pin.body.y < window.innerHeight);
+    const bubbles = [...document.querySelectorAll<HTMLElement>('button.realm-bubble[data-testid^="bubble-"]:not(.realm-bubble--leave)')].map((bubble) => {
+      const disc = bubble.querySelector('.realm-bubble__disc');
+      if (disc === null) throw new Error('the bubble has no .realm-bubble__disc');
+      return { id: bubble.getAttribute('data-testid') ?? '', hit: rect(bubble.getBoundingClientRect()), disc: rect(disc.getBoundingClientRect()) };
+    });
+    return { pins, bubbles };
+  });
 }
 
 const bubbleOf = (bubbles: BubbleInfo[], id: string): BubbleInfo => {
@@ -455,7 +484,10 @@ test.describe('acceptance B: the map', () => {
   });
 
   // [AC-14] Where the two fixture bubbles sit and what they look like. The centres are the spec's pixels (within 12 px); the clearances are measured on the boxes the browser draws.
-  test('[AC-14] the two bubbles sit at (384, 347) and (28, 142), 8 px clear of the gear, the right stack and the sheet, 48 px to hit, pointing at their members', async ({ page }) => {
+  // D89 (1) changes one of them: the spec's (384, 347) for Dara is where her bubble covered the fanned wagon (R1-01), and an on-screen pin, a fanned one included, is a keep-out for
+  // the edge bubbles now (the same slide as the gear). Her bubble slides up the right edge, the way she lies, until it is 8 px above the King's pin and the wagon's, so it is at
+  // (384, 280); Elio's has no pin near it and stays at the spec's (28, 142).
+  test('[AC-14] the two bubbles sit at (384, 280) and (28, 142), 8 px clear of the gear, the right stack and the sheet, 48 px to hit, pointing at their members', async ({ page }) => {
     await demo(page);
     await mapReady(page);
     const cast = loadDemoCast();
@@ -477,7 +509,7 @@ test.describe('acceptance B: the map', () => {
     const sheetTop: Rect = { x: 0, y: sheet.topPx, width: viewport.width, height: viewport.height - sheet.topPx };
 
     const wanted: Array<{ id: string; x: number; y: number }> = [
-      { id: 'cryptid', x: 384, y: 347 },
+      { id: 'cryptid', x: 384, y: 280 }, // D89 (1): 347 in 01 section 11, moved up past the pins by the slide rule
       { id: 'prince', x: 28, y: 142 },
     ];
     for (const { id, x, y } of wanted) {
@@ -525,6 +557,26 @@ test.describe('acceptance B: the map', () => {
     expect.soft(prince.home.shown, 'bubble-prince shows the Home badge').toBe(true);
     expect.soft(prince.home.color, 'the Home badge is gold (--realm-primary)').toBe(prince.home.gold);
     expect.soft(cryptid.home.shown, 'bubble-cryptid has no Home badge').toBe(false);
+  });
+
+  // [AC-13b] D89 (1), the ruling on R1-01: an on-screen pin, a fanned one included, is a keep-out rectangle for the edge bubbles. In the default view the King's pin sits at the right edge of the
+  // map and the wagon is fanned 48 px to its right, which is where Dara's bubble used to be drawn over the wagon. Both rectangles are read from the DOM: the button of every pin on screen
+  // and its 56 x 56 hit area (`::after`), against the 48 px button and the 40 px avatar of every bubble. The layout keeps the avatar 8 px clear of the hit area, the gap it keeps from the gear.
+  test('[AC-13b] no edge bubble covers a pin on screen: every avatar is 8 px clear of the hit area of every pin, the fanned wagon included (D89 (1))', { tag: ['@phone', '@unfolded'] }, async ({ page }) => {
+    await demo(page);
+    await mapReady(page);
+    const pins = await readHook(page, 'pins');
+    expect(pinOf(pins, 'vehicle', 'wagon').fanned, 'the wagon is fanned out beside the King (the case R1-01 found)').toBe(true);
+
+    const boxes = await readPinAndBubbleBoxes(page);
+    expect(boxes.pins.map((pin) => pin.id).sort(), 'the pins on screen').toEqual(DEFAULT_VIEW_PINS.map((key) => `pin-${key}`).sort());
+    expect(boxes.bubbles.length, 'the default view has edge bubbles (there is something to keep off the pins)').toBeGreaterThan(0);
+    for (const bubble of boxes.bubbles) {
+      for (const pin of boxes.pins) {
+        expect.soft(gapBetween(bubble.hit, pin.body), `${bubble.id} (48 px button) does not touch ${pin.id}`).toBeGreaterThan(0);
+        expect.soft(gapBetween(bubble.disc, pin.hit), `${bubble.id}: gap between the avatar and the hit area of ${pin.id}, at least ${KEEP_OUT_GAP_PX} px`).toBeGreaterThanOrEqual(KEEP_OUT_GAP_PX - GAP_NOISE_PX);
+      }
+    }
   });
 
   // [AC-15] A single-member bubble selects (D45, D84): the tap reaches the server, the member is selected, the sheet stays at Peek and the camera flies to zoom 13 with her pin in the

@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { layoutBubbles } from '../../src/Realm.Web/wwwroot/js/bubbleLayout.js';
-import { FAN_PRIORITY, fanOut } from '../../src/Realm.Web/wwwroot/js/fanout.js';
+import { FAN_DEFAULTS, FAN_PRIORITY, fanOut } from '../../src/Realm.Web/wwwroot/js/fanout.js';
 import { DEFAULT_LAYOUT, computePadding } from '../../src/Realm.Web/wwwroot/js/layoutMath.js';
 import {
   BUBBLE_EDGE_PX,
@@ -16,6 +16,9 @@ import {
   CLUSTER_FIT_MAX_ZOOM,
   CLUSTER_FIT_MS,
   HOOK_NAMES,
+  MAX_PIN_KEEP_OUTS,
+  PIN_HIT_PX,
+  PIN_POINTER_PX,
   bubbleAnchors,
   bubbleKey,
   bubbleRect,
@@ -26,6 +29,8 @@ import {
   fillTemplate,
   isOwnBubble,
   keepOutRects,
+  pinHitRect,
+  pinKeepOuts,
   reseedAnchors,
 } from '../../src/Realm.Web/wwwroot/js/testHooks.js';
 
@@ -298,4 +303,151 @@ test('[AC-16] a selected vehicle keeps its true place and the member beside it s
     'vehicle:v',
   ));
   assert.deepEqual(results.map((r) => [r.id, r.dx]), [['vehicle:v', 0], ['member:m', 48]]);
+});
+
+// ---- D89 (1): an on-screen pin, a fanned one included, is a keep-out rectangle for the edge bubbles ---------------------------------------------
+// The scene is synthetic pixels at the 412 x 915 Peek rectangle (R x 8..404, y 8..725, bubble centres on x 28..384, y 28..705). No test here names a place.
+
+const VIEW = { left: 0, top: 0, right: PHONE.width, bottom: PHONE.height };
+const RECT_R = bubbleRect(PHONE, DEFAULT_LAYOUT, PEEK);
+const CENTRE_R = { x: (RECT_R.left + RECT_R.right) / 2, y: (RECT_R.top + RECT_R.bottom) / 2 };
+/** The right edge of the bubble centres: R inset by the 20 px radius. */
+const RIGHT_EDGE_X = RECT_R.right - 20;
+/** A far anchor on the ray from the centre of R through `q`: the bubble lands on the edge at `q` (a power-of-two scale keeps the numbers exact). */
+const farVia = (id, q) => ({ id, x: CENTRE_R.x + (q.x - CENTRE_R.x) * 8, y: CENTRE_R.y + (q.y - CENTRE_R.y) * 8, priority: FAN_PRIORITY.member });
+/** The gap between the 40 px box of a bubble and a rectangle (negative when they overlap). */
+const gapFrom = (b, rect) => Math.max(rect.left - (b.x + 20), b.x - 20 - rect.right, rect.top - (b.y + 20), b.y - 20 - rect.bottom);
+const pinAt = (kind, id, x, y, extra = {}) => ({ kind, id, x, y, driving: false, sizePx: kind === 'vehicle' ? 44 : 48, ...extra });
+
+test('[AC-16] the hit area of a pin is 56 x 56 centred on its body, which sits 8 px above the true point; a 60 px selected pin is its own hit area', () => {
+  assert.equal(PIN_HIT_PX, 56);
+  assert.equal(PIN_POINTER_PX, 8);
+  // member 48: the body is y-56..y-8, centre y-32, so the hit area is y-60..y-4
+  assert.deepEqual(pinHitRect({ x: 100, y: 200, sizePx: 48 }), { left: 72, top: 140, right: 128, bottom: 196 });
+  // vehicle 44: centre y-30
+  assert.deepEqual(pinHitRect({ x: 100, y: 200, sizePx: 44 }), { left: 72, top: 142, right: 128, bottom: 198 });
+  // selected 60: the hit area is the body (60), centre y-38
+  assert.deepEqual(pinHitRect({ x: 100, y: 200, sizePx: 60 }), { left: 70, top: 132, right: 130, bottom: 192 });
+});
+
+test('[AC-16] a pin that is fanned out has the SHIFTED rectangle: the second pin on one point is 48 px to the right, the first stays', () => {
+  const rects = pinKeepOuts([pinAt('member', 'm', 200, 400), pinAt('vehicle', 'v', 200, 400)], null, VIEW);
+  assert.deepEqual(rects[0], pinHitRect({ x: 200, y: 400, sizePx: 48 }), 'the member keeps its true place');
+  assert.deepEqual(rects[1], pinHitRect({ x: 200 + FAN_DEFAULTS.step, y: 400, sizePx: 44 }), 'the vehicle is drawn 48 px to the right');
+  assert.equal(rects[1].left - pinHitRect({ x: 200, y: 400, sizePx: 44 }).left, 48);
+});
+
+test('[AC-16] the rectangles use the frame\'s own fan-out: the selected pin stays and the other steps aside, and `fan: false` leaves every pin on its true point', () => {
+  const pins = [pinAt('member', 'm', 200, 400), pinAt('vehicle', 'v', 215, 400)];
+  const selectedVehicle = pinKeepOuts(pins, 'vehicle:v', VIEW);
+  assert.deepEqual(selectedVehicle[1], pinHitRect({ x: 215, y: 400, sizePx: 44 }));
+  assert.deepEqual(selectedVehicle[0], pinHitRect({ x: 200 + FAN_DEFAULTS.step, y: 400, sizePx: 48 }));
+  const items = fanItems(pins, 'vehicle:v');
+  assert.deepEqual(fanOut(items).map((r) => r.dx), [48, 0], 'the same shifts as fanOut gives');
+  const unfanned = pinKeepOuts(pins, null, VIEW, { fan: false });
+  assert.deepEqual(unfanned, [pinHitRect({ x: 200, y: 400, sizePx: 48 }), pinHitRect({ x: 215, y: 400, sizePx: 44 })]);
+  // 36 px or more apart is no fan-out
+  const apart = pinKeepOuts([pinAt('member', 'm', 200, 400), pinAt('vehicle', 'v', 200 + FAN_DEFAULTS.threshold, 400)], null, VIEW);
+  assert.deepEqual(apart[1], pinHitRect({ x: 200 + FAN_DEFAULTS.threshold, y: 400, sizePx: 44 }));
+});
+
+test('the rectangle is the one of the DRAWN pin: MapLibre rounds a marker to whole pixels, so a fractional true point (fanned or not) is rounded', () => {
+  const [plain] = pinKeepOuts([pinAt('member', 'm', 200.4, 400.6)], null, VIEW);
+  assert.deepEqual(plain, pinHitRect({ x: 200, y: 401, sizePx: 48 }));
+  const [first, second] = pinKeepOuts([pinAt('member', 'm', 200.4, 400.6), pinAt('vehicle', 'v', 200.4, 400.6)], null, VIEW);
+  assert.deepEqual(first, plain);
+  assert.deepEqual(second, pinHitRect({ x: 200 + FAN_DEFAULTS.step, y: 401, sizePx: 44 }), 'the shift is added before the rounding, which is what the marker does with its offset');
+});
+
+test('a pin whose hit area is entirely outside the container is not on screen and has no rectangle; one that is partly inside has', () => {
+  const rects = pinKeepOuts(
+    [
+      pinAt('member', 'inside', 200, 400),
+      pinAt('vehicle', 'edge', PHONE.width + 20, 400), // the hit area spans x 404..460 at the right edge: 8 px of it is on screen
+      pinAt('vehicle', 'gone', PHONE.width + 40, 400), // x 424..480: none of it is
+      pinAt('vehicle', 'above', 200, 0), // the body is above the container, the hit area y -60..-4
+      pinAt('member', 'bad', Number.NaN, 400),
+    ],
+    null,
+    VIEW,
+    { fan: false },
+  );
+  assert.deepEqual(rects, [pinHitRect({ x: 200, y: 400, sizePx: 48 }), pinHitRect({ x: PHONE.width + 20, y: 400, sizePx: 44 })]);
+});
+
+test('the input is bounded: more than MAX_PIN_KEEP_OUTS pins give at most that many rectangles, the first ones in order, and the input is not changed', () => {
+  const pins = Array.from({ length: MAX_PIN_KEEP_OUTS + 25 }, (_, i) => pinAt('member', `m${String(i).padStart(3, '0')}`, 20 + (i % 8) * 50, 40 + Math.floor(i / 8) * 70));
+  const copy = JSON.parse(JSON.stringify(pins));
+  const rects = pinKeepOuts(pins, null, { left: -1000, top: -1000, right: 5000, bottom: 5000 }, { fan: false });
+  assert.equal(rects.length, MAX_PIN_KEEP_OUTS);
+  assert.deepEqual(rects[0], pinHitRect(pins[0]));
+  assert.deepEqual(pins, copy);
+  assert.deepEqual(pinKeepOuts([], null, VIEW), []);
+});
+
+test('[AC-14] with no pin near a bubble the positions are exactly the ones without pin keep-outs', () => {
+  const anchors = [farVia('east', { x: RIGHT_EDGE_X, y: 300 }), farVia('west', { x: 28, y: 500 })];
+  const bare = layoutBubbles(RECT_R, [], anchors);
+  // pins in the middle of the map: their grown rectangles (28 px) stay clear of both edge columns
+  const pins = [pinAt('member', 'a', 200, 360), pinAt('member', 'b', 260, 420), pinAt('vehicle', 'v', 150, 500)];
+  assert.deepEqual(layoutBubbles(RECT_R, pinKeepOuts(pins, null, VIEW), anchors), bare);
+  assert.deepEqual(layoutBubbles(RECT_R, [], anchors), bare);
+});
+
+test('[AC-13] [AC-16] a bubble whose natural spot overlaps a pin slides along its edge until its box is 8 px clear of the pin\'s hit area (the way its member lies)', () => {
+  const pin = pinAt('member', 'm', 350, 382); // body centre y 350, hit area x 322..378, y 322..378: it reaches the right-edge column (x 364..404 is the bubble box)
+  const [rect] = pinKeepOuts([pin], null, VIEW);
+  const natural = layoutBubbles(RECT_R, [], [farVia('east', { x: RIGHT_EDGE_X, y: 350 })]).bubbles[0];
+  assert.equal(natural.x, RIGHT_EDGE_X);
+  assert.ok(gapFrom(natural, rect) < 0, 'precondition: the natural spot overlaps the pin');
+
+  const result = layoutBubbles(RECT_R, [rect], [farVia('east', { x: RIGHT_EDGE_X, y: 350 })]);
+  const [bubble] = result.bubbles;
+  assert.equal(bubble.x, RIGHT_EDGE_X, 'it stays on its edge');
+  assert.equal(bubble.y, rect.top - 28, 'the member lies above the centre line of R: up, to the top of the rectangle grown by 8 + 20');
+  assert.ok(gapFrom(bubble, rect) >= 8);
+  assert.equal(bubble.cluster, 1);
+  // a member below the centre line slides down instead
+  const below = layoutBubbles(RECT_R, [rect], [farVia('east', { x: RIGHT_EDGE_X, y: 390 })]).bubbles[0];
+  assert.equal(below.y, rect.bottom + 28);
+  assert.ok(gapFrom(below, rect) >= 8);
+});
+
+test('[AC-16] the bubble keeps clear of the FANNED rectangle, not of the true point: the same scene slides with the fan-out and stays without it', () => {
+  // The first pin is clear of the right column on its own; the second shares its place, is drawn 48 px to the right and so reaches the column.
+  const pins = [pinAt('member', 'first', 300, 382), pinAt('vehicle', 'second', 312, 382)];
+  const anchors = [farVia('east', { x: RIGHT_EDGE_X, y: 350 })];
+  const bare = layoutBubbles(RECT_R, [], anchors).bubbles[0];
+  const unfanned = layoutBubbles(RECT_R, pinKeepOuts(pins, null, VIEW, { fan: false }), anchors).bubbles[0];
+  assert.deepEqual([unfanned.x, unfanned.y], [bare.x, bare.y], 'at their true points neither pin reaches the bubble');
+  const fannedRects = pinKeepOuts(pins, null, VIEW);
+  const fanned = layoutBubbles(RECT_R, fannedRects, anchors).bubbles[0];
+  assert.notEqual(fanned.y, bare.y, 'the drawn (shifted) pin reaches it, so it moves');
+  assert.ok(fannedRects.every((rect) => gapFrom(fanned, rect) >= 8));
+});
+
+test('[AC-13] when the other direction is the only one that clears, the bubble goes that way (D89 (3)), still clear of every pin', () => {
+  // A pin right at the top end of the right edge: the member lies above, so up runs off the edge and the bubble slides down past the pin.
+  const rects = pinKeepOuts([pinAt('member', 'm', 360, 80)], null, VIEW);
+  const [bubble] = layoutBubbles(RECT_R, rects, [farVia('east', { x: RIGHT_EDGE_X, y: 60 })]).bubbles;
+  assert.equal(bubble.x, RIGHT_EDGE_X);
+  assert.equal(bubble.y, rects[0].bottom + 28);
+  assert.ok(gapFrom(bubble, rects[0]) >= 8);
+});
+
+test('[AC-19a] pins that leave no clear coordinate on the edge: the bubble joins the nearest one as a cluster (the existing rule), or sits at the end of the edge when alone', () => {
+  // A column of pins down the whole right edge (40 px apart: 36 or more, so no fan-out): no coordinate of the edge is clear.
+  const column = Array.from({ length: 20 }, (_, i) => pinAt('member', `p${String(i).padStart(2, '0')}`, 380, 60 + i * 40));
+  const wall = pinKeepOuts(column, null, VIEW);
+  assert.equal(wall.length, column.length);
+  const stuck = farVia('east', { x: RIGHT_EDGE_X, y: 300 });
+  const bottom = farVia('south', { x: 200, y: RECT_R.bottom - 20 });
+  const joined = layoutBubbles(RECT_R, wall, [stuck, bottom]);
+  assert.equal(joined.bubbles.length, 1);
+  assert.deepEqual([...joined.bubbles[0].ids].sort(), ['east', 'south']);
+  assert.strictEqual(joined.bubbles[0].cluster, 2);
+  const alone = layoutBubbles(RECT_R, wall, [stuck]);
+  assert.equal(alone.bubbles.length, 1);
+  assert.equal(alone.bubbles[0].x, RIGHT_EDGE_X);
+  assert.ok(alone.bubbles[0].y === 28 || alone.bubbles[0].y === 705, `at an end of the edge: ${alone.bubbles[0].y}`);
 });
