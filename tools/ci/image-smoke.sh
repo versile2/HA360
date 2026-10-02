@@ -12,14 +12,19 @@
 #   2  base href with and without X-Ingress-Path, an invalid value is ignored
 #   3  Content-Type of the scripts and fonts (the Blazor script is requested under the name the page itself advertises)
 #   4  Set-Cookie on GET /: informational (D61), WARN with the cookie names, never FAIL
+#   5  `dotnet Realm.Web.dll healthcheck` run inside the Demo container exits 0 (the in-image CLI mode of 03 section 6.3, S16a)
 #   6  GET diagnostics.json in the Demo container (S10a): 200, "mode": "demo" and "zoneDataOk": true (the zone data is in the image)
+#   7  no unhandled exception in `docker logs` of the Demo container after its start and a few requests (S16a)
+#   8  image size against the table of 03 section 6.5 (S16a): uncompressed WARN over 360 MB and FAIL over 450 MB, app layer WARN over 45 MB;
+#      the compressed size is only an estimate here and is reported, not enforced (6.5)
 #   9  the image runs as uid 0 (asserted, not assumed)
 #   10 no forbidden path in docker export
 #   11 the Live start with Home Assistant unreachable (S13b, CR2-012): SUPERVISOR_TOKEN set, /data a volume with a valid options.json;
 #      /healthz 200 within 10 s, /data/realm.db and /data/dp-keys created, still running after a settle time, no crash in docker logs
 #   12 the licence notices ship in the image (FX2, licence audit 1 action 3): /app/LICENSE, /app/THIRD-PARTY-NOTICES.md,
 #      /app/LICENSES/Apache-2.0.txt and MapLibre's LICENSE.txt in /app/wwwroot/lib/maplibre-gl, plus an OFL-*.txt beside any font file
-# Items 5, 7 and 8 belong to S16a, which adds its own block here and touches no other item (item 6 is S10a's, after item 12).
+# Items 5, 7 and 8 belong to S16a, which added its own blocks and touched no other item: 5 and 7 follow item 6's block (the Demo container
+# has served the most requests by then) and 8 follows the sizes block it reads. Item 6 is S10a's, after item 12.
 #
 # Environment: CI_OUT (default ci-out), SMOKE_PORT (host port, default 18099), SMOKE_HEALTHY_CAP_S (how long to wait for
 # the first 200 before giving up, default 30; the FAIL line stays at 10 s, the cap only lets a slow start still be measured).
@@ -368,7 +373,8 @@ else
   fi
 fi
 
-# Items 5 (healthcheck mode), 7 (docker logs) and 8 (image size) are added by S16a; item 6 (diagnostics.json) is S10a's, after item 12.
+# Items 5 (healthcheck mode) and 7 (docker logs) are S16a's, after item 6; item 8 (image size) is S16a's, after the sizes block.
+# Item 6 (diagnostics.json) is S10a's, after item 12.
 
 # --- Item 9: root --------------------------------------------------------------------------------------------------
 # --entrypoint: the image's ENTRYPOINT is "dotnet Realm.Web.dll", so "docker run <image> id -u" would start the app with two arguments.
@@ -587,8 +593,74 @@ else
   fi
 fi
 
+# --- Item 5: the healthcheck CLI mode (S16a, 03 section 6.3) -----------------------------------------------------------------------
+# "dotnet Realm.Web.dll healthcheck" is handled at the top of Program.cs, before the host is built: one loopback GET /healthz with a 5 s timeout, exit
+# 0 when it answers with a success status and 1 otherwise. It runs inside the Demo container of item 1 through docker exec (the working directory
+# /app and ASPNETCORE_HTTP_PORTS come from the image), so it proves that the mode is in the published output and probes the port Kestrel listens
+# on. The image has no Docker HEALTHCHECK (the Supervisor ignores it); this mode exists for this item only. The timeout keeps a hung docker exec
+# from holding the job (exit 124).
+title="healthcheck mode exits 0"
+if ((healthy == 0)); then
+  record 5 SKIP "$title" "not run: the container never answered /healthz with 200 (item 1)"
+else
+  hc_start_ms=$(now_ms)
+  hc_out=$(timeout 30 docker exec "$container" dotnet Realm.Web.dll healthcheck 2>&1)
+  hc_status=$?
+  hc_ms=$(($(now_ms) - hc_start_ms))
+  add_number healthcheck_s "$(fmt_s "$hc_ms")"
+  if ((hc_status == 0)); then
+    record 5 PASS "$title" "dotnet Realm.Web.dll healthcheck exited 0 after $(fmt_s "$hc_ms") s"
+  else
+    if [[ -n $hc_out ]]; then
+      queue_block "output of the healthcheck" "$hc_out"
+    fi
+    record 5 FAIL "$title" "dotnet Realm.Web.dll healthcheck exited $hc_status after $(fmt_s "$hc_ms") s (want 0; 124 is the 30 s timeout)"
+  fi
+fi
+
+# --- Item 7: no unhandled exception in the Demo container's log (S16a) ----------------------------------------------------------------
+# After the start and a few requests that make the server do work (the Location and Driving pages are rendered on a plain GET, with and without an
+# Ingress path, diagnostics.json and /healthz go through the endpoints, an unknown path through the 404 handling), docker logs of the Demo container
+# is searched for what an unhandled exception leaves: Kestrel's "An unhandled exception was thrown by the application", the exception handler's
+# "An unhandled exception has occurred while executing the request" and the host's own "Unhandled exception." (matched without regard to case), plus
+# the crash lines that item 11 looks for. "fail:" and "warn:" lines are not failures by themselves. A 5xx answer to one of the requests fails the item
+# too: an unhandled exception in a request ends in a 500. The Demo log holds only the fictional cast, so the matching lines are printed.
+title="no unhandled exception in the Demo log"
+if ((healthy == 0)); then
+  record 7 SKIP "$title" "not run: the container never answered /healthz with 200 (item 1)"
+else
+  problems=()
+  requested=0
+  for rel in "" "driving" "diagnostics.json" "healthz" "no-such-page-for-the-smoke-test"; do
+    code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$base_url/$rel")
+    requested=$((requested + 1))
+    if [[ $code == 5?? || $code == 000 ]]; then
+      problems+=("GET /$rel answered $code")
+    fi
+  done
+  code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 -H "X-Ingress-Path: /api/hassio_ingress/$ingress_token" "$base_url/driving")
+  requested=$((requested + 1))
+  if [[ $code == 5?? || $code == 000 ]]; then
+    problems+=("GET /driving with an Ingress path answered $code")
+  fi
+  sleep 1   # the console logger writes from a background thread: let the line of the last request reach docker logs
+  unhandled_re='unhandled exception|BackgroundService failed|Application startup exception|Host terminated unexpectedly|Hosting failed to start|(^|[[:space:]])crit: '
+  demo_log=$(docker logs "$container" 2>&1)
+  unhandled=$(grep -iE "$unhandled_re" <<<"$demo_log" | head -n 3 | cut -c1-200)
+  if [[ -n $unhandled ]]; then
+    problems+=("the log shows: $(tr '\n' '|' <<<"$unhandled")")
+  fi
+  if ((${#problems[@]} == 0)); then
+    demo_lines=$(wc -l <<<"$demo_log" | tr -d ' ')
+    record 7 PASS "$title" "none among $demo_lines log lines after the start and $requested requests"
+  else
+    queue_block "container log of the Demo start, last 10 lines" "$(tail -n 10 <<<"$demo_log" | cut -c1-150)"
+    record 7 FAIL "$title" "$(join_problems)"
+  fi
+fi
+
 # ---------------------------------------------------------------------------------------------------------------------
-# Sizes for the table of 03 section 6.5 (recorded, not enforced: item 8 is S16a's) and the log of a failed run.
+# Sizes for the table of 03 section 6.5 (recorded here; item 8 below compares them with the table) and the log of a failed run.
 # ---------------------------------------------------------------------------------------------------------------------
 app_bytes=$(docker run --rm --entrypoint du "$image" -sb /app 2>/dev/null | awk '{ print $1 }')
 if [[ $app_bytes =~ ^[0-9]+$ ]]; then
@@ -598,6 +670,55 @@ fi
 gz_bytes=$(docker save "$image" 2>/dev/null | gzip -1 | wc -c | tr -d ' ')
 if [[ $gz_bytes =~ ^[0-9]+$ && $gz_bytes -gt 0 ]]; then
   add_number compressed_estimate_bytes "$gz_bytes"
+fi
+
+# --- Item 8: image size against the 03 section 6.5 table (S16a) --------------------------------------------------------------------
+# The sizes above are in bytes and the table is in MB, the unit `docker images` prints (10^6 bytes, as make-summary.mjs shows them). Enforced as
+# 6.5 says: the uncompressed size from `docker image inspect` warns over 360 MB and fails over 450 MB, and the app layer (du of /app, the published
+# output plus the licence files) warns over 45 MB, the line that D63's `-r linux-x64 --self-contained false` publish is meant to get under. The
+# compressed size is only gzip -1 of docker save, so it is reported and not enforced (6.5: read it from the registry after the first release).
+# All three numbers stay in smoke.json (image_size_bytes, app_layer_bytes, compressed_estimate_bytes), next to this item's own result.
+title="image size against the 6.5 table"
+warn_image_bytes=360000000
+fail_image_bytes=450000000
+warn_app_bytes=45000000
+fmt_mb() { printf '%d.%d MB' $(($1 / 1000000)) $((($1 % 1000000) / 100000)); }
+join_list() {
+  local out="" p
+  for p in "$@"; do
+    out+="${out:+; }$p"
+  done
+  printf '%s' "$out"
+}
+if [[ ! $size_bytes =~ ^[0-9]+$ ]]; then
+  record 8 WARN "$title" "docker image inspect gave no size, so nothing was compared"
+else
+  problems=()
+  warnings=()
+  size_detail="image $(fmt_mb "$size_bytes")"
+  if ((size_bytes > fail_image_bytes)); then
+    problems+=("the image is $(fmt_mb "$size_bytes"), over the $(fmt_mb "$fail_image_bytes") fail line")
+  elif ((size_bytes > warn_image_bytes)); then
+    warnings+=("the image is $(fmt_mb "$size_bytes"), over the $(fmt_mb "$warn_image_bytes") warn line")
+  fi
+  if [[ $app_bytes =~ ^[0-9]+$ ]]; then
+    size_detail+=", app layer $(fmt_mb "$app_bytes")"
+    if ((app_bytes > warn_app_bytes)); then
+      warnings+=("the app layer is $(fmt_mb "$app_bytes"), over the $(fmt_mb "$warn_app_bytes") warn line (D63)")
+    fi
+  else
+    size_detail+=", app layer not measured"
+  fi
+  if [[ $gz_bytes =~ ^[0-9]+$ && $gz_bytes -gt 0 ]]; then
+    size_detail+=", compressed estimate $(fmt_mb "$gz_bytes") (not enforced)"
+  fi
+  if ((${#problems[@]} > 0)); then
+    record 8 FAIL "$title" "$(join_list "${problems[@]}" "${warnings[@]}") ($size_detail)"
+  elif ((${#warnings[@]} > 0)); then
+    record 8 WARN "$title" "$(join_list "${warnings[@]}") ($size_detail)"
+  else
+    record 8 PASS "$title" "$size_detail, within the warn lines of 6.5 (image $(fmt_mb "$warn_image_bytes"), app layer $(fmt_mb "$warn_app_bytes"))"
+  fi
 fi
 
 if ((failures > 0)) && docker inspect "$container" >/dev/null 2>&1; then
