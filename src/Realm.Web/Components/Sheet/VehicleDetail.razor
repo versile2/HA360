@@ -1,0 +1,141 @@
+@using System.Globalization
+@using Microsoft.JSInterop
+@using Realm.Domain
+@using Realm.Web.Formatting
+@using Realm.Web.Sheet
+
+@* The vehicle detail (01 section 5.5; 03 section 3.4): what the sheet shows at 80 percent with a vehicle selected, and in the Expanded panel whenever one is. A 48 px back button (the same
+   step as the Android Back, BackStep.Detail), the 64 px glyph avatar with the name, the lore title as an eyebrow and the row's update line; then, for a stale vehicle, the warning line
+   at the top, and the rows (label left, value right): Location, Engine, Speed (only while the vehicle moves and its speed is known), Fuel (an 8 px bar and the percentage, red under
+   15 percent), Odometer and Last update. An unknown value reads "—". No trail in v1. The strings are the row's own (VmFactory) and SelectionHeaderFormatter's, so the detail and
+   its row agree. The placeholder (never selectable from its row) shows its note under Location and no other row. FocusOnOpen: as in MemberDetail. *@
+@{
+    var row = VmFactory.Vehicle(Vehicle, Facts);
+    var engine = SelectionHeaderFormatter.VehicleEngine(Vehicle);
+    var speed = SelectionHeaderFormatter.VehicleSpeed(Vehicle, Facts);
+    var warning = SelectionHeaderFormatter.VehicleStaleWarning(Vehicle, Facts);
+    var odometer = SelectionHeaderFormatter.VehicleOdometer(Vehicle);
+    var lastUpdate = SelectionHeaderFormatter.VehicleLastUpdate(Vehicle, Facts);
+}
+<section class="realm-detail realm-detail--vehicle" aria-labelledby="realm-detail-title">
+    <header class="realm-detail-head">
+        <button type="button"
+                class="realm-detail-back"
+                data-testid="detail-back"
+                aria-label="@SelectionHeaderFormatter.BackLabel"
+                @ref="_back"
+                @onclick="OnBack">
+            <MudIcon Icon="@Icons.Material.Filled.ArrowBack" />
+        </button>
+        <span class="realm-detail-avatar realm-detail-avatar--tile" aria-hidden="true">
+            <MudIcon Icon="@SheetSelectionHeader.GlyphIcon(Vehicle.Glyph)" />
+        </span>
+        <div class="realm-detail-heading">
+            <h2 id="realm-detail-title" class="realm-detail-name">@row.Name</h2>
+            @if (row.Lore is { } lore)
+            {
+                <p class="realm-detail-eyebrow">@lore</p>
+            }
+            @if (row.Updated.Length > 0)
+            {
+                <p class="@("realm-detail-updated" + RowClasses.Tone(row.UpdatedTone))">@row.Updated</p>
+            }
+        </div>
+    </header>
+    <div class="realm-detail-body">
+        @if (warning is not null)
+        {
+            <p class="realm-detail-warning">
+                <MudIcon Icon="@Icons.Material.Filled.Schedule" Class="realm-detail-warning-icon" />
+                <span>@warning</span>
+            </p>
+        }
+        <dl class="realm-detail-rows">
+            <div class="realm-detail-row">
+                <dt>Location</dt>
+                <dd>@SelectionHeaderFormatter.VehicleLocation(Vehicle, Facts)</dd>
+            </div>
+            @if (!Vehicle.IsPlaceholder)
+            {
+                <div class="realm-detail-row">
+                    <dt>Engine</dt>
+                    <dd>@(engine ?? DrivingFormatter.Dash)</dd>
+                </div>
+                @if (speed is not null)
+                {
+                    <div class="realm-detail-row">
+                        <dt>Speed</dt>
+                        <dd>@speed</dd>
+                    </div>
+                }
+                <div class="realm-detail-row">
+                    <dt>Fuel</dt>
+                    @if (Vehicle.FuelPct is { } fuel)
+                    {
+                        <dd class="@(row.LowFuel ? "realm-detail-fuel realm-detail-fuel--low" : "realm-detail-fuel")">
+                            <span class="realm-detail-bar"
+                                  role="progressbar"
+                                  aria-label="Fuel"
+                                  aria-valuemin="0"
+                                  aria-valuemax="100"
+                                  aria-valuenow="@fuel.ToString(CultureInfo.InvariantCulture)">
+                                <span class="realm-detail-bar-fill" style="width:@UnitFormatter.Percent(Math.Clamp(fuel, 0, 100))"></span>
+                            </span>
+                            <span class="realm-detail-fuel-text">@UnitFormatter.Percent(fuel)</span>
+                        </dd>
+                    }
+                    else
+                    {
+                        <dd>@DrivingFormatter.Dash</dd>
+                    }
+                </div>
+                <div class="realm-detail-row">
+                    <dt>Odometer</dt>
+                    <dd>@(odometer ?? DrivingFormatter.Dash)</dd>
+                </div>
+                <div class="realm-detail-row">
+                    <dt>Last update</dt>
+                    <dd>@(lastUpdate ?? DrivingFormatter.Dash)</dd>
+                </div>
+            }
+        </dl>
+    </div>
+</section>
+
+@code {
+    private ElementReference _back;
+
+    /// <summary>The vehicle shown.</summary>
+    [Parameter, EditorRequired]
+    public VehicleVm Vehicle { get; set; } = default!;
+
+    /// <summary>What the rows of this render share: the session's clock and zone, the unit system and the zones (built once by <c>SheetContent</c>).</summary>
+    [Parameter, EditorRequired]
+    public RowFacts Facts { get; set; } = default!;
+
+    /// <summary>Move the focus to the back button when this first renders (the detail was opened by the handle or by a tap on the header).</summary>
+    [Parameter]
+    public bool FocusOnOpen { get; set; }
+
+    /// <summary>The back arrow: the same step as the Android Back (<c>BackStep.Detail</c>): Peek, the selection kept.</summary>
+    [Parameter]
+    public EventCallback OnBack { get; set; }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || !FocusOnOpen)
+        {
+            return;
+        }
+
+        try
+        {
+            await _back.FocusAsync();
+        }
+        catch (Exception exception) when (exception is JSException or JSDisconnectedException or InvalidOperationException or TaskCanceledException)
+        {
+            // A circuit that is gone, or a detail that has already closed: there is nothing to focus.
+        }
+    }
+}

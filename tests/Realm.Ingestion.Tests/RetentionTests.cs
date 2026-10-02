@@ -69,7 +69,7 @@ public sealed class RetentionTests
         rig.Exec("INSERT INTO members(id, first_seen_utc, last_configured_utc) VALUES ('king', 0, 0)");
         rig.Exec(
             "WITH RECURSIVE c(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM c WHERE i < 5200) "
-            + "INSERT INTO fixes(member_id, ts, source, lat, lon) SELECT 'king', i, 'life360', 33.0, -96.0 FROM c");
+            + "INSERT INTO fixes(member_id, ts, source, lat, lon) SELECT 'king', i, 'life360', 33.0, -84.0 FROM c");
         var clock = new ManualTimeProvider(StoreRig.Start);
         var retention = rig.NewRetention(clock);
 
@@ -90,7 +90,7 @@ public sealed class RetentionTests
         rig.Exec("INSERT INTO members(id, first_seen_utc, last_configured_utc) VALUES ('king', 0, 0)");
         rig.Exec(
             "WITH RECURSIVE c(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM c WHERE i < 4000) "
-            + "INSERT INTO fixes(member_id, ts, source, lat, lon, address) SELECT 'king', i, 'life360', 33.0, -96.0, 'A long enough address to fill a page or two, 1 Example Road' FROM c");
+            + "INSERT INTO fixes(member_id, ts, source, lat, lon, address) SELECT 'king', i, 'life360', 33.0, -84.0, 'A long enough address to fill a page or two, 1 Example Road' FROM c");
         var pages = rig.Long("PRAGMA page_count");
 
         await rig.NewRetention().PruneAsync(CancellationToken.None);

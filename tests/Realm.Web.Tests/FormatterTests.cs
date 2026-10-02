@@ -365,7 +365,7 @@ public sealed class FormatterTests
         Assert.Equal(MemberStatus.AtPlace, alden.Status);
     }
 
-    [Fact(DisplayName = "[AC-26] Briar's row reads Driving · 54 mph on I-35 with Since 9:12 pm; Cass's reads her hall with 1.0 mi away and a low battery")]
+    [Fact(DisplayName = "[AC-26] Briar's row reads Driving · 54 mph on I-65 with Since 9:12 pm; Cass's reads her hall with 1.0 mi away and a low battery")]
     public void DriversRows_BriarDrives_AndCassIsLow()
     {
         var rows = DemoRows();
@@ -391,7 +391,7 @@ public sealed class FormatterTests
         var rows = DemoRows();
 
         var dara = rows[3];
-        // The cast stores the address as "Eastgate Avenue, Pinebrook, TX"; the far-away line reads "{street} · {City}, {ST}".
+        // The cast stores the address as "Eastgate Avenue, Pinebrook, AL"; the far-away line reads "{street} · {City}, {ST}".
         var address = DemoCast.Cryptid.Address!.Split(", ");
         Assert.Equal($"{address[0]} · {address[1]}, {address[2]}", dara.StatusLine);
         Assert.Equal("The raven's late — last seen 42 min ago", dara.DetailLine);
@@ -446,9 +446,9 @@ public sealed class FormatterTests
     // ---- status line and L3, one rule at a time ---------------------------------------------------------------------------------------------
 
     [Theory]
-    [InlineData(54, "I-35", "Driving · 54 mph on I-35")]
+    [InlineData(54, "I-65", "Driving · 54 mph on I-65")]
     [InlineData(54, null, "Driving · 54 mph")]
-    [InlineData(null, "I-35", "Driving on I-35")]
+    [InlineData(null, "I-65", "Driving on I-65")]
     [InlineData(null, null, "Driving")]
     public void Status_Driving_ShowsTheSpeedAndTheStreetOnlyWhenKnown(int? mph, string? street, string expected)
     {
@@ -473,9 +473,9 @@ public sealed class FormatterTests
     [Fact]
     public void Status_FarAway_IsTheStreetWithTheCityAndState_WhenBothAreKnown()
     {
-        var far = Member("a") with { Lat = 32.1, Street = "Eastgate Avenue", City = "Pinebrook", Region = "TX" };
+        var far = Member("a") with { Lat = 32.1, Street = "Eastgate Avenue", City = "Pinebrook", Region = "AL" };
 
-        Assert.Equal("Eastgate Avenue · Pinebrook, TX", RowOf(far).StatusLine);
+        Assert.Equal("Eastgate Avenue · Pinebrook, AL", RowOf(far).StatusLine);
         Assert.Equal("Eastgate Avenue", RowOf(far with { City = null }).StatusLine);
         Assert.Equal("Eastgate Avenue", RowOf(far with { Region = null }).StatusLine);
         Assert.Equal("Somewhere in the Realm", RowOf(far with { Street = null }).StatusLine);
@@ -887,7 +887,7 @@ public sealed class FormatterTests
             Color: "#445566",
             Kind: kind,
             Lat: 31.0990,
-            Lon: -97.3410,
+            Lon: -85.3410,
             AccuracyM: 10,
             BatteryPct: 50,
             Charging: null,
@@ -912,7 +912,7 @@ public sealed class FormatterTests
             LoreTitle: null,
             Glyph: VehicleGlyph.Car,
             Lat: isPlaceholder ? null : 31.0990,
-            Lon: isPlaceholder ? null : -97.3410,
+            Lon: isPlaceholder ? null : -85.3410,
             Street: null,
             PlaceId: null,
             Ignition: null,
@@ -927,7 +927,7 @@ public sealed class FormatterTests
             PlaceholderNote: null);
 
     private static PlaceVm Place(string id, IReadOnlyList<string> memberIds, IReadOnlyList<string> vehicleIds) =>
-        new(id, "Place " + id, string.Empty, PlaceKind.Other, 31.0990, -97.3410, 100, memberIds, vehicleIds);
+        new(id, "Place " + id, string.Empty, PlaceKind.Other, 31.0990, -85.3410, 100, memberIds, vehicleIds);
 
     // ---- helpers for the rows --------------------------------------------------------------------------------------------------------------
 

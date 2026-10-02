@@ -18,7 +18,7 @@ namespace Realm.Web.Tests;
 public sealed class MapInteropTests
 {
     private static readonly MapInitOptions Init = new(
-        "realm-map", MapStyleIds.DemoOffline, [-97.341, 31.099], 12, ReducedMotion: false, TestHooks: true, MapStrings.Default, MapFeatures.All);
+        "realm-map", MapStyleIds.DemoOffline, [-85.341, 31.099], 12, ReducedMotion: false, TestHooks: true, MapStrings.Default, MapFeatures.All);
 
     [Fact]
     public async Task CreateAsync_ImportsTheModuleByThePlainRelativePath()
@@ -185,7 +185,7 @@ public sealed class MapInteropTests
     {
         var handler = new RecordingHandler();
         var callbacks = new MapCallbacks(handler);
-        var camera = new CameraState([-97.3, 31.1], 12, [[-97.4, 31.0], [-97.2, 31.2]], Animated: false, LastDurationMs: 0, RecenterState.Away, UserInitiated: true);
+        var camera = new CameraState([-85.3, 31.1], 12, [[-85.4, 31.0], [-85.2, 31.2]], Animated: false, LastDurationMs: 0, RecenterState.Away, UserInitiated: true);
 
         await callbacks.OnReady(new ReadyInfo("1", 1, "6.11.2"));
         await callbacks.OnPinTap("member", "king");

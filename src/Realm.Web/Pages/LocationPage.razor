@@ -10,6 +10,7 @@
 @using Realm.Web.Layout
 @using Realm.Web.Map
 @using Realm.Web.Shell
+@using Realm.Web.Sheet
 @using Realm.Web.State
 @inject IConfiguration Configuration
 @inject IJSRuntime JS
@@ -22,15 +23,24 @@
 
    The layout is unknown until the browser has reported its window (ShellInterop, after the first render: prerendering has no window). Until then only a
    placeholder reserving the Peek band is drawn; the map and the sheet start together with the real layout, so the map's first default camera already uses the
-   right padding. *@
+   right padding.
+
+   The sheet's state (section, selection, size) is a RealmUiState (03 section 3.6) and every change goes through its reducer: a row, the handle, the header, the back arrow and the
+   segments raise events and the sheet shows RealmUiState.Body (list, selection header or detail, D45). S8c registers the state for the circuit and adds the history tokens, Esc
+   and the pin and map taps; until then this page owns one. The single-bubble tap (D84) is dispatched to this state and the map's Selection is read from it, so nothing else holds
+   a selection. A tap on the selection header and a tap on the handle are the same event (D46). The floating pill of the hidden Expanded panel (01 section 3.6) is drawn here when
+   the layout says the panel is hidden, which nothing sets yet. *@
 <section class="realm-location">
     @if (_viewport is { } viewport)
     {
         var members = Snapshot.Members;
         var vehicles = Snapshot.Vehicles;
         var places = Snapshot.Places;
-        var summary = HandleSummaryFormatter.Format(_section, members, vehicles, places, Session.Time.GetUtcNow());
+        var summary = HandleSummaryFormatter.Format(_ui.Section, members, vehicles, places, Session.Time.GetUtcNow());
         var panel = _mode == LayoutMode.Expanded;
+        var pill = panel && _ui.Layout.PanelHidden && _ui.Selection is { } selected
+            ? SelectionHeaderFormatter.For(selected, members, vehicles, places, RowFacts.Create(members, places, null, Session.Time.GetUtcNow(), Session.Zone))
+            : null;
 
         <MapView Members="@members"
                  Vehicles="@vehicles"
@@ -40,22 +50,34 @@
                  Layout="@_mapLayout"
                  ReducedMotion="@viewport.ReducedMotion"
                  TestHooks="@TestHooks"
-                 Selection="@_selection"
+                 Selection="@_ui.Selection"
                  OnBubbleTap="OnBubbleTapAsync" />
 
         <RealmSheetHost Mode="@_mode"
-                        Size="@_size"
+                        Size="@_ui.SheetSize"
                         ViewportWidth="@viewport.Width"
                         Summary="@summary"
                         OnSizeChanged="OnSizeChangedAsync">
             <SheetContent Members="@members"
                           Vehicles="@vehicles"
                           Places="@places"
-                          Section="@_section"
+                          Section="@_ui.Section"
+                          Body="@_ui.Body"
+                          FocusDetail="@_focusDetail"
                           OnSection="OnSectionAsync"
+                          OnSelect="OnSelectAsync"
+                          OnToggle="OnToggleAsync"
+                          OnClear="OnClearAsync"
+                          OnBack="OnBackAsync"
+                          OnHereNow="OnHereNowAsync"
                           Summary="@summary"
                           ShowSummary="@panel" />
         </RealmSheetHost>
+
+        @if (pill is not null)
+        {
+            <SheetSelectionHeader Header="pill" Pill="true" OnClear="OnClearAsync" />
+        }
 
         <RightButtonStack Hidden="@(!_mapLayout.StackVisible)" Panel="@panel" MapStyleName="@StyleName" />
     }
@@ -73,9 +95,8 @@
     private ViewportInfo? _viewport;
     private LayoutMode _mode = LayoutMode.Unknown;
     private LayoutOverride _layoutOverride;
-    private SheetSize _size;
-    private EntityRef? _selection;
-    private Section _section = Section.Drivers;
+    private readonly RealmUiState _ui = new();
+    private bool _focusDetail;
     private MapLayout _mapLayout = MapLayout.Compact;
     private bool _started;
     private bool _disposed;
@@ -111,7 +132,10 @@
     protected override void OnInitialized()
     {
         _layoutOverride = LayoutResolver.ParseOverride(Overrides?.Layout);
-        _size = Overrides?.Sheet == "80" ? SheetSize.Tall : SheetSize.Peek;
+        if (Overrides?.Sheet == "80")
+        {
+            _ui.Apply(new SheetEvent.HandleSet(SheetSize.Tall));
+        }
     }
 
     // The circuit exists from the first render on: only now can the page subscribe, tick and talk to the browser.
@@ -161,6 +185,7 @@
 
         _viewport = viewport;
         _mode = mode;
+        _ui.Layout = new LayoutSnapshot(mode, PanelHidden: false, viewport.Width, viewport.Height, viewport.Safe);
         RefreshMapLayout();
         StateHasChanged();
     }
@@ -170,31 +195,45 @@
         _mapLayout = new MapLayout(
             _mode == LayoutMode.Expanded ? MapLayoutMode.Expanded : MapLayoutMode.Compact,
             PanelHidden: false,
-            StackVisible: !(_mode == LayoutMode.Compact && _size == SheetSize.Tall),
+            StackVisible: !(_mode == LayoutMode.Compact && _ui.SheetSize == SheetSize.Tall),
             _viewport?.Safe ?? new Padding(0, 0, 0, 0));
 
-    // A tap or a key on the handle asked for the other state; S8's reducer will own this decision, the page accepts it as it is.
-    private Task OnSizeChangedAsync(SheetSize size)
+    // Every sheet event goes through the reducer (RealmUiState.Apply, 01 section 5.7). The focus moves to the detail's back button only when the user just opened the detail with the
+    // handle or the header (01 section 10.2); a detail that appears because a pin was tapped in the panel leaves the focus where it is.
+    private Task ApplyAsync(SheetEvent sheetEvent)
     {
-        _size = size;
+        var before = _ui.Body;
+        _ui.Apply(sheetEvent);
+        _focusDetail = sheetEvent is (SheetEvent.HandleToggle or SheetEvent.HandleSet) && before is not SheetBody.Detail && _ui.Body is SheetBody.Detail;
         RefreshMapLayout();
         return Task.CompletedTask;
     }
 
-    // An edge bubble was tapped (D45, D84). One member id selects that member exactly like a pin tap: the reducer sets the selection and leaves the sheet at Peek, and
-    // MapView then sends setSelection and the flight with the Peek padding. A cluster (two or more ids) changes nothing here: the camera fit was the script's.
-    private Task OnBubbleTapAsync(IReadOnlyList<string> ids)
-    {
-        var next = SheetStateMachine.Reduce(new SheetState(_section, _selection, _size), new SheetEvent.BubbleTap(ids), _mode);
-        _selection = next.Selection;
-        _size = next.Size;
-        RefreshMapLayout();
-        return Task.CompletedTask;
-    }
+    // A tap or a key on the handle asked for a size: the reducer decides (the panel has none).
+    private Task OnSizeChangedAsync(SheetSize size) => ApplyAsync(new SheetEvent.HandleSet(size));
 
-    private Task OnSectionAsync(Section section)
+    // The tap on the selection header (D46) is the handle's own event: Peek to 80 percent, the selection kept, the header becomes the detail.
+    private Task OnToggleAsync() => ApplyAsync(new SheetEvent.HandleToggle());
+
+    private Task OnSectionAsync(Section section) => ApplyAsync(new SheetEvent.SegmentTap(section));
+
+    private Task OnSelectAsync(EntityRef entity) => ApplyAsync(new SheetEvent.RowTap(entity));
+
+    private Task OnHereNowAsync(string memberId) => ApplyAsync(new SheetEvent.HereNowTap(memberId));
+
+    private Task OnClearAsync() => ApplyAsync(new SheetEvent.ClearTap());
+
+    // An edge bubble was tapped (D45, D84): the same reducer as a row, the handle and the header. One member id selects that member exactly like a pin tap (the selection is set and the
+    // sheet is left at Peek); a cluster (two or more ids) changes nothing here, its camera fit was the script's. MapView then sends setSelection and the flight with the target Peek
+    // padding because it reads Selection from this one state.
+    private Task OnBubbleTapAsync(IReadOnlyList<string> ids) => ApplyAsync(new SheetEvent.BubbleTap(ids));
+
+    // The detail's back arrow is the Android Back from a detail (BackStep.Detail): Peek, the selection kept; in the panel the selection is cleared. The history entries are S8c's.
+    private Task OnBackAsync()
     {
-        _section = section;
+        _ui.Back();
+        _focusDetail = false;
+        RefreshMapLayout();
         return Task.CompletedTask;
     }
 

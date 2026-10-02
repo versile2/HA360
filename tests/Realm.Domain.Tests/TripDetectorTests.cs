@@ -1186,9 +1186,9 @@ public class TripDetectorTests
     {
         var leg = DriveAndStop(0, 29);
         var fixes = leg.Fixes.Select(f =>
-            f.Ts == At(0) ? f with { Address = "48 Larkspur Lane, Millbrook, TX" }
-            : f.Ts == At(24) ? f with { Address = "Interstate 35, Pinebrook, TX" }
-            : f.Ts == At(leg.StopT) ? f with { Address = "Eastgate Avenue, Pinebrook, TX, USA" }
+            f.Ts == At(0) ? f with { Address = "48 Larkspur Lane, Millbrook, AL" }
+            : f.Ts == At(24) ? f with { Address = "Interstate 65, Pinebrook, AL" }
+            : f.Ts == At(leg.StopT) ? f with { Address = "Eastgate Avenue, Pinebrook, AL, USA" }
             : f).ToList();
         var detector = new TripDetector
         {
@@ -1207,7 +1207,7 @@ public class TripDetectorTests
         Assert.Equal("48 Larkspur Lane", trip.StartStreet);
         Assert.Equal("Eastgate Avenue", trip.EndStreet);
         Assert.Equal(At(24), trip.TopSpeedAtUtc);
-        Assert.Equal("Interstate 35", trip.TopSpeedStreet);
+        Assert.Equal("Interstate 65", trip.TopSpeedStreet);
     }
 
     [Theory]
@@ -1216,7 +1216,7 @@ public class TripDetectorTests
     public void A_trip_end_takes_the_street_of_a_life360_address_within_250_m(double addressAtS, string? street)
     {
         var leg = DriveAndStop(0, 29);
-        var fixes = leg.Fixes.Select(f => f.Ts == At(addressAtS) ? f with { Address = "48 Larkspur Lane, Millbrook, TX" } : f).ToList();
+        var fixes = leg.Fixes.Select(f => f.Ts == At(addressAtS) ? f with { Address = "48 Larkspur Lane, Millbrook, AL" } : f).ToList();
 
         var trip = Assert.Single(Replay(fixes, leg.StopT + 600).Closed);
 
@@ -1230,7 +1230,7 @@ public class TripDetectorTests
     {
         var leg = DriveAndStop(0, 29);
         var fixes = leg.Fixes.ToList();
-        fixes.Add(Fix(addressAtS, 0, mps: 0, address: "48 Larkspur Lane, Millbrook, TX"));
+        fixes.Add(Fix(addressAtS, 0, mps: 0, address: "48 Larkspur Lane, Millbrook, AL"));
 
         var trip = Assert.Single(Replay(fixes, leg.StopT + 600).Closed);
 

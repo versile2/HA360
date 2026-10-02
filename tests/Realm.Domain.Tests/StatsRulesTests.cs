@@ -726,7 +726,7 @@ public class StatsRulesTests
             0,
             [Alden(), Bree()],
             Dense("alden", Local(9, 28, 8), top: 24.1, topAt: Local(9, 28, 8, 5), topStreet: "Eastgate Avenue"),
-            Dense("alden", Local(9, 29, 8), top: 42.9, topAt: Local(9, 29, 8, 7), topStreet: "Interstate 35"),
+            Dense("alden", Local(9, 29, 8), top: 42.9, topAt: Local(9, 29, 8, 7), topStreet: "Interstate 65"),
             Dense("bree", Local(9, 29, 9), top: 30.2, topAt: Local(9, 29, 9, 3), topStreet: "Larkspur Lane"));
 
         var top = report.TopSpeed;
@@ -735,7 +735,7 @@ public class StatsRulesTests
         Assert.Equal("alden", top.MemberId);
         Assert.Equal(42.9, top.SpeedMps);
         Assert.Equal(Local(9, 29, 8, 7), top.AtUtc);
-        Assert.Equal("Interstate 35", top.Street);
+        Assert.Equal("Interstate 65", top.Street);
         Assert.Equal(new DriverTopSpeed("alden", 42.9), top.Drivers.Single(d => d.MemberId == "alden"));
         Assert.Equal(new DriverTopSpeed("bree", 30.2), top.Drivers.Single(d => d.MemberId == "bree"));
     }
@@ -744,7 +744,7 @@ public class StatsRulesTests
     public void A_tie_to_0_01_m_s_goes_to_the_earlier_time_even_if_the_other_is_a_hair_faster()
     {
         var earlier = Dense("bree", Local(9, 29, 8), top: 30.001, topAt: Local(9, 29, 8, 3), topStreet: "Larkspur Lane");
-        var later = Dense("alden", Local(9, 29, 8), top: 30.004, topAt: Local(9, 29, 8, 40), topStreet: "Interstate 35");
+        var later = Dense("alden", Local(9, 29, 8), top: 30.004, topAt: Local(9, 29, 8, 40), topStreet: "Interstate 65");
 
         var top = Report(0, [Alden(), Bree()], later, earlier).TopSpeed;
 
@@ -760,7 +760,7 @@ public class StatsRulesTests
         var report = Report(
             0,
             [Alden(), Bree()],
-            Dense("alden", Local(9, 29, 8), top: 30.004, topAt: Local(9, 29, 8, 40), topStreet: "Interstate 35"),
+            Dense("alden", Local(9, 29, 8), top: 30.004, topAt: Local(9, 29, 8, 40), topStreet: "Interstate 65"),
             Dense("alden", Local(9, 29, 8), top: 30.001, topAt: Local(9, 29, 8, 3), topStreet: "Larkspur Lane"),
             Dense("bree", Local(9, 29, 9), top: 12));
 

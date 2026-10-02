@@ -115,10 +115,10 @@ public class DemoDataTests
 
     // id, latitude, longitude, accuracy (m), battery (%), fix age (min), "since" hour and minute (local), place.
     [Theory]
-    [InlineData("king", 31.0990, -97.3410, 18.0, 19, 0, 17, 52, "home")]
-    [InlineData("queen", 31.0560, -97.4647, 12.0, 62, 1, 21, 12, null)]
-    [InlineData("jester", 31.1040, -97.3560, 22.0, 12, 3, 21, 6, "jester_hall")]
-    [InlineData("cryptid", 31.3382, -94.7291, 35.0, 10, 42, 20, 10, null)]
+    [InlineData("king", 31.0990, -85.3410, 18.0, 19, 0, 17, 52, "home")]
+    [InlineData("queen", 31.0560, -85.4647, 12.0, 62, 1, 21, 12, null)]
+    [InlineData("jester", 31.1040, -85.3560, 22.0, 12, 3, 21, 6, "jester_hall")]
+    [InlineData("cryptid", 31.3382, -82.7291, 35.0, 10, 42, 20, 10, null)]
     public void Live_members_have_the_position_accuracy_battery_age_since_and_place_of_the_table(
         string id, double lat, double lon, double accuracyM, int batteryPct, int ageMinutes, int sinceHour, int sinceMinute, string? placeId)
     {
@@ -151,7 +151,7 @@ public class DemoDataTests
         Assert.Null(king.StaticLabel);
     }
 
-    // The queen drives at 24.1 m/s (54 mph) on "I-35", her battery is not charging, and she is in no zone.
+    // The queen drives at 24.1 m/s (54 mph) on "I-65", her battery is not charging, and she is in no zone.
     [Fact]
     public void Queen_is_driving_at_24_1_metres_per_second_on_i_35()
     {
@@ -159,7 +159,7 @@ public class DemoDataTests
 
         Assert.True(queen.IsDriving);
         Assert.Equal(24.1, queen.SpeedMps);
-        Assert.Equal("I-35", queen.Street);
+        Assert.Equal("I-65", queen.Street);
         Assert.Null(queen.City);
         Assert.Null(queen.Region);
         Assert.False(queen.Charging);
@@ -171,10 +171,10 @@ public class DemoDataTests
     {
         var jester = Member("jester");
 
-        Assert.Equal("48 Larkspur Lane, Millbrook, TX", jester.FullAddress);
+        Assert.Equal("48 Larkspur Lane, Millbrook, AL", jester.FullAddress);
         Assert.Equal("48 Larkspur Lane", jester.Street);
         Assert.Equal("Millbrook", jester.City);
-        Assert.Equal("TX", jester.Region);
+        Assert.Equal("AL", jester.Region);
         Assert.False(jester.IsDriving);
         Assert.Null(jester.SpeedMps);
         Assert.Equal(Freshness.Fresh, jester.Freshness);
@@ -193,8 +193,8 @@ public class DemoDataTests
         Assert.Equal(Freshness.Stale, cryptid.Freshness);
         Assert.Equal("Eastgate Avenue", cryptid.Street);
         Assert.Equal("Pinebrook", cryptid.City);
-        Assert.Equal("TX", cryptid.Region);
-        Assert.Equal("Eastgate Avenue, Pinebrook, TX", cryptid.FullAddress);
+        Assert.Equal("AL", cryptid.Region);
+        Assert.Equal("Eastgate Avenue, Pinebrook, AL", cryptid.FullAddress);
         Assert.False(cryptid.IsDriving);
         Assert.Equal("Fresh,Fresh,Fresh,Stale,Static", string.Join(",", snapshot.Members.Select(m => m.Freshness)));
     }
@@ -206,7 +206,7 @@ public class DemoDataTests
 
         Assert.Equal(MemberKind.Static, prince.Kind);
         Assert.Equal(38.8339, prince.Lat);
-        Assert.Equal(-104.8214, prince.Lon);
+        Assert.Equal(-92.8214, prince.Lon);
         Assert.Equal("Home · Highmeadow", prince.StaticLabel);
         Assert.Equal(DemoCast.Prince.StaticLabel, prince.StaticLabel);
         Assert.Equal(Freshness.Static, prince.Freshness);
@@ -277,7 +277,7 @@ public class DemoDataTests
         Assert.Equal("The King's Wagon", wagon.LoreTitle);
         Assert.Equal(VehicleGlyph.Pickup, wagon.Glyph);
         Assert.Equal(31.09907, wagon.Lat);
-        Assert.Equal(-97.34100, wagon.Lon);
+        Assert.Equal(-85.34100, wagon.Lon);
         Assert.InRange(Geo.DistanceM(king.Lat!.Value, king.Lon!.Value, wagon.Lat!.Value, wagon.Lon!.Value), 7.7, 7.9);
         Assert.Equal("home", wagon.PlaceId);
         Assert.Null(wagon.Street);
@@ -358,7 +358,7 @@ public class DemoDataTests
         Assert.Equal("Home", home.Subtitle);
         Assert.Equal(PlaceKind.Home, home.Kind);
         Assert.Equal(31.0990, home.Lat);
-        Assert.Equal(-97.3410, home.Lon);
+        Assert.Equal(-85.3410, home.Lon);
         Assert.Equal(100.0, home.RadiusM);
 
         Assert.Equal("Work", places.Single(p => p.Id == "work").DisplayName);
@@ -831,7 +831,7 @@ public class DemoDataTests
         Assert.All(report.Events.Values, stat => Assert.Equal(StatSource.Derived, stat.Source));
     }
 
-    // 02 section 9.4 (d): the week-0 top speed is the king's 96 mph on I-35, Tuesday 29 September at 16:12.
+    // 02 section 9.4 (d): the week-0 top speed is the king's 96 mph on I-65, Tuesday 29 September at 16:12.
     [Fact]
     public async Task The_week_0_top_speed_is_the_kings_96_mph_on_i_35_on_tuesday_at_16_12()
     {
@@ -841,7 +841,7 @@ public class DemoDataTests
         Assert.Equal("king", top.MemberId);
         Assert.Equal(96, Mph(top.SpeedMps));
         Assert.Equal(42.91584, top.SpeedMps, 5);
-        Assert.Equal("I-35", top.Street);
+        Assert.Equal("I-65", top.Street);
         Assert.Equal(new DateTimeOffset(2026, 9, 29, 16, 12, 0, TimeSpan.FromHours(-5)), top.AtUtc);
     }
 
@@ -1643,9 +1643,9 @@ public class DemoDataTests
         var prince = snapshot.Members.Single(m => m.Id == "prince");
 
         Assert.Equal(31.1250, cryptid.Lat);
-        Assert.Equal(-97.3300, cryptid.Lon);
+        Assert.Equal(-85.3300, cryptid.Lon);
         Assert.Equal(31.0800, prince.Lat);
-        Assert.Equal(-97.3700, prince.Lon);
+        Assert.Equal(-85.3700, prince.Lon);
         Assert.InRange(DistanceM(king, cryptid) / 1000, 3.06, 3.08);
         Assert.InRange(DistanceM(king, prince) / 1000, 3.47, 3.49);
         Assert.Equal(Snapshot().Members.Single(m => m.Id == "queen"), snapshot.Members.Single(m => m.Id == "queen"));

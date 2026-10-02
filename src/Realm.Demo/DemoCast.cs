@@ -33,7 +33,7 @@ public static class DemoCast
         SortOrder: 1,
         PersonUserId: "demo-user-2",
         PhoneCapable: false,
-        Address: "I-35",
+        Address: "I-65",
         StaticLabel: null);
 
     public static readonly DemoMember Jester = new(
@@ -45,7 +45,7 @@ public static class DemoCast
         SortOrder: 2,
         PersonUserId: null,
         PhoneCapable: false,
-        Address: "48 Larkspur Lane, Millbrook, TX",
+        Address: "48 Larkspur Lane, Millbrook, AL",
         StaticLabel: null);
 
     public static readonly DemoMember Cryptid = new(
@@ -57,7 +57,7 @@ public static class DemoCast
         SortOrder: 3,
         PersonUserId: null,
         PhoneCapable: false,
-        Address: "Eastgate Avenue, Pinebrook, TX",
+        Address: "Eastgate Avenue, Pinebrook, AL",
         StaticLabel: null);
 
     public static readonly DemoMember Prince = new(

@@ -9,7 +9,7 @@ namespace Realm.Domain.Tests;
 public class FusionTests
 {
     private const double HomeLat = 31.0990;
-    private const double HomeLon = -97.3410;
+    private const double HomeLon = -85.3410;
     private const int OfflineAfterHours = 24;
     private const double MetresPerDegreeOfLatitude = 6_371_008.8 * Math.PI / 180;
 
@@ -65,13 +65,13 @@ public class FusionTests
     [Fact]
     public void The_output_is_the_winners_point_with_its_accuracy_and_time()
     {
-        var older = Fix(FixSource.Life360, 120, lat: 31.0000, lon: -97.0000);
-        var newer = Fix(FixSource.Companion, 20, accuracyM: 18, lat: 31.0002, lon: -97.0003);
+        var older = Fix(FixSource.Life360, 120, lat: 31.0000, lon: -85.0000);
+        var newer = Fix(FixSource.Companion, 20, accuracyM: 18, lat: 31.0002, lon: -85.0003);
 
         var fused = Fused(older, newer);
 
         Assert.Equal(31.0002, fused.Lat);
-        Assert.Equal(-97.0003, fused.Lon);
+        Assert.Equal(-85.0003, fused.Lon);
         Assert.Equal(18.0, fused.AccuracyM);
         Assert.Equal(Now.AddSeconds(-20), fused.Ts);
         Assert.Equal(FixSource.Companion, fused.WinnerSource);
@@ -90,7 +90,7 @@ public class FusionTests
     [Fact]
     public void One_source_gives_its_fix()
     {
-        var fused = Fused(Fix(FixSource.Life360, 600, lat: 31.5, lon: -97.5));
+        var fused = Fused(Fix(FixSource.Life360, 600, lat: 31.5, lon: -85.5));
 
         Assert.Equal(31.5, fused.Lat);
         Assert.Equal(FixSource.Life360, fused.WinnerSource);
@@ -346,33 +346,33 @@ public class FusionTests
     public void Address_comes_from_a_life360_fix_near_the_winner()
     {
         var companion = Fix(FixSource.Companion, 30, accuracyM: 12);
-        var life360 = Fix(FixSource.Life360, 100, address: "Street Name, Texas", lat: NorthOfHome(100));
+        var life360 = Fix(FixSource.Life360, 100, address: "Street Name, Alabama", lat: NorthOfHome(100));
 
-        Assert.Equal("Street Name, Texas", Fused(companion, life360).Address);
+        Assert.Equal("Street Name, Alabama", Fused(companion, life360).Address);
     }
 
     [Theory]
-    [InlineData(249.0, "Street Name, Texas")]
+    [InlineData(249.0, "Street Name, Alabama")]
     [InlineData(251.0, null)]
     public void Address_must_be_within_250_metres_of_the_output_position(double metresFromWinner, string? expectedAddress)
     {
         var companion = Fix(FixSource.Companion, 30, accuracyM: 12);
-        var life360 = Fix(FixSource.Life360, 100, address: "Street Name, Texas", lat: NorthOfHome(metresFromWinner));
+        var life360 = Fix(FixSource.Life360, 100, address: "Street Name, Alabama", lat: NorthOfHome(metresFromWinner));
 
         Assert.Equal(expectedAddress, Fused(companion, life360).Address);
     }
 
     // The 30 minutes run from the winner's timestamp (inclusive): the Life360 fix is this many seconds older than it.
     [Theory]
-    [InlineData(1500, "Street Name, Texas")]
-    [InlineData(1800, "Street Name, Texas")]
+    [InlineData(1500, "Street Name, Alabama")]
+    [InlineData(1800, "Street Name, Alabama")]
     [InlineData(1801, null)]
     [InlineData(2520, null)]
     public void Address_may_be_up_to_30_minutes_older_than_the_winning_fix(int secondsOlderThanWinner, string? expectedAddress)
     {
         const int winnerAgeSeconds = 10;
         var companion = Fix(FixSource.Companion, winnerAgeSeconds, accuracyM: 12);
-        var life360 = Fix(FixSource.Life360, winnerAgeSeconds + secondsOlderThanWinner, address: "Street Name, Texas");
+        var life360 = Fix(FixSource.Life360, winnerAgeSeconds + secondsOlderThanWinner, address: "Street Name, Alabama");
 
         Assert.Equal(expectedAddress, Fused(companion, life360).Address);
     }
@@ -382,7 +382,7 @@ public class FusionTests
     public void An_address_fix_31_minutes_older_than_the_winner_is_dropped()
     {
         var companion = Fix(FixSource.Companion, 5 * 60, accuracyM: 12);
-        var life360 = Fix(FixSource.Life360, (5 + 31) * 60, address: "Street Name, Texas");
+        var life360 = Fix(FixSource.Life360, (5 + 31) * 60, address: "Street Name, Alabama");
 
         Assert.Null(Fused(companion, life360).Address);
     }
@@ -392,19 +392,19 @@ public class FusionTests
     public void An_address_fix_exactly_30_minutes_older_than_the_winner_is_kept()
     {
         var companion = Fix(FixSource.Companion, 5 * 60, accuracyM: 12);
-        var life360 = Fix(FixSource.Life360, (5 + 30) * 60, address: "Street Name, Texas");
+        var life360 = Fix(FixSource.Life360, (5 + 30) * 60, address: "Street Name, Alabama");
 
-        Assert.Equal("Street Name, Texas", Fused(companion, life360).Address);
+        Assert.Equal("Street Name, Alabama", Fused(companion, life360).Address);
     }
 
     // D54: a stale member keeps the street of their last fix: a winner 60 minutes before now still carries its own address.
     [Fact]
     public void A_stale_winner_keeps_its_own_address()
     {
-        var fused = Fused(Fix(FixSource.Life360, 60 * 60, address: "Street Name, Texas"));
+        var fused = Fused(Fix(FixSource.Life360, 60 * 60, address: "Street Name, Alabama"));
 
         Assert.Equal(Now.AddMinutes(-60), fused.Ts);
-        Assert.Equal("Street Name, Texas", fused.Address);
+        Assert.Equal("Street Name, Alabama", fused.Address);
     }
 
     // A Life360 fix a second newer than the winner (a tie the winner takes on accuracy) is never too old, but the
@@ -415,7 +415,7 @@ public class FusionTests
     public void An_address_fix_newer_than_the_winner_but_beyond_250_metres_is_ignored(double metresFromWinner)
     {
         var companion = Fix(FixSource.Companion, 10, accuracyM: 12);
-        var life360 = Fix(FixSource.Life360, 9, address: "Street Name, Texas", lat: NorthOfHome(metresFromWinner));
+        var life360 = Fix(FixSource.Life360, 9, address: "Street Name, Alabama", lat: NorthOfHome(metresFromWinner));
 
         var fused = Fused(companion, life360);
 
@@ -427,7 +427,7 @@ public class FusionTests
     [Fact]
     public void Only_a_life360_address_counts()
     {
-        var companion = Fix(FixSource.Companion, 10, address: "Not From Life360, TX");
+        var companion = Fix(FixSource.Companion, 10, address: "Not From Life360, AL");
         var life360 = Fix(FixSource.Life360, 20, address: "  ");
 
         Assert.Null(Fused(companion, life360).Address);
@@ -437,9 +437,9 @@ public class FusionTests
     [Fact]
     public void A_life360_winner_with_an_address_has_it()
     {
-        var fused = Fused(Fix(FixSource.Life360, 20, address: "I-35"));
+        var fused = Fused(Fix(FixSource.Life360, 20, address: "I-65"));
 
-        Assert.Equal("I-35", fused.Address);
+        Assert.Equal("I-65", fused.Address);
     }
 
     // ---- the fixture instant through the real fusion --------------------------------------------------------
@@ -456,13 +456,13 @@ public class FusionTests
     [Fact]
     public void Fixture_king_is_at_home_charging_and_fresh()
     {
-        var companion = Fix(FixSource.Companion, 0, accuracyM: 18, battery: 19, charging: true, lat: 31.0990, lon: -97.3410);
-        var life360 = Fix(FixSource.Life360, 42, lat: 31.09905, lon: -97.34105, battery: 20, charging: false);
+        var companion = Fix(FixSource.Companion, 0, accuracyM: 18, battery: 19, charging: true, lat: 31.0990, lon: -85.3410);
+        var life360 = Fix(FixSource.Life360, 42, lat: 31.09905, lon: -85.34105, battery: 20, charging: false);
 
         var fused = Fused(companion, life360);
 
         Assert.Equal(31.0990, fused.Lat);
-        Assert.Equal(-97.3410, fused.Lon);
+        Assert.Equal(-85.3410, fused.Lon);
         Assert.Equal(18.0, fused.AccuracyM);
         Assert.Equal(19, fused.BatteryPct);
         Assert.True(fused.Charging);
@@ -471,39 +471,39 @@ public class FusionTests
         Assert.Equal(Freshness.Fresh, FreshnessOf(fused));
     }
 
-    // Queen: driving 24.1 m/s on "I-35", 62%, accuracy 12 m, fix age 1 min; the street comes from her Life360 fix.
+    // Queen: driving 24.1 m/s on "I-65", 62%, accuracy 12 m, fix age 1 min; the street comes from her Life360 fix.
     [Fact]
     public void Fixture_queen_is_driving_on_the_interstate_and_fresh()
     {
-        var companion = Fix(FixSource.Companion, 60, accuracyM: 12, speedMps: 24.1, battery: 62, charging: false, lat: 31.0560, lon: -97.4647);
-        var life360 = Fix(FixSource.Life360, 75, address: "I-35", speedMps: 24.0, lat: 31.0561, lon: -97.4647);
+        var companion = Fix(FixSource.Companion, 60, accuracyM: 12, speedMps: 24.1, battery: 62, charging: false, lat: 31.0560, lon: -85.4647);
+        var life360 = Fix(FixSource.Life360, 75, address: "I-65", speedMps: 24.0, lat: 31.0561, lon: -85.4647);
 
         var fused = Fused(companion, life360);
 
         Assert.Equal(31.0560, fused.Lat);
-        Assert.Equal(-97.4647, fused.Lon);
+        Assert.Equal(-85.4647, fused.Lon);
         Assert.Equal(12.0, fused.AccuracyM);
         Assert.Equal(24.1, fused.SpeedMps);
         Assert.Equal(62, fused.BatteryPct);
-        Assert.Equal("I-35", AddressParser.Parse(fused.Address)?.Street);
+        Assert.Equal("I-65", AddressParser.Parse(fused.Address)?.Street);
         Assert.Equal(TimeSpan.FromMinutes(1), Now - fused.Ts);
         Assert.Null(PlaceOf(fused).PlaceId);
         Assert.Equal(Freshness.Fresh, FreshnessOf(fused));
     }
 
-    // Jester: at the jester's hall, 12%, accuracy 22 m, fix age 3 min, address "48 Larkspur Lane, Millbrook, TX".
+    // Jester: at the jester's hall, 12%, accuracy 22 m, fix age 3 min, address "48 Larkspur Lane, Millbrook, AL".
     [Fact]
     public void Fixture_jester_is_at_the_jesters_hall_and_fresh()
     {
-        var companion = Fix(FixSource.Companion, 180, accuracyM: 22, battery: 12, charging: false, lat: 31.1040, lon: -97.3560);
-        var life360 = Fix(FixSource.Life360, 200, address: "48 Larkspur Lane, Millbrook, TX", lat: 31.1040, lon: -97.3560);
+        var companion = Fix(FixSource.Companion, 180, accuracyM: 22, battery: 12, charging: false, lat: 31.1040, lon: -85.3560);
+        var life360 = Fix(FixSource.Life360, 200, address: "48 Larkspur Lane, Millbrook, AL", lat: 31.1040, lon: -85.3560);
 
         var fused = Fused(companion, life360);
 
         Assert.Equal(22.0, fused.AccuracyM);
         Assert.Equal(12, fused.BatteryPct);
         Assert.Null(fused.SpeedMps);
-        Assert.Equal("48 Larkspur Lane, Millbrook, TX", fused.Address);
+        Assert.Equal("48 Larkspur Lane, Millbrook, AL", fused.Address);
         Assert.Equal(TimeSpan.FromMinutes(3), Now - fused.Ts);
         Assert.Equal("jester_hall", PlaceOf(fused).PlaceId);
         Assert.Equal(Freshness.Fresh, FreshnessOf(fused));
@@ -515,8 +515,8 @@ public class FusionTests
     [Fact]
     public void Fixture_cryptid_is_stale_and_out_and_keeps_the_street_of_its_last_fix()
     {
-        var companion = Fix(FixSource.Companion, 42 * 60, accuracyM: 35, battery: 10, charging: false, lat: 31.3382, lon: -94.7291);
-        var life360 = Fix(FixSource.Life360, 45 * 60, address: "Eastgate Avenue, Pinebrook, TX", lat: 31.3382, lon: -94.7291);
+        var companion = Fix(FixSource.Companion, 42 * 60, accuracyM: 35, battery: 10, charging: false, lat: 31.3382, lon: -82.7291);
+        var life360 = Fix(FixSource.Life360, 45 * 60, address: "Eastgate Avenue, Pinebrook, AL", lat: 31.3382, lon: -82.7291);
 
         var fused = Fused(companion, life360);
 
@@ -525,7 +525,7 @@ public class FusionTests
         Assert.Equal(TimeSpan.FromMinutes(42), Now - fused.Ts);
         Assert.Equal(Freshness.Stale, FreshnessOf(fused));
         Assert.Null(PlaceOf(fused).PlaceId);
-        Assert.Equal("Eastgate Avenue, Pinebrook, TX", fused.Address);
+        Assert.Equal("Eastgate Avenue, Pinebrook, AL", fused.Address);
         Assert.Equal("Eastgate Avenue", AddressParser.Parse(fused.Address)?.Street);
     }
 
@@ -534,14 +534,14 @@ public class FusionTests
     [Fact]
     public void Fixture_places_occupied_are_home_and_the_jesters_hall()
     {
-        var king = Fused(Fix(FixSource.Companion, 0, accuracyM: 18, lat: 31.0990, lon: -97.3410));
-        var queen = Fused(Fix(FixSource.Companion, 60, accuracyM: 12, lat: 31.0560, lon: -97.4647));
-        var jester = Fused(Fix(FixSource.Companion, 180, accuracyM: 22, lat: 31.1040, lon: -97.3560));
-        var cryptid = Fused(Fix(FixSource.Companion, 42 * 60, accuracyM: 35, lat: 31.3382, lon: -94.7291));
+        var king = Fused(Fix(FixSource.Companion, 0, accuracyM: 18, lat: 31.0990, lon: -85.3410));
+        var queen = Fused(Fix(FixSource.Companion, 60, accuracyM: 12, lat: 31.0560, lon: -85.4647));
+        var jester = Fused(Fix(FixSource.Companion, 180, accuracyM: 22, lat: 31.1040, lon: -85.3560));
+        var cryptid = Fused(Fix(FixSource.Companion, 42 * 60, accuracyM: 35, lat: 31.3382, lon: -82.7291));
 
         var occupied = new[] { king, queen, jester, cryptid }
             .Select(f => PlaceOf(f).PlaceId)
-            .Append(PlaceResolver.Resolve(31.09907, -97.34100, null, DemoZoneTable.Drawn, []).PlaceId)
+            .Append(PlaceResolver.Resolve(31.09907, -85.34100, null, DemoZoneTable.Drawn, []).PlaceId)
             .OfType<string>()
             .Distinct()
             .Order()
