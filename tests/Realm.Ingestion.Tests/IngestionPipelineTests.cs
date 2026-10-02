@@ -19,7 +19,7 @@ namespace Realm.Ingestion.Tests;
 public sealed class IngestionPipelineTests : IDisposable
 {
     private const double HomeLat = 33.0;
-    private const double HomeLon = -96.0;
+    private const double HomeLon = -84.0;
     private const double MetresPerDegree = 111_320;
 
     private static readonly DateTimeOffset Start = new(2026, 9, 30, 17, 0, 0, TimeSpan.Zero);
@@ -240,9 +240,9 @@ public sealed class IngestionPipelineTests : IDisposable
         RawPlace[] zones =
         [
             Home,
-            new("hall", "Jester's Hall", 33.1, -96.1, 80, false),
-            new("arrival", "Arrival", 33.2, -96.2, 6000, false),
-            new("shed", "Hearth", 33.3, -96.3, 50, false),   // the same name as the renamed home
+            new("hall", "Jester's Hall", 33.1, -84.1, 80, false),
+            new("arrival", "Arrival", 33.2, -84.2, 6000, false),
+            new("shed", "Hearth", 33.3, -84.3, 50, false),   // the same name as the renamed home
         ];
 
         await rig.DiscoverWithAsync(zones, null, Plans.Member("king", life360: Plans.KingTracker));
@@ -260,7 +260,7 @@ public sealed class IngestionPipelineTests : IDisposable
         var rig = NewRig();
         await rig.DiscoverWithAsync([Home], null, Plans.Member("king", life360: Plans.KingTracker));
 
-        await rig.Pipeline.ProcessAsync(new ZonesUpdated([new RawPlace("home", "Hearth Haven", HomeLat, HomeLon, 100, false), new RawPlace("park", "Elm Park", 33.5, -96.5, 300, false)]), CancellationToken.None);
+        await rig.Pipeline.ProcessAsync(new ZonesUpdated([new RawPlace("home", "Hearth Haven", HomeLat, HomeLon, 100, false), new RawPlace("park", "Elm Park", 33.5, -84.5, 300, false)]), CancellationToken.None);
 
         Assert.Equal(new[] { "home", "park" }, rig.State.Current.Places.Select(p => p.Id).Order());
     }
@@ -855,7 +855,7 @@ public sealed class IngestionPipelineTests : IDisposable
 
         Assert.NotEmpty(rig.Log.Entries);
         Assert.DoesNotContain("33.01234", rig.Log.Text, StringComparison.Ordinal);
-        Assert.DoesNotContain("96.00789", rig.Log.Text, StringComparison.Ordinal);
+        Assert.DoesNotContain("84.00789", rig.Log.Text, StringComparison.Ordinal);
     }
 
     // ---- rig and builders -----------------------------------------------------------------------------------------

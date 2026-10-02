@@ -55,7 +55,7 @@ public class OptionsBindingTests
             { "id": "prince", "display_name": "Elio", "lore_title": "Prince of the Peaks", "color": "#7EE0A5", "sort_order": 4,
               "kind": "static", "in_driving_report": false, "static_label": "Home · Highmeadow",
               "static_address": "1 Example Rd, Highmeadow, ST 00000", "static_latitude": 38.5000,
-              "static_longitude": -98.5000, "static_show_address": false }
+              "static_longitude": -86.5000, "static_show_address": false }
           ],
           "vehicles": [
             { "id": "wagon", "name": "Ford Pickup", "lore_title": "The King's Wagon", "glyph": "pickup",
@@ -303,7 +303,7 @@ public class OptionsBindingTests
         Assert.Equal("Home · Highmeadow", prince.StaticLabel);
         Assert.Equal("1 Example Rd, Highmeadow, ST 00000", prince.StaticAddress);
         Assert.Equal(38.5, prince.StaticLatitude);
-        Assert.Equal(-98.5, prince.StaticLongitude);
+        Assert.Equal(-86.5, prince.StaticLongitude);
         Assert.False(prince.StaticShowAddress);
 
         var wagon = options.Vehicles[0];
@@ -472,8 +472,8 @@ public class OptionsBindingTests
             [
                 Member("king"),
                 Member("prince", MemberKind.Static, latitude: 38.5, longitude: null),
-                Member("princess", MemberKind.Static, latitude: null, longitude: -98.5),
-                Member("elder", MemberKind.Static, latitude: 38.5, longitude: -98.5),
+                Member("princess", MemberKind.Static, latitude: null, longitude: -86.5),
+                Member("elder", MemberKind.Static, latitude: 38.5, longitude: -86.5),
             ],
             MeFallbackMember = "ghost",
         };

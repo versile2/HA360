@@ -9,7 +9,7 @@ namespace Realm.Domain.Tests;
 public class FusionTests
 {
     private const double HomeLat = 31.0990;
-    private const double HomeLon = -97.3410;
+    private const double HomeLon = -85.3410;
     private const int OfflineAfterHours = 24;
     private const double MetresPerDegreeOfLatitude = 6_371_008.8 * Math.PI / 180;
 
@@ -65,13 +65,13 @@ public class FusionTests
     [Fact]
     public void The_output_is_the_winners_point_with_its_accuracy_and_time()
     {
-        var older = Fix(FixSource.Life360, 120, lat: 31.0000, lon: -97.0000);
-        var newer = Fix(FixSource.Companion, 20, accuracyM: 18, lat: 31.0002, lon: -97.0003);
+        var older = Fix(FixSource.Life360, 120, lat: 31.0000, lon: -85.0000);
+        var newer = Fix(FixSource.Companion, 20, accuracyM: 18, lat: 31.0002, lon: -85.0003);
 
         var fused = Fused(older, newer);
 
         Assert.Equal(31.0002, fused.Lat);
-        Assert.Equal(-97.0003, fused.Lon);
+        Assert.Equal(-85.0003, fused.Lon);
         Assert.Equal(18.0, fused.AccuracyM);
         Assert.Equal(Now.AddSeconds(-20), fused.Ts);
         Assert.Equal(FixSource.Companion, fused.WinnerSource);
@@ -90,7 +90,7 @@ public class FusionTests
     [Fact]
     public void One_source_gives_its_fix()
     {
-        var fused = Fused(Fix(FixSource.Life360, 600, lat: 31.5, lon: -97.5));
+        var fused = Fused(Fix(FixSource.Life360, 600, lat: 31.5, lon: -85.5));
 
         Assert.Equal(31.5, fused.Lat);
         Assert.Equal(FixSource.Life360, fused.WinnerSource);
@@ -456,13 +456,13 @@ public class FusionTests
     [Fact]
     public void Fixture_king_is_at_home_charging_and_fresh()
     {
-        var companion = Fix(FixSource.Companion, 0, accuracyM: 18, battery: 19, charging: true, lat: 31.0990, lon: -97.3410);
-        var life360 = Fix(FixSource.Life360, 42, lat: 31.09905, lon: -97.34105, battery: 20, charging: false);
+        var companion = Fix(FixSource.Companion, 0, accuracyM: 18, battery: 19, charging: true, lat: 31.0990, lon: -85.3410);
+        var life360 = Fix(FixSource.Life360, 42, lat: 31.09905, lon: -85.34105, battery: 20, charging: false);
 
         var fused = Fused(companion, life360);
 
         Assert.Equal(31.0990, fused.Lat);
-        Assert.Equal(-97.3410, fused.Lon);
+        Assert.Equal(-85.3410, fused.Lon);
         Assert.Equal(18.0, fused.AccuracyM);
         Assert.Equal(19, fused.BatteryPct);
         Assert.True(fused.Charging);
@@ -475,13 +475,13 @@ public class FusionTests
     [Fact]
     public void Fixture_queen_is_driving_on_the_interstate_and_fresh()
     {
-        var companion = Fix(FixSource.Companion, 60, accuracyM: 12, speedMps: 24.1, battery: 62, charging: false, lat: 31.0560, lon: -97.4647);
-        var life360 = Fix(FixSource.Life360, 75, address: "I-35", speedMps: 24.0, lat: 31.0561, lon: -97.4647);
+        var companion = Fix(FixSource.Companion, 60, accuracyM: 12, speedMps: 24.1, battery: 62, charging: false, lat: 31.0560, lon: -85.4647);
+        var life360 = Fix(FixSource.Life360, 75, address: "I-35", speedMps: 24.0, lat: 31.0561, lon: -85.4647);
 
         var fused = Fused(companion, life360);
 
         Assert.Equal(31.0560, fused.Lat);
-        Assert.Equal(-97.4647, fused.Lon);
+        Assert.Equal(-85.4647, fused.Lon);
         Assert.Equal(12.0, fused.AccuracyM);
         Assert.Equal(24.1, fused.SpeedMps);
         Assert.Equal(62, fused.BatteryPct);
@@ -495,8 +495,8 @@ public class FusionTests
     [Fact]
     public void Fixture_jester_is_at_the_jesters_hall_and_fresh()
     {
-        var companion = Fix(FixSource.Companion, 180, accuracyM: 22, battery: 12, charging: false, lat: 31.1040, lon: -97.3560);
-        var life360 = Fix(FixSource.Life360, 200, address: "48 Larkspur Lane, Millbrook, TX", lat: 31.1040, lon: -97.3560);
+        var companion = Fix(FixSource.Companion, 180, accuracyM: 22, battery: 12, charging: false, lat: 31.1040, lon: -85.3560);
+        var life360 = Fix(FixSource.Life360, 200, address: "48 Larkspur Lane, Millbrook, TX", lat: 31.1040, lon: -85.3560);
 
         var fused = Fused(companion, life360);
 
@@ -515,8 +515,8 @@ public class FusionTests
     [Fact]
     public void Fixture_cryptid_is_stale_and_out_and_keeps_the_street_of_its_last_fix()
     {
-        var companion = Fix(FixSource.Companion, 42 * 60, accuracyM: 35, battery: 10, charging: false, lat: 31.3382, lon: -94.7291);
-        var life360 = Fix(FixSource.Life360, 45 * 60, address: "Eastgate Avenue, Pinebrook, TX", lat: 31.3382, lon: -94.7291);
+        var companion = Fix(FixSource.Companion, 42 * 60, accuracyM: 35, battery: 10, charging: false, lat: 31.3382, lon: -82.7291);
+        var life360 = Fix(FixSource.Life360, 45 * 60, address: "Eastgate Avenue, Pinebrook, TX", lat: 31.3382, lon: -82.7291);
 
         var fused = Fused(companion, life360);
 
@@ -534,14 +534,14 @@ public class FusionTests
     [Fact]
     public void Fixture_places_occupied_are_home_and_the_jesters_hall()
     {
-        var king = Fused(Fix(FixSource.Companion, 0, accuracyM: 18, lat: 31.0990, lon: -97.3410));
-        var queen = Fused(Fix(FixSource.Companion, 60, accuracyM: 12, lat: 31.0560, lon: -97.4647));
-        var jester = Fused(Fix(FixSource.Companion, 180, accuracyM: 22, lat: 31.1040, lon: -97.3560));
-        var cryptid = Fused(Fix(FixSource.Companion, 42 * 60, accuracyM: 35, lat: 31.3382, lon: -94.7291));
+        var king = Fused(Fix(FixSource.Companion, 0, accuracyM: 18, lat: 31.0990, lon: -85.3410));
+        var queen = Fused(Fix(FixSource.Companion, 60, accuracyM: 12, lat: 31.0560, lon: -85.4647));
+        var jester = Fused(Fix(FixSource.Companion, 180, accuracyM: 22, lat: 31.1040, lon: -85.3560));
+        var cryptid = Fused(Fix(FixSource.Companion, 42 * 60, accuracyM: 35, lat: 31.3382, lon: -82.7291));
 
         var occupied = new[] { king, queen, jester, cryptid }
             .Select(f => PlaceOf(f).PlaceId)
-            .Append(PlaceResolver.Resolve(31.09907, -97.34100, null, DemoZoneTable.Drawn, []).PlaceId)
+            .Append(PlaceResolver.Resolve(31.09907, -85.34100, null, DemoZoneTable.Drawn, []).PlaceId)
             .OfType<string>()
             .Distinct()
             .Order()

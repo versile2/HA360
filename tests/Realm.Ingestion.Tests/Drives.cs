@@ -12,7 +12,7 @@ namespace Realm.Ingestion.Tests;
 internal static class Drives
 {
     public const double OriginLat = 33.1;
-    public const double OriginLon = -96.7;
+    public const double OriginLon = -84.7;
     public const double CruiseMph = 45;
 
     /// <summary>How long before the departure a drive's first fix is.</summary>

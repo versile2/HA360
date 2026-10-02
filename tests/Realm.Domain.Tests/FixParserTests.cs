@@ -9,7 +9,7 @@ namespace Realm.Domain.Tests;
 public class FixParserTests
 {
     private const double HomeLat = 31.0990;
-    private const double HomeLon = -97.3410;
+    private const double HomeLon = -85.3410;
     private const double MetresPerDegreeOfLatitude = 6_371_008.8 * Math.PI / 180;
 
     private static readonly DateTimeOffset Now = DateTimeOffset.Parse("2026-09-30T21:25:00-05:00", CultureInfo.InvariantCulture);
@@ -263,8 +263,8 @@ public class FixParserTests
     // ---- validity -------------------------------------------------------------------------------------------
 
     [Theory]
-    [InlineData(91.0, -97.0)]
-    [InlineData(-90.5, -97.0)]
+    [InlineData(91.0, -85.0)]
+    [InlineData(-90.5, -85.0)]
     [InlineData(31.0, 181.0)]
     [InlineData(31.0, -180.5)]
     public void A_position_outside_the_valid_range_is_not_a_fix(double lat, double lon)
@@ -285,7 +285,7 @@ public class FixParserTests
             FixSource.Life360,
             Now);
         var withTextPosition = FixParser.ParseTracker(
-            Life360("home", ("latitude", "31.0990"), ("longitude", "-97.3410"), ("last_seen", "2026-09-30T21:24:00-05:00")),
+            Life360("home", ("latitude", "31.0990"), ("longitude", "-85.3410"), ("last_seen", "2026-09-30T21:24:00-05:00")),
             FixSource.Life360,
             Now);
 
@@ -572,7 +572,7 @@ public class FixParserTests
         var updated = At("2026-09-30T21:05:00-05:00");
 
         var fix = FixParser.ParseTracker(
-            FordPass(updated, 31.09907, -97.3410, ("gps_accuracy", 0), ("speed", 12.0)),
+            FordPass(updated, 31.09907, -85.3410, ("gps_accuracy", 0), ("speed", 12.0)),
             FixSource.FordPass,
             Now);
 
@@ -764,7 +764,7 @@ public class FixParserTests
             "1",
             Now,
             ("latitude", 31.1040),
-            ("longitude", -97.3560),
+            ("longitude", -85.3560),
             ("radius", 100.0),
             ("passive", true),
             ("friendly_name", "The Jester's Hall "));
@@ -775,7 +775,7 @@ public class FixParserTests
         Assert.Equal("jester_hall", place.Id);
         Assert.Equal("The Jester's Hall", place.Name);
         Assert.Equal(31.1040, place.Lat);
-        Assert.Equal(-97.3560, place.Lon);
+        Assert.Equal(-85.3560, place.Lon);
         Assert.Equal(100.0, place.RadiusM);
         Assert.True(place.Passive);
     }

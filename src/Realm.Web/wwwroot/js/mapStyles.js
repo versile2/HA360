@@ -18,7 +18,7 @@
 export const DEFAULT_STYLE_ID = 'night';
 
 /** The fixture centre [lon, lat]: the graticule of demo-offline is drawn within one degree of it (02 section 9.3). */
-export const FIXTURE_CENTER = Object.freeze(/** @type {[number, number]} */ ([-97.341, 31.099]));
+export const FIXTURE_CENTER = Object.freeze(/** @type {[number, number]} */ ([-85.341, 31.099]));
 
 /** The three OpenFreeMap styles share sprite, glyph and source definitions, so switching between them is a cheap diff. */
 const OPENFREEMAP = 'https://tiles.openfreemap.org/styles';

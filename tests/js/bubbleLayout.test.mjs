@@ -42,12 +42,12 @@ const deepFreeze = (value) => {
 const MERCATOR_WORLD_PX = 512; // MapLibre's world is 512 px wide at zoom 0
 const mercator = ([lon, lat]) => ({ x: (lon + 180) / 360, y: 0.5 - Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI) / 360)) / (2 * Math.PI) });
 const DEMO = {
-  king: [-97.341, 31.099],
-  queen: [-97.4647, 31.056],
-  jester: [-97.356, 31.104],
-  wagon: [-97.341, 31.09907],
-  cryptid: [-94.7291, 31.3382],
-  prince: [-104.8214, 38.8339],
+  king: [-85.341, 31.099],
+  queen: [-85.4647, 31.056],
+  jester: [-85.356, 31.104],
+  wagon: [-85.341, 31.09907],
+  cryptid: [-82.7291, 31.3382],
+  prince: [-92.8214, 38.8339],
 };
 
 /** The default camera of 01 section 4.9 at 412 x 915 Peek, as MapLibre's fitBounds computes it for these four in-view points. */

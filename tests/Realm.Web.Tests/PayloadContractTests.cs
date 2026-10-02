@@ -77,15 +77,15 @@ public sealed class PayloadContractTests
     public void WhatTheScriptReports_IsReadIntoTheRecords()
     {
         var camera = JsonSerializer.Deserialize<CameraState>(
-            """{"center":[-97.341,31.099],"zoom":14.5,"bounds":[[-97.36,31.08],[-97.32,31.12]],"animated":true,"lastDurationMs":600,"recenter":"me","userInitiated":false}""",
+            """{"center":[-85.341,31.099],"zoom":14.5,"bounds":[[-85.36,31.08],[-85.32,31.12]],"animated":true,"lastDurationMs":600,"recenter":"me","userInitiated":false}""",
             MapJson.Options)!;
         var style = JsonSerializer.Deserialize<StyleResult>("""{"styleId":"satellite","ok":false,"error":"offline"}""", MapJson.Options)!;
         var ready = JsonSerializer.Deserialize<ReadyInfo>("""{"jsVersion":"1.0.0","payloadSchema":1,"maplibre":"6.11.2"}""", MapJson.Options)!;
 
-        Assert.Equal([-97.341, 31.099], camera.Center);
+        Assert.Equal([-85.341, 31.099], camera.Center);
         Assert.Equal(14.5, camera.Zoom);
         Assert.Equal(2, camera.Bounds.Count);
-        Assert.Equal(-97.32, camera.Bounds[1][0]);
+        Assert.Equal(-85.32, camera.Bounds[1][0]);
         Assert.True(camera.Animated);
         Assert.Equal(600, camera.LastDurationMs);
         Assert.Equal(RecenterState.Me, camera.Recenter);
@@ -133,7 +133,7 @@ public sealed class PayloadContractTests
             ["layout-expanded.json"] = MapPayloadFactory.Layout(MapLayout.Expanded),
 
             // These two travel from the script to C#; they are written from the records so that their field names are checked too.
-            ["camera.json"] = new CameraState([-97.341, 31.099], 14.5, [[-97.36, 31.08], [-97.32, 31.12]], Animated: true, LastDurationMs: 600, RecenterState.Default, UserInitiated: false),
+            ["camera.json"] = new CameraState([-85.341, 31.099], 14.5, [[-85.36, 31.08], [-85.32, 31.12]], Animated: true, LastDurationMs: 600, RecenterState.Default, UserInitiated: false),
             ["style-result.json"] = new StyleResult(MapStyleIds.Night, Ok: true, Error: null),
         }.ToDictionary(entry => entry.Key, entry => JsonSerializer.Serialize(entry.Value, entry.Value.GetType(), Indented));
     }

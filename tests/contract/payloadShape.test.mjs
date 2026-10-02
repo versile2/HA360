@@ -20,7 +20,7 @@ const member = (over = {}) => ({
   initial: 'K',
   color: '#E8BC4E',
   lat: 31.099,
-  lon: -97.341,
+  lon: -85.341,
   accuracyM: 12,
   poorAccuracy: false,
   status: 'atPlace',
@@ -47,7 +47,7 @@ const vehicle = (over = {}) => ({
   name: "The King's Wagon",
   glyph: 'pickup',
   lat: 31.09907,
-  lon: -97.341,
+  lon: -85.341,
   ring: ring({ color: '#7FB3D5', widthPx: 3 }),
   stale: false,
   chip: null,
@@ -60,7 +60,7 @@ const appearance = (over = {}) => ({ lineColor: '#E8BC4E', fillAlpha: 0.1, fillA
 
 const SAMPLES = {
   Padding: () => ({ top: 72, right: 72, bottom: 190, left: 16 }),
-  Bounds: () => [[-97.4647, 31.056], [-97.341, 31.099]],
+  Bounds: () => [[-85.4647, 31.056], [-85.341, 31.099]],
   LayoutPayload: () => ({ mode: 'compact', panelLeftPx: 16, panelWidthPx: 0, panelHidden: false, stackVisible: true, safe: { top: 24, right: 0, bottom: 34, left: 0 }, navHeightPx: 64 }),
   Ring: () => ring(),
   MemberPayloadItem: () => member(),
@@ -71,17 +71,17 @@ const SAMPLES = {
   }),
   VehiclePayloadItem: () => vehicle(),
   VehiclesPayload: () => ({ version: 3, vehicles: [vehicle(), vehicle({ id: 'chariot', name: 'Chariot', lat: null, lon: null })] }),
-  ZoneItem: () => ({ id: 'forge', name: 'The Forge', lat: 31.1, lon: -97.35, radiusM: 120, occupied: true }),
+  ZoneItem: () => ({ id: 'forge', name: 'The Forge', lat: 31.1, lon: -85.35, radiusM: 120, occupied: true }),
   ZoneAppearance: () => appearance(),
   ZonesPayload: () => ({
     version: 2,
     show: true,
-    zones: [{ id: 'forge', name: 'The Forge', lat: 31.1, lon: -97.35, radiusM: 120, occupied: true }],
+    zones: [{ id: 'forge', name: 'The Forge', lat: 31.1, lon: -85.35, radiusM: 120, occupied: true }],
     appearances: { dark: appearance(), light: appearance({ fillAlpha: 0.14 }), imagery: appearance({ casing: true }) },
   }),
   SelectionPayload: () => ({ kind: 'member', id: 'king', follow: false }),
-  DefaultTargets: () => ({ version: 1, default: { bounds: [[-97.4647, 31.056], [-97.341, 31.1]], maxZoom: 16 }, me: { center: [-97.341, 31.099], zoom: 16 } }),
-  CameraState: () => ({ center: [-97.341, 31.099], zoom: 15.2, bounds: [[-97.36, 31.08], [-97.32, 31.12]], animated: false, lastDurationMs: 0, recenter: 'default', userInitiated: false }),
+  DefaultTargets: () => ({ version: 1, default: { bounds: [[-85.4647, 31.056], [-85.341, 31.1]], maxZoom: 16 }, me: { center: [-85.341, 31.099], zoom: 16 } }),
+  CameraState: () => ({ center: [-85.341, 31.099], zoom: 15.2, bounds: [[-85.36, 31.08], [-85.32, 31.12]], animated: false, lastDurationMs: 0, recenter: 'default', userInitiated: false }),
   StyleResult: () => ({ styleId: 'night', ok: true }),
 };
 
@@ -204,9 +204,9 @@ test('DefaultTargets: maxZoom and the "me" zoom are the literal 16; "me" may be 
   assert.ok(mentions(errorsOf('DefaultTargets', { ...targets, default: { ...targets.default, maxZoom: 15 } }), '$.default.maxZoom: expected one of 16'));
   assert.ok(mentions(errorsOf('DefaultTargets', { ...targets, me: { center: [0, 0], zoom: 15 } }), '$.me.zoom: expected one of 16'));
   assert.deepEqual(errorsOf('DefaultTargets', { ...targets, me: null }), []);
-  assert.ok(mentions(errorsOf('DefaultTargets', { ...targets, default: { bounds: [[-97, 31]], maxZoom: 16 } }), '$.default.bounds: expected an array of 2 items'));
-  assert.ok(mentions(errorsOf('Bounds', [[-97, 31], [-96, 31, 5]]), '$[1]: expected an array of 2 items'));
-  assert.ok(mentions(errorsOf('Bounds', [[-97, 100], [-96, 31]]), 'latitude 100 is outside'));
+  assert.ok(mentions(errorsOf('DefaultTargets', { ...targets, default: { bounds: [[-85, 31]], maxZoom: 16 } }), '$.default.bounds: expected an array of 2 items'));
+  assert.ok(mentions(errorsOf('Bounds', [[-85, 31], [-84, 31, 5]]), '$[1]: expected an array of 2 items'));
+  assert.ok(mentions(errorsOf('Bounds', [[-85, 100], [-84, 31]]), 'latitude 100 is outside'));
 });
 
 test('StyleResult: error is optional (absent, a string or null)', () => {

@@ -115,10 +115,10 @@ public class DemoDataTests
 
     // id, latitude, longitude, accuracy (m), battery (%), fix age (min), "since" hour and minute (local), place.
     [Theory]
-    [InlineData("king", 31.0990, -97.3410, 18.0, 19, 0, 17, 52, "home")]
-    [InlineData("queen", 31.0560, -97.4647, 12.0, 62, 1, 21, 12, null)]
-    [InlineData("jester", 31.1040, -97.3560, 22.0, 12, 3, 21, 6, "jester_hall")]
-    [InlineData("cryptid", 31.3382, -94.7291, 35.0, 10, 42, 20, 10, null)]
+    [InlineData("king", 31.0990, -85.3410, 18.0, 19, 0, 17, 52, "home")]
+    [InlineData("queen", 31.0560, -85.4647, 12.0, 62, 1, 21, 12, null)]
+    [InlineData("jester", 31.1040, -85.3560, 22.0, 12, 3, 21, 6, "jester_hall")]
+    [InlineData("cryptid", 31.3382, -82.7291, 35.0, 10, 42, 20, 10, null)]
     public void Live_members_have_the_position_accuracy_battery_age_since_and_place_of_the_table(
         string id, double lat, double lon, double accuracyM, int batteryPct, int ageMinutes, int sinceHour, int sinceMinute, string? placeId)
     {
@@ -206,7 +206,7 @@ public class DemoDataTests
 
         Assert.Equal(MemberKind.Static, prince.Kind);
         Assert.Equal(38.8339, prince.Lat);
-        Assert.Equal(-104.8214, prince.Lon);
+        Assert.Equal(-92.8214, prince.Lon);
         Assert.Equal("Home · Highmeadow", prince.StaticLabel);
         Assert.Equal(DemoCast.Prince.StaticLabel, prince.StaticLabel);
         Assert.Equal(Freshness.Static, prince.Freshness);
@@ -277,7 +277,7 @@ public class DemoDataTests
         Assert.Equal("The King's Wagon", wagon.LoreTitle);
         Assert.Equal(VehicleGlyph.Pickup, wagon.Glyph);
         Assert.Equal(31.09907, wagon.Lat);
-        Assert.Equal(-97.34100, wagon.Lon);
+        Assert.Equal(-85.34100, wagon.Lon);
         Assert.InRange(Geo.DistanceM(king.Lat!.Value, king.Lon!.Value, wagon.Lat!.Value, wagon.Lon!.Value), 7.7, 7.9);
         Assert.Equal("home", wagon.PlaceId);
         Assert.Null(wagon.Street);
@@ -358,7 +358,7 @@ public class DemoDataTests
         Assert.Equal("Home", home.Subtitle);
         Assert.Equal(PlaceKind.Home, home.Kind);
         Assert.Equal(31.0990, home.Lat);
-        Assert.Equal(-97.3410, home.Lon);
+        Assert.Equal(-85.3410, home.Lon);
         Assert.Equal(100.0, home.RadiusM);
 
         Assert.Equal("Work", places.Single(p => p.Id == "work").DisplayName);
@@ -1643,9 +1643,9 @@ public class DemoDataTests
         var prince = snapshot.Members.Single(m => m.Id == "prince");
 
         Assert.Equal(31.1250, cryptid.Lat);
-        Assert.Equal(-97.3300, cryptid.Lon);
+        Assert.Equal(-85.3300, cryptid.Lon);
         Assert.Equal(31.0800, prince.Lat);
-        Assert.Equal(-97.3700, prince.Lon);
+        Assert.Equal(-85.3700, prince.Lon);
         Assert.InRange(DistanceM(king, cryptid) / 1000, 3.06, 3.08);
         Assert.InRange(DistanceM(king, prince) / 1000, 3.47, 3.49);
         Assert.Equal(Snapshot().Members.Single(m => m.Id == "queen"), snapshot.Members.Single(m => m.Id == "queen"));

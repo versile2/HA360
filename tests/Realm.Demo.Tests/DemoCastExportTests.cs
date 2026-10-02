@@ -29,21 +29,21 @@ public class DemoCastExportTests
     // "Rollerdome" zones share an HA name; the display name gets " (2)" on the second (02 section 1.9).
     private static readonly (string Id, string ZoneName, string Name, string Subtitle, string Kind, double Lat, double Lon, double RadiusM, bool Drawn)[] ExpectedPlaces =
     [
-        ("home", "Hearth Haven", "Hearth Haven", "Home", "home", 31.0990, -97.3410, 100.0, true),
-        ("jester_hall", "The Jester's Hall", "The Jester's Hall", "Cass's house", "family", 31.1040, -97.3560, 100.0, true),
-        ("work", "Work", "Work", "The Counting House", "work", 31.1530, -97.4080, 150.0, true),
-        ("work_2", "Work", "Work (2)", "The Counting House", "work", 31.1534, -97.4084, 150.0, true),
-        ("park", "Park", "Park", "The Commons", "park", 31.0720, -97.3290, 200.0, true),
-        ("orrin", "Orrin's", "Orrin's", "Orrin's Stronghold", "family", 31.0420, -97.3880, 120.0, true),
-        ("mara", "Mara's", "Mara's", "Mara's Manor", "family", 31.1450, -97.2960, 120.0, true),
-        ("skate_one", "Rollerdome", "Rollerdome", "The Tourney Grounds", "fun", 31.1760, -97.4700, 200.0, true),
-        ("skate_two", "Rollerdome", "Rollerdome (2)", "The Tourney Grounds", "fun", 31.2210, -97.5140, 200.0, true),
-        ("queen_office", "Briar's Office", "Briar's Office", "The Queen's Counting House", "work", 31.0200, -97.5200, 150.0, true),
-        ("derby", "Derby Hall", "Derby Hall", "The Joust", "fun", 31.2550, -97.3400, 250.0, true),
-        ("cemetery", "Hollow Cemetery", "Hollow Cemetery", "The Quiet Fields", "cemetery", 31.0300, -97.2900, 150.0, true),
-        ("vet", "Vet Clinic", "Vet Clinic", "The Beast Healer", "vet", 31.1180, -97.4350, 100.0, true),
-        ("wheels", "Wheel Hall", "Wheel Hall", "The Wheeled Hall", "fun", 31.1900, -97.3300, 200.0, true),
-        ("approach", "(arrival zone, never shown)", "(arrival zone, never shown)", "n/a", "other", 31.0990, -97.3410, 32187.0, false),
+        ("home", "Hearth Haven", "Hearth Haven", "Home", "home", 31.0990, -85.3410, 100.0, true),
+        ("jester_hall", "The Jester's Hall", "The Jester's Hall", "Cass's house", "family", 31.1040, -85.3560, 100.0, true),
+        ("work", "Work", "Work", "The Counting House", "work", 31.1530, -85.4080, 150.0, true),
+        ("work_2", "Work", "Work (2)", "The Counting House", "work", 31.1534, -85.4084, 150.0, true),
+        ("park", "Park", "Park", "The Commons", "park", 31.0720, -85.3290, 200.0, true),
+        ("orrin", "Orrin's", "Orrin's", "Orrin's Stronghold", "family", 31.0420, -85.3880, 120.0, true),
+        ("mara", "Mara's", "Mara's", "Mara's Manor", "family", 31.1450, -85.2960, 120.0, true),
+        ("skate_one", "Rollerdome", "Rollerdome", "The Tourney Grounds", "fun", 31.1760, -85.4700, 200.0, true),
+        ("skate_two", "Rollerdome", "Rollerdome (2)", "The Tourney Grounds", "fun", 31.2210, -85.5140, 200.0, true),
+        ("queen_office", "Briar's Office", "Briar's Office", "The Queen's Counting House", "work", 31.0200, -85.5200, 150.0, true),
+        ("derby", "Derby Hall", "Derby Hall", "The Joust", "fun", 31.2550, -85.3400, 250.0, true),
+        ("cemetery", "Hollow Cemetery", "Hollow Cemetery", "The Quiet Fields", "cemetery", 31.0300, -85.2900, 150.0, true),
+        ("vet", "Vet Clinic", "Vet Clinic", "The Beast Healer", "vet", 31.1180, -85.4350, 100.0, true),
+        ("wheels", "Wheel Hall", "Wheel Hall", "The Wheeled Hall", "fun", 31.1900, -85.3300, 200.0, true),
+        ("approach", "(arrival zone, never shown)", "(arrival zone, never shown)", "n/a", "other", 31.0990, -85.3410, 32187.0, false),
     ];
 
     private const string ExpectedChariotNote = "Awaiting the royal scribes (the maker's app)";

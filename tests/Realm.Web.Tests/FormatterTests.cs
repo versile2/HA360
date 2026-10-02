@@ -795,7 +795,7 @@ public sealed class FormatterTests
             Color: "#445566",
             Kind: kind,
             Lat: 31.0990,
-            Lon: -97.3410,
+            Lon: -85.3410,
             AccuracyM: 10,
             BatteryPct: 50,
             Charging: null,
@@ -820,7 +820,7 @@ public sealed class FormatterTests
             LoreTitle: null,
             Glyph: VehicleGlyph.Car,
             Lat: isPlaceholder ? null : 31.0990,
-            Lon: isPlaceholder ? null : -97.3410,
+            Lon: isPlaceholder ? null : -85.3410,
             Street: null,
             PlaceId: null,
             Ignition: null,
@@ -835,7 +835,7 @@ public sealed class FormatterTests
             PlaceholderNote: null);
 
     private static PlaceVm Place(string id, IReadOnlyList<string> memberIds, IReadOnlyList<string> vehicleIds) =>
-        new(id, "Place " + id, string.Empty, PlaceKind.Other, 31.0990, -97.3410, 100, memberIds, vehicleIds);
+        new(id, "Place " + id, string.Empty, PlaceKind.Other, 31.0990, -85.3410, 100, memberIds, vehicleIds);
 
     // ---- helpers for the rows --------------------------------------------------------------------------------------------------------------
 

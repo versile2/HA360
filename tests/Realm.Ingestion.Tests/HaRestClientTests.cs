@@ -293,7 +293,7 @@ public sealed class HaRestClientTests : IDisposable
             [
               {"entity_id":"person.king","state":"home","attributes":{"user_id":"user-aaa","device_trackers":["device_tracker.life360_king"]},"last_changed":"2026-09-30T10:00:00+00:00","last_updated":"2026-09-30T10:00:00+00:00"},
               {"entity_id":"light.hall","state":"on","attributes":{},"last_changed":"2026-09-30T10:00:00+00:00","last_updated":"2026-09-30T10:00:00+00:00"},
-              {"entity_id":"zone.home","state":"1","attributes":{"latitude":31.1,"longitude":-97.3,"radius":100.0},"last_changed":"2026-09-30T10:00:00+00:00","last_updated":"2026-09-30T10:00:00+00:00"}
+              {"entity_id":"zone.home","state":"1","attributes":{"latitude":31.1,"longitude":-85.3,"radius":100.0},"last_changed":"2026-09-30T10:00:00+00:00","last_updated":"2026-09-30T10:00:00+00:00"}
             ]
             """;
         var rig = NewRig(handler => handler.Respond(HttpStatusCode.OK, body));
@@ -342,10 +342,10 @@ public sealed class HaRestClientTests : IDisposable
     {
         const string answer = """
             [
-              {"id":"zone.home","name":"Hearth","lat":31.1,"lon":-97.3,"r":100,"passive":false},
-              {"id":"zone.work_2","name":" Work ","lat":31.2,"lon":-97.4,"r":250.5,"passive":true},
-              {"id":"zone.broken","name":"Broken","lat":null,"lon":-97.4,"r":50,"passive":false},
-              {"id":"zone.far","name":"Far","lat":131.2,"lon":-97.4,"r":50,"passive":false}
+              {"id":"zone.home","name":"Hearth","lat":31.1,"lon":-85.3,"r":100,"passive":false},
+              {"id":"zone.work_2","name":" Work ","lat":31.2,"lon":-85.4,"r":250.5,"passive":true},
+              {"id":"zone.broken","name":"Broken","lat":null,"lon":-85.4,"r":50,"passive":false},
+              {"id":"zone.far","name":"Far","lat":131.2,"lon":-85.4,"r":50,"passive":false}
             ]
             """;
         var rig = NewRig(handler => handler.Respond(HttpStatusCode.OK, answer, "text/plain"));
@@ -353,7 +353,7 @@ public sealed class HaRestClientTests : IDisposable
         var zones = await rig.Client.GetZonesAsync(CancellationToken.None);
 
         Assert.Equal(
-            new[] { new RawPlace("home", "Hearth", 31.1, -97.3, 100, false), new RawPlace("work_2", "Work", 31.2, -97.4, 250.5, true) },
+            new[] { new RawPlace("home", "Hearth", 31.1, -85.3, 100, false), new RawPlace("work_2", "Work", 31.2, -85.4, 250.5, true) },
             zones.ToArray());
     }
 

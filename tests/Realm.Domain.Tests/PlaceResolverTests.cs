@@ -8,7 +8,7 @@ namespace Realm.Domain.Tests;
 public class PlaceResolverTests
 {
     private const double HomeLat = 31.0990;
-    private const double HomeLon = -97.3410;
+    private const double HomeLon = -85.3410;
     private const double MetresPerDegreeOfLatitude = 6_371_008.8 * Math.PI / 180;
 
     private static readonly IReadOnlyList<RawPlace> HomeOnly = [new("home", "Hearth Haven", HomeLat, HomeLon, 100, false)];
@@ -180,11 +180,11 @@ public class PlaceResolverTests
     // 02 section 9.3: the king and the pickup (7.78 m away) are at home, the jester is at the jester's hall, and the
     // queen and the cryptid are in no drawn zone: only the first two zones are occupied.
     [Theory]
-    [InlineData(31.0990, -97.3410, "home")]
-    [InlineData(31.09907, -97.34100, "home")]
-    [InlineData(31.1040, -97.3560, "jester_hall")]
-    [InlineData(31.0560, -97.4647, null)]
-    [InlineData(31.3382, -94.7291, null)]
+    [InlineData(31.0990, -85.3410, "home")]
+    [InlineData(31.09907, -85.34100, "home")]
+    [InlineData(31.1040, -85.3560, "jester_hall")]
+    [InlineData(31.0560, -85.4647, null)]
+    [InlineData(31.3382, -82.7291, null)]
     public void Fixture_positions_resolve_to_the_places_of_the_spec(double lat, double lon, string? expectedPlaceId)
     {
         var membership = PlaceResolver.Resolve(lat, lon, 18, DemoZoneTable.Drawn, NoPreviousZones);

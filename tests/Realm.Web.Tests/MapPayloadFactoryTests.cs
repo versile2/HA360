@@ -16,7 +16,7 @@ public sealed class MapPayloadFactoryTests
 
     // The viewer of every hand-built case sits here, at the Demo's home (02 section 9.2).
     private const double MeLat = 31.0990;
-    private const double MeLon = -97.3410;
+    private const double MeLon = -85.3410;
 
     // 0.001 degree of latitude is about 111 m.
     private const double Step = 0.001;
@@ -170,7 +170,7 @@ public sealed class MapPayloadFactoryTests
     public void WithoutAPositionForMe_NobodyIsFar()
     {
         var me = Member("a", freshness: Freshness.NoFix, lat: null, lon: null);
-        var other = Member("b", lat: 38.8, lon: -104.8);
+        var other = Member("b", lat: 38.8, lon: -92.8);
 
         var payload = Members([me, other], [], meId: "a");
 
@@ -389,7 +389,7 @@ public sealed class MapPayloadFactoryTests
     public void AVehicleWithoutAFix_AndThePlaceholder_HaveNoCoordinates()
     {
         var noFix = Vehicle("v", freshness: Freshness.NoFix, lat: null, lon: null);
-        var placeholder = Vehicle("w", isPlaceholder: true, lat: 31.0, lon: -97.0);
+        var placeholder = Vehicle("w", isPlaceholder: true, lat: 31.0, lon: -85.0);
 
         var items = MapPayloadFactory.Vehicles([noFix, placeholder], [], 1).Vehicles;
 
@@ -458,7 +458,7 @@ public sealed class MapPayloadFactoryTests
     [Fact]
     public void AZoneWithOnlyAVehicleInsideIsOccupied()
     {
-        var parked = new PlaceVm("garage", "Garage", string.Empty, PlaceKind.Other, 31.0, -97.0, 50, [], ["wagon"]);
+        var parked = new PlaceVm("garage", "Garage", string.Empty, PlaceKind.Other, 31.0, -85.0, 50, [], ["wagon"]);
 
         var zone = Assert.Single(MapPayloadFactory.Zones([parked], show: true, Options, 1).Zones);
 
@@ -517,7 +517,7 @@ public sealed class MapPayloadFactoryTests
     [Fact]
     public void DefaultView_WithNoOtherLiveMember_IsMeAlone_GrownToTheMinimumDiagonal()
     {
-        var targets = Targets([Member("a", lat: MeLat, lon: MeLon), Member("p", kind: MemberKind.Static, freshness: Freshness.Static, lat: 38.8, lon: -104.8)], [], [], "a");
+        var targets = Targets([Member("a", lat: MeLat, lon: MeLon), Member("p", kind: MemberKind.Static, freshness: Freshness.Static, lat: 38.8, lon: -92.8)], [], [], "a");
 
         AssertDiagonalAtLeast800(targets);
         AssertCentredOn(targets, MeLat, MeLon);
@@ -590,12 +590,12 @@ public sealed class MapPayloadFactoryTests
     public void DefaultView_WhenIHaveNoFix_UsesTheHomeZoneAsMe()
     {
         var me = Member("a", freshness: Freshness.NoFix, lat: null, lon: null);
-        var home = new PlaceVm("home", "Home", string.Empty, PlaceKind.Home, 31.2, -97.2, 100, [], []);
+        var home = new PlaceVm("home", "Home", string.Empty, PlaceKind.Home, 31.2, -85.2, 100, [], []);
 
         var targets = Targets([me], [], [home], "a");
 
-        Assert.Equal([-97.2, 31.2], targets.Me!.Center);
-        AssertCentredOn(targets, 31.2, -97.2);
+        Assert.Equal([-85.2, 31.2], targets.Me!.Center);
+        AssertCentredOn(targets, 31.2, -85.2);
     }
 
     [Fact]
