@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using Realm.Domain;
+using Realm.Infrastructure.Diagnostics;
 
 namespace Realm.Infrastructure.Ha;
 
@@ -33,18 +34,22 @@ public sealed partial class HaRestClient
     private readonly HaRestOptions _options;
     private readonly TimeProvider _time;
     private readonly ILogger _logger;
+    private readonly ServiceCounters? _counters;
     private readonly SemaphoreSlim _historyGate = new(1, 1);
     private DateTimeOffset? _lastHistoryEnd;
 
     /// <param name="http">The client; its <c>BaseAddress</c> is the one of <paramref name="options"/>, and a request that is not allowed to follow redirects must come from a handler that does not.</param>
     /// <param name="options">Token, base address and timings.</param>
     /// <param name="time">The clock of the timeouts, the retry waits and the history spacing.</param>
-    public HaRestClient(HttpClient http, HaRestOptions options, TimeProvider time, ILogger<HaRestClient> logger)
+    /// <param name="logger">Where retries are logged (the call and the reason, never a token).</param>
+    /// <param name="counters">Where calls and failures are counted for <c>diagnostics.json</c>; null counts nothing.</param>
+    public HaRestClient(HttpClient http, HaRestOptions options, TimeProvider time, ILogger<HaRestClient> logger, ServiceCounters? counters = null)
     {
         _http = http;
         _options = options;
         _time = time;
         _logger = logger;
+        _counters = counters;
     }
 
     /// <summary><c>GET config</c>: the time zone and the version.</summary>
@@ -212,6 +217,7 @@ public sealed partial class HaRestClient
             {
                 if (response.StatusCode != HttpStatusCode.OK)
                 {
+                    _counters?.RecordRestFailure();
                     return null;
                 }
 
@@ -246,9 +252,30 @@ public sealed partial class HaRestClient
     private static bool IsTransient(HttpStatusCode status) =>
         status is HttpStatusCode.BadGateway or HttpStatusCode.ServiceUnavailable or HttpStatusCode.GatewayTimeout;
 
+    // The counters see one call however many attempts it took, and one failure when it ended in an error (retries used up included). A call the caller
+    // cancelled is neither: it was not answered and did not go wrong.
+    private async Task<T> CallAsync<T>(
+        string call,
+        Func<HttpRequestMessage> create,
+        bool allowRetry,
+        Func<HttpResponseMessage, CancellationToken, Task<T>> read,
+        CancellationToken cancellationToken)
+    {
+        _counters?.RecordRestCall();
+        try
+        {
+            return await AttemptAsync(call, create, allowRetry, read, cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+        {
+            _counters?.RecordRestFailure();
+            throw;
+        }
+    }
+
     // One attempt per pass. A transient failure waits and tries again until the delays are used up; everything else (a 4xx, a body that does not parse,
     // a cancellation by the caller) ends the call at once. The per-attempt timeout covers the headers and the body (read), on the injected clock.
-    private async Task<T> CallAsync<T>(
+    private async Task<T> AttemptAsync<T>(
         string call,
         Func<HttpRequestMessage> create,
         bool allowRetry,

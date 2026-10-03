@@ -5,6 +5,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Realm.Domain;
 using Realm.Infrastructure.Data;
+using Realm.Infrastructure.Diagnostics;
 using Realm.Infrastructure.Ha;
 using Realm.Infrastructure.Hosting;
 using Realm.Infrastructure.Options;
@@ -54,6 +55,7 @@ public sealed class IngestionPipeline : BackgroundService
     private readonly DetectionSettings _detection;
     private readonly RealmStateHydrator _hydrator;
     private readonly Func<HaConnectionStatus>? _liveStatus;
+    private readonly ServiceCounters? _counters;
     private readonly Channel<IngestItem> _channel = Channel.CreateBounded<IngestItem>(new BoundedChannelOptions(QueueCapacity)
     {
         FullMode = BoundedChannelFullMode.Wait,
@@ -100,6 +102,7 @@ public sealed class IngestionPipeline : BackgroundService
     /// announces only a change of its state, never the state events and ping replies that keep it alive (02 section 1.8 counts those). Null (the pipeline
     /// on its own, in a test) leaves the entry to <see cref="ApplyConnectionStatus"/>. The service provider fills it in with the registered connection.
     /// </param>
+    /// <param name="counters">Where items, skipped items and the queue depth are counted for <c>diagnostics.json</c>; null counts nothing.</param>
     public IngestionPipeline(
         RealmOptions options,
         RealmState state,
@@ -109,7 +112,8 @@ public sealed class IngestionPipeline : BackgroundService
         TimeProvider time,
         ILogger<IngestionPipeline> logger,
         RealmStateHydrator? hydrator = null,
-        HaWebSocketConnection? connection = null)
+        HaWebSocketConnection? connection = null,
+        ServiceCounters? counters = null)
     {
         _options = options;
         _state = state;
@@ -122,6 +126,7 @@ public sealed class IngestionPipeline : BackgroundService
         _hydrator = hydrator ?? new RealmStateHydrator(queries);
         _detection = new DetectionSettings(options);
         _liveStatus = connection is null ? null : () => connection.Status;
+        _counters = counters;
 
         // Until the websocket says otherwise Home Assistant is being reached for the first time: Reconnecting for 15 s, then Unavailable.
         _connection = new HaConnectionStatus(HaConnectionState.Connecting, time.GetUtcNow(), null, 0, null);
@@ -152,6 +157,7 @@ public sealed class IngestionPipeline : BackgroundService
         try
         {
             await _channel.Writer.WriteAsync(item, cancellationToken);
+            _counters?.SetIngestQueueDepth(_channel.Reader.Count);
         }
         catch (ChannelClosedException)
         {
@@ -175,6 +181,30 @@ public sealed class IngestionPipeline : BackgroundService
         }
 
         Announce(publication);
+    }
+
+    /// <summary>
+    /// The stale threshold in whole minutes (rounded up) of each live member by id, as the snapshot applies it now: <c>max(ui_stale_after_minutes, heartbeat +
+    /// grace)</c> of 02 section 4.7, so the heartbeat the pipeline observed is part of it. A static member has none. <c>diagnostics.json</c> reports it.
+    /// </summary>
+    public IReadOnlyDictionary<string, int> StaleAfterMinutes()
+    {
+        lock (_gate)
+        {
+            var thresholds = new Dictionary<string, int>(_members.Count, StringComparer.Ordinal);
+            foreach (var (id, member) in _members)
+            {
+                if (member.Plan.Kind != MemberKind.Live)
+                {
+                    continue;
+                }
+
+                var staleAfter = FreshnessRules.StaleAfter(_options.UiStaleAfterMinutes, member.Heartbeat, _options.FusionStaleGraceMinutes);
+                thresholds[id] = (int)Math.Ceiling(staleAfter.TotalMinutes);
+            }
+
+            return thresholds;
+        }
     }
 
     /// <summary>The 30 s data tick (03 section 2.9): ages freshness, speed and battery, and closes trips that have been silent too long.</summary>
@@ -257,6 +287,7 @@ public sealed class IngestionPipeline : BackgroundService
         }
 
         Interlocked.Increment(ref _processed);
+        _counters?.RecordIngestItem(_time.GetUtcNow());
 
         // Published and announced above; only now do the rows go to the writer (03 section 2.8 step 3 before 4).
         Announce(publication);
@@ -283,6 +314,7 @@ public sealed class IngestionPipeline : BackgroundService
         Announce(first);
         await foreach (var item in _channel.Reader.ReadAllAsync(CancellationToken.None))
         {
+            _counters?.SetIngestQueueDepth(_channel.Reader.Count);
             try
             {
                 await ProcessAsync(item, stoppingToken);
@@ -294,6 +326,7 @@ public sealed class IngestionPipeline : BackgroundService
             catch (Exception ex)
             {
                 // One bad item must not stall the stream; the log has one line a minute, whatever the rate of failures.
+                _counters?.RecordIngestSkipped();
                 var now = _time.GetUtcNow();
                 if (now - _lastErrorLogged >= ErrorLogInterval)
                 {
