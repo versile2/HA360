@@ -1,0 +1,1282 @@
+{
+  "config": {
+    "argv": [
+      "/opt/hostedtoolcache/node/22.23.3/x64/bin/node",
+      "/home/runner/work/HA360/HA360/node_modules/.bin/playwright",
+      "test",
+      "--config",
+      "tests/e2e/playwright.config.ts"
+    ],
+    "configFile": "/home/runner/work/HA360/HA360/tests/e2e/playwright.config.ts",
+    "rootDir": "/home/runner/work/HA360/HA360/tests/e2e/specs",
+    "failOnFlakyTests": false,
+    "forbidOnly": true,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "ci": {
+        "commitHref": "https://github.com/versile2/HA360/commit/9b4502af6eafc2173aa3728ba65318706896a646",
+        "commitHash": "9b4502af6eafc2173aa3728ba65318706896a646",
+        "buildHref": "https://github.com/versile2/HA360/actions/runs/36985983661"
+      },
+      "gitCommit": {
+        "shortHash": "9b4502a",
+        "hash": "9b4502af6eafc2173aa3728ba65318706896a646",
+        "subject": "S7a fix 1: tap-only sheet, correct Peek height, free map gestures",
+        "body": "S7a fix 1: tap-only sheet, correct Peek height, free map gestures\n\nAC-06 (drag): D73 ruled the sheet drag off. RealmSheetHost passes EnableDragToSize=false and no longer passes SnapMode or subscribes to\nCurrentSizeChanged (MudX only echoes the size the host gave it, so nothing it raises is a request any more); the handle button keeps the tap and the keys.\nThe handle CSS is a tap target (cursor pointer, touch-action manipulation). The realmShell.js tap shim and isTap go: they existed only to repair the click\nthat MudX's drag pointer capture swallowed, and with no capture a late shim click could only toggle twice. AC-06 loses its drag step; AC-07 now asserts\nthat a press that moves away from the handle resizes nothing at Peek and at 80 %; AC-08 reaches 80 % by tap; X-07 drops the handle-drag count and waits\nfor the wheel zoom before it counts frames. RealmSheetHostTests, SheetPartsTests and realmShell.test.mjs follow (no SnapMode, no echo-as-request, no shim).\n\nX-14 (wheel): the test now polls for the wheel zoom instead of reading the camera once after settled(); the assertion (zoom changes by more than 0.01)\nand its failure message are unchanged.\n\nROOT CAUSE: (1) AC-06: heightPx 667.94 at state peek is 73 % of 915, a drag in flight. MudX's own drag had set its internal size to 73 and the host kept\npassing CurrentSize=19, which MudX's ParameterState never re-applies because it only reacts to a CHANGE of the parent's value; data-state comes from the\nhost's Size (peek), not from the measured height. The Peek measure itself is right (AC-05 is green at 174), and with EnableDragToSize=false MudX never changes\nits size on its own. (2) X-14: not a scroll lock. MudBlazor's lock is the class scroll-locked(-no-padding) on <body> (overflow:hidden) and neither MudBlazor's\nscroll manager nor MudX 9.5.0 registers any wheel or touch listener; the non-modal overlay is pointer-events:none (the CI annotation shows both), and the pan\nin the same test passed. The wheel did nothing for the test because MapLibre's scroll-zoom handler waits 40 ms to tell a wheel from a trackpad and then\neases for about 200 ms, while settled() (map.isMoving()) is false until that timer fires, so the camera was read before it moved. Reproduced against the\nS7 realmMap.js with no sheet or lock: after page.mouse.wheel the zoom is 10.846785693787368 right after settled() (the CI value to the digit), 11.249 after 600 ms.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01KBQausaArk3u4LVWi4qxwu\n",
+        "author": {
+          "name": "Claude",
+          "email": "noreply@anthropic.com",
+          "time": 1790930763000
+        },
+        "committer": {
+          "name": "Claude",
+          "email": "noreply@anthropic.com",
+          "time": 1790930775000
+        },
+        "branch": "slice/S7-sheet"
+      },
+      "actualWorkers": 2
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/home/runner/work/HA360/HA360/ci-out/e2e/artifacts",
+        "repeatEach": 1,
+        "retries": 1,
+        "metadata": {
+          "ci": {
+            "commitHref": "https://github.com/versile2/HA360/commit/9b4502af6eafc2173aa3728ba65318706896a646",
+            "commitHash": "9b4502af6eafc2173aa3728ba65318706896a646",
+            "buildHref": "https://github.com/versile2/HA360/actions/runs/36985983661"
+          },
+          "gitCommit": {
+            "shortHash": "9b4502a",
+            "hash": "9b4502af6eafc2173aa3728ba65318706896a646",
+            "subject": "S7a fix 1: tap-only sheet, correct Peek height, free map gestures",
+            "body": "S7a fix 1: tap-only sheet, correct Peek height, free map gestures\n\nAC-06 (drag): D73 ruled the sheet drag off. RealmSheetHost passes EnableDragToSize=false and no longer passes SnapMode or subscribes to\nCurrentSizeChanged (MudX only echoes the size the host gave it, so nothing it raises is a request any more); the handle button keeps the tap and the keys.\nThe handle CSS is a tap target (cursor pointer, touch-action manipulation). The realmShell.js tap shim and isTap go: they existed only to repair the click\nthat MudX's drag pointer capture swallowed, and with no capture a late shim click could only toggle twice. AC-06 loses its drag step; AC-07 now asserts\nthat a press that moves away from the handle resizes nothing at Peek and at 80 %; AC-08 reaches 80 % by tap; X-07 drops the handle-drag count and waits\nfor the wheel zoom before it counts frames. RealmSheetHostTests, SheetPartsTests and realmShell.test.mjs follow (no SnapMode, no echo-as-request, no shim).\n\nX-14 (wheel): the test now polls for the wheel zoom instead of reading the camera once after settled(); the assertion (zoom changes by more than 0.01)\nand its failure message are unchanged.\n\nROOT CAUSE: (1) AC-06: heightPx 667.94 at state peek is 73 % of 915, a drag in flight. MudX's own drag had set its internal size to 73 and the host kept\npassing CurrentSize=19, which MudX's ParameterState never re-applies because it only reacts to a CHANGE of the parent's value; data-state comes from the\nhost's Size (peek), not from the measured height. The Peek measure itself is right (AC-05 is green at 174), and with EnableDragToSize=false MudX never changes\nits size on its own. (2) X-14: not a scroll lock. MudBlazor's lock is the class scroll-locked(-no-padding) on <body> (overflow:hidden) and neither MudBlazor's\nscroll manager nor MudX 9.5.0 registers any wheel or touch listener; the non-modal overlay is pointer-events:none (the CI annotation shows both), and the pan\nin the same test passed. The wheel did nothing for the test because MapLibre's scroll-zoom handler waits 40 ms to tell a wheel from a trackpad and then\neases for about 200 ms, while settled() (map.isMoving()) is false until that timer fires, so the camera was read before it moved. Reproduced against the\nS7 realmMap.js with no sheet or lock: after page.mouse.wheel the zoom is 10.846785693787368 right after settled() (the CI value to the digit), 11.249 after 600 ms.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01KBQausaArk3u4LVWi4qxwu\n",
+            "author": {
+              "name": "Claude",
+              "email": "noreply@anthropic.com",
+              "time": 1790930763000
+            },
+            "committer": {
+              "name": "Claude",
+              "email": "noreply@anthropic.com",
+              "time": 1790930775000
+            },
+            "branch": "slice/S7-sheet"
+          },
+          "actualWorkers": 2
+        },
+        "id": "phone",
+        "name": "phone",
+        "testDir": "/home/runner/work/HA360/HA360/tests/e2e/specs",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.spec.ts"
+        ],
+        "timeout": 45000
+      },
+      {
+        "outputDir": "/home/runner/work/HA360/HA360/ci-out/e2e/artifacts",
+        "repeatEach": 1,
+        "retries": 1,
+        "metadata": {
+          "ci": {
+            "commitHref": "https://github.com/versile2/HA360/commit/9b4502af6eafc2173aa3728ba65318706896a646",
+            "commitHash": "9b4502af6eafc2173aa3728ba65318706896a646",
+            "buildHref": "https://github.com/versile2/HA360/actions/runs/36985983661"
+          },
+          "gitCommit": {
+            "shortHash": "9b4502a",
+            "hash": "9b4502af6eafc2173aa3728ba65318706896a646",
+            "subject": "S7a fix 1: tap-only sheet, correct Peek height, free map gestures",
+            "body": "S7a fix 1: tap-only sheet, correct Peek height, free map gestures\n\nAC-06 (drag): D73 ruled the sheet drag off. RealmSheetHost passes EnableDragToSize=false and no longer passes SnapMode or subscribes to\nCurrentSizeChanged (MudX only echoes the size the host gave it, so nothing it raises is a request any more); the handle button keeps the tap and the keys.\nThe handle CSS is a tap target (cursor pointer, touch-action manipulation). The realmShell.js tap shim and isTap go: they existed only to repair the click\nthat MudX's drag pointer capture swallowed, and with no capture a late shim click could only toggle twice. AC-06 loses its drag step; AC-07 now asserts\nthat a press that moves away from the handle resizes nothing at Peek and at 80 %; AC-08 reaches 80 % by tap; X-07 drops the handle-drag count and waits\nfor the wheel zoom before it counts frames. RealmSheetHostTests, SheetPartsTests and realmShell.test.mjs follow (no SnapMode, no echo-as-request, no shim).\n\nX-14 (wheel): the test now polls for the wheel zoom instead of reading the camera once after settled(); the assertion (zoom changes by more than 0.01)\nand its failure message are unchanged.\n\nROOT CAUSE: (1) AC-06: heightPx 667.94 at state peek is 73 % of 915, a drag in flight. MudX's own drag had set its internal size to 73 and the host kept\npassing CurrentSize=19, which MudX's ParameterState never re-applies because it only reacts to a CHANGE of the parent's value; data-state comes from the\nhost's Size (peek), not from the measured height. The Peek measure itself is right (AC-05 is green at 174), and with EnableDragToSize=false MudX never changes\nits size on its own. (2) X-14: not a scroll lock. MudBlazor's lock is the class scroll-locked(-no-padding) on <body> (overflow:hidden) and neither MudBlazor's\nscroll manager nor MudX 9.5.0 registers any wheel or touch listener; the non-modal overlay is pointer-events:none (the CI annotation shows both), and the pan\nin the same test passed. The wheel did nothing for the test because MapLibre's scroll-zoom handler waits 40 ms to tell a wheel from a trackpad and then\neases for about 200 ms, while settled() (map.isMoving()) is false until that timer fires, so the camera was read before it moved. Reproduced against the\nS7 realmMap.js with no sheet or lock: after page.mouse.wheel the zoom is 10.846785693787368 right after settled() (the CI value to the digit), 11.249 after 600 ms.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01KBQausaArk3u4LVWi4qxwu\n",
+            "author": {
+              "name": "Claude",
+              "email": "noreply@anthropic.com",
+              "time": 1790930763000
+            },
+            "committer": {
+              "name": "Claude",
+              "email": "noreply@anthropic.com",
+              "time": 1790930775000
+            },
+            "branch": "slice/S7-sheet"
+          },
+          "actualWorkers": 2
+        },
+        "id": "phone-short",
+        "name": "phone-short",
+        "testDir": "/home/runner/work/HA360/HA360/tests/e2e/specs",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.spec.ts"
+        ],
+        "timeout": 45000
+      },
+      {
+        "outputDir": "/home/runner/work/HA360/HA360/ci-out/e2e/artifacts",
+        "repeatEach": 1,
+        "retries": 1,
+        "metadata": {
+          "ci": {
+            "commitHref": "https://github.com/versile2/HA360/commit/9b4502af6eafc2173aa3728ba65318706896a646",
+            "commitHash": "9b4502af6eafc2173aa3728ba65318706896a646",
+            "buildHref": "https://github.com/versile2/HA360/actions/runs/36985983661"
+          },
+          "gitCommit": {
+            "shortHash": "9b4502a",
+            "hash": "9b4502af6eafc2173aa3728ba65318706896a646",
+            "subject": "S7a fix 1: tap-only sheet, correct Peek height, free map gestures",
+            "body": "S7a fix 1: tap-only sheet, correct Peek height, free map gestures\n\nAC-06 (drag): D73 ruled the sheet drag off. RealmSheetHost passes EnableDragToSize=false and no longer passes SnapMode or subscribes to\nCurrentSizeChanged (MudX only echoes the size the host gave it, so nothing it raises is a request any more); the handle button keeps the tap and the keys.\nThe handle CSS is a tap target (cursor pointer, touch-action manipulation). The realmShell.js tap shim and isTap go: they existed only to repair the click\nthat MudX's drag pointer capture swallowed, and with no capture a late shim click could only toggle twice. AC-06 loses its drag step; AC-07 now asserts\nthat a press that moves away from the handle resizes nothing at Peek and at 80 %; AC-08 reaches 80 % by tap; X-07 drops the handle-drag count and waits\nfor the wheel zoom before it counts frames. RealmSheetHostTests, SheetPartsTests and realmShell.test.mjs follow (no SnapMode, no echo-as-request, no shim).\n\nX-14 (wheel): the test now polls for the wheel zoom instead of reading the camera once after settled(); the assertion (zoom changes by more than 0.01)\nand its failure message are unchanged.\n\nROOT CAUSE: (1) AC-06: heightPx 667.94 at state peek is 73 % of 915, a drag in flight. MudX's own drag had set its internal size to 73 and the host kept\npassing CurrentSize=19, which MudX's ParameterState never re-applies because it only reacts to a CHANGE of the parent's value; data-state comes from the\nhost's Size (peek), not from the measured height. The Peek measure itself is right (AC-05 is green at 174), and with EnableDragToSize=false MudX never changes\nits size on its own. (2) X-14: not a scroll lock. MudBlazor's lock is the class scroll-locked(-no-padding) on <body> (overflow:hidden) and neither MudBlazor's\nscroll manager nor MudX 9.5.0 registers any wheel or touch listener; the non-modal overlay is pointer-events:none (the CI annotation shows both), and the pan\nin the same test passed. The wheel did nothing for the test because MapLibre's scroll-zoom handler waits 40 ms to tell a wheel from a trackpad and then\neases for about 200 ms, while settled() (map.isMoving()) is false until that timer fires, so the camera was read before it moved. Reproduced against the\nS7 realmMap.js with no sheet or lock: after page.mouse.wheel the zoom is 10.846785693787368 right after settled() (the CI value to the digit), 11.249 after 600 ms.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01KBQausaArk3u4LVWi4qxwu\n",
+            "author": {
+              "name": "Claude",
+              "email": "noreply@anthropic.com",
+              "time": 1790930763000
+            },
+            "committer": {
+              "name": "Claude",
+              "email": "noreply@anthropic.com",
+              "time": 1790930775000
+            },
+            "branch": "slice/S7-sheet"
+          },
+          "actualWorkers": 2
+        },
+        "id": "unfolded",
+        "name": "unfolded",
+        "testDir": "/home/runner/work/HA360/HA360/tests/e2e/specs",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.spec.ts"
+        ],
+        "timeout": 45000
+      },
+      {
+        "outputDir": "/home/runner/work/HA360/HA360/ci-out/e2e/artifacts",
+        "repeatEach": 1,
+        "retries": 1,
+        "metadata": {
+          "ci": {
+            "commitHref": "https://github.com/versile2/HA360/commit/9b4502af6eafc2173aa3728ba65318706896a646",
+            "commitHash": "9b4502af6eafc2173aa3728ba65318706896a646",
+            "buildHref": "https://github.com/versile2/HA360/actions/runs/36985983661"
+          },
+          "gitCommit": {
+            "shortHash": "9b4502a",
+            "hash": "9b4502af6eafc2173aa3728ba65318706896a646",
+            "subject": "S7a fix 1: tap-only sheet, correct Peek height, free map gestures",
+            "body": "S7a fix 1: tap-only sheet, correct Peek height, free map gestures\n\nAC-06 (drag): D73 ruled the sheet drag off. RealmSheetHost passes EnableDragToSize=false and no longer passes SnapMode or subscribes to\nCurrentSizeChanged (MudX only echoes the size the host gave it, so nothing it raises is a request any more); the handle button keeps the tap and the keys.\nThe handle CSS is a tap target (cursor pointer, touch-action manipulation). The realmShell.js tap shim and isTap go: they existed only to repair the click\nthat MudX's drag pointer capture swallowed, and with no capture a late shim click could only toggle twice. AC-06 loses its drag step; AC-07 now asserts\nthat a press that moves away from the handle resizes nothing at Peek and at 80 %; AC-08 reaches 80 % by tap; X-07 drops the handle-drag count and waits\nfor the wheel zoom before it counts frames. RealmSheetHostTests, SheetPartsTests and realmShell.test.mjs follow (no SnapMode, no echo-as-request, no shim).\n\nX-14 (wheel): the test now polls for the wheel zoom instead of reading the camera once after settled(); the assertion (zoom changes by more than 0.01)\nand its failure message are unchanged.\n\nROOT CAUSE: (1) AC-06: heightPx 667.94 at state peek is 73 % of 915, a drag in flight. MudX's own drag had set its internal size to 73 and the host kept\npassing CurrentSize=19, which MudX's ParameterState never re-applies because it only reacts to a CHANGE of the parent's value; data-state comes from the\nhost's Size (peek), not from the measured height. The Peek measure itself is right (AC-05 is green at 174), and with EnableDragToSize=false MudX never changes\nits size on its own. (2) X-14: not a scroll lock. MudBlazor's lock is the class scroll-locked(-no-padding) on <body> (overflow:hidden) and neither MudBlazor's\nscroll manager nor MudX 9.5.0 registers any wheel or touch listener; the non-modal overlay is pointer-events:none (the CI annotation shows both), and the pan\nin the same test passed. The wheel did nothing for the test because MapLibre's scroll-zoom handler waits 40 ms to tell a wheel from a trackpad and then\neases for about 200 ms, while settled() (map.isMoving()) is false until that timer fires, so the camera was read before it moved. Reproduced against the\nS7 realmMap.js with no sheet or lock: after page.mouse.wheel the zoom is 10.846785693787368 right after settled() (the CI value to the digit), 11.249 after 600 ms.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01KBQausaArk3u4LVWi4qxwu\n",
+            "author": {
+              "name": "Claude",
+              "email": "noreply@anthropic.com",
+              "time": 1790930763000
+            },
+            "committer": {
+              "name": "Claude",
+              "email": "noreply@anthropic.com",
+              "time": 1790930775000
+            },
+            "branch": "slice/S7-sheet"
+          },
+          "actualWorkers": 2
+        },
+        "id": "unfolded-tall",
+        "name": "unfolded-tall",
+        "testDir": "/home/runner/work/HA360/HA360/tests/e2e/specs",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.spec.ts"
+        ],
+        "timeout": 45000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "/home/runner/work/HA360/HA360/ci-out/e2e/results.json"
+        }
+      ],
+      [
+        "html",
+        {
+          "outputFolder": "/home/runner/work/HA360/HA360/ci-out/e2e/html",
+          "open": "never"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.63.0",
+    "workers": 2,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "ac-a-sheet.spec.ts",
+      "file": "ac-a-sheet.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "navigation, right stack, sheet and layout",
+          "file": "ac-a-sheet.spec.ts",
+          "line": 156,
+          "column": 6,
+          "specs": [
+            {
+              "title": "[AC-02] the bottom nav has exactly two links, 64 px high at the bottom edge, each at least 48 px tall, and no Safety or Membership",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 3751,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T08:49:10.925Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2b634ca0d7678e22b4ca-9f37f8d7485cd3932c94",
+              "file": "ac-a-sheet.spec.ts",
+              "line": 157,
+              "column": 3
+            },
+            {
+              "title": "[AC-04] the right stack has two 48 px buttons, recenter above layers, 12 px apart at x = 352, the layers bottom 12 px above the Peek sheet",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2239,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T08:49:14.987Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2b634ca0d7678e22b4ca-17800e605b544c938cc1",
+              "file": "ac-a-sheet.spec.ts",
+              "line": 174,
+              "column": 3
+            },
+            {
+              "title": "[AC-05] on load the sheet is at Peek: 174 high (168 at 800), full width, flush with the bottom; only the handle summary and the tabs show",
+              "ok": true,
+              "tags": [
+                "phone",
+                "phone-short"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2290,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T08:49:17.258Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2b634ca0d7678e22b4ca-310f7f0cc5675a7ab6a2",
+              "file": "ac-a-sheet.spec.ts",
+              "line": 201,
+              "column": 3
+            },
+            {
+              "title": "[AC-06] a tap toggles Peek, 80 %, Peek; the state hook and aria-expanded follow; the sheet stays open, also after Esc",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 6748,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T08:49:19.573Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2b634ca0d7678e22b4ca-dc439321610dd50e3899",
+              "file": "ac-a-sheet.spec.ts",
+              "line": 236,
+              "column": 3
+            },
+            {
+              "title": "[AC-06] keyboard on the focused handle: Enter and Space toggle, ArrowUp and End go to 80 %, ArrowDown and Home go to Peek",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 8108,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T08:49:26.344Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2b634ca0d7678e22b4ca-cff7c5e10735568a0dd1",
+              "file": "ac-a-sheet.spec.ts",
+              "line": 280,
+              "column": 3
+            },
+            {
+              "title": "[AC-06] ?sheet=80 starts the sheet at 80 % with the right stack hidden",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1905,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T08:49:34.484Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2b634ca0d7678e22b4ca-72130e88b46a20cefd0a",
+              "file": "ac-a-sheet.spec.ts",
+              "line": 305,
+              "column": 3
+            },
+            {
+              "title": "[AC-07] a press on the handle that moves up 300 px at Peek resizes nothing (no drag, D73): the sheet stays at Peek and open",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 3265,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T08:49:36.410Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2b634ca0d7678e22b4ca-09243f94a4bd482d5ea5",
+              "file": "ac-a-sheet.spec.ts",
+              "line": 325,
+              "column": 5
+            },
+            {
+              "title": "[AC-07] a press on the handle that moves down 300 px at 80 % resizes nothing (no drag, D73): the sheet stays at 80 % and open",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 3623,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T08:49:39.697Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2b634ca0d7678e22b4ca-748cccdf3f93c5f612ea",
+              "file": "ac-a-sheet.spec.ts",
+              "line": 325,
+              "column": 5
+            },
+            {
+              "title": "[AC-08] the right stack sits 12 px above the sheet while it is under 50 % of the viewport height, and is hidden and unfocusable from 50 % up",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 3456,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T08:49:43.341Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2b634ca0d7678e22b4ca-65ae43d11480143858e8",
+              "file": "ac-a-sheet.spec.ts",
+              "line": 363,
+              "column": 3
+            },
+            {
+              "title": "[AC-09] the map padding is {72, 72, 190, 16} at Peek and {72, 16, 748, 16} at 80 %, and the camera does not move with the sheet",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2407,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T08:49:46.815Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2b634ca0d7678e22b4ca-52fa575bf2096d402fbd",
+              "file": "ac-a-sheet.spec.ts",
+              "line": 409,
+              "column": 3
+            },
+            {
+              "title": "[AC-10] the Compact sheet is a bottom sheet at the full viewport width, with no width cap",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1324,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T08:49:49.239Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2b634ca0d7678e22b4ca-2aedef44ed9f1ef5021a",
+              "file": "ac-a-sheet.spec.ts",
+              "line": 448,
+              "column": 3
+            },
+            {
+              "title": "[AC-10] a wider window keeps the bottom sheet at the full width: 700 x 900 and a landscape phone 915 x 412",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1608,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T08:49:50.579Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2b634ca0d7678e22b4ca-5ac15f2da2f5bef9707c",
+              "file": "ac-a-sheet.spec.ts",
+              "line": 465,
+              "column": 3
+            },
+            {
+              "title": "[AC-05] on load the sheet is at Peek: 174 high (168 at 800), full width, flush with the bottom; only the handle summary and the tabs show",
+              "ok": true,
+              "tags": [
+                "phone",
+                "phone-short"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone-short",
+                  "projectName": "phone-short",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 3188,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T08:49:32.188Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2b634ca0d7678e22b4ca-69092985e49ae914c29e",
+              "file": "ac-a-sheet.spec.ts",
+              "line": 201,
+              "column": 3
+            },
+            {
+              "title": "[AC-11] at 884 wide the sheet is a left panel: 400 wide at x = 16, top 76, 16 px above the nav, no handle, tabs and summary visible, map padding-left 432",
+              "ok": true,
+              "tags": [
+                "unfolded",
+                "unfolded-tall"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unfolded",
+                  "projectName": "unfolded",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 2624,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T08:49:36.326Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2b634ca0d7678e22b4ca-4c6873f9e19acb55e1dc",
+              "file": "ac-a-sheet.spec.ts",
+              "line": 485,
+              "column": 3
+            },
+            {
+              "title": "[AC-11] ?layout=sheet at 884 wide shows the bottom sheet",
+              "ok": true,
+              "tags": [
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unfolded",
+                  "projectName": "unfolded",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 2468,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T08:49:39.134Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2b634ca0d7678e22b4ca-df14a5ebdbd7b23ec156",
+              "file": "ac-a-sheet.spec.ts",
+              "line": 508,
+              "column": 3
+            },
+            {
+              "title": "[AC-11] ?layout=panel shows the panel also when the window is narrowed to 700 wide",
+              "ok": true,
+              "tags": [
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unfolded",
+                  "projectName": "unfolded",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 2053,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T08:49:41.624Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2b634ca0d7678e22b4ca-1087a380a8df5d9b713b",
+              "file": "ac-a-sheet.spec.ts",
+              "line": 519,
+              "column": 3
+            },
+            {
+              "title": "[AC-11] at 884 wide the sheet is a left panel: 400 wide at x = 16, top 76, 16 px above the nav, no handle, tabs and summary visible, map padding-left 432",
+              "ok": true,
+              "tags": [
+                "unfolded",
+                "unfolded-tall"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unfolded-tall",
+                  "projectName": "unfolded-tall",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 2658,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T08:49:46.599Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2b634ca0d7678e22b4ca-4c9d0958314ad2010335",
+              "file": "ac-a-sheet.spec.ts",
+              "line": 485,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "appendix-c.spec.ts",
+      "file": "appendix-c.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "appendix C platform tests",
+          "file": "appendix-c.spec.ts",
+          "line": 6,
+          "column": 6,
+          "specs": [
+            {
+              "title": "[X-14] the page scroll lock of the open sheet adds no padding to <body>, and the map still pans and zooms",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [
+                    {
+                      "type": "info",
+                      "description": "[X-14] body class \"scroll-locked-no-padding\", padding-right 0px, overlays [{\"className\":\"mud-overlay\",\"pointerEvents\":\"none\",\"background\":\"rgba(0, 0, 0, 0)\"}]"
+                    }
+                  ],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 5974,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T08:49:10.881Z",
+                      "annotations": [
+                        {
+                          "type": "info",
+                          "description": "[X-14] body class \"scroll-locked-no-padding\", padding-right 0px, overlays [{\"className\":\"mud-overlay\",\"pointerEvents\":\"none\",\"background\":\"rgba(0, 0, 0, 0)\"}]"
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "3a29b21a241c7b273c60-ff805239a0c9c087ec2b",
+              "file": "appendix-c.spec.ts",
+              "line": 13,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "harness.spec.ts",
+      "file": "harness.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "harness",
+          "file": "harness.spec.ts",
+          "line": 4,
+          "column": 6,
+          "specs": [
+            {
+              "title": "demoUrl() writes the seven parameters in order and percent-encodes every value (CR2-008)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 4,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T08:49:17.195Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2726d9e30a893a88bbed-4418a16a673a13656e4d",
+              "file": "harness.spec.ts",
+              "line": 5,
+              "column": 3
+            },
+            {
+              "title": "demoUrl() refuses a path that would leave the ingress prefix",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 6,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T08:49:17.218Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2726d9e30a893a88bbed-44795aed5eb6bf09bf13",
+              "file": "harness.spec.ts",
+              "line": 15,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "ingress.spec.ts",
+      "file": "ingress.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "ingress platform tests",
+          "file": "ingress.spec.ts",
+          "line": 10,
+          "column": 6,
+          "specs": [
+            {
+              "title": "[X-01] the page, its assets and the _blazor websocket all live under the ingress prefix",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 2092,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T08:49:17.274Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "ac416494832f376feef3-d16b03c0a1855ae69973",
+              "file": "ingress.spec.ts",
+              "line": 11,
+              "column": 3
+            },
+            {
+              "title": "[X-03] the module scripts are text/javascript and the MapLibre worker starts",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 2068,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T08:49:19.391Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "ac416494832f376feef3-f71c6cf4c4d934e3bda8",
+              "file": "ingress.spec.ts",
+              "line": 61,
+              "column": 3
+            },
+            {
+              "title": "[X-05] the only cookie / sets is the antiforgery cookie, scoped to the ingress prefix",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [
+                    {
+                      "type": "info",
+                      "description": "Set-Cookie on /: .AspNetCore.Antiforgery.fU4C0xp-sPg"
+                    }
+                  ],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 210,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T08:49:21.479Z",
+                      "annotations": [
+                        {
+                          "type": "info",
+                          "description": "Set-Cookie on /: .AspNetCore.Antiforgery.fU4C0xp-sPg"
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "ac416494832f376feef3-c30c8068db0f32b065a8",
+              "file": "ingress.spec.ts",
+              "line": 79,
+              "column": 3
+            },
+            {
+              "title": "[X-10] an invalid or missing X-Ingress-Path is ignored and <base href> stays \"/\"",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 167,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T08:49:21.710Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "ac416494832f376feef3-492ab1c670b71c42d970",
+              "file": "ingress.spec.ts",
+              "line": 96,
+              "column": 3
+            },
+            {
+              "title": "[X-07] a map pan and a zoom send fewer than 6 websocket frames",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [
+                    {
+                      "type": "info",
+                      "description": "[X-07] websocket frames sent by the browser during a map pan and zoom: 2 (limit: fewer than 6)"
+                    }
+                  ],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 6765,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T08:49:21.892Z",
+                      "annotations": [
+                        {
+                          "type": "info",
+                          "description": "[X-07] websocket frames sent by the browser during a map pan and zoom: 2 (limit: fewer than 6)"
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "ac416494832f376feef3-766d547767576f34ce99",
+              "file": "ingress.spec.ts",
+              "line": 125,
+              "column": 3
+            },
+            {
+              "title": "[X-08] exactly one popover div[mudsheet] and one [data-testid=\"sheet\"], nested, and the selector list resolves to the popover",
+              "ok": true,
+              "tags": [
+                "phone",
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 2386,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T08:49:28.677Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "ac416494832f376feef3-d2a2e4c9f99cde1ac1ed",
+              "file": "ingress.spec.ts",
+              "line": 173,
+              "column": 3
+            },
+            {
+              "title": "[X-08] exactly one popover div[mudsheet] and one [data-testid=\"sheet\"], nested, and the selector list resolves to the popover",
+              "ok": true,
+              "tags": [
+                "phone",
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unfolded",
+                  "projectName": "unfolded",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 1983,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T08:49:43.712Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "ac416494832f376feef3-a404d64594e806fa4a60",
+              "file": "ingress.spec.ts",
+              "line": 173,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-10-02T08:49:06.967Z",
+    "duration": 45619.736999999994,
+    "expected": 27,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

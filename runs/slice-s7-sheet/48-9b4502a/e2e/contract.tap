@@ -1,0 +1,191 @@
+TAP version 13
+# Subtest: every shape has a hand-written sample and every sample is valid
+ok 1 - every shape has a hand-written sample and every sample is valid
+  ---
+  duration_ms: 3.34674
+  type: 'test'
+  ...
+# Subtest: samples survive a JSON round trip (the shape of the wire, not of a JavaScript object)
+ok 2 - samples survive a JSON round trip (the shape of the wire, not of a JavaScript object)
+  ---
+  duration_ms: 0.631483
+  type: 'test'
+  ...
+# Subtest: unknown shape name throws
+ok 3 - unknown shape name throws
+  ---
+  duration_ms: 0.450003
+  type: 'test'
+  ...
+# Subtest: a renamed field fails twice: the old name is missing and the new one is unexpected
+ok 4 - a renamed field fails twice: the old name is missing and the new one is unexpected
+  ---
+  duration_ms: 0.302237
+  type: 'test'
+  ...
+# Subtest: a renamed field fails in a nested object
+ok 5 - a renamed field fails in a nested object
+  ---
+  duration_ms: 0.909424
+  type: 'test'
+  ...
+# Subtest: PascalCase keys (a serializer without the web defaults) fail
+ok 6 - PascalCase keys (a serializer without the web defaults) fail
+  ---
+  duration_ms: 0.174728
+  type: 'test'
+  ...
+# Subtest: a missing field fails with its path
+ok 7 - a missing field fails with its path
+  ---
+  duration_ms: 0.330119
+  type: 'test'
+  ...
+# Subtest: an extra field fails
+ok 8 - an extra field fails
+  ---
+  duration_ms: 0.15494
+  type: 'test'
+  ...
+# Subtest: a wrong type fails: number as string, string as number, object as array, null where not allowed
+ok 9 - a wrong type fails: number as string, string as number, object as array, null where not allowed
+  ---
+  duration_ms: 0.463288
+  type: 'test'
+  ...
+# Subtest: a value outside an enum fails
+ok 10 - a value outside an enum fails
+  ---
+  duration_ms: 0.60316
+  type: 'test'
+  ...
+# Subtest: every documented status and style id is accepted
+ok 11 - every documented status and style id is accepted
+  ---
+  duration_ms: 0.517429
+  type: 'test'
+  ...
+# Subtest: coordinates: out of range and half-null positions fail; a full null is "no fix"
+ok 12 - coordinates: out of range and half-null positions fail; a full null is "no fix"
+  ---
+  duration_ms: 0.209132
+  type: 'test'
+  ...
+# Subtest: avatarUrl is relative: a leading slash or a scheme fails
+ok 13 - avatarUrl is relative: a leading slash or a scheme fails
+  ---
+  duration_ms: 0.1495
+  type: 'test'
+  ...
+# Subtest: ids are unique within a payload
+ok 14 - ids are unique within a payload
+  ---
+  duration_ms: 0.16544
+  type: 'test'
+  ...
+# Subtest: zones: all three appearances are required, alphas stay in 0..1, the radius is positive
+ok 15 - zones: all three appearances are required, alphas stay in 0..1, the radius is positive
+  ---
+  duration_ms: 0.169107
+  type: 'test'
+  ...
+# Subtest: DefaultTargets: maxZoom and the "me" zoom are the literal 16; "me" may be null; bounds are two [lon, lat] pairs
+ok 16 - DefaultTargets: maxZoom and the "me" zoom are the literal 16; "me" may be null; bounds are two [lon, lat] pairs
+  ---
+  duration_ms: 0.216365
+  type: 'test'
+  ...
+# Subtest: StyleResult: error is optional (absent, a string or null)
+ok 17 - StyleResult: error is optional (absent, a string or null)
+  ---
+  duration_ms: 0.134953
+  type: 'test'
+  ...
+# Subtest: CameraState: numbers must be finite
+ok 18 - CameraState: numbers must be finite
+  ---
+  duration_ms: 0.11758
+  type: 'test'
+  ...
+# Subtest: shapeNameForFile: the shape comes from the file name
+ok 19 - shapeNameForFile: the shape comes from the file name
+  ---
+  duration_ms: 1.21713
+  type: 'test'
+  ...
+# Subtest: command line: PASS and FAIL lines, exit codes
+ok 20 - command line: PASS and FAIL lines, exit codes
+  ---
+  duration_ms: 1.738237
+  type: 'test'
+  ...
+# Subtest: golden payloads: every file of tests/contract/payloads matches its shape
+    # Subtest: camera.json
+    ok 1 - camera.json
+      ---
+      duration_ms: 0.227747
+      type: 'test'
+      ...
+    # Subtest: default-targets.json
+    ok 2 - default-targets.json
+      ---
+      duration_ms: 0.177252
+      type: 'test'
+      ...
+    # Subtest: layout-expanded.json
+    ok 3 - layout-expanded.json
+      ---
+      duration_ms: 0.137748
+      type: 'test'
+      ...
+    # Subtest: layout.json
+    ok 4 - layout.json
+      ---
+      duration_ms: 0.192932
+      type: 'test'
+      ...
+    # Subtest: members.json
+    ok 5 - members.json
+      ---
+      duration_ms: 0.211236
+      type: 'test'
+      ...
+    # Subtest: style-result.json
+    ok 6 - style-result.json
+      ---
+      duration_ms: 0.123471
+      type: 'test'
+      ...
+    # Subtest: vehicles.json
+    ok 7 - vehicles.json
+      ---
+      duration_ms: 0.148749
+      type: 'test'
+      ...
+    # Subtest: zones-hidden.json
+    ok 8 - zones-hidden.json
+      ---
+      duration_ms: 0.182702
+      type: 'test'
+      ...
+    # Subtest: zones.json
+    ok 9 - zones.json
+      ---
+      duration_ms: 0.173615
+      type: 'test'
+      ...
+    1..9
+ok 21 - golden payloads: every file of tests/contract/payloads matches its shape
+  ---
+  duration_ms: 2.297705
+  type: 'test'
+  ...
+1..21
+# tests 30
+# suites 0
+# pass 30
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 100.518523

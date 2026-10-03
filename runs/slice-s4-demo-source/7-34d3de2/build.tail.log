@@ -1,0 +1,6 @@
+  Realm.Domain -> /home/runner/work/HA360/HA360/src/Realm.Domain/bin/Release/net10.0/Realm.Domain.dll
+  Realm.Domain.Tests -> /home/runner/work/HA360/HA360/tests/Realm.Domain.Tests/bin/Release/net10.0/Realm.Domain.Tests.dll
+  Realm.Infrastructure -> /home/runner/work/HA360/HA360/src/Realm.Infrastructure/bin/Release/net10.0/Realm.Infrastructure.dll
+  Realm.Demo -> /home/runner/work/HA360/HA360/src/Realm.Demo/bin/Release/net10.0/Realm.Demo.dll
+  Realm.Demo.Tests -> /home/runner/work/HA360/HA360/tests/Realm.Demo.Tests/bin/Release/net10.0/Realm.Demo.Tests.dll
+  Realm.Web -> /home/runner/work/HA360/HA360/src/Realm.Web/bin/Release/net10.0/Realm.Web.dll

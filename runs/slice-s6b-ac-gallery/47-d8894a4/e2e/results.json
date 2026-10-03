@@ -1,0 +1,821 @@
+{
+  "config": {
+    "argv": [
+      "/opt/hostedtoolcache/node/22.23.3/x64/bin/node",
+      "/home/runner/work/HA360/HA360/node_modules/.bin/playwright",
+      "test",
+      "--config",
+      "tests/e2e/playwright.config.ts"
+    ],
+    "configFile": "/home/runner/work/HA360/HA360/tests/e2e/playwright.config.ts",
+    "rootDir": "/home/runner/work/HA360/HA360/tests/e2e/specs",
+    "failOnFlakyTests": false,
+    "forbidOnly": true,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "ci": {
+        "commitHref": "https://github.com/versile2/HA360/commit/d8894a4ea7166b75cca3d3dd2b81e476aa512b88",
+        "commitHash": "d8894a4ea7166b75cca3d3dd2b81e476aa512b88",
+        "buildHref": "https://github.com/versile2/HA360/actions/runs/36985981097"
+      },
+      "gitCommit": {
+        "shortHash": "d8894a4",
+        "hash": "d8894a4ea7166b75cca3d3dd2b81e476aa512b88",
+        "subject": "S6b fix 1: link the map stylesheets and align pin geometry",
+        "body": "S6b fix 1: link the map stylesheets and align pin geometry\n\nApp.razor now links lib/maplibre-gl/maplibre-gl.css and css/realm-map.css (plain relative URLs, as the\nno-static-files guard requires for our own files) in the order MudBlazor -> maplibre-gl.css -> tokens.css\n-> app.css -> realm-map.css, so MapLibre's marker and attribution rules and our pin, chip and attribution\nrules actually apply.\n\n[X-01] now also asserts that the page links the four stylesheets in that order and that the browser applied\nmaplibre-gl.css and realm-map.css, so this cannot regress unnoticed again.\n\nNo change to realm-map.css or realmMap.js: checked against the real CSS and JS in Chromium at 412 x 915, the\ngeometry already matches 01 sections 4.2 to 4.4 once the sheets load (attribution 48 x 48 with a 12 px right\ngap, discs 48 / 44 px with a 4 px solid ring, chip centred on the pin and 8 px above it). AC-18's 0.14\nalpha for demo-offline and the ~10.85 zoom stay as D74 says.\n\nROOT CAUSE: App.razor never linked maplibre-gl.css or realm-map.css (and realmMap.js does not inject them),\nso .maplibregl-marker was not position:absolute (pins stacked in flow, invisible), the compact attribution\nsummary was a full-width block (412 px) and the pin, disc and chip rules were absent (disc 10.98 px, chip\ncentre 351.48).\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01KBQausaArk3u4LVWi4qxwu\n",
+        "author": {
+          "name": "Claude",
+          "email": "noreply@anthropic.com",
+          "time": 1790930317000
+        },
+        "committer": {
+          "name": "Claude",
+          "email": "noreply@anthropic.com",
+          "time": 1790930317000
+        },
+        "branch": "slice/S6b-ac-gallery"
+      },
+      "actualWorkers": 2
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/home/runner/work/HA360/HA360/ci-out/e2e/artifacts",
+        "repeatEach": 1,
+        "retries": 1,
+        "metadata": {
+          "ci": {
+            "commitHref": "https://github.com/versile2/HA360/commit/d8894a4ea7166b75cca3d3dd2b81e476aa512b88",
+            "commitHash": "d8894a4ea7166b75cca3d3dd2b81e476aa512b88",
+            "buildHref": "https://github.com/versile2/HA360/actions/runs/36985981097"
+          },
+          "gitCommit": {
+            "shortHash": "d8894a4",
+            "hash": "d8894a4ea7166b75cca3d3dd2b81e476aa512b88",
+            "subject": "S6b fix 1: link the map stylesheets and align pin geometry",
+            "body": "S6b fix 1: link the map stylesheets and align pin geometry\n\nApp.razor now links lib/maplibre-gl/maplibre-gl.css and css/realm-map.css (plain relative URLs, as the\nno-static-files guard requires for our own files) in the order MudBlazor -> maplibre-gl.css -> tokens.css\n-> app.css -> realm-map.css, so MapLibre's marker and attribution rules and our pin, chip and attribution\nrules actually apply.\n\n[X-01] now also asserts that the page links the four stylesheets in that order and that the browser applied\nmaplibre-gl.css and realm-map.css, so this cannot regress unnoticed again.\n\nNo change to realm-map.css or realmMap.js: checked against the real CSS and JS in Chromium at 412 x 915, the\ngeometry already matches 01 sections 4.2 to 4.4 once the sheets load (attribution 48 x 48 with a 12 px right\ngap, discs 48 / 44 px with a 4 px solid ring, chip centred on the pin and 8 px above it). AC-18's 0.14\nalpha for demo-offline and the ~10.85 zoom stay as D74 says.\n\nROOT CAUSE: App.razor never linked maplibre-gl.css or realm-map.css (and realmMap.js does not inject them),\nso .maplibregl-marker was not position:absolute (pins stacked in flow, invisible), the compact attribution\nsummary was a full-width block (412 px) and the pin, disc and chip rules were absent (disc 10.98 px, chip\ncentre 351.48).\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01KBQausaArk3u4LVWi4qxwu\n",
+            "author": {
+              "name": "Claude",
+              "email": "noreply@anthropic.com",
+              "time": 1790930317000
+            },
+            "committer": {
+              "name": "Claude",
+              "email": "noreply@anthropic.com",
+              "time": 1790930317000
+            },
+            "branch": "slice/S6b-ac-gallery"
+          },
+          "actualWorkers": 2
+        },
+        "id": "phone",
+        "name": "phone",
+        "testDir": "/home/runner/work/HA360/HA360/tests/e2e/specs",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.spec.ts"
+        ],
+        "timeout": 45000
+      },
+      {
+        "outputDir": "/home/runner/work/HA360/HA360/ci-out/e2e/artifacts",
+        "repeatEach": 1,
+        "retries": 1,
+        "metadata": {
+          "ci": {
+            "commitHref": "https://github.com/versile2/HA360/commit/d8894a4ea7166b75cca3d3dd2b81e476aa512b88",
+            "commitHash": "d8894a4ea7166b75cca3d3dd2b81e476aa512b88",
+            "buildHref": "https://github.com/versile2/HA360/actions/runs/36985981097"
+          },
+          "gitCommit": {
+            "shortHash": "d8894a4",
+            "hash": "d8894a4ea7166b75cca3d3dd2b81e476aa512b88",
+            "subject": "S6b fix 1: link the map stylesheets and align pin geometry",
+            "body": "S6b fix 1: link the map stylesheets and align pin geometry\n\nApp.razor now links lib/maplibre-gl/maplibre-gl.css and css/realm-map.css (plain relative URLs, as the\nno-static-files guard requires for our own files) in the order MudBlazor -> maplibre-gl.css -> tokens.css\n-> app.css -> realm-map.css, so MapLibre's marker and attribution rules and our pin, chip and attribution\nrules actually apply.\n\n[X-01] now also asserts that the page links the four stylesheets in that order and that the browser applied\nmaplibre-gl.css and realm-map.css, so this cannot regress unnoticed again.\n\nNo change to realm-map.css or realmMap.js: checked against the real CSS and JS in Chromium at 412 x 915, the\ngeometry already matches 01 sections 4.2 to 4.4 once the sheets load (attribution 48 x 48 with a 12 px right\ngap, discs 48 / 44 px with a 4 px solid ring, chip centred on the pin and 8 px above it). AC-18's 0.14\nalpha for demo-offline and the ~10.85 zoom stay as D74 says.\n\nROOT CAUSE: App.razor never linked maplibre-gl.css or realm-map.css (and realmMap.js does not inject them),\nso .maplibregl-marker was not position:absolute (pins stacked in flow, invisible), the compact attribution\nsummary was a full-width block (412 px) and the pin, disc and chip rules were absent (disc 10.98 px, chip\ncentre 351.48).\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01KBQausaArk3u4LVWi4qxwu\n",
+            "author": {
+              "name": "Claude",
+              "email": "noreply@anthropic.com",
+              "time": 1790930317000
+            },
+            "committer": {
+              "name": "Claude",
+              "email": "noreply@anthropic.com",
+              "time": 1790930317000
+            },
+            "branch": "slice/S6b-ac-gallery"
+          },
+          "actualWorkers": 2
+        },
+        "id": "phone-short",
+        "name": "phone-short",
+        "testDir": "/home/runner/work/HA360/HA360/tests/e2e/specs",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.spec.ts"
+        ],
+        "timeout": 45000
+      },
+      {
+        "outputDir": "/home/runner/work/HA360/HA360/ci-out/e2e/artifacts",
+        "repeatEach": 1,
+        "retries": 1,
+        "metadata": {
+          "ci": {
+            "commitHref": "https://github.com/versile2/HA360/commit/d8894a4ea7166b75cca3d3dd2b81e476aa512b88",
+            "commitHash": "d8894a4ea7166b75cca3d3dd2b81e476aa512b88",
+            "buildHref": "https://github.com/versile2/HA360/actions/runs/36985981097"
+          },
+          "gitCommit": {
+            "shortHash": "d8894a4",
+            "hash": "d8894a4ea7166b75cca3d3dd2b81e476aa512b88",
+            "subject": "S6b fix 1: link the map stylesheets and align pin geometry",
+            "body": "S6b fix 1: link the map stylesheets and align pin geometry\n\nApp.razor now links lib/maplibre-gl/maplibre-gl.css and css/realm-map.css (plain relative URLs, as the\nno-static-files guard requires for our own files) in the order MudBlazor -> maplibre-gl.css -> tokens.css\n-> app.css -> realm-map.css, so MapLibre's marker and attribution rules and our pin, chip and attribution\nrules actually apply.\n\n[X-01] now also asserts that the page links the four stylesheets in that order and that the browser applied\nmaplibre-gl.css and realm-map.css, so this cannot regress unnoticed again.\n\nNo change to realm-map.css or realmMap.js: checked against the real CSS and JS in Chromium at 412 x 915, the\ngeometry already matches 01 sections 4.2 to 4.4 once the sheets load (attribution 48 x 48 with a 12 px right\ngap, discs 48 / 44 px with a 4 px solid ring, chip centred on the pin and 8 px above it). AC-18's 0.14\nalpha for demo-offline and the ~10.85 zoom stay as D74 says.\n\nROOT CAUSE: App.razor never linked maplibre-gl.css or realm-map.css (and realmMap.js does not inject them),\nso .maplibregl-marker was not position:absolute (pins stacked in flow, invisible), the compact attribution\nsummary was a full-width block (412 px) and the pin, disc and chip rules were absent (disc 10.98 px, chip\ncentre 351.48).\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01KBQausaArk3u4LVWi4qxwu\n",
+            "author": {
+              "name": "Claude",
+              "email": "noreply@anthropic.com",
+              "time": 1790930317000
+            },
+            "committer": {
+              "name": "Claude",
+              "email": "noreply@anthropic.com",
+              "time": 1790930317000
+            },
+            "branch": "slice/S6b-ac-gallery"
+          },
+          "actualWorkers": 2
+        },
+        "id": "unfolded",
+        "name": "unfolded",
+        "testDir": "/home/runner/work/HA360/HA360/tests/e2e/specs",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.spec.ts"
+        ],
+        "timeout": 45000
+      },
+      {
+        "outputDir": "/home/runner/work/HA360/HA360/ci-out/e2e/artifacts",
+        "repeatEach": 1,
+        "retries": 1,
+        "metadata": {
+          "ci": {
+            "commitHref": "https://github.com/versile2/HA360/commit/d8894a4ea7166b75cca3d3dd2b81e476aa512b88",
+            "commitHash": "d8894a4ea7166b75cca3d3dd2b81e476aa512b88",
+            "buildHref": "https://github.com/versile2/HA360/actions/runs/36985981097"
+          },
+          "gitCommit": {
+            "shortHash": "d8894a4",
+            "hash": "d8894a4ea7166b75cca3d3dd2b81e476aa512b88",
+            "subject": "S6b fix 1: link the map stylesheets and align pin geometry",
+            "body": "S6b fix 1: link the map stylesheets and align pin geometry\n\nApp.razor now links lib/maplibre-gl/maplibre-gl.css and css/realm-map.css (plain relative URLs, as the\nno-static-files guard requires for our own files) in the order MudBlazor -> maplibre-gl.css -> tokens.css\n-> app.css -> realm-map.css, so MapLibre's marker and attribution rules and our pin, chip and attribution\nrules actually apply.\n\n[X-01] now also asserts that the page links the four stylesheets in that order and that the browser applied\nmaplibre-gl.css and realm-map.css, so this cannot regress unnoticed again.\n\nNo change to realm-map.css or realmMap.js: checked against the real CSS and JS in Chromium at 412 x 915, the\ngeometry already matches 01 sections 4.2 to 4.4 once the sheets load (attribution 48 x 48 with a 12 px right\ngap, discs 48 / 44 px with a 4 px solid ring, chip centred on the pin and 8 px above it). AC-18's 0.14\nalpha for demo-offline and the ~10.85 zoom stay as D74 says.\n\nROOT CAUSE: App.razor never linked maplibre-gl.css or realm-map.css (and realmMap.js does not inject them),\nso .maplibregl-marker was not position:absolute (pins stacked in flow, invisible), the compact attribution\nsummary was a full-width block (412 px) and the pin, disc and chip rules were absent (disc 10.98 px, chip\ncentre 351.48).\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01KBQausaArk3u4LVWi4qxwu\n",
+            "author": {
+              "name": "Claude",
+              "email": "noreply@anthropic.com",
+              "time": 1790930317000
+            },
+            "committer": {
+              "name": "Claude",
+              "email": "noreply@anthropic.com",
+              "time": 1790930317000
+            },
+            "branch": "slice/S6b-ac-gallery"
+          },
+          "actualWorkers": 2
+        },
+        "id": "unfolded-tall",
+        "name": "unfolded-tall",
+        "testDir": "/home/runner/work/HA360/HA360/tests/e2e/specs",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.spec.ts"
+        ],
+        "timeout": 45000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "/home/runner/work/HA360/HA360/ci-out/e2e/results.json"
+        }
+      ],
+      [
+        "html",
+        {
+          "outputFolder": "/home/runner/work/HA360/HA360/ci-out/e2e/html",
+          "open": "never"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.63.0",
+    "workers": 2,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "ac-a-shell.spec.ts",
+      "file": "ac-a-shell.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "acceptance A: the shell",
+          "file": "ac-a-shell.spec.ts",
+          "line": 58,
+          "column": 6,
+          "specs": [
+            {
+              "title": "[AC-01] opening / shows Location and the map canvas covers the whole viewport",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 3164,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T08:48:29.303Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "c0da192f7b82ecb477ff-70548822907c8edc03e6",
+              "file": "ac-a-shell.spec.ts",
+              "line": 59,
+              "column": 3
+            },
+            {
+              "title": "[AC-03] the settings button is 48 x 48 at (12, 12) and the attribution control is a 48 x 48 target in the top-right corner",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2255,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T08:48:34.189Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "c0da192f7b82ecb477ff-f810fc4826eb6a7840b3",
+              "file": "ac-a-shell.spec.ts",
+              "line": 82,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "ac-b-map.spec.ts",
+      "file": "ac-b-map.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "acceptance B: the map",
+          "file": "ac-b-map.spec.ts",
+          "line": 80,
+          "column": 6,
+          "specs": [
+            {
+              "title": "[AC-13a] on load no camera animation runs and exactly the four pins of the default view are on screen",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 3237,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T08:48:29.376Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "dc00f343cbce5b812581-b82ce71dd3a393d2c952",
+              "file": "ac-b-map.spec.ts",
+              "line": 84,
+              "column": 3
+            },
+            {
+              "title": "[AC-16a] member pins are 48 px circles with a 4 px solid ring, the wagon is a 44 px rounded square",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 2145,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T08:48:34.254Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "dc00f343cbce5b812581-f283b888a51eb54b02fd",
+              "file": "ac-b-map.spec.ts",
+              "line": 111,
+              "column": 3
+            },
+            {
+              "title": "[AC-17] with nothing selected one Here-for chip shows above the King's pin and on no other pin",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 2518,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T08:48:36.418Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "dc00f343cbce5b812581-489d1bab9b5df4c7b701",
+              "file": "ac-b-map.spec.ts",
+              "line": 164,
+              "column": 3
+            },
+            {
+              "title": "[AC-18] fourteen zone circles are drawn, two occupied, every circle at least 14 px, the arrival zone not drawn",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 2260,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T08:48:38.962Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "dc00f343cbce5b812581-3d86e909f97f017814d2",
+              "file": "ac-b-map.spec.ts",
+              "line": 196,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "gallery.spec.ts",
+      "file": "gallery.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "[GAL] screenshot gallery",
+          "file": "gallery.spec.ts",
+          "line": 29,
+          "column": 6,
+          "specs": [
+            {
+              "title": "[GAL] SC01-location-peek",
+              "ok": true,
+              "tags": [
+                "phone",
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2222,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T08:48:36.480Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0087bd98ece4956907e4-f96eb512a9ed1da60146",
+              "file": "gallery.spec.ts",
+              "line": 32,
+              "column": 3
+            },
+            {
+              "title": "[GAL] SC01-location-peek",
+              "ok": true,
+              "tags": [
+                "phone",
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unfolded",
+                  "projectName": "unfolded",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 3709,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T08:48:42.097Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0087bd98ece4956907e4-1bd60d62237463635065",
+              "file": "gallery.spec.ts",
+              "line": 32,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "harness.spec.ts",
+      "file": "harness.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "harness",
+          "file": "harness.spec.ts",
+          "line": 4,
+          "column": 6,
+          "specs": [
+            {
+              "title": "demoUrl() writes the seven parameters in order and percent-encodes every value (CR2-008)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 4,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T08:48:38.731Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2726d9e30a893a88bbed-4418a16a673a13656e4d",
+              "file": "harness.spec.ts",
+              "line": 5,
+              "column": 3
+            },
+            {
+              "title": "demoUrl() refuses a path that would leave the ingress prefix",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 5,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T08:48:38.759Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2726d9e30a893a88bbed-44795aed5eb6bf09bf13",
+              "file": "harness.spec.ts",
+              "line": 15,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "ingress.spec.ts",
+      "file": "ingress.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "ingress platform tests",
+          "file": "ingress.spec.ts",
+          "line": 10,
+          "column": 6,
+          "specs": [
+            {
+              "title": "[X-01] the page, its assets and the _blazor websocket all live under the ingress prefix",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2748,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T08:48:38.785Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "ac416494832f376feef3-d16b03c0a1855ae69973",
+              "file": "ingress.spec.ts",
+              "line": 11,
+              "column": 3
+            },
+            {
+              "title": "[X-03] the module scripts are text/javascript and the MapLibre worker starts",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 3638,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T08:48:41.557Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "ac416494832f376feef3-f71c6cf4c4d934e3bda8",
+              "file": "ingress.spec.ts",
+              "line": 82,
+              "column": 3
+            },
+            {
+              "title": "[X-05] the only cookie / sets is the antiforgery cookie, scoped to the ingress prefix",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [
+                    {
+                      "type": "info",
+                      "description": "Set-Cookie on /: .AspNetCore.Antiforgery.fU4C0xp-sPg"
+                    }
+                  ],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 753,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T08:48:45.223Z",
+                      "annotations": [
+                        {
+                          "type": "info",
+                          "description": "Set-Cookie on /: .AspNetCore.Antiforgery.fU4C0xp-sPg"
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "ac416494832f376feef3-c30c8068db0f32b065a8",
+              "file": "ingress.spec.ts",
+              "line": 100,
+              "column": 3
+            },
+            {
+              "title": "[X-10] an invalid or missing X-Ingress-Path is ignored and <base href> stays \"/\"",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 141,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T08:48:46.004Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "ac416494832f376feef3-492ab1c670b71c42d970",
+              "file": "ingress.spec.ts",
+              "line": 117,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-10-02T08:48:25.493Z",
+    "duration": 20756.503,
+    "expected": 14,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}
