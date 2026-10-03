@@ -1,0 +1,28 @@
+@using Realm.Domain
+
+@* One placeholder row of the list before the first data snapshot (01 section 3.8): an avatar circle and two text bars, shimmering for 1.2 s (the .realm-skeleton shimmer of
+   realm-driving.css, switched off by reduced motion there). It has the box of the real row of its section, so nothing shifts when the data arrives: the same border-top as
+   .realm-sheet-item and the same minimum height (84 px a person, 96 a vehicle, 72 a place, 01 section 5.1). It says nothing to a screen reader (aria-hidden on the list that holds it; the
+   handle's summary "Summoning the court…" is what is read) and takes no focus. *@
+<li class="realm-sheet-item" data-testid="skeleton-row">
+    <div class="@RowClass">
+        <span class="realm-skeleton realm-skeleton-avatar"></span>
+        <span class="realm-skeleton-lines">
+            <span class="realm-skeleton realm-skeleton-bar realm-skeleton-bar--name"></span>
+            <span class="realm-skeleton realm-skeleton-bar realm-skeleton-bar--line"></span>
+        </span>
+    </div>
+</li>
+
+@code {
+    /// <summary>The section the row stands in for: it sets the row's minimum height. Default: Drivers.</summary>
+    [Parameter]
+    public Section Kind { get; set; } = Section.Drivers;
+
+    private string RowClass => Kind switch
+    {
+        Section.Vehicles => "realm-skeleton-row realm-skeleton-row--vehicle",
+        Section.Places => "realm-skeleton-row realm-skeleton-row--place",
+        _ => "realm-skeleton-row",
+    };
+}

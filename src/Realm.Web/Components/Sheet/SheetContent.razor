@@ -2,6 +2,7 @@
 @using Realm.Web.Formatting
 @using Realm.Web.Sheet
 @using Realm.Web.State
+@implements IDisposable
 
 @* The body of the sheet (03 section 3.4): the three-tab control and the list of the section that shows, or, with something selected, the selection header or the detail. Container-agnostic: the
    same markup fills the MudX bottom sheet, the MudX left panel and the aside fallback, and nothing here knows about MudX. In the bottom sheet the summary line lives in the handle; in the
@@ -13,7 +14,10 @@
    (never the browser's). A tap raises OnSelect with the entity; the page turns it into the selection. The header's body raises OnToggle and its X raises OnClear (D46); the detail's back arrow
    raises OnBack and a person in a place's Here-now list raises OnHereNow. The page wires OnToggle to the handler of the handle's own tap, so there is one code path; this component decides
    nothing about sizes. FocusDetail asks a detail that has just opened to take the focus (01 section 10.2). The one polite live region of the sheet (01 section 10.3) is here, outside the segments and the list, so it stays on
-   the page whatever the body is: it says what the page hands it in Announcement and nothing of its own. *@
+   the page whatever the body is: it says what the page hands it in Announcement and nothing of its own.
+   Before the first data snapshot (no people, no vehicles and no places: FirstDataWatch.IsPending, the rule of the "Summoning the court…" summary) the list is three SkeletonRows (01 section 3.8),
+   and past 20 s of that wait, the circuit's FirstDataWatch says Failed and the error with its Retry button takes their place (01 section 8.6; FirstDataState). The skeleton list has no
+   data-testid="sheet-list": that id is the list of rows. A bare render with no watch never reaches the error. *@
 @{
     var facts = RowFacts.Create(Members, Places, MeId, Moment, Zone ?? Session?.Zone ?? TimeZoneInfo.Utc);
     var selected = Body switch
@@ -27,6 +31,8 @@
     var vehicle = Body is SheetBody.Detail ? FindVehicle(selected) : null;
     var place = Body is SheetBody.Detail ? FindPlace(selected) : null;
     var showDetail = member is not null || vehicle is not null || place is not null;
+    var pending = FirstDataWatch.IsPending(Members, Vehicles, Places);
+    _stageAtRender = FirstData?.Stage;
 }
 <div class="realm-sheet-content" data-testid="sheet-content">
     @if (ShowSummary)
@@ -62,36 +68,52 @@
     }
     else if (selectionHeader is null)
     {
-        <div class="realm-sheet-list-wrap" id="@SheetSegments.PanelId" role="tabpanel" aria-labelledby="@SheetSegments.TabId(Section)">
-            <ul class="realm-sheet-list" data-testid="sheet-list">
-                @if (Section == Section.Vehicles)
-                {
-                    foreach (var row in VmFactory.VehicleRows(Vehicles, facts))
+        <div class="realm-sheet-list-wrap" id="@SheetSegments.PanelId" role="tabpanel" aria-labelledby="@SheetSegments.TabId(Section)" aria-busy="@(pending ? "true" : null)">
+            @if (pending && FirstData is { Stage: FirstDataStage.Failed })
+            {
+                <FirstDataState />
+            }
+            else if (pending)
+            {
+                <ul class="realm-sheet-list realm-skeleton-list" aria-hidden="true">
+                    @for (var i = 0; i < SkeletonRowCount; i++)
                     {
-                        <li @key="row.Id" class="realm-sheet-item">
-                            <VehicleRow Row="row" OnClick="() => SelectAsync(EntityKind.Vehicle, row.Id)" />
-                        </li>
+                        <SkeletonRow @key="i" Kind="Section" />
                     }
-                }
-                else if (Section == Section.Places)
-                {
-                    foreach (var row in VmFactory.PlaceRows(Places, facts))
+                </ul>
+            }
+            else
+            {
+                <ul class="realm-sheet-list" data-testid="sheet-list">
+                    @if (Section == Section.Vehicles)
                     {
-                        <li @key="row.Id" class="realm-sheet-item">
-                            <PlaceRow Row="row" OnClick="() => SelectAsync(EntityKind.Place, row.Id)" />
-                        </li>
+                        foreach (var row in VmFactory.VehicleRows(Vehicles, facts))
+                        {
+                            <li @key="row.Id" class="realm-sheet-item">
+                                <VehicleRow Row="row" OnClick="() => SelectAsync(EntityKind.Vehicle, row.Id)" />
+                            </li>
+                        }
                     }
-                }
-                else
-                {
-                    foreach (var row in VmFactory.MemberRows(Members, facts))
+                    else if (Section == Section.Places)
                     {
-                        <li @key="row.Id" class="realm-sheet-item">
-                            <MemberRow Row="row" OnClick="() => SelectAsync(EntityKind.Member, row.Id)" />
-                        </li>
+                        foreach (var row in VmFactory.PlaceRows(Places, facts))
+                        {
+                            <li @key="row.Id" class="realm-sheet-item">
+                                <PlaceRow Row="row" OnClick="() => SelectAsync(EntityKind.Place, row.Id)" />
+                            </li>
+                        }
                     }
-                }
-            </ul>
+                    else
+                    {
+                        foreach (var row in VmFactory.MemberRows(Members, facts))
+                        {
+                            <li @key="row.Id" class="realm-sheet-item">
+                                <MemberRow Row="row" OnClick="() => SelectAsync(EntityKind.Member, row.Id)" />
+                            </li>
+                        }
+                    }
+                </ul>
+            }
         </div>
     }
 
@@ -178,6 +200,61 @@
     /// <summary>The circuit's session, cascaded by <c>RealmShell</c> (it reaches the popover the sheet is drawn in). Absent in a bare component test.</summary>
     [CascadingParameter]
     public IRealmSession? Session { get; set; }
+
+    /// <summary>The circuit's first-data deadlines, cascaded by <c>RealmShell</c>. Absent in a bare component test: the skeleton rows still show before data, the error never does.</summary>
+    [CascadingParameter]
+    public FirstDataWatch? FirstData { get; set; }
+
+    /// <summary>The skeleton rows of 01 section 3.8: three.</summary>
+    private const int SkeletonRowCount = 3;
+
+    private FirstDataWatch? _watching;
+    private FirstDataStage? _stageAtRender;
+    private bool _disposed;
+
+    // The stage moves on a timer, not on a parameter, so the content subscribes to re-render when it does; only the circuit runs this (prerender runs no OnAfterRender), so a subscription is
+    // made only where it will be disposed. A stage that moved between the render and the subscription is caught by comparing with the one the render saw.
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (!firstRender || FirstData is not { } watch)
+        {
+            return;
+        }
+
+        watch.Changed += OnFirstDataChanged;
+        _watching = watch;
+        if (watch.Stage != _stageAtRender)
+        {
+            StateHasChanged();
+        }
+    }
+
+    // Raised from a timer's thread: marshal, and never touch a disposed component.
+    private void OnFirstDataChanged()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _ = InvokeAsync(() =>
+        {
+            if (!_disposed)
+            {
+                StateHasChanged();
+            }
+        });
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        _disposed = true;
+        if (_watching is { } watch)
+        {
+            watch.Changed -= OnFirstDataChanged;
+        }
+    }
 
     // The session's own clock, never the wall clock. Only a render with neither an explicit Now nor a session (a bare component test) falls back to the system clock.
     private DateTimeOffset Moment => Now ?? Session?.Time.GetUtcNow() ?? TimeProvider.System.GetUtcNow();

@@ -70,6 +70,13 @@ html:has(.realm-location) body {
   display: none;
 }
 
+/* The status banners of ConnectionBanner (01 section 8.6): up to 2 lines. At 412 px the banner is 268 px wide; with the 16 px padding and 12 px gap of the static banner the longest copy
+   ("The royal messengers can't reach Home Assistant. Retrying…") needed three lines (203 px for two, 198 px available), so the status banners trim padding and gap to leave 215 px. */
+.realm-reconnect.realm-banner {
+  padding: 12px 10px;
+  gap: 8px;
+}
+
 .realm-reconnect-retry {
   min-height: 48px;
   padding: 0 16px;

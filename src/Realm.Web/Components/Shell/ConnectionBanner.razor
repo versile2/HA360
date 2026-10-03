@@ -1,21 +1,40 @@
+@using Realm.Demo
 @using Realm.Domain
 @implements IDisposable
 @inject ISnackbar Snackbar
 
-@* The two persistent banners and the recovery toast of 01 sections 8.6 and 9 (cases 2 and 4). It reads the circuit's session, so Demo and Live look alike.
-   Home Assistant wins when both are down: with no data coming in, the state of the Life360 trackers means nothing. The banner takes the position and the
-   look of the static reconnect banner of App.razor (class realm-reconnect, which holds the placement between the gear and the attribution control); the
-   inline style only swaps its surface and adds the status-coloured left border, with tokens, below the 1300 of that banner so the circuit's own
-   "Reconnecting to the court…" is never hidden behind it. Nothing is read in OnInitialized: the prerender pass creates a session and throws it away. *@
+@* The persistent banners and the recovery toast of 01 sections 8.6 and 9 (cases 1, 2 and 4). It reads the circuit's session, so Demo and Live look alike.
+   Home Assistant wins when it is down: with no data coming in, nothing else the page could say about the data means anything. Then the first-data banner ("Still summoning the
+   court…", 01 section 8.6: no snapshot yet and more than 8 s waited, the circuit's FirstDataWatch), then Life360. The banner takes the position and the look of the static
+   reconnect banner of App.razor (class realm-reconnect, which holds the placement between the gear and the attribution control, up to 2 lines; realm-banner trims its padding and gap so the
+   longest copy still fits two lines in the 268 px of a 412 px phone, measured with the real Atkinson Hyperlegible: 190 px of the 215 px the text has); the inline style only swaps its surface
+   and adds the status-coloured left border, with tokens, below the 1300 of that banner so the circuit's own "Reconnecting to the court…" is never hidden behind it. Nothing is read in
+   OnInitialized: the prerender pass creates a session and throws it away.
+   Demo only: a tap on the Home Assistant banner of a Demo session that runs the ha-down variant restores Home Assistant (DemoRealmSession.RestoreHomeAssistant, the variant's test hook of
+   02 section 9.5), so an E2E test can watch the banner clear and the toast show without a new window.__realm hook or URL parameter. No other session has the handler. *@
 @if (_banner is { } banner)
 {
-    <div class="realm-reconnect"
-         role="status"
-         data-testid="@banner.TestId"
-         style="z-index: 1290; justify-content: flex-start; text-align: start; background: var(--realm-surface-2); border-left: 4px solid var(--realm-warning);">
-        <MudIcon Icon="@banner.Icon" Size="Size.Small" Style="flex: none; color: var(--realm-warning);" />
-        <span>@banner.Text</span>
-    </div>
+    if (banner == HomeAssistantDown && Session is DemoRealmSession)
+    {
+        <div class="realm-reconnect realm-banner"
+             role="status"
+             data-testid="@banner.TestId"
+             style="@BannerStyle"
+             @onclick="RestoreHomeAssistant">
+            <MudIcon Icon="@banner.Icon" Size="Size.Small" Style="flex: none; color: var(--realm-warning);" />
+            <span>@banner.Text</span>
+        </div>
+    }
+    else
+    {
+        <div class="realm-reconnect realm-banner"
+             role="status"
+             data-testid="@banner.TestId"
+             style="@BannerStyle">
+            <MudIcon Icon="@banner.Icon" Size="Size.Small" Style="flex: none; color: var(--realm-warning);" />
+            <span>@banner.Text</span>
+        </div>
+    }
 }
 
 @code {
@@ -29,14 +48,27 @@
         Icons.Material.Filled.LocationOff,
         "Life360 isn't answering. Showing what Home Assistant knows.");
 
+    private const string BannerStyle = "z-index: 1290; justify-content: flex-start; text-align: start; background: var(--realm-surface-2); border-left: 4px solid var(--realm-warning);";
+
+    // The first-data banner has no test id: the ids of 01 Appendix B are closed (banner-ha, banner-life360, banner-reconnect), and it is not one of them. A test finds it by its text.
+    private static readonly BannerView FirstDataSlow = new(
+        null,
+        Icons.Material.Filled.Schedule,
+        "Still summoning the court…");
+
     private BannerView? _banner;
     private bool _homeAssistantWasDown;
     private bool _subscribed;
+    private FirstDataWatch? _watching;
     private bool _disposed;
 
     /// <summary>The circuit's session, cascaded by <c>RealmShell</c>.</summary>
     [CascadingParameter]
     private IRealmSession Session { get; set; } = default!;
+
+    /// <summary>The circuit's first-data deadlines, cascaded by <c>RealmShell</c>. Absent in a bare test: no first-data banner then.</summary>
+    [CascadingParameter]
+    private FirstDataWatch? FirstData { get; set; }
 
     // Only the circuit runs this (prerender does not), so a subscription is made only where it will be disposed.
     protected override void OnAfterRender(bool firstRender)
@@ -47,6 +79,12 @@
         }
 
         Session.Changed += OnChanged;
+        if (FirstData is { } watch)
+        {
+            watch.Changed += OnChanged;
+            _watching = watch;
+        }
+
         _subscribed = true;
         Apply();
         if (_banner is not null)
@@ -76,10 +114,13 @@
     }
 
     // A banner stands while the connection is Unavailable: the first 15 s of an outage read Reconnecting and never show one (02 section 1.8), and the Life360
-    // entry turns Unavailable only after 5 minutes of every tracker being down (D29). The toast follows only a banner that was shown.
+    // entry turns Unavailable only after 5 minutes of every tracker being down (D29). The toast follows only a banner that was shown. The first-data banner stands
+    // while the snapshot is still the empty one and the watch has run past 8 s; it stays through the 20 s of the sheet's error (both rows of 01 section 8.6 read "over"),
+    // and goes the moment data arrives.
     private void Apply()
     {
-        var connections = Session.Current.Connections;
+        var snapshot = Session.Current;
+        var connections = snapshot.Connections;
         var homeAssistant = StateOf(connections, ConnectionNames.HomeAssistant);
         if (homeAssistant == Realm.Domain.ConnectionState.Unavailable)
         {
@@ -103,9 +144,30 @@
                 });
         }
 
-        _banner = homeAssistant == Realm.Domain.ConnectionState.Unavailable
-            ? HomeAssistantDown
-            : StateOf(connections, ConnectionNames.Life360Trackers) == Realm.Domain.ConnectionState.Unavailable ? Life360Down : null;
+        var firstDataSlow = FirstData is { Stage: not FirstDataStage.Waiting }
+            && FirstDataWatch.IsPending(snapshot.Members, snapshot.Vehicles, snapshot.Places);
+
+        if (homeAssistant == Realm.Domain.ConnectionState.Unavailable)
+        {
+            _banner = HomeAssistantDown;
+        }
+        else if (firstDataSlow)
+        {
+            _banner = FirstDataSlow;
+        }
+        else
+        {
+            _banner = StateOf(connections, ConnectionNames.Life360Trackers) == Realm.Domain.ConnectionState.Unavailable ? Life360Down : null;
+        }
+    }
+
+    // Demo only (the markup attaches this to the Home Assistant banner of a DemoRealmSession and to nothing else): Home Assistant is back, and the session raises Changed.
+    private void RestoreHomeAssistant()
+    {
+        if (Session is DemoRealmSession demo)
+        {
+            demo.RestoreHomeAssistant();
+        }
     }
 
     private static Realm.Domain.ConnectionState? StateOf(IReadOnlyList<ConnectionVm> connections, string name)
@@ -128,7 +190,12 @@
         {
             Session.Changed -= OnChanged;
         }
+
+        if (_watching is { } watch)
+        {
+            watch.Changed -= OnChanged;
+        }
     }
 
-    private sealed record BannerView(string TestId, string Icon, string Text);
+    private sealed record BannerView(string? TestId, string Icon, string Text);
 }

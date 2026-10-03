@@ -1,0 +1,30 @@
+@using Realm.Web.Layout
+@using Realm.Web.State
+@inject NavigationManager Navigation
+@inject RealmUiState Ui
+
+@* The first-data-failed error of 01 section 8.6 ("First data failed (over 20 s)"): in the sheet body, in place of the skeleton rows, the sentence "The court didn't answer. Try again." and a Retry
+   button, and the sheet rises to 80 % to show it. SheetContent renders it only when the snapshot is still the empty one and the circuit's FirstDataWatch has passed 20 s; a refused
+   configuration (02 section 10.8) lands here the same way, because its data service never starts and the snapshot never fills.
+   The rise happens once, when the error first appears and only in the bottom sheet (the panel has no sizes; the reducer ignores the event there): a person who then lowers the sheet is not pulled
+   back up. It is done in OnAfterRender (never in prerender, which runs none) through the circuit's UI state, the same event the handle raises (HandleSet), because the page that owns the sheet
+   does not know about this state.
+   Retry reloads the page: a full navigation to the same address, which builds a new circuit, a new session and a new clock, so the banner, the sheet and the map all start again from nothing.
+   The button is a 48 px pill in the primary colours (realm-sheet.css); the sentence is a role=alert, said once when it appears. *@
+<div class="realm-first-data-error" role="alert">
+    <MudIcon Icon="@Icons.Material.Filled.CloudOff" Class="realm-first-data-error-icon" />
+    <p class="realm-first-data-error-text">The court didn't answer. Try again.</p>
+    <button type="button" class="realm-first-data-retry" @onclick="Retry">Retry</button>
+</div>
+
+@code {
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender && Ui.SheetSize != SheetSize.Tall)
+        {
+            Ui.Apply(new SheetEvent.HandleSet(SheetSize.Tall));
+        }
+    }
+
+    private void Retry() => Navigation.NavigateTo(Navigation.Uri, forceLoad: true);
+}
