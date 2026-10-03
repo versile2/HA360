@@ -43,4 +43,17 @@ public static class RealmPalette
 
     /// <summary>The 2 px outline of pins and bubbles (01 section 4.2); a token so that <c>realm-map.css</c> needs no colour literal.</summary>
     public const string PinOutline = "#0B0E1F";
+
+    /// <summary>
+    /// The opacity of a stale row (01 section 5.1, 72 percent). Not a colour but part of the contrast arithmetic of a faded row (<c>ContrastTests</c>), so the number lives here and
+    /// <c>realm-sheet.css</c> reads it as <c>--realm-row-stale-opacity</c>.
+    /// </summary>
+    public const double RowStaleOpacity = 0.72;
+
+    /// <summary>
+    /// The opacity of an offline row. 01 section 5.1 said 60 percent, which lays its "Gone dark" line (<c>--realm-stale</c>) on the surface at 3.24:1 and its second line (<c>--realm-text-2</c>) at 4.02:1,
+    /// both below the 4.5:1 of WCAG 2.2 AA for 13 px text (R2-13, D89 (4)). 80 percent is the round value above the 77.3 percent at which the weakest of them reaches 4.5:1 (4.72:1 at 80),
+    /// and <c>ContrastTests</c> keeps it there. Read by <c>realm-sheet.css</c> as <c>--realm-row-offline-opacity</c>.
+    /// </summary>
+    public const double RowOfflineOpacity = 0.8;
 }

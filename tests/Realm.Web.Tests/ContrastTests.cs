@@ -85,6 +85,33 @@ public sealed class ContrastTests
         Assert.Equal(0.86, alpha, 6);
     }
 
+    // R2-13, D89 (4): a faded row lays its text on the surface at the row's opacity. A stale row (72 percent) fades text and text-2; an offline row (80 percent) also fades the
+    // "Gone dark" line, which is drawn in --realm-stale. The opacities are the shipped constants, so a change to either number is judged here.
+    [Fact(DisplayName = "[AC-44a] the text of a stale (72 percent) and an offline (80 percent) row, faded over the surface, still meets 4.5:1")]
+    public void FadedRows_MeetTheTextMinimum()
+    {
+        var surface = Hex(RealmPalette.Surface);
+        var failures = new List<string>();
+        foreach (var (name, colour, opacity) in new (string, string, double)[]
+        {
+            ("text, stale row", RealmPalette.Text, RealmPalette.RowStaleOpacity),
+            ("text-2, stale row", RealmPalette.Text2, RealmPalette.RowStaleOpacity),
+            ("text, offline row", RealmPalette.Text, RealmPalette.RowOfflineOpacity),
+            ("text-2, offline row", RealmPalette.Text2, RealmPalette.RowOfflineOpacity),
+            ("stale (Gone dark line), offline row", RealmPalette.Stale, RealmPalette.RowOfflineOpacity),
+        })
+        {
+            var faded = Blend($"rgba({Hex(colour).R},{Hex(colour).G},{Hex(colour).B},{opacity.ToString(CultureInfo.InvariantCulture)})", surface);
+            var ratio = Ratio(faded, surface);
+            if (ratio < TextMinimum)
+            {
+                failures.Add($"{name}: {Show(ratio)}:1 is below {Show(TextMinimum)}:1");
+            }
+        }
+
+        Assert.Empty(failures);
+    }
+
     [Fact]
     public void Formula_GivesTwentyOneForBlackOnWhiteAndSeparatesTheTextBoundary()
     {

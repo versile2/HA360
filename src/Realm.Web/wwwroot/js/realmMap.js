@@ -1221,11 +1221,11 @@ function buildProbe() {
  * with the source data, has been shown. The (i) button still toggles the credits; using it ends the automatic fold. demo-offline draws no
  * third-party data and starts as the 48 px (i) button (01 section 3.3, AC-03).
  * @param {MapLibreMap} map
- * @param {HTMLElement} container
+ * @param {HTMLElement} scope the element that holds the controls (`controlScope`)
  * @param {StyleId} styleId the style the map opens with
  */
-function bindAttribution(map, container, styleId) {
-  const control = container.querySelector('.maplibregl-ctrl-attrib');
+function bindAttribution(map, scope, styleId) {
+  const control = scope.querySelector('.maplibregl-ctrl-attrib');
   const collapse = () => control?.classList.remove('maplibregl-compact-show');
   if (!attributionStartsExpanded(styleId)) {
     collapse();
@@ -1243,8 +1243,35 @@ function bindAttribution(map, container, styleId) {
     if (event.originalEvent) fold.fold();
   });
   map.on('click', () => fold.fold());
-  container.querySelector('.maplibregl-ctrl-attrib-button')?.addEventListener('click', () => fold.release());
+  scope.querySelector('.maplibregl-ctrl-attrib-button')?.addEventListener('click', () => fold.release());
   map.once('remove', () => fold.dispose());
+}
+
+/**
+ * Where the map's controls are (R1-15, 01 section 10.2): MapLibre builds its control container inside the element it draws into, after the canvas, so the attribution would be
+ * the keyboard's stop after the map. The page renders an empty `.realm-map-controls` before the bubbles and the right stack (MapControlsHost.razor), and the control container
+ * is moved there once the map has made it: the attribution button then comes second in the Tab order (gear, attribution, bubbles, recenter, layers, canvas). MapLibre keeps its own
+ * references to the control container and to its corner elements, and removes the container itself when the map is removed, so nothing else changes. A page without the host
+ * (a test page) keeps the controls where MapLibre put them.
+ * @param {HTMLElement} container the map's element
+ * @returns {HTMLElement} the element to search for the controls in
+ */
+function hostControls(container) {
+  const controls = container.querySelector('.maplibregl-control-container');
+  const host = document.querySelector('.realm-map-controls');
+  if (!(controls instanceof HTMLElement) || !(host instanceof HTMLElement)) return container;
+  host.appendChild(controls);
+  return host;
+}
+
+/**
+ * The element that holds the controls of the map in `container`: the page's host once `hostControls` has moved them there, the map's own element otherwise.
+ * @param {HTMLElement} container
+ * @returns {HTMLElement}
+ */
+function controlScope(container) {
+  const host = document.querySelector('.realm-map-controls');
+  return host instanceof HTMLElement && host.querySelector('.maplibregl-ctrl-attrib') ? host : container;
 }
 
 /**
@@ -1282,8 +1309,9 @@ function createMap(opts, container, restore) {
   // A non-empty customAttribution makes MapLibre build the compact control at once (it also credits MapLibre itself); the sources'
   // own attributions (OpenFreeMap, USGS, the demo text) are collected into it as their styles load.
   map.addControl(new (lib().AttributionControl)({ compact: true, customAttribution: MAPLIBRE_CREDIT }), 'top-right');
-  container.querySelector('.maplibregl-ctrl-attrib-button')?.setAttribute('data-testid', 'map-attribution');
-  bindAttribution(map, container, opts.styleId);
+  const scope = hostControls(container);
+  scope.querySelector('.maplibregl-ctrl-attrib-button')?.setAttribute('data-testid', 'map-attribution');
+  bindAttribution(map, scope, opts.styleId);
   return map;
 }
 
@@ -2209,7 +2237,7 @@ function bubbleHost(r, state) {
  */
 function measureKeepOuts(r, state) {
   const gear = document.querySelector('[data-testid="btn-settings"]');
-  const attribution = r.container.querySelector('.maplibregl-ctrl-attrib');
+  const attribution = controlScope(r.container).querySelector('.maplibregl-ctrl-attrib');
   const stack = document.querySelector('.realm-right-stack');
   /** @type {Array<{ left: number, top: number, right: number, bottom: number } | null>} */
   const boxes = [];

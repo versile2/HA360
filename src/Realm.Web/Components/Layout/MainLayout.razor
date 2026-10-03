@@ -4,20 +4,24 @@
 
 @* The shell is the outermost element and the five providers sit inside it (03 section 3.2 as amended by D67, CR2-001). A MudBlazor popover or
    dialog renders its content inside its own provider, and Blazor resolves a cascading parameter by walking up from the component that renders the
-   fragment, so a value reaches the sheet and every dialog only if the provider is below the cascade. The shell renders no element, so the DOM is
-   unchanged: the popover provider still comes before the nav. *@
+   fragment, so a value reaches the sheet and every dialog only if the provider is below the cascade. The shell renders no element.
+
+   The DOM order is the Tab order (01 section 10.2, R1-15, [AC-47]): the gear first, then the page (on Location: attribution, bubbles, right stack, map canvas), then
+   MudPopoverProvider, which is where the sheet lives (handle, section tabs, content), then the nav. The provider has to come after the page and before the nav, and the other
+   providers draw nothing in the page until a dialog or a snackbar is open, so their place is free. Stacking is by z-index, never by DOM order. *@
 <RealmShell>
     <MudThemeProvider Theme="Realm.Web.Theme.RealmTheme.Create()" IsDarkMode="true" ObserveSystemDarkModeChange="false" />
-    <MudPopoverProvider />
     <MudDialogProvider />
     <MudSnackbarProvider />
     <MudXProvider />
+
+    <ConnectionBanner />
+    <TopControls />
 
     <main id="realm-main" aria-label="The Realm">
         @Body
     </main>
 
-    <ConnectionBanner />
-    <TopControls />
+    <MudPopoverProvider />
     <BottomNav />
 </RealmShell>

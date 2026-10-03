@@ -229,17 +229,26 @@ div[mudsheet] .mud-sheet-container[data-testid="sheet"] .mud-sheet-content > con
   padding: 16px 16px 8px;
 }
 
+/* The section tabs (01 section 10.1): every tab is a 48 px target and the tabs are 8 px apart, so the control is a capsule of three 48 px pills with 8 px between them; the selected one is gold.
+   The capsule's hairline is an outline over the pills, not a border, so it takes no room. In the bottom sheet the 7 px above it are the room the Peek floor leaves between the handle
+   row and the tabs (168 px at 800 high = 1 border + 48 handle + 7 + 48 tabs + the 64 px navigation bar), which 01 section 11's tolerance of 2 px takes for the 8 px of 10.1; the
+   left panel has no handle, so its summary line above gives the room there. */
 .realm-segments {
   box-sizing: border-box;
   display: flex;
   flex: 0 0 auto;
-  gap: 4px;
+  gap: 8px;
   height: 48px;
   margin: 0 16px;
-  padding: 4px;
-  border: 1px solid var(--realm-line);
+  padding: 0;
   border-radius: 24px;
   background: var(--realm-surface-2);
+  outline: 1px solid var(--realm-line);
+  outline-offset: -1px;
+}
+
+div[mudsheet] .mud-sheet-container.mud-sheet-position-bottom[data-testid="sheet"] .realm-segments {
+  margin-top: 7px;
 }
 
 .realm-segment {
@@ -251,11 +260,12 @@ div[mudsheet] .mud-sheet-container[data-testid="sheet"] .mud-sheet-content > con
   justify-content: center;
   gap: 6px;
   min-width: 0;
-  min-height: 38px;
+  height: 48px;
+  min-height: 48px;
   margin: 0;
   padding: 0 8px;
   border: 0;
-  border-radius: 20px;
+  border-radius: 24px;
   background: none;
   color: var(--realm-text-2);
   font: inherit;
@@ -350,13 +360,14 @@ div[mudsheet] .mud-sheet-container[data-testid="sheet"] .mud-sheet-content > con
   box-shadow: 0 0 0 3px var(--realm-primary);
 }
 
-/* A stale fix is dimmed to 72 percent and an offline one to 60 (01 section 5.1). */
+/* A stale fix is dimmed to 72 percent and an offline one to 80 (01 section 5.1 said 60, which leaves the "Gone dark" line at 3.24:1; R2-13, D89 (4)). Both numbers are tokens
+   (RealmPalette.RowStaleOpacity and RowOfflineOpacity) because ContrastTests computes the faded text pairs from them. */
 .realm-row--stale {
-  opacity: 0.72;
+  opacity: var(--realm-row-stale-opacity);
 }
 
 .realm-row--offline {
-  opacity: 0.6;
+  opacity: var(--realm-row-offline-opacity);
 }
 
 .realm-row:focus-visible,
@@ -644,7 +655,7 @@ div[mudsheet] .mud-sheet-container[data-testid="sheet"] .mud-sheet-content > con
 }
 
 .realm-row-count--empty {
-  color: var(--realm-text-disabled);
+  color: var(--realm-stale); /* 6.64:1 on the surface; --realm-text-disabled is a disabled-control colour and fails the 4.5:1 of text (AC-44) */
 }
 
 /* The placeholder's info button (48 px) sits over the row's trailing edge, and its note over the row's text. */
@@ -710,7 +721,7 @@ div[mudsheet] .mud-sheet-container[data-testid="sheet"] .mud-sheet-content > con
   align-items: center;
   gap: 12px;
   height: 48px;
-  margin: 0 16px;
+  margin: 7px 16px 0; /* the 7 px of the tabs above it (.realm-segments): the handle row and the X are two targets */
   color: var(--realm-text);
   cursor: pointer;
   touch-action: manipulation;

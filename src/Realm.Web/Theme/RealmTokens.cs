@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -39,6 +40,8 @@ public static class RealmTokens
         ("scrim", RealmPalette.Scrim),
         ("focus", RealmPalette.Focus),
         ("pin-outline", RealmPalette.PinOutline),
+        ("row-stale-opacity", RealmPalette.RowStaleOpacity.ToString("0.##", CultureInfo.InvariantCulture)),
+        ("row-offline-opacity", RealmPalette.RowOfflineOpacity.ToString("0.##", CultureInfo.InvariantCulture)),
     ];
 
     private static readonly string Content = Build();

@@ -1,6 +1,6 @@
 @* The container of the edge bubbles (03 sections 3.4 and 4.6): empty on purpose. A member outside the visible rectangle is shown as a bubble on the edge of
    the map, and realmMap.js creates and moves those bubbles inside this element from the member payload, once per map frame, so C# is not involved per
-   frame. The component exists so that the DOM order, and with it the focus order of 01 section 10.2, is explicit: the bubbles come after the map and its
-   attribution control and before the sheet and the right stack. The group role gives the name a role to sit on; the element itself takes no pointer events
+   frame. The component exists so that the DOM order, and with it the focus order of 01 section 10.2, is explicit: the page renders it after the
+   attribution control (MapControlsHost) and before the right stack, the map canvas and the sheet. The group role gives the name a role to sit on; the element itself takes no pointer events
    (realm-map.css), so the map stays draggable under it. Blazor never diffs the children the script adds, because Razor renders none. *@
 <div class="realm-bubbles" role="group" aria-label="Members off screen"></div>

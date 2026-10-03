@@ -11,6 +11,7 @@
 
 html,
 body {
+  overscroll-behavior: none; /* no pull-to-refresh or bounce inside the HA companion WebView (03 section 5.8 item 6, CR2-020) */
   margin: 0;
   min-height: 100%;
   background: var(--realm-bg);
@@ -154,6 +155,8 @@ html:has(.realm-location) body {
   z-index: 1210;
   box-sizing: border-box;
   display: flex;
+  align-items: center;
+  gap: 8px;
   height: calc(var(--realm-nav-h) + env(safe-area-inset-bottom));
   padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
   border-top: 1px solid var(--realm-line);
@@ -167,6 +170,7 @@ html:has(.realm-location) body {
   align-items: center;
   justify-content: center;
   gap: 2px;
+  box-sizing: border-box;
   min-height: 48px;
   color: var(--realm-text-2);
   font-size: 0.875rem;
@@ -205,7 +209,8 @@ html:has(.realm-location) body {
 .realm-driving,
 .realm-not-found {
   box-sizing: border-box;
-  min-height: 100vh;
+  min-height: 100vh; /* fallback */
+  min-height: 100dvh; /* the visible height under a collapsing browser bar (03 section 5.8 item 7, CR2-020) */
   padding: 72px 16px calc(var(--realm-nav-h) + env(safe-area-inset-bottom) + 16px);
 }
 

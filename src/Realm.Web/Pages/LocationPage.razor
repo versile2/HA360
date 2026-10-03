@@ -30,6 +30,10 @@
    placeholder reserving the Peek band is drawn; the map and the sheet start together with the real layout, so the map's first default camera already uses the
    right padding.
 
+   The markup order is the keyboard order (01 section 10.2, R1-15, [AC-47]): the gear comes first (MainLayout), then here the attribution control's host, the edge bubbles' host, the right stack
+   and the map canvas, and after the page the sheet (MudPopoverProvider, which MainLayout renders after the main element and before the bottom nav). Nothing is moved by CSS: the elements are
+   all fixed and stack by z-index. The two hosts are empty; realmMap.js fills them.
+
    The sheet's state (section, selection, size) is the circuit's RealmUiState (03 section 3.6, scoped, so it outlives this page and a trip to Driving finds the selection where it was,
    R2-03) and every change goes through its reducer: a row, a pin, a zone, a bubble, the empty map, the handle, the header, the back arrow and the segments raise events and the sheet shows
    RealmUiState.Body (list, selection header or detail, D45). The map's Selection is read from it, so nothing else holds a selection; a tap on the entity that is already selected changes
@@ -51,6 +55,20 @@
         var pill = panel && Ui.Layout.PanelHidden && Ui.Selection is { } selected
             ? SelectionHeaderFormatter.For(selected, members, vehicles, places, RowFacts.Create(members, places, Ui.MeId, Session.Time.GetUtcNow(), Session.Zone))
             : null;
+
+        <MapControlsHost />
+
+        <EdgeBubbles />
+
+        <RightButtonStack Hidden="@(!_mapLayout.StackVisible)"
+                          Panel="@panel"
+                          Recenter="@_recenter"
+                          OnRecenter="OnRecenterAsync"
+                          MapStyleName="@StyleName"
+                          StyleId="@StyleId"
+                          ShowZones="@Prefs.ShowZones"
+                          OnStyleChosen="OnStyleChosenAsync"
+                          OnShowZonesChanged="OnShowZonesChangedAsync" />
 
         <MapView @ref="_map"
                  Members="@members"
@@ -104,16 +122,6 @@
         {
             <SheetSelectionHeader Header="pill" Pill="true" OnClear="OnClearAsync" />
         }
-
-        <RightButtonStack Hidden="@(!_mapLayout.StackVisible)"
-                          Panel="@panel"
-                          Recenter="@_recenter"
-                          OnRecenter="OnRecenterAsync"
-                          MapStyleName="@StyleName"
-                          StyleId="@StyleId"
-                          ShowZones="@Prefs.ShowZones"
-                          OnStyleChosen="OnStyleChosenAsync"
-                          OnShowZonesChanged="OnShowZonesChangedAsync" />
     }
     else
     {

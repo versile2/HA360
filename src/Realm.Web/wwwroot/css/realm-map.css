@@ -11,7 +11,7 @@
   background: var(--realm-bg);
 }
 
-/* Markers keep their own stacking context, so the highest pin (z-index 4) never paints over the attribution control (z-index 2). */
+/* Markers keep their own stacking context, so the highest pin (z-index 4) never paints over the layers above the map (the controls, the bubbles, the stack). */
 .realm-map .maplibregl-canvas-container {
   isolation: isolate;
 }
@@ -353,7 +353,18 @@
 
 /* ---- attribution: a 48 x 48 target, its right edge 12 px from the viewport edge (03 section 4.4) ------------------------------ */
 
-.realm-map .maplibregl-ctrl-top-right .maplibregl-ctrl-attrib.maplibregl-compact {
+/* The control container of the map lives in this host (MapControlsHost.razor, realmMap.js hostControls), so that the attribution is the second Tab stop and the canvas comes after the
+   right stack (01 section 10.2, R1-15). The host is the whole viewport, as the map's own element was, so MapLibre's corner positions (absolute, top right) land where they did; it takes no
+   pointer events (MapLibre gives the controls their own), and it stacks with the bubbles (5, which come after it) above the map (0). The rules below match the host, and the map's
+   own element too for a page that has no host. */
+.realm-map-controls {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+}
+
+:is(.realm-map, .realm-map-controls) .maplibregl-ctrl-top-right .maplibregl-ctrl-attrib.maplibregl-compact {
   position: relative;
   box-sizing: border-box;
   width: 48px;
@@ -365,7 +376,11 @@
   color: var(--realm-text);
 }
 
-.realm-map .maplibregl-ctrl-attrib.maplibregl-compact .maplibregl-ctrl-attrib-button {
+:is(.realm-map, .realm-map-controls) .maplibregl-ctrl-attrib.maplibregl-compact .maplibregl-ctrl-attrib-button:focus {
+  box-shadow: none; /* MapLibre's blue glow; the focus ring of the shell (app.css, :focus-visible) is the only indicator (01 section 10.2) */
+}
+
+:is(.realm-map, .realm-map-controls) .maplibregl-ctrl-attrib.maplibregl-compact .maplibregl-ctrl-attrib-button {
   top: 0;
   right: 0;
   bottom: auto;
@@ -382,19 +397,19 @@
 }
 
 /* Open: the credits read left of the button, on the same pill. */
-.realm-map .maplibregl-ctrl-top-right .maplibregl-ctrl-attrib.maplibregl-compact-show {
+:is(.realm-map, .realm-map-controls) .maplibregl-ctrl-top-right .maplibregl-ctrl-attrib.maplibregl-compact-show {
   width: auto;
   max-width: calc(100vw - 24px);
   padding: 6px 56px 6px 16px;
   border-radius: 24px;
 }
 
-.realm-map .maplibregl-ctrl-attrib a,
-.realm-map .maplibregl-ctrl-attrib a:hover {
+:is(.realm-map, .realm-map-controls) .maplibregl-ctrl-attrib a,
+:is(.realm-map, .realm-map-controls) .maplibregl-ctrl-attrib a:hover {
   color: var(--realm-text);
 }
 
-.realm-map .maplibregl-ctrl-attrib-inner {
+:is(.realm-map, .realm-map-controls) .maplibregl-ctrl-attrib-inner {
   font-family: var(--realm-font-body);
   font-size: 12px;
   line-height: 18px;
