@@ -11,13 +11,17 @@ COPY src/Realm.Web/Realm.Web.csproj                     src/Realm.Web/
 # so a stub stands in for the real components while restoring and is gone again at the end of the same layer. Without it the image
 # serves a 404 for the Blazor script (S2 fix 1). <RequiresAspNetWebAssets>true</RequiresAspNetWebAssets> in Realm.Web.csproj
 # would make the stub unnecessary.
+# D63: the image is built for linux-x64 only (config.yaml: arch amd64), so restore and publish both name that runtime. A RID-specific publish
+# keeps only the native libraries of linux-x64 (EF Core's SQLite ships one per platform, which made the app layer 52.7 MB). Restore needs the
+# same -r and properties as publish: publish below runs --no-restore, and an assets file without a linux-x64 target fails it with NETSDK1047.
+# The runtime stays framework-dependent (the aspnet base image supplies it); ReadyToRun and trimming stay off (03 section 6.3).
 RUN touch src/Realm.Web/RestoreStub.razor \
- && dotnet restore src/Realm.Web/Realm.Web.csproj \
+ && dotnet restore src/Realm.Web/Realm.Web.csproj -r linux-x64 -p:SelfContained=false -p:UseAppHost=false \
  && rm src/Realm.Web/RestoreStub.razor
 COPY src/ src/
 ARG VERSION=0.0.0-dev
 ARG REVISION=unknown
-RUN dotnet publish src/Realm.Web/Realm.Web.csproj -c Release -o /out --no-restore \
+RUN dotnet publish src/Realm.Web/Realm.Web.csproj -c Release -o /out --no-restore -r linux-x64 --self-contained false \
       -p:UseAppHost=false -p:DebugType=none -p:Version=${VERSION} -p:ContinuousIntegrationBuild=true
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0

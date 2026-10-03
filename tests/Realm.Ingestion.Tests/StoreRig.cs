@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Realm.Domain;
 using Realm.Infrastructure.Backfill;
 using Realm.Infrastructure.Data;
+using Realm.Infrastructure.Diagnostics;
 using Realm.Infrastructure.Ha;
 using Realm.Infrastructure.Ingestion;
 using Realm.Infrastructure.Options;
@@ -36,12 +37,13 @@ internal sealed class StoreRig : IAsyncDisposable
         FilePath = Path.Combine(_folder, "realm.db");
         Options = options;
         Time = new ManualTimeProvider(now);
-        new SchemaBootstrap(FilePath, new RecordingLogger<SchemaBootstrap>(), Time).Run();
+        Counters = new ServiceCounters(Time);
+        new SchemaBootstrap(FilePath, new RecordingLogger<SchemaBootstrap>(), Time, Counters).Run();
         _provider = new ServiceCollection()
             .AddPooledDbContextFactory<RealmDb>(builder => RealmDb.Configure(builder, FilePath))
             .BuildServiceProvider();
         var factory = _provider.GetRequiredService<IDbContextFactory<RealmDb>>();
-        Writer = new DbWriter(factory, Time, new RecordingLogger<DbWriter>());
+        Writer = new DbWriter(factory, Time, new RecordingLogger<DbWriter>(), Counters);
         Queries = new SqliteRealmQueries(factory);
         Gateway = new FakeHaGateway { History = History.Answer };
         (State, Notifier, Discovery, Hydrator, Stats, Pipeline, PipelineLog) = NewProcess();
@@ -50,6 +52,9 @@ internal sealed class StoreRig : IAsyncDisposable
     public RealmOptions Options { get; }
 
     public ManualTimeProvider Time { get; }
+
+    /// <summary>The counters every service of the rig fills in, as the Live host's single instance does for <c>diagnostics.json</c>.</summary>
+    public ServiceCounters Counters { get; }
 
     public string FilePath { get; }
 
@@ -109,14 +114,14 @@ internal sealed class StoreRig : IAsyncDisposable
 
     /// <summary>The backfill service over this rig, on its own recording logger.</summary>
     public BackfillService NewBackfill(RecordingLogger<BackfillService>? log = null) =>
-        new(Gateway, Queries, Writer, Discovery, Hydrator, State, Stats, Options, Time, log ?? new RecordingLogger<BackfillService>());
+        new(Gateway, Queries, Writer, Discovery, Hydrator, State, Stats, Options, Time, log ?? new RecordingLogger<BackfillService>(), Counters);
 
     /// <summary>
     /// The retention job over this rig. A test that moves the clock by days gives it a clock of its own, so the writer's two second timer does not fire a
     /// hundred thousand times on the way.
     /// </summary>
     public RetentionService NewRetention(TimeProvider? time = null, RecordingLogger<RetentionService>? log = null) =>
-        new(Writer, State, Options, time ?? Time, log ?? new RecordingLogger<RetentionService>());
+        new(Writer, State, Options, time ?? Time, log ?? new RecordingLogger<RetentionService>(), Counters);
 
     /// <summary>Discovery reports these members: the discovery state is published and the pipeline applies it (and hydrates each new member from the file).</summary>
     public Task DiscoverAsync(params ResolvedMember[] members) => DiscoverInZoneAsync("UTC", members);
@@ -239,7 +244,7 @@ internal sealed class StoreRig : IAsyncDisposable
         var hydrator = new RealmStateHydrator(Queries);
         var stats = new StatsService(state, discovery, notifier, Queries, Writer, Options, Time);
         var log = new RecordingLogger<IngestionPipeline>();
-        var pipeline = new IngestionPipeline(Options, state, notifier, Writer, Queries, Time, log, hydrator);
+        var pipeline = new IngestionPipeline(Options, state, notifier, Writer, Queries, Time, log, hydrator, null, Counters);
         return (state, notifier, discovery, hydrator, stats, pipeline, log);
     }
 

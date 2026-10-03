@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Realm.Infrastructure.Diagnostics;
 
 namespace Realm.Infrastructure.Data;
 
@@ -21,12 +22,19 @@ public sealed class SchemaBootstrap : IHostedService
     private readonly string _path;
     private readonly ILogger<SchemaBootstrap> _logger;
     private readonly TimeProvider _time;
+    private readonly ServiceCounters? _counters;
+    private bool _unclean;
 
-    public SchemaBootstrap(string databasePath, ILogger<SchemaBootstrap> logger, TimeProvider time)
+    /// <param name="databasePath">The SQLite file.</param>
+    /// <param name="logger">Where the findings are logged.</param>
+    /// <param name="time">The clock of <c>meta.created_utc</c> and of the quarantine name.</param>
+    /// <param name="counters">Where the schema version and the unclean-shutdown finding are kept for <c>diagnostics.json</c>; null keeps nothing.</param>
+    public SchemaBootstrap(string databasePath, ILogger<SchemaBootstrap> logger, TimeProvider time, ServiceCounters? counters = null)
     {
         _path = databasePath;
         _logger = logger;
         _time = time;
+        _counters = counters;
     }
 
     /// <summary>Runs the bootstrap synchronously (it is fast) so nothing touches the database before it finishes.</summary>
@@ -44,6 +52,7 @@ public sealed class SchemaBootstrap : IHostedService
     /// <summary>Prepares the database file and returns its schema version.</summary>
     public int Run()
     {
+        _unclean = false;
         var version = TryInitialize();
         if (version is null)
         {
@@ -52,6 +61,9 @@ public sealed class SchemaBootstrap : IHostedService
                 ?? throw new InvalidOperationException("A newly created database file was reported damaged");
         }
 
+        // Whether the previous run stopped cleanly is the finding of the file as it was found, also when it was then quarantined and replaced (the
+        // finding stays), and is the unclean_shutdown warning of diagnostics.json (02 section 7.8, 03 section 2.11).
+        _counters?.RecordStartup(version.Value, _unclean);
         return version.Value;
     }
 
@@ -64,6 +76,7 @@ public sealed class SchemaBootstrap : IHostedService
             var existingVersion = SchemaRunner.ReadUserVersion(connection);
             if (existingVersion > 0 && WasUncleanShutdown(connection))
             {
+                _unclean = true;
                 _logger.LogWarning("clean_shutdown = 0 found at start; running quick_check");
                 if (!QuickCheckPasses(connection))
                 {

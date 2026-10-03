@@ -26,10 +26,21 @@ public sealed class RealmState
     /// The state of a host that has just started: no members, UTC, and Home Assistant being reached for the first time (Reconnecting for 15 s, then
     /// Unavailable), which is what the pipeline's first status says too.
     /// </summary>
-    public static RealmState CreateInitial(RealmOptions options, TimeProvider time)
+    /// <param name="options">The add-on options.</param>
+    /// <param name="time">The clock of the first connection status.</param>
+    /// <param name="refused">
+    /// True when the options were refused (02 section 3.3): no service that talks to Home Assistant starts, so nothing will ever replace this snapshot, and a
+    /// Connecting status would read Reconnecting for 15 s and then Unavailable with no first data behind it. The Home Assistant entry is built from
+    /// <see cref="HaConnectionState.NotConfigured"/> instead, which reads Unavailable at once (02 section 1.8, 03 section 9.3), so the UI shows the first-data
+    /// error of 01 section 8.6 and <c>diagnostics.json</c> raises <c>ha_unavailable</c>.
+    /// </param>
+    public static RealmState CreateInitial(RealmOptions options, TimeProvider time, bool refused = false)
     {
         var now = time.GetUtcNow();
-        return new RealmState(SnapshotBuilder.Initial(options, now, new HaConnectionStatus(HaConnectionState.Connecting, now, null, 0, null)));
+        var status = refused
+            ? new HaConnectionStatus(HaConnectionState.NotConfigured, null, null, 0, null)
+            : new HaConnectionStatus(HaConnectionState.Connecting, now, null, 0, null);
+        return new RealmState(SnapshotBuilder.Initial(options, now, status));
     }
 
     public RealmSnapshot Current => _current.Snapshot;

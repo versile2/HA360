@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Realm.Domain;
+using Realm.Infrastructure.Diagnostics;
 using Realm.Infrastructure.Ha;
 using Realm.Infrastructure.Hosting;
 using Realm.Infrastructure.Ingestion;
@@ -52,11 +53,13 @@ public sealed class BackfillService : BackgroundService
     private readonly RealmOptions _options;
     private readonly TimeProvider _time;
     private readonly ILogger _logger;
+    private readonly ServiceCounters? _counters;
     private readonly ResilientLoop _loop;
     private readonly DetectionSettings _detection;
     private long _rows;
     private long _trips;
 
+    /// <param name="counters">Where finished gap-fills and the rows they queued are counted for <c>diagnostics.json</c>; null counts nothing.</param>
     public BackfillService(
         IHaGateway gateway,
         IRealmQueries queries,
@@ -67,7 +70,8 @@ public sealed class BackfillService : BackgroundService
         StatsService stats,
         RealmOptions options,
         TimeProvider time,
-        ILogger<BackfillService> logger)
+        ILogger<BackfillService> logger,
+        ServiceCounters? counters = null)
     {
         _gateway = gateway;
         _queries = queries;
@@ -79,6 +83,7 @@ public sealed class BackfillService : BackgroundService
         _options = options;
         _time = time;
         _logger = logger;
+        _counters = counters;
         _detection = new DetectionSettings(options);
         _loop = new ResilientLoop(nameof(BackfillService), logger, time);
     }
@@ -103,6 +108,7 @@ public sealed class BackfillService : BackgroundService
         }
 
         var now = _time.GetUtcNow();
+        var before = RowsBackfilled;
         foreach (var member in _discovery.Current.Members.Where(m => m.Kind == MemberKind.Live))
         {
             if (_hydrator.MarkOf(member.Id) is { } mark)
@@ -110,6 +116,9 @@ public sealed class BackfillService : BackgroundService
                 await BackfillMemberAsync(member, mark, now, cancellationToken);
             }
         }
+
+        // A run that finished: a run that was switched off (above) or that threw is not one.
+        _counters?.RecordBackfillRun(RowsBackfilled - before);
     }
 
     protected override Task ExecuteAsync(CancellationToken stoppingToken) => _loop.RunAsync(RunAsync, stoppingToken);

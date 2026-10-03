@@ -10,6 +10,7 @@ using Realm.Domain;
 using Realm.Infrastructure.Avatars;
 using Realm.Infrastructure.Backfill;
 using Realm.Infrastructure.Data;
+using Realm.Infrastructure.Diagnostics;
 using Realm.Infrastructure.Ha;
 using Realm.Infrastructure.Ingestion;
 using Realm.Infrastructure.Options;
@@ -81,19 +82,21 @@ public static class RealmLiveServiceCollectionExtensions
     /// <summary>
     /// Registers the Live services: the SQLite data layer first (its hosted services must start first), then the HA connection, the discovery refresher and
     /// the ingestion pipeline, then the trip recorder, the backfill and the retention job, the statistics service, the data source and its session factory,
-    /// and the avatar proxy. Options that fail the validation of 02 section 3.3 refuse the
-    /// data service: nothing but a logged reason starts, and the UI keeps what it has (the first-data error of 01 section 8.6).
+    /// and the avatar proxy, the time zone self-check and the diagnostics of <c>diagnostics.json</c> (<see cref="DiagnosticsSnapshotBuilder"/>). Options that
+    /// fail the validation of 02 section 3.3 refuse the data service: nothing but a logged reason starts, the state is built as <c>NotConfigured</c> so that
+    /// Home Assistant reads Unavailable at once (the first-data error of 01 section 8.6, not Reconnecting for ever), and the diagnostics say so.
     /// </summary>
     /// <param name="configuration">Where <c>Realm:Ha:*</c>, <c>Realm:Db</c>, <c>SUPERVISOR_TOKEN</c> and the mapped options live.</param>
     /// <param name="demoFactory">The session factory for a circuit that asked for Demo with <c>?demo=1</c>; null when this host cannot make Demo sessions.</param>
     public static IServiceCollection AddRealmLive(this IServiceCollection services, IConfiguration configuration, IRealmSessionFactory? demoFactory = null)
     {
         var settings = LiveSettings.Read(configuration);
+        var refused = settings.Errors.Count > 0;
 
         services.TryAddSingleton(TimeProvider.System);   // the state, the REST client, the connection, the refresher and the avatar service all take one
         services.AddRealmData(settings.DatabasePath);
         services.AddSingleton(settings.Options);
-        services.AddSingleton(provider => RealmState.CreateInitial(settings.Options, provider.GetRequiredService<TimeProvider>()));
+        services.AddSingleton(provider => RealmState.CreateInitial(settings.Options, provider.GetRequiredService<TimeProvider>(), refused));
         services.AddSingleton<DiscoveryState>();
         services.AddSingleton<ChangeNotifier>();
         services.AddSingleton<StatsService>();
@@ -104,14 +107,16 @@ public static class RealmLiveServiceCollectionExtensions
             NewHaClient(settings.RestBase),
             new HaRestOptions { BaseAddress = settings.RestBase, Token = settings.Token },
             provider.GetRequiredService<TimeProvider>(),
-            provider.GetRequiredService<ILogger<HaRestClient>>()));
+            provider.GetRequiredService<ILogger<HaRestClient>>(),
+            provider.GetRequiredService<ServiceCounters>()));
         services.AddSingleton(provider =>
         {
             var connection = new HaWebSocketConnection(
                 new HaWebSocketOptions { Endpoint = settings.WebSocket, Token = settings.Token },
                 (item, token) => provider.GetRequiredService<IngestionPipeline>().EnqueueAsync(new FeedItem(item), token),
                 provider.GetRequiredService<TimeProvider>(),
-                provider.GetRequiredService<ILogger<HaWebSocketConnection>>());
+                provider.GetRequiredService<ILogger<HaWebSocketConnection>>(),
+                provider.GetRequiredService<ServiceCounters>());
             connection.StatusChanged += status => provider.GetRequiredService<IngestionPipeline>().ApplyConnectionStatus(status);
             return connection;
         });
@@ -123,7 +128,8 @@ public static class RealmLiveServiceCollectionExtensions
             provider.GetRequiredService<DiscoveryState>(),
             (item, token) => provider.GetRequiredService<IngestionPipeline>().EnqueueAsync(item, token),
             provider.GetRequiredService<TimeProvider>(),
-            provider.GetRequiredService<ILogger<HaDiscoveryRefresher>>()));
+            provider.GetRequiredService<ILogger<HaDiscoveryRefresher>>(),
+            provider.GetRequiredService<ServiceCounters>()));
         services.AddSingleton<RealmStateHydrator>();
         services.AddSingleton<IngestionPipeline>();
         services.AddSingleton<TripRecorder>();
@@ -136,11 +142,38 @@ public static class RealmLiveServiceCollectionExtensions
             NewLife360Client(),
             settings.AvatarCacheDirectory,
             provider.GetRequiredService<TimeProvider>(),
-            provider.GetRequiredService<ILogger<AvatarService>>()));
+            provider.GetRequiredService<ILogger<AvatarService>>(),
+            provider.GetRequiredService<ServiceCounters>()));
+
+        // diagnostics.json (03 section 2.11): answered in Live from the counters and the current snapshot. A refused host has no websocket and no pipeline to
+        // ask, so its websocket reads notConfigured (the state is already Unavailable, R3-07) and nobody has a stale threshold of their own.
+        services.AddSingleton<IDiagnostics>(provider =>
+        {
+            Func<HaConnectionStatus?> websocket = static () => null;
+            Func<IReadOnlyDictionary<string, int>> thresholds = static () => new Dictionary<string, int>();
+            if (!refused)
+            {
+                var connection = provider.GetRequiredService<HaWebSocketConnection>();
+                websocket = () => connection.Status;
+                thresholds = provider.GetRequiredService<IngestionPipeline>().StaleAfterMinutes;
+            }
+
+            return new DiagnosticsSnapshotBuilder(
+                provider.GetRequiredService<RealmState>(),
+                settings.Options,
+                provider.GetRequiredService<ServiceCounters>(),
+                provider.GetRequiredService<TimeProvider>(),
+                settings.DatabasePath,
+                websocket,
+                thresholds);
+        });
 
         // The options are reported first, whatever follows. A refusal starts none of the services that talk to Home Assistant or work from what it reports.
         services.AddHostedService(provider => new OptionsReport(settings.Errors, settings.Warnings, provider.GetRequiredService<ILogger<OptionsReport>>()));
-        if (settings.Errors.Count == 0)
+
+        // The time zone self-check of 03 section 5.1 runs whatever the options say: it is about this machine, and its answer is a warning of diagnostics.json.
+        services.AddHostedService(provider => new ZoneDataSelfCheck(provider.GetRequiredService<ServiceCounters>(), provider.GetRequiredService<ILogger<ZoneDataSelfCheck>>()));
+        if (!refused)
         {
             services.AddHostedService(provider => provider.GetRequiredService<HaWebSocketConnection>());
             services.AddHostedService(provider => provider.GetRequiredService<HaDiscoveryRefresher>());

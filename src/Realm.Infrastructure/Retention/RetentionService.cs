@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Realm.Infrastructure.Data;
+using Realm.Infrastructure.Diagnostics;
 using Realm.Infrastructure.Hosting;
 using Realm.Infrastructure.Ingestion;
 using Realm.Infrastructure.Options;
@@ -34,18 +35,27 @@ public sealed class RetentionService : BackgroundService
     private readonly RealmOptions _options;
     private readonly TimeProvider _time;
     private readonly ILogger _logger;
+    private readonly ServiceCounters? _counters;
     private readonly ResilientLoop _loop;
     private DateTimeOffset? _lastCheckpoint;
     private long _lastRunMs;
     private long _lastDeleted;
 
-    public RetentionService(DbWriter writer, RealmState state, RealmOptions options, TimeProvider time, ILogger<RetentionService> logger)
+    /// <param name="counters">Where finished prune runs and the rows they deleted are counted for <c>diagnostics.json</c>; null counts nothing.</param>
+    public RetentionService(
+        DbWriter writer,
+        RealmState state,
+        RealmOptions options,
+        TimeProvider time,
+        ILogger<RetentionService> logger,
+        ServiceCounters? counters = null)
     {
         _writer = writer;
         _state = state;
         _options = options;
         _time = time;
         _logger = logger;
+        _counters = counters;
         _loop = new ResilientLoop(nameof(RetentionService), logger, time);
     }
 
@@ -124,6 +134,7 @@ public sealed class RetentionService : BackgroundService
 
         Interlocked.Exchange(ref _lastDeleted, deleted);
         Interlocked.Exchange(ref _lastRunMs, _time.GetUtcNow().ToUnixTimeMilliseconds());
+        _counters?.RecordRetentionRun(deleted);
         if (deleted > 0)
         {
             _logger.LogInformation("Retention deleted {Rows} rows older than {Days} days", deleted, _options.RetentionFixDays);
