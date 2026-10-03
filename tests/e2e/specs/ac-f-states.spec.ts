@@ -11,7 +11,7 @@
 // the Expanded panel has no handle and no Peek, and its focus rules are the detail's alone.
 import type { Locator, Page } from '@playwright/test';
 
-import { castMember, demo, expect, expectHistoryDepth, loadDemoCast, mapReady, readHook, tapEmptyMap, test } from '../fixtures.js';
+import { castMember, demo, expect, expectHistoryDepth, loadDemoCast, mapReady, proxyControl, readHook, saveShot, tapEmptyMap, test } from '../fixtures.js';
 
 const handle = (page: Page): Locator => page.getByTestId('sheet-handle');
 const back = (page: Page): Locator => page.getByTestId('detail-back');
@@ -129,5 +129,53 @@ test.describe('[AC-47a] the focus flow of D45', () => {
       return `${element.tagName.toLowerCase()}${testId === null ? '' : `[data-testid=${testId}]`} (${insideSheet ? 'inside' : 'outside'} the sheet)`;
     });
     test.info().annotations.push({ type: 'info', description: `[AC-47a] Shift+Tab from the handle landed on ${landed}` });
+  });
+});
+
+// ==== S15b: the connection states ([AC-49a] E2E half, SC16, [X-04]) =====================================================================================
+// [AC-49b] (skeleton rows, "Still summoning the court…" after 8 s, the error and Retry after 20 s) cannot be reached in Demo, which has its data at once; it is covered by
+// FirstDataWatchTests and the component tests (dotnet). Here: the Demo `ha-down` banner, its gallery scene, and the circuit reconnect banner.
+
+const HA_DOWN_TEXT = "The royal messengers can't reach Home Assistant. Retrying…";
+
+test.describe('[AC-49a] the Home Assistant banner under ?variant=ha-down', () => {
+  test('[AC-49a] the banner shows its copy as a polite status within 5 s, stays clear of the gear, and clears with a toast when Home Assistant is restored', async ({ page }) => {
+    await demo(page, { variant: 'ha-down' });
+    const banner = page.getByTestId('banner-ha');
+    await expect(banner, 'the banner shows').toBeVisible({ timeout: 5000 });
+    await expect(banner).toContainText(HA_DOWN_TEXT);
+    await expect(banner, 'a polite status region').toHaveAttribute('role', 'status');
+
+    const gear = await page.getByTestId('btn-settings').boundingBox();
+    const box = await banner.boundingBox();
+    expect(gear, 'the gear has a box').not.toBeNull();
+    expect(box, 'the banner has a box').not.toBeNull();
+    const overlaps = box!.x < gear!.x + gear!.width && box!.x + box!.width > gear!.x && box!.y < gear!.y + gear!.height && box!.y + box!.height > gear!.y;
+    expect(overlaps, 'the banner does not cover the gear').toBe(false);
+
+    await banner.click();
+    await expect(banner, 'the banner clears when Home Assistant is back').toHaveCount(0);
+  });
+
+  test('[GAL] SC16-variant-ha-down', { tag: ['@phone', '@unfolded'] }, async ({ page }, testInfo) => {
+    await demo(page, { variant: 'ha-down' });
+    await expect(page.getByTestId('banner-ha')).toBeVisible({ timeout: 5000 });
+    await saveShot(page, testInfo, 'SC16-variant-ha-down');
+  });
+});
+
+test.describe('[X-04] the circuit reconnect banner', () => {
+  test('[X-04] after the sockets drop the static banner "Reconnecting to the court…" shows and clears, and the selection is unchanged', async ({ page, request }) => {
+    await demo(page);
+    await mapReady(page);
+    await page.getByTestId('pin-member-jester').click();
+    await expect(header(page), 'the selection header shows').toBeVisible();
+
+    await proxyControl(request, 'drop-websockets');
+    const reconnect = page.getByTestId('banner-reconnect');
+    await expect(reconnect, 'the reconnect banner shows').toBeVisible({ timeout: 15000 });
+    await expect(reconnect).toContainText('Reconnecting to the court…');
+    await expect(reconnect, 'the banner clears when the circuit is back').toBeHidden({ timeout: 60000 });
+    await expect(header(page), 'the selection survived the reconnect').toBeVisible();
   });
 });
