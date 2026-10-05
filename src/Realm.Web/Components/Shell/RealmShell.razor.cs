@@ -84,7 +84,7 @@ public sealed partial class RealmShell : IAsyncDisposable
             Week: ParseWeek(First(query, "week")));
 
         _session = SessionFactory.Create(demo);
-        _firstData = new FirstDataWatch(_session.Time);
+        _firstData = new FirstDataWatch(() => Session.Time);
     }
 
     /// <inheritdoc />

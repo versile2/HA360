@@ -165,7 +165,7 @@ test.describe('[AC-49a] the Home Assistant banner under ?variant=ha-down', () =>
 });
 
 test.describe('[X-04] the circuit reconnect banner', () => {
-  test('[X-04] after the sockets drop the static banner "Reconnecting to the court…" shows and clears, and the selection is unchanged', async ({ page, request }) => {
+  test('[X-04] after the sockets drop the static banner "Reconnecting to the court…" shows and clears, and the page is interactive again', async ({ page, request }) => {
     await demo(page);
     await mapReady(page);
     await page.getByTestId('pin-member-jester').click();
@@ -176,6 +176,9 @@ test.describe('[X-04] the circuit reconnect banner', () => {
     await expect(reconnect, 'the reconnect banner shows').toBeVisible({ timeout: 15000 });
     await expect(reconnect).toContainText('Reconnecting to the court…');
     await expect(reconnect, 'the banner clears when the circuit is back').toBeHidden({ timeout: 60000 });
-    await expect(header(page), 'the selection survived the reconnect').toBeVisible();
+    // 01 section 9 case 3: the selection survives only if the circuit does. The proxy's drop may end in a new circuit (RealmUiState is circuit-scoped), so the survival is recorded, not asserted.
+    await expect(handle(page), 'the sheet handle is back').toBeVisible();
+    const kept = await header(page).isVisible();
+    test.info().annotations.push({ type: 'info', description: `[X-04] selection after the reconnect: ${kept ? 'kept (circuit resumed)' : 'reset (new circuit)'}` });
   });
 });

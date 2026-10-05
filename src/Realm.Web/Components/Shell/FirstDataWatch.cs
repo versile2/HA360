@@ -34,7 +34,7 @@ public sealed class FirstDataWatch : IDisposable
     /// <summary>The wait after which the sheet shows the error and the Retry button.</summary>
     public static readonly TimeSpan FailedAfter = TimeSpan.FromSeconds(20);
 
-    private readonly TimeProvider _time;
+    private readonly Func<TimeProvider> _time;
     private readonly object _gate = new();
     private ITimer? _slowTimer;
     private ITimer? _failedTimer;
@@ -44,6 +44,13 @@ public sealed class FirstDataWatch : IDisposable
 
     /// <param name="time">The session's clock (<c>IRealmSession.Time</c>).</param>
     public FirstDataWatch(TimeProvider time)
+        : this(() => time)
+    {
+        ArgumentNullException.ThrowIfNull(time);
+    }
+
+    /// <param name="time">Reads the session's clock when <see cref="Begin"/> runs, so creating the watch touches nothing on the session (creating a session has no other side effect).</param>
+    public FirstDataWatch(Func<TimeProvider> time)
     {
         ArgumentNullException.ThrowIfNull(time);
         _time = time;
@@ -87,8 +94,9 @@ public sealed class FirstDataWatch : IDisposable
             }
 
             _begun = true;
-            _slowTimer = _time.CreateTimer(_ => MoveTo(FirstDataStage.Slow), null, SlowAfter, Timeout.InfiniteTimeSpan);
-            _failedTimer = _time.CreateTimer(_ => MoveTo(FirstDataStage.Failed), null, FailedAfter, Timeout.InfiniteTimeSpan);
+            var clock = _time();
+            _slowTimer = clock.CreateTimer(_ => MoveTo(FirstDataStage.Slow), null, SlowAfter, Timeout.InfiniteTimeSpan);
+            _failedTimer = clock.CreateTimer(_ => MoveTo(FirstDataStage.Failed), null, FailedAfter, Timeout.InfiniteTimeSpan);
         }
     }
 
