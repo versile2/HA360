@@ -209,7 +209,11 @@ export const test = base.extend<Options>({
     const proxyHost = `${PROXY_HOST}:${PROXY_PORT}`;
     const problems: string[] = [];
 
-    page.on('pageerror', (error) => problems.push(`page error: ${error.message}`));
+    page.on('pageerror', (error) => {
+      // An entry without a url filter also covers an uncaught page error with a matching message (a socket dropped on purpose makes SignalR throw one).
+      if (allowed.some((entry) => entry.url === undefined && entry.pattern.test(error.message))) return;
+      problems.push(`page error: ${error.message}`);
+    });
     page.on('console', (message) => {
       if (message.type() !== 'error') return;
       const text = message.text();

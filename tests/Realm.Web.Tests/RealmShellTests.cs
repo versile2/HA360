@@ -249,7 +249,8 @@ public sealed class RealmShellTests : ComponentTestBase
         RenderShell();
 
         var session = Assert.Single(factory.Sessions);
-        Assert.Equal(0, session.MemberAccessCount);   // no snapshot built, no clock read, no Changed subscription (which would start the ha-down timer)
+        Assert.Equal(0, session.MemberAccessCount);   // no snapshot built, no Changed subscription (which would start the ha-down timer)
+        Assert.Equal(1, session.TimeAccessCount);     // the first-data watch reads the session clock once, when the circuit's first render starts it (FirstDataWatch.Begin, 01 section 8.6)
         Assert.Equal(0, session.DisposeCount);
     }
 
@@ -330,6 +331,8 @@ public sealed class RealmShellTests : ComponentTestBase
     {
         public int MemberAccessCount { get; private set; }
 
+        public int TimeAccessCount { get; private set; }
+
         public int DisposeCount { get; private set; }
 
         public RealmSnapshot Current
@@ -356,7 +359,7 @@ public sealed class RealmShellTests : ComponentTestBase
         {
             get
             {
-                MemberAccessCount++;
+                TimeAccessCount++;
                 return inner.Time;
             }
         }
