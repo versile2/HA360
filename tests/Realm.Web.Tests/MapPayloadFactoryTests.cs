@@ -462,7 +462,8 @@ public sealed class MapPayloadFactoryTests
         Assert.NotNull(prince.Lon);
         Assert.False(prince.LowBattery);
         Assert.False(prince.DrivingFresh);
-        Assert.Contains(DemoCast.Prince.StaticLabel!, prince.AriaLabel);
+        // The pin name is the accessible name of 01 section 10.3, which reads the middle dots as commas.
+        Assert.Contains(DemoCast.Prince.StaticLabel!.Replace(" · ", ", ", StringComparison.Ordinal), prince.AriaLabel);
     }
 
     [Fact]
@@ -506,7 +507,9 @@ public sealed class MapPayloadFactoryTests
         Assert.StartsWith($"{DemoCast.Jester.Name}, {DemoCast.Jester.Lore}. At {hall} since ", jester);
         Assert.Contains(" Battery 12 percent, low.", jester);
         Assert.EndsWith(" away.", jester);
-        Assert.StartsWith($"{DemoCast.Queen.Name}, {DemoCast.Queen.Lore}. Driving on I-65.", members[DemoCast.Queen.Id].AriaLabel);
+        var queen = members[DemoCast.Queen.Id].AriaLabel;
+        Assert.StartsWith($"{DemoCast.Queen.Name}, {DemoCast.Queen.Lore}. Driving, ", queen);   // "Driving, 54 mph on I-65": the speed and the street, the dot read as a comma
+        Assert.Contains(" on I-65", queen);
     }
 
     [Fact]
