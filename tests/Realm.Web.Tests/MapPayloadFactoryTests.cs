@@ -497,8 +497,15 @@ public sealed class MapPayloadFactoryTests
         var home = Demo.Places.Single(place => place.Id == DemoPlaces.Home.Id).DisplayName;
         var hall = Demo.Places.Single(place => place.Id == DemoPlaces.JesterHall.Id).DisplayName;
 
-        Assert.Equal($"{DemoCast.King.Name}, {DemoCast.King.Lore}. At {home}. Battery 19 percent, charging.", members[DemoCast.King.Id].AriaLabel);
-        Assert.Equal($"{DemoCast.Jester.Name}, {DemoCast.Jester.Lore}. At {hall}. Battery 12 percent, low.", members[DemoCast.Jester.Id].AriaLabel);
+        // The time part ("since 9:06 pm") and the distance ("1.0 mile away") come from the same formatter as the row, so the parts that depend on the clock are matched loosely here and
+        // exactly by the E2E test of AC-46.
+        var king = members[DemoCast.King.Id].AriaLabel;
+        Assert.StartsWith($"{DemoCast.King.Name}, {DemoCast.King.Lore}. At {home}", king);
+        Assert.Contains(" Battery 19 percent, charging.", king);
+        var jester = members[DemoCast.Jester.Id].AriaLabel;
+        Assert.StartsWith($"{DemoCast.Jester.Name}, {DemoCast.Jester.Lore}. At {hall} since ", jester);
+        Assert.Contains(" Battery 12 percent, low.", jester);
+        Assert.EndsWith(" away.", jester);
         Assert.StartsWith($"{DemoCast.Queen.Name}, {DemoCast.Queen.Lore}. Driving on I-65.", members[DemoCast.Queen.Id].AriaLabel);
     }
 

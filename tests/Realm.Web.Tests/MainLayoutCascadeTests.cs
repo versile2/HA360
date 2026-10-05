@@ -40,12 +40,19 @@ public sealed class MainLayoutCascadeTests : ComponentTestBase
         builder.OpenComponent<InlineProbe>(0);
         builder.CloseComponent();
 
-        builder.OpenComponent<MudPopover>(1);
-        builder.AddComponentParameter(2, nameof(MudPopover.Open), true);
-        builder.AddComponentParameter(3, nameof(MudPopover.ChildContent), (RenderFragment)(popover =>
+        // The popover provider sits after the page body in the DOM order (R1-15: the sheet's place in the Tab order), and a MudPopover needs the provider to exist when it is initialised.
+        // The Location page renders its popovers only after its first render (the map and the sheet start with the real layout), so the probe does the same.
+        builder.OpenComponent<AfterFirstRender>(1);
+        builder.AddComponentParameter(2, nameof(AfterFirstRender.ChildContent), (RenderFragment)(deferred =>
         {
-            popover.OpenComponent<PopoverProbe>(0);
-            popover.CloseComponent();
+            deferred.OpenComponent<MudPopover>(0);
+            deferred.AddComponentParameter(1, nameof(MudPopover.Open), true);
+            deferred.AddComponentParameter(2, nameof(MudPopover.ChildContent), (RenderFragment)(popover =>
+            {
+                popover.OpenComponent<PopoverProbe>(0);
+                popover.CloseComponent();
+            }));
+            deferred.CloseComponent();
         }));
         builder.CloseComponent();
     };
@@ -108,6 +115,32 @@ public sealed class MainLayoutCascadeTests : ComponentTestBase
         Assert.NotNull(underProvider.Overrides);
         Assert.Same(inline.Session, underProvider.Session);
         Assert.Same(inline.Overrides, underProvider.Overrides);
+    }
+
+    // Renders its content from the second render on, which is when every provider of the layout has been initialised.
+    private sealed class AfterFirstRender : ComponentBase
+    {
+        private bool _ready;
+
+        [Parameter]
+        public RenderFragment? ChildContent { get; set; }
+
+        protected override void BuildRenderTree(Microsoft.AspNetCore.Components.Rendering.RenderTreeBuilder builder)
+        {
+            if (_ready)
+            {
+                builder.AddContent(0, ChildContent);
+            }
+        }
+
+        protected override void OnAfterRender(bool firstRender)
+        {
+            if (firstRender)
+            {
+                _ready = true;
+                StateHasChanged();
+            }
+        }
     }
 
     private abstract class ProbeBase : ComponentBase

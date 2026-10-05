@@ -260,7 +260,29 @@ test.describe('[AC-45] targets, gaps, text size and reflow', () => {
   }
 
   // At 320 px and 200 % text there is no horizontal page scroll. The 200 % is the root font size doubled (everything is rem based), set after the page has loaded at 320 px.
-  for (const scene of SCENES.filter((candidate) => ['location-peek', 'sheet-80-drivers', 'driving', 'popup', 'settings'].includes(candidate.id))) {
+  // The Location scenes open without waiting for the map's pins and `settled()`: at 320 x 640 the default view's pins are not all on screen and the software-rendered map may still be drawing, and
+  // the criterion is about the page's layout, not the map.
+  const reflowScenes: Scene[] = [
+    { id: 'location-peek', label: 'Location at Peek', open: async (page) => { await demo(page, { hooks: false }); await expect(page.getByTestId('sheet-handle')).toBeVisible(); } },
+    {
+      id: 'sheet-80-drivers',
+      label: 'the 80 % state, Drivers',
+      open: async (page) => {
+        await demo(page, { sheet: '80', hooks: false });
+        await expect(page.getByTestId('tab-drivers')).toBeVisible();
+      },
+    },
+    ...SCENES.filter((candidate) => ['driving', 'popup'].includes(candidate.id)),
+    {
+      id: 'settings',
+      label: 'Settings',
+      open: async (page) => {
+        await demo(page, { hooks: false });
+        await openFrom(page, page.getByTestId('btn-settings'), page.getByTestId('settings-dialog'));
+      },
+    },
+  ];
+  for (const scene of reflowScenes) {
     test(`[AC-45] ${scene.label}: no horizontal scroll at 320 px and 200 % text`, async ({ page }) => {
       await page.setViewportSize({ width: 320, height: 640 });
       await scene.open(page);

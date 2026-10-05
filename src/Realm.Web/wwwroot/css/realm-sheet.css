@@ -230,8 +230,8 @@ div[mudsheet] .mud-sheet-container[data-testid="sheet"] .mud-sheet-content > con
 }
 
 /* The section tabs (01 section 10.1): every tab is a 48 px target and the tabs are 8 px apart, so the control is a capsule of three 48 px pills with 8 px between them; the selected one is gold.
-   The capsule's hairline is an outline over the pills, not a border, so it takes no room. In the bottom sheet the 7 px above it are the room the Peek floor leaves between the handle
-   row and the tabs (168 px at 800 high = 1 border + 48 handle + 7 + 48 tabs + the 64 px navigation bar), which 01 section 11's tolerance of 2 px takes for the 8 px of 10.1; the
+   The capsule's hairline is an outline over the pills, not a border, so it takes no room. In the bottom sheet the 8 px above it are the room the Peek floor leaves between the handle
+   row and the tabs (168 px at 800 high = 48 handle + 8 + 48 tabs + the 64 px navigation bar, the top hairline being inset); the
    left panel has no handle, so its summary line above gives the room there. */
 .realm-segments {
   box-sizing: border-box;
@@ -248,7 +248,14 @@ div[mudsheet] .mud-sheet-container[data-testid="sheet"] .mud-sheet-content > con
 }
 
 div[mudsheet] .mud-sheet-container.mud-sheet-position-bottom[data-testid="sheet"] .realm-segments {
-  margin-top: 7px;
+  margin-top: 8px;
+}
+
+/* The bottom sheet's top hairline is drawn inside the box, not as a border, so it takes no room: the Peek floor of 168 px is then 48 handle + 8 + 48 tabs + the 64 px navigation bar, and the
+   handle row and the tabs are the 8 px apart that 01 section 10.1 asks for (AC-45) without moving the floor. The sides and the bottom keep their 1 px border. */
+div[mudsheet] .mud-sheet-container.mud-sheet-position-bottom[data-testid="sheet"] {
+  border-top-width: 0 !important;
+  box-shadow: inset 0 1px 0 var(--realm-line);
 }
 
 .realm-segment {
@@ -721,7 +728,7 @@ div[mudsheet] .mud-sheet-container.mud-sheet-position-bottom[data-testid="sheet"
   align-items: center;
   gap: 12px;
   height: 48px;
-  margin: 7px 16px 0; /* the 7 px of the tabs above it (.realm-segments): the handle row and the X are two targets */
+  margin: 8px 16px 0; /* the 8 px of the tabs above it (.realm-segments): the handle row and the X are two targets */
   color: var(--realm-text);
   cursor: pointer;
   touch-action: manipulation;

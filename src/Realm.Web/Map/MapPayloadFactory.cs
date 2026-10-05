@@ -203,6 +203,21 @@ public static class MapPayloadFactory
         return drawn;
     }
 
+    /// <summary>
+    /// The pin's accessible name of 01 section 10.3, the same words as the list row (<see cref="MemberTextFormatter.AccessibleName"/>): the status, the time part, the battery and, for a fresh
+    /// member other than me, the distance ("Cass, The Royal Jester. At The Jester's Hall since 9:06 pm. Battery 12 percent, low. 1.0 mile away.", AC-46).
+    /// </summary>
+    private static string PinName(MemberVm member, MemberStatus status, PlaceVm? place, bool poorAccuracy, bool lowBattery, bool far, double? meters, DateTimeOffset now, TimeZoneInfo zone, UnitSystem units)
+    {
+        var statusLine = MemberTextFormatter.StatusLine(member, status, place?.DisplayName, poorAccuracy, far, units);
+        var timePart = MemberTextFormatter.TimePart(member, status, now, zone);
+        string? battery = member.BatteryPct is { } percent && status != MemberStatus.Static
+            ? MemberTextFormatter.BatteryName(percent, member.Charging, lowBattery, member.BatteryAsOfUtc, now, zone)
+            : null;
+        string? distanceWords = meters is { } away && status is (MemberStatus.AtPlace or MemberStatus.Out) ? UnitFormatter.DistanceWords(away, units) : null;
+        return MemberTextFormatter.AccessibleName(member.DisplayName, member.LoreTitle, status, statusLine, timePart, battery, distanceWords);
+    }
+
     private static MemberPayloadItem Member(
         MemberVm member,
         bool isMe,
@@ -254,7 +269,7 @@ public static class MapPayloadFactory
             AvatarUrl: string.IsNullOrEmpty(member.AvatarUrl) ? null : member.AvatarUrl,
             Chip: chip,
             ChipMinute: minute,
-            AriaLabel: MapText.MemberPinName(member, status, place, poorAccuracy, lowBattery),
+            AriaLabel: PinName(member, status, place, poorAccuracy, lowBattery, far, fromMe?.Meters, now, zone, units),
             Tooltip: MapText.Title(member.DisplayName, member.LoreTitle),
             BubbleLabel: BubbleTextFormatter.Label(member.DisplayName, fromMe),
             BubbleTooltip: BubbleTextFormatter.Tooltip(member.DisplayName, fromMe));
