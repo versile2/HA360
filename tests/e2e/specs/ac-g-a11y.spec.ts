@@ -394,7 +394,8 @@ test.describe('[AC-47b] the Tab sequence of Location', () => {
     for (let i = 1; i < chain.length; i += 1) {
       const [beforeName, before] = chain[i - 1]!;
       const [afterName, after] = chain[i]!;
-      expect(Math.min(...after), `${afterName} comes after ${beforeName} (${sequence})`).toBeGreaterThan(Math.max(...before));
+      // First visits are compared: the sheet traps Tab (R-032, [X-13]), so after the section tab the cycle wraps back to the handle, a second visit that says nothing about the order.
+      expect(Math.min(...after), `${afterName} comes after ${beforeName} (${sequence})`).toBeGreaterThan(Math.min(...before));
     }
     const bubbles = chain[2]![1];
     expect(Math.max(...bubbles) - Math.min(...bubbles), `the bubbles are consecutive stops (${sequence})`).toBe(bubbles.length - 1);
