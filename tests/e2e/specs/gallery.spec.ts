@@ -207,6 +207,22 @@ async function openDrivingPopup(page: Page, opener: Locator, key: string): Promi
   return dialog;
 }
 
+/**
+ * R3-12: the selected week chip must be inside the row's visible box, clear of the 16 px edge fade. The chip is scrolled into view only after the circuit is up (the prerendered
+ * row is not), so this polls: it passes once the circuit has done it, which is also when the picture is fit to be taken.
+ */
+async function expectSelectedChipVisibleInRow(page: Page, offset: number): Promise<void> {
+  const FADE_PX = 16;
+  await expect(async () => {
+    const row = await page.getByTestId('week-chips').boundingBox();
+    const chip = await page.getByTestId(`week-chip-${offset}`).boundingBox();
+    expect(row, 'the chip row has a box').not.toBeNull();
+    expect(chip, 'the selected chip has a box').not.toBeNull();
+    expect(chip!.x, 'the chip starts clear of the left fade').toBeGreaterThanOrEqual(row!.x + FADE_PX - 1);
+    expect(chip!.x + chip!.width, 'the chip ends clear of the right fade').toBeLessThanOrEqual(row!.x + row!.width - FADE_PX + 1);
+  }, 'the selected week chip is scrolled into the visible row').toPass({ timeout: 20_000 });
+}
+
 test.describe('[GAL] screenshot gallery: Driving popups, the driver week and the variants', () => {
   // SC11-popup-drives: the Total Drives popup (the four bars by drives, the footnote, "Got it"), then the Miles toggle (03 section 8.5, row SC11): two shots, the second named
   // SC11-popup-drives-miles.
@@ -291,6 +307,7 @@ test.describe('[GAL] screenshot gallery: Driving popups, the driver week and the
     await expect(page.getByTestId('stat-speeding'), 'the chips read a dash').toHaveText(/^\s*—\s*Speeding\s*$/);
     await expect(page.getByTestId('driver-card-jester'), 'the driver card says there is no record').toContainText('No record of this week');
 
+    await expectSelectedChipVisibleInRow(page, 2);   // R3-12: wait for the circuit's scroll before the shot
     const file = await saveShot(page, testInfo, 'SC17-variant-fresh-install');
     expectViewportPng(file, page, testInfo.project.name);
 
@@ -299,6 +316,7 @@ test.describe('[GAL] screenshot gallery: Driving popups, the driver week and the
     await expect(page.locator('p.realm-driving__range'), 'the partial week says where the record begins').toHaveText('Sep 21 – Sep 27 · recorded from Wed');
     await expect(page.getByTestId('stat-speeding'), 'the scaled speeding total of the partial week').toHaveText(/^\s*40\s*Speeding\s*$/);
 
+    await expectSelectedChipVisibleInRow(page, 1);
     const partial = await saveShot(page, testInfo, 'SC17-variant-fresh-install-partial');
     expectViewportPng(partial, page, testInfo.project.name);
   });
