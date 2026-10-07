@@ -8,6 +8,8 @@ namespace Realm.Domain;
 /// <param name="TrendDelta">Change over the drivers that have a value in both periods; null if there are none.</param>
 /// <param name="Partial">Some report drivers have no count for a type that is All or Some available (the chip asterisk).</param>
 /// <param name="Note">Qualifier shown in the chip tooltip, for example for sampled speeding.</param>
+/// <param name="Drivers">One row per report driver, including a driver who is not covered (whose counts are null).</param>
+/// <param name="CoveredCount">The number of report drivers the stat speaks for (covered ones, 01 section 6.9): the n of "Only k of n drivers shared this" (R3-09). Null means every listed driver.</param>
 public record EventStat(
     int? Total,
     int? ComparatorTotal,
@@ -16,4 +18,5 @@ public record EventStat(
     EventAvailability Availability,
     bool Partial,
     string? Note,
-    IReadOnlyList<EventDriverCount> Drivers);
+    IReadOnlyList<EventDriverCount> Drivers,
+    int? CoveredCount = null);

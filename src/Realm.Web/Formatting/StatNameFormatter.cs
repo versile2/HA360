@@ -168,9 +168,12 @@ public static class StatNameFormatter
         return note is null ? partial : partial + ". " + note;
     }
 
-    /// <summary>"Only 1 of 4 drivers shared this" (01 section 8.8): k is the number of report drivers that have a count, n the number of report drivers in the stat.</summary>
+    /// <summary>"Only 1 of 4 drivers shared this" (01 section 8.8): k is the number of report drivers that have a count, n the number of covered report drivers in the stat.</summary>
     public static string PartialSentence(EventStat stat) =>
-        string.Create(CultureInfo.InvariantCulture, $"Only {SharedCount(stat)} of {stat.Drivers.Count} drivers shared this");
+        string.Create(CultureInfo.InvariantCulture, $"Only {SharedCount(stat)} of {DriverCount(stat)} drivers shared this");
+
+    /// <summary>The n of "k of n": the drivers the stat speaks for (covered ones, R3-09); a stat without the figure counts every listed driver.</summary>
+    public static int DriverCount(EventStat stat) => stat.CoveredCount ?? stat.Drivers.Count;
 
     /// <summary>The number of report drivers that have a (non-null) count of the type.</summary>
     public static int SharedCount(EventStat stat)
@@ -205,7 +208,7 @@ public static class StatNameFormatter
         var text = title + ": " + DrivingFormatter.Count(total) + (total == 1 ? " event " : " events ") + Period(weekOffset);
         if (IsPartial(stat))
         {
-            text += ", from " + SharedCount(stat).ToString(CultureInfo.InvariantCulture) + " of " + stat.Drivers.Count.ToString(CultureInfo.InvariantCulture) + " drivers";
+            text += ", from " + SharedCount(stat).ToString(CultureInfo.InvariantCulture) + " of " + DriverCount(stat).ToString(CultureInfo.InvariantCulture) + " drivers";
         }
 
         var previous = Previous(weekOffset);

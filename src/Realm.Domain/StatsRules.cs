@@ -279,7 +279,8 @@ public static class StatsRules
             Availability: availability,
             Partial: availability != EventAvailability.None && present.Count > 0 && present.Count < coveredDrivers,
             Note: key == EventKeys.Speeding ? SpeedingNote : null,
-            Drivers: counts);
+            Drivers: counts,
+            CoveredCount: coveredDrivers);
     }
 
     // ---- top speed (02 section 6.8) --------------------------------------------------------------------------------

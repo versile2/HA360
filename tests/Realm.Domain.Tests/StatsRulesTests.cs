@@ -385,6 +385,7 @@ public class StatsRulesTests
 
         Assert.True(report.Events["phone"].Partial);
         Assert.Equal(3, report.Events["phone"].Total);
+        Assert.Equal(2, report.Events["phone"].CoveredCount);   // R3-09: the n of "1 of 2", not the three listed drivers
     }
 
     [Fact]
