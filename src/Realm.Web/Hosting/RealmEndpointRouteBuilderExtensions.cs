@@ -52,7 +52,7 @@ public static class RealmEndpointRouteBuilderExtensions
         return Results.Bytes(image.Bytes, image.ContentType, entityTag: image.ETag is null ? null : new EntityTagHeaderValue(image.ETag));
     }
 
-    // Live registers its IDiagnostics with S13c; until then a Live start answers 404 like an avatar that does not exist. The circuit counts are the web
+    // Demo and Live both register an IDiagnostics (Live since S13c); a host with none answers 404. The circuit counts are the web
     // host's own, so they are filled in here rather than by the port.
     private static IResult DiagnosticsJson(HttpContext context)
     {

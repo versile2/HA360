@@ -32,7 +32,7 @@ public sealed class RealmShellTests : ComponentTestBase
         Assert.NotNull(demo);
         Assert.Equal(new DateTimeOffset(2026, 10, 1, 13, 0, 0, TimeSpan.Zero), demo.Now);
         Assert.Equal(new[] { "all-sources", "no-fix" }, demo.Variants);
-        Assert.Equal(new DemoUiOverrides(Style: "day", Sheet: "80", Layout: "panel", Week: 2), shell.Overrides);
+        Assert.Equal(new DemoUiOverrides(Style: "day", Sheet: "80", Layout: "panel"), shell.Overrides);
     }
 
     [Theory]
@@ -67,18 +67,6 @@ public sealed class RealmShellTests : ComponentTestBase
         Arrange(RealmMode.Demo, "?layout=" + layout);
 
         Assert.Equal(layout, RenderShell().Overrides.Layout);
-    }
-
-    [Theory]
-    [InlineData(RealmMode.Demo, 0)]
-    [InlineData(RealmMode.Demo, 3)]
-    [InlineData(RealmMode.Live, 0)]
-    [InlineData(RealmMode.Live, 3)]
-    public void Week_ZeroToThree_IsHonouredInEveryMode(RealmMode mode, int week)
-    {
-        Arrange(mode, "?week=" + week);
-
-        Assert.Equal(week, RenderShell().Overrides.Week);
     }
 
     [Theory]
@@ -160,14 +148,14 @@ public sealed class RealmShellTests : ComponentTestBase
     }
 
     [Fact]
-    public void InLiveMode_IgnoresTheSixDemoOnlyParameters_AndHonoursWeek()
+    public void InLiveMode_IgnoresTheDemoOnlyParameters()
     {
         var factory = Arrange(RealmMode.Live, Everything + "&demo=1");
 
         var shell = RenderShell();
 
         Assert.Null(Assert.Single(factory.Calls));
-        Assert.Equal(new DemoUiOverrides(Week: 2), shell.Overrides);
+        Assert.Equal(DemoUiOverrides.None, shell.Overrides);
     }
 
     [Theory]
@@ -188,7 +176,6 @@ public sealed class RealmShellTests : ComponentTestBase
         Assert.Equal(expectDemoSession, demo is not null);
         Assert.Equal(expectDemoSession ? "no-fix" : null, demo?.Variants.SingleOrDefault());
         Assert.Equal(expectDemoSession ? "day" : null, shell.Overrides.Style);
-        Assert.Equal(1, shell.Overrides.Week);
     }
 
     [Fact]
@@ -225,7 +212,7 @@ public sealed class RealmShellTests : ComponentTestBase
         Services.GetRequiredService<NavigationManager>().NavigateTo("driving?week=3&variant=life360-down");
 
         Assert.Single(factory.Calls);
-        Assert.Equal(2, shell.Overrides.Week);
+        Assert.Equal("day", shell.Overrides.Style);
         Assert.Same(factory.Sessions[0], shell.Session);
     }
 

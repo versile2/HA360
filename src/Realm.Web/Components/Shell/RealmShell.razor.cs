@@ -80,8 +80,7 @@ public sealed partial class RealmShell : IAsyncDisposable
         _overrides = new DemoUiOverrides(
             Style: demoSession ? OneOf(First(query, "style"), StyleIds) : null,
             Sheet: demoSession ? OneOf(First(query, "sheet"), SheetStates) : null,
-            Layout: demoSession ? OneOf(First(query, "layout"), LayoutModes) : null,
-            Week: ParseWeek(First(query, "week")));
+            Layout: demoSession ? OneOf(First(query, "layout"), LayoutModes) : null);
 
         _session = SessionFactory.Create(demo);
         _firstData = new FirstDataWatch(() => Session.Time);
@@ -121,10 +120,6 @@ public sealed partial class RealmShell : IAsyncDisposable
         query.TryGetValue(name, out var values) && values.Count > 0 ? values[0] : null;
 
     private static string? OneOf(string? value, string[] allowed) => value is not null && allowed.Contains(value) ? value : null;
-
-    // week=0..3 written in plain digits.
-    private static int? ParseWeek(string? value) =>
-        int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var week) && week is >= 0 and <= 3 ? week : null;
 
     private static DateTimeOffset? ParseNow(string? value) =>
         value is not null && HasExplicitOffset(value)
