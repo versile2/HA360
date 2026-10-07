@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.1
+
+### Fixed
+
+- **Map credits no longer cover the settings gear** on phones. The credits pill is kept clear of the gear, folds after
+  five seconds from the start of the page (it no longer waits for every map tile), and folds on the first tap without
+  swallowing it.
+- **Satellite map style no longer fails to load** when the page is in the background or throttled. Styles built in the
+  app are now loaded through a blob URL, which does not wait for an animation frame.
+
 ## 0.1.0
 
 First experimental release.

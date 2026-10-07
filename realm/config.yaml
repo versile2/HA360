@@ -1,5 +1,5 @@
 name: "HA Cartographer"
-version: "0.1.0"                  # equals the image tag; edited by hand only after the image exists; a CHANGELOG.md section of the same name must exist
+version: "0.1.1"                  # equals the image tag; edited by hand only after the image exists; a CHANGELOG.md section of the same name must exist
 slug: realm
 description: "Map-first family map and weekly driving reports, inside Home Assistant."
 url: "https://github.com/Versile2/ha-cartographer"
