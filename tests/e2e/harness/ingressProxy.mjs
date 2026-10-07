@@ -19,7 +19,8 @@
 //   - pipes websocket upgrades byte for byte to the app
 //   - control endpoints for tests, outside the prefix:
 //       GET  /__proxy/health                      200 "ok"
-//       POST /__proxy/drop-websockets             closes every upgraded socket; JSON { dropped: n }
+//       POST /__proxy/drop-websockets[?session=S] closes every upgraded socket, or with ?session= only those of the browser whose ingress_session cookie is S (tests run in
+//                                                 parallel against one proxy, so a test that drops sockets names its own session); JSON { dropped: n }
 //       POST /__proxy/expire-session[?upgrades=N] the next N upgrades (default 1) answer 401, like the window between a session expiring
 //                                                 and the HA frontend's next keep-alive (research section 2.5); JSON { rejecting: N }
 //
@@ -113,7 +114,7 @@ export function createIngressProxy(options = {}) {
   /** Sessions this proxy issued; a cookie that is not in the set is no session. */
   const sessions = new Set();
   let rejectUpgrades = 0;
-  /** @type {Set<{ client: net.Socket, upstream: net.Socket }>} */
+  /** @type {Set<{ client: net.Socket, upstream: net.Socket, session: string | null }>} */
   const tunnels = new Set();
 
   /** @param {string | undefined} cookieHeader */
@@ -190,13 +191,16 @@ export function createIngressProxy(options = {}) {
       if (req.method === 'GET' || req.method === 'HEAD') return reply(res, 200, 'ok');
     } else if (name === 'drop-websockets') {
       if (post) {
-        const dropped = tunnels.size;
-        for (const { client, upstream } of [...tunnels]) {
-          client.destroy();
-          upstream.destroy();
+        const only = new URLSearchParams(search).get('session');
+        let dropped = 0;
+        for (const tunnel of [...tunnels]) {
+          if (only !== null && tunnel.session !== only) continue;
+          tunnel.client.destroy();
+          tunnel.upstream.destroy();
+          tunnels.delete(tunnel);
+          dropped += 1;
         }
-        tunnels.clear();
-        log(`control drop-websockets: ${dropped}`);
+        log(`control drop-websockets${only === null ? '' : ' (one session)'}: ${dropped}`);
         return reply(res, 200, JSON.stringify({ dropped }), 'application/json');
       }
     } else if (name === 'expire-session') {
@@ -284,7 +288,7 @@ export function createIngressProxy(options = {}) {
 
     log(`UPGRADE ${pathname}${search} -> ${upstreamPath}${search}`);
     const upstream = net.connect({ host: upstreamHost, port: upstreamPort });
-    const tunnel = { client, upstream };
+    const tunnel = { client, upstream, session: cookieValue(req.headers.cookie, SESSION_COOKIE) };
     const end = () => {
       tunnels.delete(tunnel);
       client.destroy();

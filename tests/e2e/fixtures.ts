@@ -165,6 +165,17 @@ export async function proxyControl(request: APIRequestContext, action: 'drop-web
   return response.json();
 }
 
+/**
+ * The query that limits `drop-websockets` to this page's own circuit. The proxy is shared by every test of every worker, so an unscoped drop also kills the circuits of tests that run
+ * at the same time in the other worker (the AC-44b "WebSocket closed with status code: 1006" flake).
+ */
+export async function ownSessionQuery(page: Page): Promise<string> {
+  const cookies = await page.context().cookies(page.url());
+  const session = cookies.find((cookie) => cookie.name === 'ingress_session');
+  if (session === undefined) throw new Error('the page has no ingress_session cookie, so its sockets cannot be told from the others');
+  return `?session=${encodeURIComponent(session.value)}`;
+}
+
 // ---- the guard fixture -----------------------------------------------------------------------------------------------------------------------
 
 export interface GuardAllow {

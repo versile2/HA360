@@ -534,6 +534,9 @@ test.describe('acceptance D: driving popups and the driver week', () => {
     // So does the browser's Back, after another visit.
     await page.getByTestId('driver-card-jester').click();
     await expect(page).toHaveURL((url) => url.pathname === `${INGRESS_PREFIX}/driving/jester`);
+    // The URL changes at the tap (the client intercepts the link and pushes the entry); the circuit renders the page a moment later. A browser Back taken before that render is
+    // overtaken by the circuit's own location update and leaves the URL on jester (the CI flake), so the week page is waited for, as after the first visit.
+    await expect(page.getByTestId('drive-row-0'), "Cass's drives are listed before the browser's Back").toBeVisible();
     await page.goBack();
     await expect(page).toHaveURL((url) => url.pathname === `${INGRESS_PREFIX}/driving`);
     await expect(page.getByTestId('week-chip-0'), 'This week is still selected').toHaveAttribute('aria-checked', 'true');

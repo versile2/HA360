@@ -11,7 +11,7 @@
 // the Expanded panel has no handle and no Peek, and its focus rules are the detail's alone.
 import type { Locator, Page } from '@playwright/test';
 
-import { castMember, demo, expect, expectHistoryDepth, loadDemoCast, mapReady, proxyControl, readHook, saveShot, tapEmptyMap, test } from '../fixtures.js';
+import { castMember, demo, expect, expectHistoryDepth, loadDemoCast, mapReady, ownSessionQuery, proxyControl, readHook, saveShot, tapEmptyMap, test } from '../fixtures.js';
 
 const handle = (page: Page): Locator => page.getByTestId('sheet-handle');
 const back = (page: Page): Locator => page.getByTestId('detail-back');
@@ -183,7 +183,7 @@ test.describe('[X-04] the circuit reconnect banner', () => {
     await page.getByTestId('pin-member-jester').click();
     await expect(header(page), 'the selection header shows').toBeVisible();
 
-    await proxyControl(request, 'drop-websockets');
+    await proxyControl(request, 'drop-websockets', await ownSessionQuery(page));
     const reconnect = page.getByTestId('banner-reconnect');
     await expect(reconnect, 'the reconnect banner shows').toBeVisible({ timeout: 15000 });
     await expect(reconnect).toContainText('Reconnecting to the court…');
