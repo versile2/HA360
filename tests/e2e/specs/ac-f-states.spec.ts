@@ -167,12 +167,15 @@ test.describe('[AC-49a] the Home Assistant banner under ?variant=ha-down', () =>
 test.describe('[X-04] the circuit reconnect banner', () => {
   // Dropping the sockets on purpose makes the Blazor client log the disconnect and SignalR throw on a send while the connection is down.
   test.use({
-    // Wrapped as [value, { option: true }]: Playwright reads a bare array given to test.use as that tuple, so a bare list of entries would make the first entry the value.
-    allowConsoleErrors: [[
-      { pattern: /Connection disconnected with error .*WebSocket closed with status code: 1006/, reason: 'drop-websockets closes the circuit socket on purpose; Blazor logs the abnormal close.' },
-      { pattern: /Cannot send data if the connection is not in the 'Connected' State/, reason: 'A send that races the deliberate socket drop is rejected by SignalR while it reconnects.' },
-    ], { option: true }],
+    // One entry on purpose: Playwright reads a two-element array given to test.use as a [value, options] tuple, which a pair of entries would be mistaken for.
+    allowConsoleErrors: [
+      {
+        pattern: /Connection disconnected with error .*WebSocket closed with status code: 1006|Cannot send data if the connection is not in the 'Connected' State/,
+        reason: 'drop-websockets closes the circuit socket on purpose: Blazor logs the abnormal close (1006) and a send that races the drop is rejected by SignalR while it reconnects.',
+      },
+    ],
   });
+
 
   test('[X-04] after the sockets drop the static banner "Reconnecting to the court…" shows and clears, and the page is interactive again', async ({ page, request }) => {
     await demo(page);
