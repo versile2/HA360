@@ -109,7 +109,7 @@ public sealed class MainLayoutCascadeTests : ComponentTestBase
     {
         Assert.NotNull(inline.Session);
         Assert.NotNull(inline.Overrides);
-        Assert.Equal(new DemoUiOverrides(Style: "day", Week: 2), inline.Overrides);
+        Assert.Equal(new DemoUiOverrides(Style: "day"), inline.Overrides);
 
         Assert.NotNull(underProvider.Session);
         Assert.NotNull(underProvider.Overrides);
