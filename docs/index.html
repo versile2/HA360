@@ -66,6 +66,7 @@ section h2{font-size:clamp(1.6rem,3.6vw,2.3rem);margin-bottom:10px}
 .gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:22px}
 .gallery figure{margin:0;text-align:center}
 .gallery figcaption{font-size:.88rem;color:var(--text2);margin-top:8px}
+.live-h{margin:34px 0 14px;font-size:1.2rem;color:var(--accent)}
 .wide{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:22px;margin-top:40px}
 .wide figure{margin:0;text-align:center}
 .wide .phone{border-radius:16px}
@@ -101,6 +102,7 @@ footer p{max-width:60em}
       <ul>
         <li><a href="#features">Features</a></li>
         <li><a href="#gallery">Gallery</a></li>
+        <li><a href="#live">Live</a></li>
         <li><a href="#install">Install</a></li>
         <li><a href="#privacy">Privacy</a></li>
         <li><a href="#faq">FAQ</a></li>
@@ -161,6 +163,85 @@ footer p{max-width:60em}
     <figure><div class="phone"><img src="../assets/screenshots/unfolded-driving-report.png" alt="Driving report on a wide screen" loading="lazy" width="884" height="916"></div><figcaption>Unfolded: Driving report</figcaption></figure>
     <figure><div class="phone"><img src="../assets/screenshots/unfolded-places-panel.png" alt="Places in the side panel" loading="lazy" width="884" height="916"></div><figcaption>Unfolded: Places</figcaption></figure>
     <figure><div class="phone"><img src="../assets/screenshots/unfolded-map-styles.png" alt="Map styles on a wide screen" loading="lazy" width="884" height="916"></div><figcaption>Unfolded: map styles</figcaption></figure>
+  </div>
+</div></section>
+
+<section id="live"><div class="wrap">
+  <h2>Live in Home Assistant</h2>
+  <p class="sub">Captured from the add-on installed on a real Home Assistant instance, in Demo mode. Every person and place is fictional.</p>
+  <h3 class="live-h">Map styles (phone)</h3>
+  <div class="gallery">
+    <figure><div class="phone"><img src="../assets/screenshots/live-phone-map-peek-night.png" alt="The map in the Night style with four people, a pickup and the bottom sheet at its peek height" loading="lazy" width="714" height="1408"></div><figcaption>Night (default)</figcaption></figure>
+    <figure><div class="phone"><img src="../assets/screenshots/live-phone-map-day.jpg" alt="The map in the Day style, a pale greyscale base with the same pins" loading="lazy" width="714" height="1408"></div><figcaption>Day</figcaption></figure>
+    <figure><div class="phone"><img src="../assets/screenshots/live-phone-map-streets.jpg" alt="The map in the Streets style, with coloured roads, water and parks" loading="lazy" width="714" height="1408"></div><figcaption>Streets</figcaption></figure>
+    <figure><div class="phone"><img src="../assets/screenshots/live-phone-map-satellite.jpg" alt="The map in the Satellite style, USGS aerial imagery under the pins" loading="lazy" width="714" height="1408"></div><figcaption>Satellite</figcaption></figure>
+  </div>
+  <h3 class="live-h">Map and sheet</h3>
+  <div class="gallery">
+    <figure><div class="phone"><img src="../assets/screenshots/live-phone-sheet-drivers.png" alt="The bottom sheet opened to 80 percent, listing five drivers with status and battery" loading="lazy" width="714" height="1408"></div><figcaption>Drivers, 80%</figcaption></figure>
+    <figure><div class="phone"><img src="../assets/screenshots/live-phone-member-selected-edge-bubbles.png" alt="Alden selected: the map centred on him in a compact card, with the other members as edge bubbles" loading="lazy" width="714" height="1408"></div><figcaption>Selected member, edge bubbles</figcaption></figure>
+    <figure><div class="phone"><img src="../assets/screenshots/live-phone-layers-popover.png" alt="The layers popover with Night, Day, Streets, Satellite and a Show places switch" loading="lazy" width="714" height="1408"></div><figcaption>Layers popover</figcaption></figure>
+    <figure><div class="phone"><img src="../assets/screenshots/live-phone-sheet-vehicles.png" alt="The Vehicles tab: a pickup with engine and fuel, and a second vehicle awaiting its maker's integration" loading="lazy" width="714" height="1408"></div><figcaption>Vehicles</figcaption></figure>
+    <figure><div class="phone"><img src="../assets/screenshots/live-phone-sheet-places.png" alt="The Places tab listing fourteen places and who is at each" loading="lazy" width="714" height="1408"></div><figcaption>Places</figcaption></figure>
+  </div>
+  <h3 class="live-h">Members</h3>
+  <div class="gallery">
+    <figure><div class="phone"><img src="../assets/screenshots/live-phone-member-alden.png" alt="Alden at Hearth Haven, charging, with this week's drives, miles and top speed" loading="lazy" width="714" height="1408"></div><figcaption>Alden, at home</figcaption></figure>
+    <figure><div class="phone"><img src="../assets/screenshots/live-phone-member-briar-driving.png" alt="Briar driving at 54 mph on I-65 with battery and the week's totals" loading="lazy" width="714" height="1408"></div><figcaption>Briar, driving</figcaption></figure>
+    <figure><div class="phone"><img src="../assets/screenshots/live-phone-member-cass-low-battery.png" alt="Cass at The Jester's Hall with a low-battery badge and a street address" loading="lazy" width="714" height="1408"></div><figcaption>Cass, low battery</figcaption></figure>
+    <figure><div class="phone"><img src="../assets/screenshots/live-phone-member-dara-stale.png" alt="Dara's last-seen warning, &quot;The raven's late&quot;, with the pin drawn dashed" loading="lazy" width="714" height="1408"></div><figcaption>Dara, stale</figcaption></figure>
+    <figure><div class="phone"><img src="../assets/screenshots/live-phone-member-elio-static-pin.png" alt="Elio, who does not share his location, shown as a static pin at his home place" loading="lazy" width="714" height="1408"></div><figcaption>Elio, location not shared</figcaption></figure>
+  </div>
+  <h3 class="live-h">Details</h3>
+  <div class="gallery">
+    <figure><div class="phone"><img src="../assets/screenshots/live-phone-vehicle-detail.png" alt="The pickup's detail: location, engine, fuel, odometer and last update" loading="lazy" width="714" height="1408"></div><figcaption>Vehicle detail</figcaption></figure>
+    <figure><div class="phone"><img src="../assets/screenshots/live-phone-place-detail.png" alt="Hearth Haven with its radius and the people and vehicles there now" loading="lazy" width="714" height="1408"></div><figcaption>Place detail</figcaption></figure>
+  </div>
+  <h3 class="live-h">Driving</h3>
+  <div class="gallery">
+    <figure><div class="phone"><img src="../assets/screenshots/live-phone-driving-weekly-report.png" alt="The weekly Driving report with six statistics and a card per driver" loading="lazy" width="714" height="1408"></div><figcaption>Weekly report</figcaption></figure>
+    <figure><div class="phone"><img src="../assets/screenshots/live-phone-driving-last-week.png" alt="The report for the previous week" loading="lazy" width="714" height="1408"></div><figcaption>Earlier week</figcaption></figure>
+    <figure><div class="phone"><img src="../assets/screenshots/live-phone-driving-driver-week.png" alt="Alden's week: totals and the trips of each day" loading="lazy" width="714" height="1408"></div><figcaption>A driver's week</figcaption></figure>
+    <figure><div class="phone"><img src="../assets/screenshots/live-phone-driving-speeding-popup.png" alt="The Speeding popup with a bar per driver" loading="lazy" width="714" height="1408"></div><figcaption>Speeding popup</figcaption></figure>
+    <figure><div class="phone"><img src="../assets/screenshots/live-phone-driving-phone-use-popup.png" alt="The Phone use popup, with dashes for drivers whose phone does not share it" loading="lazy" width="714" height="1408"></div><figcaption>Phone-use popup</figcaption></figure>
+    <figure><div class="phone"><img src="../assets/screenshots/live-phone-driving-top-speed-popup.png" alt="The Top speed popup naming the fastest drive" loading="lazy" width="714" height="1408"></div><figcaption>Top-speed popup</figcaption></figure>
+    <figure><div class="phone"><img src="../assets/screenshots/live-phone-driving-total-drives-popup.png" alt="The Total drives popup with a bar per driver" loading="lazy" width="714" height="1408"></div><figcaption>Drives popup</figcaption></figure>
+    <figure><div class="phone"><img src="../assets/screenshots/live-phone-driving-unrecorded-stat-popup.png" alt="A statistic popup for something not recorded yet: every row is a dash" loading="lazy" width="714" height="1408"></div><figcaption>Not recorded yet</figcaption></figure>
+  </div>
+  <h3 class="live-h">Settings</h3>
+  <div class="gallery">
+    <figure><div class="phone"><img src="../assets/screenshots/live-phone-settings.png" alt="Settings: map style, show places, default view and layout" loading="lazy" width="714" height="1408"></div><figcaption>Settings</figcaption></figure>
+    <figure><div class="phone"><img src="../assets/screenshots/live-phone-settings-about.png" alt="Settings: connection status, version and map credits" loading="lazy" width="714" height="1408"></div><figcaption>Connections and credits</figcaption></figure>
+  </div>
+  <h3 class="live-h">On a wide screen</h3>
+  <div class="wide">
+    <figure><div class="phone"><img src="../assets/screenshots/live-desktop-map-night.png" alt="The desktop two-pane layout in the Night style: drivers panel left, map right" loading="lazy" width="1467" height="812"></div><figcaption>Night</figcaption></figure>
+    <figure><div class="phone"><img src="../assets/screenshots/live-desktop-map-day.jpg" alt="The desktop layout in the Day style" loading="lazy" width="1467" height="812"></div><figcaption>Day</figcaption></figure>
+    <figure><div class="phone"><img src="../assets/screenshots/live-desktop-map-streets.jpg" alt="The desktop layout in the Streets style" loading="lazy" width="1467" height="812"></div><figcaption>Streets</figcaption></figure>
+    <figure><div class="phone"><img src="../assets/screenshots/live-desktop-map-satellite.jpg" alt="The desktop layout in the Satellite style" loading="lazy" width="1467" height="812"></div><figcaption>Satellite</figcaption></figure>
+    <figure><div class="phone"><img src="../assets/screenshots/live-desktop-layers-popover.jpg" alt="The layers popover on the desktop layout" loading="lazy" width="1467" height="812"></div><figcaption>Layers popover</figcaption></figure>
+    <figure><div class="phone"><img src="../assets/screenshots/live-desktop-attribution-credit.png" alt="The map credit pill expanded at the top right" loading="lazy" width="1467" height="812"></div><figcaption>Map credit</figcaption></figure>
+    <figure><div class="phone"><img src="../assets/screenshots/live-desktop-member-alden.png" alt="A selected member in the side panel with the map centred on him" loading="lazy" width="1467" height="812"></div><figcaption>Alden</figcaption></figure>
+    <figure><div class="phone"><img src="../assets/screenshots/live-desktop-member-briar-driving.png" alt="Briar driving, in the side panel" loading="lazy" width="1467" height="812"></div><figcaption>Briar driving</figcaption></figure>
+    <figure><div class="phone"><img src="../assets/screenshots/live-desktop-member-cass-low-battery.png" alt="Cass at home with a low battery" loading="lazy" width="1467" height="812"></div><figcaption>Cass</figcaption></figure>
+    <figure><div class="phone"><img src="../assets/screenshots/live-desktop-member-dara-stale.png" alt="Dara with the last-seen warning" loading="lazy" width="1467" height="812"></div><figcaption>Dara, stale</figcaption></figure>
+    <figure><div class="phone"><img src="../assets/screenshots/live-desktop-member-elio-static-pin.png" alt="Elio's static pin" loading="lazy" width="1467" height="812"></div><figcaption>Elio</figcaption></figure>
+    <figure><div class="phone"><img src="../assets/screenshots/live-desktop-panel-vehicles.png" alt="The Vehicles panel" loading="lazy" width="1467" height="812"></div><figcaption>Vehicles</figcaption></figure>
+    <figure><div class="phone"><img src="../assets/screenshots/live-desktop-vehicle-awaiting-integration.png" alt="The note explaining that the second vehicle awaits its maker's integration" loading="lazy" width="1467" height="812"></div><figcaption>Awaiting integration</figcaption></figure>
+    <figure><div class="phone"><img src="../assets/screenshots/live-desktop-panel-places.png" alt="The Places panel" loading="lazy" width="1467" height="812"></div><figcaption>Places</figcaption></figure>
+    <figure><div class="phone"><img src="../assets/screenshots/live-desktop-place-detail.png" alt="Place detail in the side panel" loading="lazy" width="1467" height="812"></div><figcaption>Place detail</figcaption></figure>
+    <figure><div class="phone"><img src="../assets/screenshots/live-desktop-vehicle-detail.png" alt="Vehicle detail in the side panel" loading="lazy" width="1467" height="812"></div><figcaption>Vehicle detail</figcaption></figure>
+    <figure><div class="phone"><img src="../assets/screenshots/live-desktop-settings.png" alt="Settings dialog on the desktop layout" loading="lazy" width="1467" height="812"></div><figcaption>Settings</figcaption></figure>
+    <figure><div class="phone"><img src="../assets/screenshots/live-desktop-settings-about.png" alt="The Settings dialog scrolled to connections and about" loading="lazy" width="1467" height="812"></div><figcaption>Credits</figcaption></figure>
+    <figure><div class="phone"><img src="../assets/screenshots/live-desktop-driving-weekly-report.png" alt="The weekly Driving report on a wide screen" loading="lazy" width="1467" height="812"></div><figcaption>Driving report</figcaption></figure>
+    <figure><div class="phone"><img src="../assets/screenshots/live-desktop-driving-last-week.png" alt="The report for last week" loading="lazy" width="1467" height="812"></div><figcaption>Last week</figcaption></figure>
+    <figure><div class="phone"><img src="../assets/screenshots/live-desktop-driving-earlier-week.png" alt="The report for the earliest week offered" loading="lazy" width="1467" height="812"></div><figcaption>Sep 7 to Sep 13</figcaption></figure>
+    <figure><div class="phone"><img src="../assets/screenshots/live-desktop-driving-speeding-popup.png" alt="The Speeding popup on a wide screen" loading="lazy" width="1467" height="812"></div><figcaption>Speeding popup</figcaption></figure>
+    <figure><div class="phone"><img src="../assets/screenshots/live-desktop-driving-phone-use-popup.png" alt="The Phone use popup on a wide screen" loading="lazy" width="1467" height="812"></div><figcaption>Phone-use popup</figcaption></figure>
+    <figure><div class="phone"><img src="../assets/screenshots/live-desktop-driving-top-speed-popup.png" alt="The Top speed popup on a wide screen" loading="lazy" width="1467" height="812"></div><figcaption>Top-speed popup</figcaption></figure>
+    <figure><div class="phone"><img src="../assets/screenshots/live-desktop-driving-total-drives-popup.png" alt="The Total drives popup on a wide screen" loading="lazy" width="1467" height="812"></div><figcaption>Drives popup</figcaption></figure>
+    <figure><div class="phone"><img src="../assets/screenshots/live-desktop-driving-driver-week.png" alt="Alden's week on a wide screen" loading="lazy" width="1467" height="812"></div><figcaption>A driver's week</figcaption></figure>
+    <figure><div class="phone"><img src="../assets/screenshots/live-desktop-driving-drive-list.png" alt="Alden's trips by day, with speeding and phone-use markers" loading="lazy" width="1467" height="812"></div><figcaption>Trip list</figcaption></figure>
   </div>
 </div></section>
 

@@ -162,6 +162,136 @@ The app says what it does not know instead of inventing it.
 
 </details>
 
+## Live in Home Assistant
+
+These are captures of the add-on installed on a real Home Assistant instance, running in Demo mode and opened through Ingress with the Home Assistant frame cropped away. Every person, place and trip is fictional.
+
+### Map styles (phone)
+
+<table>
+  <tr>
+    <td align="center"><img src="assets/screenshots/live-phone-map-peek-night.png" width="180" alt="The map in the Night style with four people, a pickup and the bottom sheet at its peek height"><br><sub>Night (default)</sub></td>
+    <td align="center"><img src="assets/screenshots/live-phone-map-day.jpg" width="180" alt="The map in the Day style, a pale greyscale base with the same pins"><br><sub>Day</sub></td>
+    <td align="center"><img src="assets/screenshots/live-phone-map-streets.jpg" width="180" alt="The map in the Streets style, with coloured roads, water and parks"><br><sub>Streets</sub></td>
+    <td align="center"><img src="assets/screenshots/live-phone-map-satellite.jpg" width="180" alt="The map in the Satellite style, USGS aerial imagery under the pins"><br><sub>Satellite</sub></td>
+  </tr>
+</table>
+
+### Map and sheet
+
+<table>
+  <tr>
+    <td align="center"><img src="assets/screenshots/live-phone-sheet-drivers.png" width="180" alt="The bottom sheet opened to 80 percent, listing five drivers with status and battery"><br><sub>Drivers, 80%</sub></td>
+    <td align="center"><img src="assets/screenshots/live-phone-member-selected-edge-bubbles.png" width="180" alt="Alden selected: the map centred on him in a compact card, with the other members as edge bubbles"><br><sub>Selected member, edge bubbles</sub></td>
+    <td align="center"><img src="assets/screenshots/live-phone-layers-popover.png" width="180" alt="The layers popover with Night, Day, Streets, Satellite and a Show places switch"><br><sub>Layers popover</sub></td>
+    <td align="center"><img src="assets/screenshots/live-phone-sheet-vehicles.png" width="180" alt="The Vehicles tab: a pickup with engine and fuel, and a second vehicle awaiting its maker's integration"><br><sub>Vehicles</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="assets/screenshots/live-phone-sheet-places.png" width="180" alt="The Places tab listing fourteen places and who is at each"><br><sub>Places</sub></td>
+  </tr>
+</table>
+
+### Members
+
+<table>
+  <tr>
+    <td align="center"><img src="assets/screenshots/live-phone-member-alden.png" width="180" alt="Alden at Hearth Haven, charging, with this week's drives, miles and top speed"><br><sub>Alden, at home</sub></td>
+    <td align="center"><img src="assets/screenshots/live-phone-member-briar-driving.png" width="180" alt="Briar driving at 54 mph on I-65 with battery and the week's totals"><br><sub>Briar, driving</sub></td>
+    <td align="center"><img src="assets/screenshots/live-phone-member-cass-low-battery.png" width="180" alt="Cass at The Jester's Hall with a low-battery badge and a street address"><br><sub>Cass, low battery</sub></td>
+    <td align="center"><img src="assets/screenshots/live-phone-member-dara-stale.png" width="180" alt="Dara's last-seen warning, &quot;The raven's late&quot;, with the pin drawn dashed"><br><sub>Dara, stale</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="assets/screenshots/live-phone-member-elio-static-pin.png" width="180" alt="Elio, who does not share his location, shown as a static pin at his home place"><br><sub>Elio, location not shared</sub></td>
+  </tr>
+</table>
+
+### Details
+
+<table>
+  <tr>
+    <td align="center"><img src="assets/screenshots/live-phone-vehicle-detail.png" width="180" alt="The pickup's detail: location, engine, fuel, odometer and last update"><br><sub>Vehicle detail</sub></td>
+    <td align="center"><img src="assets/screenshots/live-phone-place-detail.png" width="180" alt="Hearth Haven with its radius and the people and vehicles there now"><br><sub>Place detail</sub></td>
+  </tr>
+</table>
+
+### Driving
+
+<table>
+  <tr>
+    <td align="center"><img src="assets/screenshots/live-phone-driving-weekly-report.png" width="180" alt="The weekly Driving report with six statistics and a card per driver"><br><sub>Weekly report</sub></td>
+    <td align="center"><img src="assets/screenshots/live-phone-driving-last-week.png" width="180" alt="The report for the previous week"><br><sub>Earlier week</sub></td>
+    <td align="center"><img src="assets/screenshots/live-phone-driving-driver-week.png" width="180" alt="Alden's week: totals and the trips of each day"><br><sub>A driver's week</sub></td>
+    <td align="center"><img src="assets/screenshots/live-phone-driving-speeding-popup.png" width="180" alt="The Speeding popup with a bar per driver"><br><sub>Speeding popup</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="assets/screenshots/live-phone-driving-phone-use-popup.png" width="180" alt="The Phone use popup, with dashes for drivers whose phone does not share it"><br><sub>Phone-use popup</sub></td>
+    <td align="center"><img src="assets/screenshots/live-phone-driving-top-speed-popup.png" width="180" alt="The Top speed popup naming the fastest drive"><br><sub>Top-speed popup</sub></td>
+    <td align="center"><img src="assets/screenshots/live-phone-driving-total-drives-popup.png" width="180" alt="The Total drives popup with a bar per driver"><br><sub>Drives popup</sub></td>
+    <td align="center"><img src="assets/screenshots/live-phone-driving-unrecorded-stat-popup.png" width="180" alt="A statistic popup for something not recorded yet: every row is a dash"><br><sub>Not recorded yet</sub></td>
+  </tr>
+</table>
+
+### Settings
+
+<table>
+  <tr>
+    <td align="center"><img src="assets/screenshots/live-phone-settings.png" width="180" alt="Settings: map style, show places, default view and layout"><br><sub>Settings</sub></td>
+    <td align="center"><img src="assets/screenshots/live-phone-settings-about.png" width="180" alt="Settings: connection status, version and map credits"><br><sub>Connections and credits</sub></td>
+  </tr>
+</table>
+
+### On a wide screen
+
+The unfolded two-pane layout, one capture per view.
+
+<table>
+  <tr>
+    <td align="center"><img src="assets/screenshots/live-desktop-map-night.png" width="330" alt="The desktop two-pane layout in the Night style: drivers panel left, map right"><br><sub>Night</sub></td>
+    <td align="center"><img src="assets/screenshots/live-desktop-map-day.jpg" width="330" alt="The desktop layout in the Day style"><br><sub>Day</sub></td>
+    <td align="center"><img src="assets/screenshots/live-desktop-map-streets.jpg" width="330" alt="The desktop layout in the Streets style"><br><sub>Streets</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="assets/screenshots/live-desktop-map-satellite.jpg" width="330" alt="The desktop layout in the Satellite style"><br><sub>Satellite</sub></td>
+    <td align="center"><img src="assets/screenshots/live-desktop-layers-popover.jpg" width="330" alt="The layers popover on the desktop layout"><br><sub>Layers popover</sub></td>
+    <td align="center"><img src="assets/screenshots/live-desktop-attribution-credit.png" width="330" alt="The map credit pill expanded at the top right"><br><sub>Map credit</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="assets/screenshots/live-desktop-member-alden.png" width="330" alt="A selected member in the side panel with the map centred on him"><br><sub>Alden</sub></td>
+    <td align="center"><img src="assets/screenshots/live-desktop-member-briar-driving.png" width="330" alt="Briar driving, in the side panel"><br><sub>Briar driving</sub></td>
+    <td align="center"><img src="assets/screenshots/live-desktop-member-cass-low-battery.png" width="330" alt="Cass at home with a low battery"><br><sub>Cass</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="assets/screenshots/live-desktop-member-dara-stale.png" width="330" alt="Dara with the last-seen warning"><br><sub>Dara, stale</sub></td>
+    <td align="center"><img src="assets/screenshots/live-desktop-member-elio-static-pin.png" width="330" alt="Elio's static pin"><br><sub>Elio</sub></td>
+    <td align="center"><img src="assets/screenshots/live-desktop-panel-vehicles.png" width="330" alt="The Vehicles panel"><br><sub>Vehicles</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="assets/screenshots/live-desktop-vehicle-awaiting-integration.png" width="330" alt="The note explaining that the second vehicle awaits its maker's integration"><br><sub>Awaiting integration</sub></td>
+    <td align="center"><img src="assets/screenshots/live-desktop-panel-places.png" width="330" alt="The Places panel"><br><sub>Places</sub></td>
+    <td align="center"><img src="assets/screenshots/live-desktop-place-detail.png" width="330" alt="Place detail in the side panel"><br><sub>Place detail</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="assets/screenshots/live-desktop-vehicle-detail.png" width="330" alt="Vehicle detail in the side panel"><br><sub>Vehicle detail</sub></td>
+    <td align="center"><img src="assets/screenshots/live-desktop-settings.png" width="330" alt="Settings dialog on the desktop layout"><br><sub>Settings</sub></td>
+    <td align="center"><img src="assets/screenshots/live-desktop-settings-about.png" width="330" alt="The Settings dialog scrolled to connections and about"><br><sub>Credits</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="assets/screenshots/live-desktop-driving-weekly-report.png" width="330" alt="The weekly Driving report on a wide screen"><br><sub>Driving report</sub></td>
+    <td align="center"><img src="assets/screenshots/live-desktop-driving-last-week.png" width="330" alt="The report for last week"><br><sub>Last week</sub></td>
+    <td align="center"><img src="assets/screenshots/live-desktop-driving-earlier-week.png" width="330" alt="The report for the earliest week offered"><br><sub>Sep 7 to Sep 13</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="assets/screenshots/live-desktop-driving-speeding-popup.png" width="330" alt="The Speeding popup on a wide screen"><br><sub>Speeding popup</sub></td>
+    <td align="center"><img src="assets/screenshots/live-desktop-driving-phone-use-popup.png" width="330" alt="The Phone use popup on a wide screen"><br><sub>Phone-use popup</sub></td>
+    <td align="center"><img src="assets/screenshots/live-desktop-driving-top-speed-popup.png" width="330" alt="The Top speed popup on a wide screen"><br><sub>Top-speed popup</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="assets/screenshots/live-desktop-driving-total-drives-popup.png" width="330" alt="The Total drives popup on a wide screen"><br><sub>Drives popup</sub></td>
+    <td align="center"><img src="assets/screenshots/live-desktop-driving-driver-week.png" width="330" alt="Alden's week on a wide screen"><br><sub>A driver's week</sub></td>
+    <td align="center"><img src="assets/screenshots/live-desktop-driving-drive-list.png" width="330" alt="Alden's trips by day, with speeding and phone-use markers"><br><sub>Trip list</sub></td>
+  </tr>
+</table>
+
 ## Install
 
 HA Cartographer is a Home Assistant add-on (newer releases of Home Assistant call add-ons apps), so it needs an installation
