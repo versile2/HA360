@@ -427,7 +427,7 @@ public sealed class DiagnosticsWiringTests : IDisposable
     public async Task TheAvatarProxy_CountsAFetchOnce_AndNotThePicturesItServesFromItsCache()
     {
         var counters = new ServiceCounters(new ManualTimeProvider(Start));
-        var (service, gateway) = NewAvatars(counters);
+        var (service, gateway, _) = NewAvatars(counters);
         gateway.Image = (_, _, _) => Task.FromResult<AvatarImage?>(new AvatarImage(Png, "image/png"));
 
         Assert.NotNull(await service.GetAsync("king", CancellationToken.None));
@@ -441,10 +441,11 @@ public sealed class DiagnosticsWiringTests : IDisposable
     public async Task TheAvatarProxy_CountsEveryRefusalAsAFailure()
     {
         var counters = new ServiceCounters(new ManualTimeProvider(Start));
-        var (service, gateway) = NewAvatars(counters);
+        var (service, gateway, time) = NewAvatars(counters);
         gateway.Image = (_, _, _) => Task.FromResult<AvatarImage?>(null);
 
         Assert.Null(await service.GetAsync("king", CancellationToken.None));
+        time.Advance(AvatarService.RevalidateAfter);   // a refusal is remembered for the revalidation period (R3-08)
         gateway.Image = (_, _, _) => Task.FromResult<AvatarImage?>(new AvatarImage([1, 2, 3, 4], "image/png"));   // the bytes are not a picture
         Assert.Null(await service.GetAsync("king", CancellationToken.None));
 
@@ -456,7 +457,7 @@ public sealed class DiagnosticsWiringTests : IDisposable
     public async Task AnAvatarRequestForAMemberThatHasNone_IsNotAFetch()
     {
         var counters = new ServiceCounters(new ManualTimeProvider(Start));
-        var (service, _) = NewAvatars(counters);
+        var (service, _, _) = NewAvatars(counters);
 
         Assert.Null(await service.GetAsync("nobody", CancellationToken.None));
 
@@ -552,15 +553,16 @@ public sealed class DiagnosticsWiringTests : IDisposable
         return new HaRestClient(http, options, time, new RecordingLogger<HaRestClient>(), counters);
     }
 
-    private (AvatarService Service, FakeHaGateway Gateway) NewAvatars(ServiceCounters counters)
+    private (AvatarService Service, FakeHaGateway Gateway, ManualTimeProvider Time) NewAvatars(ServiceCounters counters)
     {
         var discovery = new DiscoveryState();
         discovery.Publish(Plans.Discovery(members: Plans.Member("king", avatar: HaPicture)));
         var gateway = new FakeHaGateway();
         var client = new HttpClient(new ScriptedHttpHandler());
         _clients.Add(client);
-        var service = new AvatarService(discovery, gateway, client, NewFolder() + "/avatars", new ManualTimeProvider(Start), new RecordingLogger<AvatarService>(), counters);
-        return (service, gateway);
+        var time = new ManualTimeProvider(Start);
+        var service = new AvatarService(discovery, gateway, client, NewFolder() + "/avatars", time, new RecordingLogger<AvatarService>(), counters);
+        return (service, gateway, time);
     }
 
     // Throws what it is given instead of answering, as a connection that fails (or a request that was cancelled) does.

@@ -18,7 +18,9 @@ namespace Realm.Infrastructure.Avatars;
 /// </summary>
 /// <remarks>
 /// The cache is one file per member, <c>{cacheDirectory}/{MemberId}</c>, overwritten when it is 24 hours old (the file's modification time is set from the
-/// injected clock). The content type is not stored: it is read back from the bytes, and the entity tag is a hash of them.
+/// injected clock). The content type is not stored: it is read back from the bytes, and the entity tag is a hash of them. A refusal is remembered per member
+/// for the same period (R3-08): the upstream is not asked again, and nothing more is logged, until it is over. A stale file is served while a refresh fails
+/// or the member is in that period, instead of being dropped.
 /// </remarks>
 public sealed partial class AvatarService : IAvatarSource
 {
@@ -40,6 +42,7 @@ public sealed partial class AvatarService : IAvatarSource
     private readonly ILogger _logger;
     private readonly ServiceCounters? _counters;
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _gates = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, DateTimeOffset> _refusedAt = new(StringComparer.Ordinal);
 
     /// <param name="discovery">Who the members are and which picture each one shows.</param>
     /// <param name="gateway">Fetches the pictures of the HA kind.</param>
@@ -83,18 +86,27 @@ public sealed partial class AvatarService : IAvatarSource
         await gate.WaitAsync(cancellationToken);
         try
         {
-            if (ReadCache(memberId) is { } cached)
+            if (ReadCache(memberId, allowStale: false) is { } cached)
             {
                 return cached;
+            }
+
+            // R3-08: a refusal stands for the revalidation period; the stale file (if any) is what is served meanwhile.
+            if (_refusedAt.TryGetValue(memberId, out var refused) && _time.GetUtcNow() - refused is { } since && since >= TimeSpan.Zero && since < RevalidateAfter)
+            {
+                return ReadCache(memberId, allowStale: true);
             }
 
             var fetched = await FetchAsync(memberId, upstream, cancellationToken);
             if (fetched is not null)
             {
+                _refusedAt.TryRemove(memberId, out _);
                 WriteCache(memberId, fetched.Bytes);
+                return fetched;
             }
 
-            return fetched;
+            _refusedAt[memberId] = _time.GetUtcNow();
+            return ReadCache(memberId, allowStale: true);
         }
         finally
         {
@@ -209,8 +221,9 @@ public sealed partial class AvatarService : IAvatarSource
 
     private string PathOf(string memberId) => Path.Combine(_cacheDirectory, memberId);
 
-    // A fresh file that still holds a raster image, or null (missing, 24 hours old, unreadable or not an image: all of them mean "fetch it").
-    private AvatarImage? ReadCache(string memberId)
+    // A fresh file that still holds a raster image, or null (missing, 24 hours old, unreadable or not an image: all of them mean "fetch it"). With
+    // allowStale the age is ignored: the file of an earlier fetch is better than no picture when the upstream refuses.
+    private AvatarImage? ReadCache(string memberId, bool allowStale)
     {
         try
         {
@@ -222,7 +235,7 @@ public sealed partial class AvatarService : IAvatarSource
 
             var written = new DateTimeOffset(File.GetLastWriteTimeUtc(path), TimeSpan.Zero);
             var age = _time.GetUtcNow() - written;
-            if (age >= RevalidateAfter || age < TimeSpan.FromMinutes(-5))
+            if (!allowStale && (age >= RevalidateAfter || age < TimeSpan.FromMinutes(-5)))
             {
                 return null;
             }

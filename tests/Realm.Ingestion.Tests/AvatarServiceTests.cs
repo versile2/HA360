@@ -118,7 +118,7 @@ public sealed class AvatarServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task ARefreshThatFails_AnswersNone_AndLogsOneWarning()
+    public async Task ARefreshThatFails_ServesTheStaleFile_AndLogsOneWarning()
     {
         var rig = NewRig(Plans.Member("king", avatar: HaPicture));
         rig.Gateway.Image = (_, _, _) => Task.FromResult<AvatarImage?>(new AvatarImage(Png, "image/png"));
@@ -126,9 +126,29 @@ public sealed class AvatarServiceTests : IDisposable
         rig.Time.Advance(AvatarService.RevalidateAfter);
         rig.Gateway.Image = (_, _, _) => Task.FromResult<AvatarImage?>(null);
 
-        Assert.Null(await rig.Service.GetAsync("king", CancellationToken.None));
+        var served = await rig.Service.GetAsync("king", CancellationToken.None);
 
+        Assert.Equal("image/png", served?.ContentType);
         Assert.Single(rig.Log.Messages(LogLevel.Warning));
+    }
+
+    [Fact]
+    public async Task ARefusal_IsRemembered_ForTheRevalidationPeriod_ThenTheUpstreamIsAskedAgain()
+    {
+        var rig = NewRig(Plans.Member("king", avatar: HaPicture));
+        rig.Gateway.Image = (_, _, _) => Task.FromResult<AvatarImage?>(null);
+
+        Assert.Null(await rig.Service.GetAsync("king", CancellationToken.None));
+        Assert.Null(await rig.Service.GetAsync("king", CancellationToken.None));
+        rig.Time.Advance(AvatarService.RevalidateAfter - TimeSpan.FromSeconds(1));
+        Assert.Null(await rig.Service.GetAsync("king", CancellationToken.None));
+        Assert.Equal(1, rig.Gateway.ImageCalls);
+        Assert.Single(rig.Log.Messages(LogLevel.Warning));
+
+        rig.Time.Advance(TimeSpan.FromSeconds(1));
+        Assert.Null(await rig.Service.GetAsync("king", CancellationToken.None));
+        Assert.Equal(2, rig.Gateway.ImageCalls);
+        Assert.Equal(2, rig.Log.Messages(LogLevel.Warning).Count);
     }
 
     [Theory]
