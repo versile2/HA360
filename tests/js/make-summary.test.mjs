@@ -31,7 +31,7 @@ import {
 } from '../../tools/ci/make-summary.mjs';
 import { cleanEnv, fixture, repoRoot, tempDir, tools, writeFile } from './helpers/ci-harness.mjs';
 
-const WORKSPACE = '/home/runner/work/ha360/ha360';
+const WORKSPACE = '/home/runner/work/ha-cartographer/ha-cartographer';
 
 // Lays out ci-in/<job>/... the way actions/download-artifact does and runs the tool.
 function summarize({ files = {}, needs, extraArgs = [], env = {}, createIn = true } = {}) {
@@ -134,12 +134,12 @@ test('header: branch, sha, run and url come from the GitHub variables', () => {
   const run = summarize({
     files: { 'dotnet/errors.log': '' },
     needs: NEEDS_OK,
-    env: { GITHUB_SERVER_URL: 'https://github.com', GITHUB_REPOSITORY: 'Versile2/ha360', GITHUB_RUN_ID: '555' },
+    env: { GITHUB_SERVER_URL: 'https://github.com', GITHUB_REPOSITORY: 'Versile2/ha-cartographer', GITHUB_RUN_ID: '555' },
   });
   assert.match(run.summary, /^- branch: slice\/S0-skeleton$/m);
   assert.match(run.summary, /^- sha: abcdef0123456789abcdef0123456789abcdef01$/m);
   assert.match(run.summary, /^- run: 7$/m);
-  assert.match(run.summary, /^- url: https:\/\/github\.com\/Versile2\/ha360\/actions\/runs\/555$/m);
+  assert.match(run.summary, /^- url: https:\/\/github\.com\/Versile2\/ha-cartographer\/actions\/runs\/555$/m);
 });
 
 test('every input absent: still writes a SUMMARY.md (failure, nothing found), exit 0', () => {
@@ -291,12 +291,12 @@ test('guards: the guards job failed without a FAIL line (crash, no log): the why
   const crashed = summarize({
     files: { 'guards/guards.log': 'file:///w/tools/ci/guards.mjs:10\nTypeError: boom\n    at run (guards.mjs:10:3)\n' },
     needs: guardsNeeds('failure', 'skipped'),
-    env: { GITHUB_SERVER_URL: 'https://github.com', GITHUB_REPOSITORY: 'Versile2/ha360', GITHUB_RUN_ID: '9' },
+    env: { GITHUB_SERVER_URL: 'https://github.com', GITHUB_REPOSITORY: 'Versile2/ha-cartographer', GITHUB_RUN_ID: '9' },
   });
   assert.match(crashed.summary, /^- why: guards failed: unknown \(guards\.log holds no FAIL line\)$/m);
   assert.match(section(crashed.summary, 'Guards'), /TypeError: boom/, 'what the script printed is shown as it is');
   assert.match(section(crashed.summary, 'Guards'), /^PASS: 0 of 0 guards\.$/m);
-  assert.match(section(crashed.summary, 'Notes'), /raw job log of the workflow run \(https:\/\/github\.com\/Versile2\/ha360\/actions\/runs\/9\)/);
+  assert.match(section(crashed.summary, 'Notes'), /raw job log of the workflow run \(https:\/\/github\.com\/Versile2\/ha-cartographer\/actions\/runs\/9\)/);
 
   const noLog = summarize({ needs: guardsNeeds('failure', 'skipped') });
   assert.match(noLog.summary, /^- why: guards failed: unknown \(no guards\.log was found\)$/m);
@@ -474,11 +474,11 @@ test('docker smoke: items that were skipped because the container never started 
 });
 
 test('docker smoke: no smoke.json. A failed or succeeded job is a failure with a pointer; a skipped job and a missing --needs give no section', () => {
-  const env = { GITHUB_SERVER_URL: 'https://github.com', GITHUB_REPOSITORY: 'Versile2/ha360', GITHUB_RUN_ID: '12' };
+  const env = { GITHUB_SERVER_URL: 'https://github.com', GITHUB_REPOSITORY: 'Versile2/ha-cartographer', GITHUB_RUN_ID: '12' };
   const failed = summarize({ files: { 'dotnet/errors.log': '' }, needs: smokeNeeds('failure'), env });
   assert.match(failed.summary, /^- result: failure$/m);
   assert.match(failed.summary, /^- why: job docker-smoke: failure$/m);
-  assert.match(section(failed.summary, 'Docker smoke'), /^No smoke\.json was found: the image build or the smoke script stopped before it wrote one\. The cause is in the raw job log of the workflow run \(https:\/\/github\.com\/Versile2\/ha360\/actions\/runs\/12\)\.$/m);
+  assert.match(section(failed.summary, 'Docker smoke'), /^No smoke\.json was found: the image build or the smoke script stopped before it wrote one\. The cause is in the raw job log of the workflow run \(https:\/\/github\.com\/Versile2\/ha-cartographer\/actions\/runs\/12\)\.$/m);
 
   const succeeded = summarize({ files: { 'dotnet/errors.log': '' }, needs: smokeNeeds('success') });
   assert.match(succeeded.summary, /^- why: job docker-smoke succeeded but left no smoke\.json$/m);
@@ -977,7 +977,7 @@ test('screenshots: the gallery under shots/ and the first 20 failure screenshots
   const failing = Array.from({ length: 22 }, (_, i) => ({
     title: `[X-${String(i + 1).padStart(2, '0')}] t${i + 1}`,
     status: 'unexpected',
-    attachments: [{ name: 'screenshot', contentType: 'image/png', path: `/home/runner/work/ha360/ha360/ci-out/e2e/artifacts/t${i + 1}-phone/test-failed-1.png` }],
+    attachments: [{ name: 'screenshot', contentType: 'image/png', path: `/home/runner/work/ha-cartographer/ha-cartographer/ci-out/e2e/artifacts/t${i + 1}-phone/test-failed-1.png` }],
   }));
   const files = {
     'e2e/e2e/results.json': playwrightOf(failing),
@@ -1051,7 +1051,7 @@ test('helpers: parseTap names a nested failure by its describe chain, lists the 
   );
   const [file, slides, merges] = parsed.failures;
   assert.match(file.detail, /^node:internal\/modules\/esm\/resolve:275\n/, 'the lines node printed before the file entry come first');
-  assert.match(file.detail, /Cannot find module '\/home\/runner\/work\/ha360\/ha360\/tests\/js\/helpers\/missing\.mjs'/);
+  assert.match(file.detail, /Cannot find module '\/home\/runner\/work\/ha-cartographer\/ha-cartographer\/tests\/js\/helpers\/missing\.mjs'/);
   assert.match(file.detail, /\n {2}exitCode: 1\n/);
   assert.match(slides.detail, /^ {2}duration_ms: 1\.5\n {2}type: 'test'/, 'the YAML block of a nested test is shown at the indent of a top-level one');
   assert.match(slides.detail, / {4}\+ {3}y: 2\n {4}- {3}y: 3/);

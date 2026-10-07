@@ -14,7 +14,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import YAML from 'yaml';
 
-export const IMAGE = 'ghcr.io/versile2/ha360';
+export const IMAGE = 'ghcr.io/versile2/ha-cartographer';
 export const REQUIRED_KEYS = ['name', 'slug', 'description', 'version', 'arch'];
 export const WATCHDOG_RE = /^(?:https?|\[PROTO:\w+\]|tcp):\/\/\[HOST\]:(\[PORT:\d+\]|\d+).*$/;
 export const SEMVER_RE = /^\d+\.\d+\.\d+$/;

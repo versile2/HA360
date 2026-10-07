@@ -30,16 +30,16 @@ HA Cartographer is a Home Assistant add-on (newer releases of Home Assistant cal
 that has the Supervisor (Home Assistant OS or Supervised) on an amd64 machine.
 
 1. **Add the repository.** In Home Assistant open **Settings -> Apps -> Install app**, open the menu (three dots),
-   choose **Repositories**, paste `https://github.com/Versile2/ha360` exactly and press **Add**. Close the dialog and
+   choose **Repositories**, paste `https://github.com/Versile2/ha-cartographer` exactly and press **Add**. Close the dialog and
    reload the page if the store does not list the app yet.
 2. **Install.** Open **HA Cartographer** in the store and press **Install**. The Supervisor pulls the image
-   `ghcr.io/versile2/ha360` (see the registry note below).
+   `ghcr.io/versile2/ha-cartographer` (see the registry note below).
 3. **Choose Demo mode first.** Before the first start open the app's **Configuration** tab, switch on **Demo mode**
    (`demo_mode: true` if you edit as YAML) and save. Nothing else needs to be filled in: the member, vehicle and place
    lists ship empty.
 4. **Start and open it.** Press **Start**, switch on **Show in sidebar** (Home Assistant keeps this as a per-install
-   setting, so the app cannot do it for you; **Watchdog** is optional) and open **HA Cartographer** from the sidebar, the
-   entry with the crown icon. It also opens in the Home Assistant companion app. You should see the invented family on
+   setting, so the app cannot do it for you; **Watchdog** is optional) and open the sidebar entry called **The Realm** (the
+   crown icon; the app is named HA Cartographer in the store). It also opens in the Home Assistant companion app. You should see the invented family on
    the map and a Driving report; that confirms the install works before any real data is involved.
 5. **Switch to your own household.** Turn **Demo mode** off. Then fill in the **Household members**, vehicles and places
    lists of the Configuration tab (an example with an invented cast is in
@@ -50,7 +50,7 @@ that has the Supervisor (Home Assistant OS or Supervised) on an amd64 machine.
 The app's own **Documentation** tab ([realm/DOCS.md](realm/DOCS.md)) covers where the data comes from, what is stored
 and where, the phone-use statistic and troubleshooting.
 
-**Registry note.** The image is a package on the GitHub Container Registry, `ghcr.io/versile2/ha360:<version>`, and it
+**Registry note.** The image is a package on the GitHub Container Registry, `ghcr.io/versile2/ha-cartographer:<version>`, and it
 can be private until the owner of the repository makes it public. While it is private, Home Assistant cannot pull it and
 the installation fails with a pull error (for example `unauthorized` or `denied` in the Supervisor log). In that case
 either wait until the package is public, or give your Home Assistant a registry login for `ghcr.io` (a GitHub account
@@ -62,7 +62,7 @@ name and a token that may read packages).
 - CI: `.github/workflows/ci.yml`. Every run publishes a summary to the `ci-artifacts` branch; see `tools/ci/README.md`.
 - Releases: pushing a tag `vMAJOR.MINOR.PATCH` runs `.github/workflows/release.yml`. It refuses a tag that differs from
   `version` in `realm/config.yaml` or has no `## MAJOR.MINOR.PATCH` section in `realm/CHANGELOG.md`, then builds the
-  image and pushes `ghcr.io/versile2/ha360:<version>` (never `latest`).
+  image and pushes `ghcr.io/versile2/ha-cartographer:<version>` (never `latest`).
 
 ## Licence
 

@@ -1,6 +1,8 @@
 # Third-party notices
 
-The Realm's own code is MIT-licensed (see [LICENSE](LICENSE)). This repository and the image `ghcr.io/versile2/ha360` also contain the components listed here, each under its own licence. This file gives the notices those licences ask for. In the image it sits at `/app/THIRD-PARTY-NOTICES.md`, beside `/app/LICENSE` and the licence texts in `/app/LICENSES/`.
+The Realm's own code is MIT-licensed (see [LICENSE](LICENSE)). This repository and the image `ghcr.io/versile2/ha-cartographer` also contain the components listed here, each under its own licence. This file gives the notices those licences ask for. In the image it sits at `/app/THIRD-PARTY-NOTICES.md`, beside `/app/LICENSE` and the licence texts in `/app/LICENSES/`.
+
+`realm/icon.png` and `realm/logo.png` are original artwork created for this project (not derived from third-party artwork) and are covered by the project's MIT licence.
 
 Versions are those of the packages and files the image is built from (`Directory.Packages.props`, the vendored files). The licence texts below are copied unchanged from the sources named with them. Development and test tools (npm dev dependencies, test NuGet packages) are not part of the image and are not listed.
 

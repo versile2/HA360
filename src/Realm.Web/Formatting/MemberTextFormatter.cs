@@ -37,7 +37,7 @@ public static class MemberTextFormatter
     public static readonly TimeSpan BatteryAgeThreshold = TimeSpan.FromMinutes(15);
 
     /// <summary>
-    /// L2 of the row (01 section 5.1), first match wins by <paramref name="status"/>: "Driving · 54 mph on I-35" (the speed only when one was reported, the street
+    /// L2 of the row (01 section 5.1), first match wins by <paramref name="status"/>: "Driving · 54 mph on Maple Street" (the speed only when one was reported, the street
     /// only when known), "At Hearth Haven", the street ("Near {street}" when <paramref name="poorAccuracy"/>), "{street} · {City}, {ST}" when
     /// <paramref name="far"/>, or "Somewhere in the Realm". Stale and offline members keep their last known line. <paramref name="placeName"/> is the display name of
     /// the zone the member is in, or null.

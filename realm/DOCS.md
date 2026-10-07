@@ -8,16 +8,16 @@ own login is the only login.
 ## Setup
 
 1. In Home Assistant open **Settings -> Apps -> Install app**, open the menu (three dots) and choose **Repositories**,
-   and add `https://github.com/Versile2/ha360`.
+   and add `https://github.com/Versile2/ha-cartographer`.
 2. Install **HA Cartographer** and press **Start**.
 3. Switch on **Show in sidebar** on the app's page. Home Assistant keeps this as a per-install setting, so the app
    cannot turn it on by itself. Optionally switch on **Watchdog** too.
-4. Open **HA Cartographer** from the sidebar. With no options set, everyone found through Home Assistant appears with a plain
+4. Open the sidebar entry called **The Realm** (crown icon; the app is listed as HA Cartographer in the store). With no options set, everyone found through Home Assistant appears with a plain
    name.
 5. To name people, vehicles and places, open the **Configuration** tab. Members, vehicles and places are lists:
    each member has an `id` (a short lower-case slug) and a `display_name`, and can have a `lore_title` (a secondary
    label), a `color`, and the entity ids of its trackers. An example is in
-   [docs/ARCHITECTURE.md](https://github.com/Versile2/ha360/blob/main/docs/ARCHITECTURE.md). Options are read when the
+   [docs/ARCHITECTURE.md](https://github.com/Versile2/ha-cartographer/blob/main/docs/ARCHITECTURE.md). Options are read when the
    app starts, so restart the app after saving them.
 
 Your names, entity ids and addresses live only in these options on your own Home Assistant. They are never part of the

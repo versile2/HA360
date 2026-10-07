@@ -23,7 +23,7 @@ ids, addresses) lives in the add-on's options on the user's own Home Assistant, 
 | Map | MapLibre GL JS 6.11.2, vendored, driven through JS interop; tiles are fetched by the browser |
 | Home Assistant access | WebSocket and REST through the Supervisor proxy (`homeassistant_api`) |
 | History | SQLite under `/data`, schema as plain SQL scripts keyed on `PRAGMA user_version`; EF Core is only a mapper |
-| Packaging | One image per version, `ghcr.io/versile2/ha360:<version>`, add-on slug `realm`, Ingress on port 8099 |
+| Packaging | One image per version, `ghcr.io/versile2/ha-cartographer:<version>`, add-on slug `realm`, Ingress on port 8099 |
 
 Per-frame work (pins, bubbles, camera) is JavaScript; the server sends immutable view-model payloads and receives
 discrete events. The app runs in one of two modes from the same UI: `Live` (Home Assistant plus SQLite) and `Demo`
@@ -108,5 +108,5 @@ app) and `publish-ci`, which waits for all of them. `SUMMARY.md` has a section f
 The add-on version in `realm/config.yaml` equals the image tag, and every version has a section in
 `realm/CHANGELOG.md`. A release is image first, store second: push a tag `vX.Y.Z` (a workflow, added with the
 Dockerfile, builds and pushes the image), then edit `version` in `realm/config.yaml` once the image exists, so nobody is
-offered an update they cannot pull. Install in Home Assistant by adding `https://github.com/Versile2/ha360` as an app
+offered an update they cannot pull. Install in Home Assistant by adding `https://github.com/Versile2/ha-cartographer` as an app
 repository.

@@ -23,7 +23,7 @@ line 14
 line 15
 line 16
 line 17</Message>
-          <StackTrace>   at Realm.Domain.Tests.FusionTests.Prefers() in /home/runner/work/ha360/ha360/tests/Realm.Domain.Tests/FusionTests.cs:line 9</StackTrace>
+          <StackTrace>   at Realm.Domain.Tests.FusionTests.Prefers() in /home/runner/work/ha-cartographer/ha-cartographer/tests/Realm.Domain.Tests/FusionTests.cs:line 9</StackTrace>
         </ErrorInfo>
       </Output>
     </UnitTestResult>

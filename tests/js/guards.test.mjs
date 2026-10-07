@@ -38,7 +38,7 @@ slug: realm
 description: "A test add-on."
 arch:
   - amd64
-image: "ghcr.io/versile2/ha360"
+image: "ghcr.io/versile2/ha-cartographer"
 ingress: true
 ingress_port: 8099
 watchdog: "http://[HOST]:[PORT:8099]/healthz"
@@ -253,8 +253,8 @@ test('addon-validate: the baseline passes; a newer top CHANGELOG section, the Do
 const ADDON_FAILURES = [
   ['a required key is missing', config((c) => c.replace(/^description: .*\n/m, '')), /required key 'description' is missing/],
   ['arch is empty', config((c) => c.replace('arch:\n  - amd64\n', 'arch: []\n')), /required key 'arch' is missing/],
-  ['image carries a tag', config((c) => c.replace('ha360"', 'ha360:0.1.0"')), /image must be exactly 'ghcr\.io\/versile2\/ha360'/],
-  ['image uses {arch}', config((c) => c.replace('ha360"', 'ha360-{arch}"')), /image must be exactly/],
+  ['image carries a tag', config((c) => c.replace('ha-cartographer"', 'ha-cartographer:0.1.0"')), /image must be exactly 'ghcr\.io\/versile2\/ha-cartographer'/],
+  ['image uses {arch}', config((c) => c.replace('ha-cartographer"', 'ha-cartographer-{arch}"')), /image must be exactly/],
   ['image is not lower case', config((c) => c.replace('versile2', 'Versile2')), /image must be exactly/],
   ['image is absent', config((c) => c.replace(/^image: .*\n/m, '')), /found none/],
   ['version is not plain semver', config((c) => c.replace('"0.1.0"', '"0.1"')), /version '0\.1' is not plain MAJOR\.MINOR\.PATCH/],

@@ -39,7 +39,7 @@ first; only without one, a run above the baseline whose sha7 is not ours means t
 `WAIT_POLL_S` (default 30) changes the poll interval.
 
 If the script cannot tell what happened, the independent check is the Actions API for the SHA, with the read token:
-`GET https://api.github.com/repos/Versile2/ha360/actions/runs?head_sha=<sha>` (`status` and `conclusion`). If `publish-ci`
+`GET https://api.github.com/repos/Versile2/ha-cartographer/actions/runs?head_sha=<sha>` (`status` and `conclusion`). If `publish-ci`
 itself could not push, the workflow artifacts (3 days) hold the raw logs.
 
 By hand:
@@ -51,6 +51,10 @@ git show origin/ci-artifacts:LATEST.json
 git ls-tree --name-only origin/ci-artifacts runs/<branch-slug>/
 git show origin/ci-artifacts:runs/<branch-slug>/<run>-<sha7>/SUMMARY.md
 ```
+
+## New repository
+
+The `ci-artifacts` branch is recreated by the first CI run of a new repository (`publish-ci-artifacts.sh` creates the orphan branch when none exists). It then contains only CI output of that repository; nothing from an earlier repository carries over, and `ci.yml` needs `contents: write` for the push.
 
 ## What is on `ci-artifacts`
 

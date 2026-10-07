@@ -1,5 +1,5 @@
   Determining projects to restore...
-/home/runner/work/ha360/ha360/Realm.slnx : warning NU1903: Package 'Newtonsoft.Json' 9.0.1 has a known high severity vulnerability, https://github.com/advisories/GHSA-5crp-9r3c-p9vr
-/home/runner/work/ha360/ha360/tests/Realm.Domain.Tests/Realm.Domain.Tests.csproj : error NU1102: Unable to find package xunit with version (>= 9.9.9)
-/home/runner/work/ha360/ha360/tests/Realm.Domain.Tests/Realm.Domain.Tests.csproj : error NU1102:   - Found 130 version(s) in nuget.org [ Nearest version: 2.9.3 ]
-  Failed to restore /home/runner/work/ha360/ha360/tests/Realm.Domain.Tests/Realm.Domain.Tests.csproj (in 1.2 sec).
+/home/runner/work/ha-cartographer/ha-cartographer/Realm.slnx : warning NU1903: Package 'Newtonsoft.Json' 9.0.1 has a known high severity vulnerability, https://github.com/advisories/GHSA-5crp-9r3c-p9vr
+/home/runner/work/ha-cartographer/ha-cartographer/tests/Realm.Domain.Tests/Realm.Domain.Tests.csproj : error NU1102: Unable to find package xunit with version (>= 9.9.9)
+/home/runner/work/ha-cartographer/ha-cartographer/tests/Realm.Domain.Tests/Realm.Domain.Tests.csproj : error NU1102:   - Found 130 version(s) in nuget.org [ Nearest version: 2.9.3 ]
+  Failed to restore /home/runner/work/ha-cartographer/ha-cartographer/tests/Realm.Domain.Tests/Realm.Domain.Tests.csproj (in 1.2 sec).

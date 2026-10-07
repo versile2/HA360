@@ -164,9 +164,9 @@ test('GH_TOKEN: an https://github.com remote is pushed through the x-access-toke
     GH_TOKEN: token,
     GIT_CONFIG_COUNT: '1',
     GIT_CONFIG_KEY_0: `url.${remote.url}.insteadOf`,
-    GIT_CONFIG_VALUE_0: `https://x-access-token:${token}@github.com/Versile2/ha360.git`,
+    GIT_CONFIG_VALUE_0: `https://x-access-token:${token}@github.com/Versile2/ha-cartographer.git`,
   };
-  for (const githubUrl of ['https://github.com/Versile2/ha360', 'https://github.com/Versile2/ha360.git', 'https://github.com/Versile2/ha360/']) {
+  for (const githubUrl of ['https://github.com/Versile2/ha-cartographer', 'https://github.com/Versile2/ha-cartographer.git', 'https://github.com/Versile2/ha-cartographer/']) {
     const out = ciOut({ branch: 'main', sha: SHA_A, run: 5 });
     const result = publish(out, githubUrl, { env });
     assert.equal(result.status, 0, `${githubUrl}: ${result.stderr}`);
@@ -177,7 +177,7 @@ test('GH_TOKEN: an https://github.com remote is pushed through the x-access-toke
 
 test('GH_TOKEN: a failing push gives up after 6 attempts (exit 1) without printing the token', () => {
   const token = 'ghs_SENTINELfailing456';
-  const result = publish(ciOut({ branch: 'main', sha: SHA_A, run: 1 }), 'https://github.com/Versile2/ha360', {
+  const result = publish(ciOut({ branch: 'main', sha: SHA_A, run: 1 }), 'https://github.com/Versile2/ha-cartographer', {
     env: { GH_TOKEN: token, GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'http.proxy', GIT_CONFIG_VALUE_0: 'http://127.0.0.1:9' },
   });
   assert.equal(result.status, 1);
