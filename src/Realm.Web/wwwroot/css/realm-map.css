@@ -399,7 +399,9 @@
 /* Open: the credits read left of the button, on the same pill. */
 :is(.realm-map, .realm-map-controls) .maplibregl-ctrl-top-right .maplibregl-ctrl-attrib.maplibregl-compact-show {
   width: auto;
-  max-width: calc(100vw - 24px);
+  /* Never over the gear: the credits end 12 px from the right edge and start at least 68 px from the left (gear 12 + 48, plus 8), so on a phone they wrap
+     into two or three lines to the right of the gear instead of spanning the screen (mapStyles.js attributionMaxWidthPx is the same sum). */
+  max-width: calc(100vw - 68px - 12px);
   padding: 6px 56px 6px 16px;
   border-radius: 24px;
 }
@@ -413,6 +415,8 @@
   font-family: var(--realm-font-body);
   font-size: 12px;
   line-height: 18px;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 /* ---- edge bubbles (01 section 4.10, 03 section 4.6): a member outside the visible rectangle, on its edge, pointing at them --------------- */

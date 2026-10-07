@@ -7,7 +7,10 @@ import {
   ATTRIBUTION_FOLD_MS,
   STYLES,
   STYLE_IDS,
+  ATTRIBUTION_LEFT_KEEP_OUT_PX,
+  attributionMaxWidthPx,
   attributionStartsExpanded,
+  styleDocumentUrl,
   buildStyle,
   createAttributionFold,
 } from '../../src/Realm.Web/wwwroot/js/mapStyles.js';
@@ -210,4 +213,52 @@ test('a different delay is honoured', () => {
   assert.deepEqual(timer.scheduled.map((entry) => entry.delayMs), [250]);
   timer.advance(250);
   assert.deepEqual(collapsed, ['collapse']);
+});
+
+// ---- v0.1.1: credits layout and the satellite style hand-over -----------------------------------------------------------------
+
+test('attributionMaxWidthPx: the open credits keep clear of the gear on a phone and stay inside the right margin', () => {
+  assert.equal(ATTRIBUTION_LEFT_KEEP_OUT_PX, 12 + 48 + 8, 'gear (12 + 48) plus the 8 px keep-out');
+  for (const width of [360, 400, 412, 884]) {
+    const max = attributionMaxWidthPx(width);
+    assert.ok(width - 12 - max >= ATTRIBUTION_LEFT_KEEP_OUT_PX, `${width}: left edge ${width - 12 - max} is right of the gear`);
+  }
+  assert.equal(attributionMaxWidthPx(400), 320);
+  assert.equal(attributionMaxWidthPx(10), 48, 'never narrower than the (i) target');
+});
+
+test('realm-map.css caps the open credits with the same numbers as attributionMaxWidthPx', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const css = await readFile(new URL('../../src/Realm.Web/wwwroot/css/realm-map.css', import.meta.url), 'utf8');
+  const rule = css.match(/maplibregl-compact-show \{[^}]*\}/s)?.[0] ?? '';
+  assert.match(rule, /max-width:\s*calc\(100vw - 68px - 12px\)/, rule);
+});
+
+test('the arming of the fold does not wait for map load: a fold armed at creation fires at 5 s even if load never comes', () => {
+  const timer = fakeTimer();
+  const { fold, collapsed } = foldWith(timer);
+  fold.arm(); // realmMap.js bindAttribution arms at creation; `load` waits for every tile and used to hold the credits open for 10 to 20 s
+  timer.advance(5000);
+  assert.deepEqual(collapsed, ['collapse']);
+});
+
+test('styleDocumentUrl: an object style (satellite) goes to MapLibre as a blob URL, whose load needs no animation frame; a URL style is untouched', () => {
+  // MapLibre 6 Style.loadJSON waits for requestAnimationFrame before it loads an object style (loadURL does not). A throttled tab never delivers the frame,
+  // so style.load never fired and the 8 s timeout reported "That map style didn't load" with no tile requested (v0.1.1 bug 2).
+  const made = [];
+  class FakeBlob {
+    constructor(parts, options) {
+      this.text = parts.join('');
+      this.type = options.type;
+    }
+  }
+  const env = { Blob: FakeBlob, createObjectURL: (blob) => (made.push(blob), `blob:realm/${made.length}`) };
+  const satellite = buildStyle('satellite');
+  assert.equal(typeof satellite, 'object', 'satellite is built as an object');
+  assert.equal(styleDocumentUrl(satellite, env), 'blob:realm/1');
+  assert.equal(made[0].type, 'application/json');
+  assert.deepEqual(JSON.parse(made[0].text), satellite, 'the document is the style, unchanged');
+  assert.equal(styleDocumentUrl(buildStyle('night'), env), STYLES.night.url, 'a URL style stays a URL');
+  assert.equal(made.length, 1, 'and makes no blob');
+  assert.equal(typeof styleDocumentUrl(buildStyle('demo-offline'), env), 'string');
 });

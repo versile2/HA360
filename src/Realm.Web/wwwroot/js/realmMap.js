@@ -59,6 +59,7 @@ import {
   appearanceOf,
   attributionStartsExpanded,
   buildStyle,
+  styleDocumentUrl,
   createAttributionFold,
   isStyleId,
   overlaySpec,
@@ -300,6 +301,7 @@ const PIN_TEMPLATE =
  * @property {boolean} styleReady
  * @property {boolean} loadFired the map's first `load` has happened (OnReady was sent)
  * @property {PendingStyle | null} pending
+ * @property {string | null} styleBlobUrl the blob: URL of the object style being loaded or shown (satellite, demo-offline), revoked when replaced
  * @property {LayoutPayload} layout
  * @property {Padding | null} forcedPadding
  * @property {number | null} sheetHeightPx the measured sheet height (the sheetMetrics feed, S7a); null while there is no sheet (then the Peek height is assumed)
@@ -835,9 +837,29 @@ function ensureOverlay(r) {
  * @param {boolean} withTransform
  */
 function applyStyle(r, styleId, withTransform) {
-  const style = buildStyle(styleId, { demoAttribution: r.opts.strings?.demoAttribution });
+  const built = buildStyle(styleId, { demoAttribution: r.opts.strings?.demoAttribution });
+  releaseStyleBlob(r);
+  const style = documentUrlOf(built);
+  if (typeof built !== 'string') r.styleBlobUrl = style;
   r.styleReady = false;
   r.map.setStyle(style, withTransform ? { diff: false, transformStyle: (prev, next) => transformStyle(prev, next) } : { diff: false });
+}
+
+/** Hands an object style to MapLibre as a blob: URL (see styleDocumentUrl: no animation frame is needed to load it). @param {string | import('maplibre-gl').StyleSpecification} built @returns {string} */
+function documentUrlOf(built) {
+  return styleDocumentUrl(built, { createObjectURL: (blob) => URL.createObjectURL(blob), Blob });
+}
+
+/** What was true when a style timeout fired, for the failure message: tab visibility, whether MapLibre had a loaded style, and whether the style went in as a blob. @param {Runtime} r @returns {string} */
+function styleDiagnostics(r) {
+  const style = /** @type {any} */ (r.map).style;
+  return `event: timeout; hidden ${document.hidden}; style loaded ${style ? Boolean(style._loaded) : 'none'}; via ${r.styleBlobUrl ? 'blob url' : 'url'}; map loaded ${r.map.loaded()}`;
+}
+
+/** Revokes the blob: URL of the previous object style, if any. @param {Runtime} r */
+function releaseStyleBlob(r) {
+  if (r.styleBlobUrl) URL.revokeObjectURL(r.styleBlobUrl);
+  r.styleBlobUrl = null;
 }
 
 /**
@@ -912,7 +934,7 @@ function onMapError(r, event) {
   if (event?.sourceId !== undefined || event?.tile !== undefined) return;
   const error = event?.error;
   const url = typeof error?.url === 'string' ? error.url : null;
-  const styleUrl = STYLES[pending.styleId]?.url ?? null;
+  const styleUrl = STYLES[pending.styleId]?.url ?? r.styleBlobUrl ?? null;
   if (url !== null && url !== styleUrl) return;
   failPending(r, pending, String(error?.message ?? error ?? 'the style failed to load'));
 }
@@ -1216,9 +1238,8 @@ function buildProbe() {
 /**
  * The map credits (D81, the OSMF Attribution Guidelines). MapLibre builds a compact control that starts open and folds on the first drag.
  * A style that draws third-party data keeps that and adds the rest of the guideline: the credits are open when the map opens and fold to the
- * (i) button on the first pan or zoom by the person, the first click on the map, or 5 s after the map has loaded, whichever comes first.
- * The countdown starts at `load`, not at creation, so a slow network cannot fold the credits before the OpenStreetMap credit, which arrives
- * with the source data, has been shown. The (i) button still toggles the credits; using it ends the automatic fold. demo-offline draws no
+ * (i) button on the first pan or zoom by the person, the first click on the map, or 5 s after the map was made, whichever comes first.
+ * The countdown starts at creation, not at `load` (which waits for the tiles and kept the credits open for 10 to 20 s), and the first pointer or key press anywhere folds them. While open they stay to the right of the gear (realm-map.css). The (i) button still toggles the credits; using it ends the automatic fold. demo-offline draws no
  * third-party data and starts as the 48 px (i) button (01 section 3.3, AC-03).
  * @param {MapLibreMap} map
  * @param {HTMLElement} scope the element that holds the controls (`controlScope`)
@@ -1237,7 +1258,20 @@ function bindAttribution(map, scope, styleId) {
     cancel: (handle) => clearTimeout(/** @type {ReturnType<typeof setTimeout>} */ (handle)),
     collapse,
   });
-  map.once('load', () => fold.arm());
+  // Armed now, not at `load`: `load` waits for every tile of the first view, so on a slow or throttled page the credits stayed open for 10 to 20 s and covered the gear
+  // (v0.1.1, bug 1). The countdown is a fixed ATTRIBUTION_FOLD_MS from the map being made.
+  fold.arm();
+  // The first tap or key anywhere folds the credits too. The listener is passive and only observes, so the tap itself still reaches its target (it is never swallowed).
+  const onFirstInteraction = (/** @type {Event} */ event) => {
+    if (event.target instanceof Node && control?.contains(event.target)) return; // the (i) button and the credit links are the person using them
+    fold.fold();
+  };
+  document.addEventListener('pointerdown', onFirstInteraction, { capture: true, passive: true });
+  document.addEventListener('keydown', onFirstInteraction, { capture: true, passive: true });
+  map.once('remove', () => {
+    document.removeEventListener('pointerdown', onFirstInteraction, true);
+    document.removeEventListener('keydown', onFirstInteraction, true);
+  });
   // movestart carries the DOM event only when the person moved the map (drag, wheel, pinch, keys): a flight of ours has none.
   map.on('movestart', (event) => {
     if (event.originalEvent) fold.fold();
@@ -1274,6 +1308,9 @@ function controlScope(container) {
   return host instanceof HTMLElement && host.querySelector('.maplibregl-ctrl-attrib') ? host : container;
 }
 
+/** The blob: URL of the object style createMap handed to the new map, taken over by createRuntime. @type {string | null} */
+let initialStyleBlob = null;
+
 /**
  * Builds the MapLibre map (03 section 4.4). Throws when WebGL2 is unavailable.
  * @param {InitOptions} opts
@@ -1283,9 +1320,12 @@ function controlScope(container) {
  */
 function createMap(opts, container, restore) {
   const strings = opts.strings;
+  const built = buildStyle(opts.styleId, { demoAttribution: strings?.demoAttribution });
+  const first = documentUrlOf(built);
+  initialStyleBlob = typeof built === 'string' ? null : first;
   const map = new (lib().Map)({
     container,
-    style: buildStyle(opts.styleId, { demoAttribution: strings?.demoAttribution }),
+    style: first,
     center: restore ? restore.center : opts.center,
     zoom: restore ? restore.zoom : opts.zoom,
     minZoom: opts.minZoom ?? MIN_ZOOM,
@@ -1328,6 +1368,7 @@ function createRuntime(opts, dotnet, map, container) {
     styleId: null,
     appearance: appearanceOf(opts.styleId),
     styleReady: false,
+    styleBlobUrl: initialStyleBlob,
     loadFired: false,
     pending: null,
     layout: { ...DEFAULT_LAYOUT, safe: { ...DEFAULT_LAYOUT.safe } },
@@ -1419,6 +1460,7 @@ function teardown() {
   if (r.raf) cancelAnimationFrame(r.raf);
   if (r.cameraTimer !== null) clearTimeout(r.cameraTimer);
   if (r.pending) clearTimeout(r.pending.timer);
+  releaseStyleBlob(r);
   releaseSelection(r); // S8a
   releaseBubbles(r); // S9b
   r.resizeObserver?.disconnect();
@@ -1557,7 +1599,7 @@ export function setStyle(styleId, opts = {}) {
         revert: false,
         notifyOnSuccess: true,
         resolve,
-        timer: setTimeout(() => failPending(r, pending, `the style did not load within ${timeoutMs} ms`), timeoutMs),
+        timer: setTimeout(() => failPending(r, pending, `the style did not load within ${timeoutMs} ms (${styleDiagnostics(r)})`), timeoutMs),
       };
       const withTransform = r.styleReady;
       r.pending = pending;

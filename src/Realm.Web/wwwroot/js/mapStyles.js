@@ -63,6 +63,20 @@ export function appearanceOf(styleId) {
 /** How long the credits of a style with third-party data stay open once the map has loaded, when nobody touches the map first. */
 export const ATTRIBUTION_FOLD_MS = 5000;
 
+/** The left edge the open credits keep clear of, in CSS px from the left of the viewport: the gear (12 + 48) plus 8 px (01 section 4.10 keep-out). realm-map.css derives its max-width from the same number. */
+export const ATTRIBUTION_LEFT_KEEP_OUT_PX = 68;
+/** The right margin of the credits (the (i) target's right edge sits 12 px from the viewport edge, AC-03). */
+export const ATTRIBUTION_RIGHT_MARGIN_PX = 12;
+
+/**
+ * The widest the open credits may be in a viewport of `viewportWidth` px, so they sit to the right of the gear and never over it.
+ * @param {number} viewportWidth
+ * @returns {number}
+ */
+export function attributionMaxWidthPx(viewportWidth) {
+  return Math.max(48, viewportWidth - ATTRIBUTION_LEFT_KEEP_OUT_PX - ATTRIBUTION_RIGHT_MARGIN_PX);
+}
+
 /**
  * Whether the map credits start expanded. Every style that draws third-party data (OpenFreeMap with OpenStreetMap, USGS) shows them open
  * when the map opens; only demo-offline, which draws none, starts as the (i) button (D81). An unknown id counts as third-party data: showing
@@ -197,6 +211,21 @@ export function buildStyle(styleId, opts = {}) {
   if (!info) throw new Error(`unknown style id '${String(styleId)}'`);
   if (info.url) return info.url;
   return styleId === 'satellite' ? satelliteStyle() : demoOfflineStyle(opts.demoAttribution);
+}
+
+/**
+ * What to hand to `map.setStyle`. MapLibre loads a style given as an object only after an animation frame (Style.loadJSON waits for
+ * requestAnimationFrame), while a style given as a URL is loaded as soon as its document is fetched. A tab, iframe or window that is
+ * throttled or hidden delivers no animation frame, so an object style (satellite, demo-offline) never fired `style.load` and the 8 s
+ * timeout reported "That map style didn't load" although nothing was wrong and no tile had been requested (v0.1.1, bug 2). An object
+ * style is therefore handed over as a blob: URL, which takes the frame-free URL path. A URL stays as it is.
+ * @param {string | StyleSpecification} style
+ * @param {{ createObjectURL: (blob: any) => string, Blob: new (parts: string[], options: { type: string }) => any }} env
+ * @returns {string}
+ */
+export function styleDocumentUrl(style, env) {
+  if (typeof style === 'string') return style;
+  return env.createObjectURL(new env.Blob([JSON.stringify(style)], { type: 'application/json' }));
 }
 
 // ---- the overlay: accuracy halos and zone circles ---------------------------------------------------------------------------
