@@ -1,28 +1,166 @@
+<div align="center">
+
+<img src="realm/logo.png" alt="HA Cartographer" width="250">
+
 # HA Cartographer
 
-A map-first family locator that runs as a Home Assistant add-on. It works with Home Assistant's Life360 integration
-and the Home Assistant companion app.
+**A map-first family locator for Home Assistant. Everyone, on one map, on your own server.**
 
-Status: experimental. [realm/CHANGELOG.md](realm/CHANGELOG.md) lists what each version contains and what it does not
-do yet.
+[![Status: experimental](https://img.shields.io/badge/status-experimental-E8BC4E?style=flat-square&labelColor=0B0E1F)](realm/CHANGELOG.md)
+[![Home Assistant add-on](https://img.shields.io/badge/Home%20Assistant-add--on-5CC8FF?style=flat-square&labelColor=0B0E1F)](#install)
+[![Privacy: no cloud](https://img.shields.io/badge/privacy-no%20cloud%2C%20no%20telemetry-4ADE80?style=flat-square&labelColor=0B0E1F)](#privacy)
+[![Licence: MIT](https://img.shields.io/badge/licence-MIT-B794F6?style=flat-square&labelColor=0B0E1F)](LICENSE)
 
-## Screenshots
+[**Install**](#install) &nbsp;·&nbsp; [**Features**](#what-it-does) &nbsp;·&nbsp; [**Gallery**](#gallery) &nbsp;·&nbsp; [**Privacy**](#privacy) &nbsp;·&nbsp; [**FAQ**](#faq) &nbsp;·&nbsp; [**Landing page**](docs/index.html)
+
+<br>
 
 <table>
   <tr>
-    <td align="center"><img src="assets/screenshots/location-peek-phone.png" width="220" alt="The Location page on a phone: a map with four people and a vehicle, and the bottom sheet resting at its peek height"><br>Location</td>
-    <td align="center"><img src="assets/screenshots/drivers-sheet-phone.png" width="220" alt="The bottom sheet opened to 80 percent, listing five drivers with their status and battery"><br>Drivers sheet</td>
-    <td align="center"><img src="assets/screenshots/driving-report-phone.png" width="220" alt="The weekly Driving report: speeding, phone use, top speed, drives and miles, and a card per driver"><br>Weekly Driving report</td>
-  </tr>
-  <tr>
-    <td align="center"><img src="assets/screenshots/driving-popup-phone.png" width="220" alt="A popup that explains the Total Drives statistic, with a bar for each driver"><br>Statistic popup</td>
-    <td align="center"><img src="assets/screenshots/settings-phone.png" width="220" alt="The Settings dialog: map style, saved places, default view radius, layout and connection status"><br>Settings</td>
-    <td align="center"><img src="assets/screenshots/location-panel-unfolded.png" width="300" alt="The Location page on an unfolded phone, with the drivers list as a side panel"><br>Unfolded phone</td>
+    <td align="center"><img src="assets/screenshots/phone-map-peek.png" width="210" alt="The map with four people, a vehicle and the bottom sheet resting at its peek height"></td>
+    <td align="center"><img src="assets/screenshots/phone-sheet-drivers.png" width="210" alt="The bottom sheet opened to 80 percent, listing five drivers with status and battery"></td>
+    <td align="center"><img src="assets/screenshots/phone-driving-report.png" width="210" alt="The weekly Driving report with speeding, phone use, top speed, drives and miles"></td>
+    <td align="center"><img src="assets/screenshots/phone-map-styles.png" width="210" alt="The map style picker offering Night, Day, Streets and Satellite"></td>
   </tr>
 </table>
 
-Every screenshot shows Demo mode: an invented family on a frozen clock, drawn on the app's own offline demo map style,
-so no real person, place or map data appears in them.
+<sub>Every screenshot on this page is Demo mode: an invented court on a frozen clock. No real person, place or map data appears.</sub>
+
+</div>
+
+---
+
+## What it does
+
+HA Cartographer runs inside Home Assistant as an add-on (newer releases call them apps). It reads the people and trackers
+Home Assistant already knows about, from the **Life360 integration** and the **companion app**, and draws them on a
+full-screen map. It opens from the Home Assistant sidebar, so Home Assistant's own login is the only login.
+
+Status: experimental. [realm/CHANGELOG.md](realm/CHANGELOG.md) lists what each version contains and what it does not do yet.
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>Map first</h3>
+      A full-screen map with pins for people, vehicles and your saved places. Tap a pin to select it; the sheet follows.
+      Those who are far away do not shrink the view: they wait at the edge as <b>edge bubbles</b> that point the way.
+    </td>
+    <td width="50%" valign="top">
+      <h3>One sheet, two heights</h3>
+      A bottom sheet rests at a <b>Peek</b> so the map stays yours, and opens to <b>80 percent</b> for the full
+      <b>Drivers</b>, <b>Vehicles</b> and <b>Places</b> lists. On a wide screen it becomes a side panel.
+    </td>
+  </tr>
+  <tr>
+    <td align="center"><img src="assets/screenshots/phone-member-selected.png" width="230" alt="A selected member, Cass, shown in a compact card at the peek height"></td>
+    <td align="center"><img src="assets/screenshots/phone-sheet-vehicles.png" width="230" alt="The Vehicles tab listing a pickup and a second vehicle with engine and fuel status"></td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>Weekly driving report</h3>
+      Trips are recorded as they close and kept on your server, so reports reach back further than Home Assistant's
+      recorder does. Six statistics (speeding, phone use, rapid acceleration, hard braking, top speed, drives and miles),
+      a card per driver and a week-by-week picker.
+    </td>
+    <td width="50%" valign="top">
+      <h3>Every number explained</h3>
+      Tap a statistic and a popup explains where it comes from, with a bar per driver. Drives and miles flip between the
+      two views. Missing data shows a dash, not a guess.
+    </td>
+  </tr>
+  <tr>
+    <td align="center"><img src="assets/screenshots/phone-driver-week.png" width="230" alt="One driver's week: totals and a list of that week's trips"></td>
+    <td align="center"><img src="assets/screenshots/phone-popup-speeding.png" width="230" alt="A popup explaining the Speeding statistic with a bar for each driver"></td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>Places that mean something</h3>
+      Saved places are drawn as circles on the map and listed with who is there. Open one for its address, who is
+      inside, and how far away it is.
+    </td>
+    <td width="50%" valign="top">
+      <h3>Switchable map styles</h3>
+      Night, Day, Streets or Satellite, from the layers button, and a toggle for the place circles. The demo uses its own
+      offline map so nothing is fetched.
+    </td>
+  </tr>
+  <tr>
+    <td align="center"><img src="assets/screenshots/phone-place-detail.png" width="230" alt="Detail of a place with its address, people present and this week's totals"></td>
+    <td align="center"><img src="assets/screenshots/phone-settings.png" width="230" alt="Settings: map style, show places, default view radius and layout"></td>
+  </tr>
+</table>
+
+Also: a **default view radius** (you plus those within 6 to 155 miles, or everyone), **layout** choice (auto, bottom sheet or
+side panel), battery and staleness cues ("last seen 42 min ago", "location isn't shared"), and a **Demo mode** with a
+fictional court so you can check the install before any real data is involved.
+
+## Gallery
+
+Phone first, then unfolded. Each frame is a real capture of the running app in Demo mode.
+
+### On a phone
+
+<table>
+  <tr>
+    <td align="center"><img src="assets/screenshots/phone-map-peek.png" width="180" alt="Map at peek height"><br><sub>Map, Peek</sub></td>
+    <td align="center"><img src="assets/screenshots/phone-map-far-members.png" width="180" alt="Map with saved places as circles and a far member at the edge"><br><sub>Edge bubble &amp; places</sub></td>
+    <td align="center"><img src="assets/screenshots/phone-member-selected.png" width="180" alt="A selected member at the peek height"><br><sub>Selected member</sub></td>
+    <td align="center"><img src="assets/screenshots/phone-map-styles.png" width="180" alt="Map style picker"><br><sub>Map styles</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="assets/screenshots/phone-sheet-drivers.png" width="180" alt="Drivers list at 80 percent"><br><sub>Drivers, 80%</sub></td>
+    <td align="center"><img src="assets/screenshots/phone-sheet-vehicles.png" width="180" alt="Vehicles list at 80 percent"><br><sub>Vehicles</sub></td>
+    <td align="center"><img src="assets/screenshots/phone-sheet-places.png" width="180" alt="Places list at 80 percent"><br><sub>Places</sub></td>
+    <td align="center"><img src="assets/screenshots/phone-place-detail.png" width="180" alt="Place detail"><br><sub>Place detail</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="assets/screenshots/phone-driving-report.png" width="180" alt="Weekly Driving report"><br><sub>Driving report</sub></td>
+    <td align="center"><img src="assets/screenshots/phone-popup-drives.png" width="180" alt="Total drives popup"><br><sub>Popup: drives</sub></td>
+    <td align="center"><img src="assets/screenshots/phone-popup-miles.png" width="180" alt="Total drives popup showing miles"><br><sub>Popup: miles</sub></td>
+    <td align="center"><img src="assets/screenshots/phone-popup-speeding.png" width="180" alt="Speeding popup"><br><sub>Popup: speeding</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="assets/screenshots/phone-driver-week.png" width="180" alt="One driver's week"><br><sub>Driver's week</sub></td>
+    <td align="center"><img src="assets/screenshots/phone-report-last-week.png" width="180" alt="The report for an earlier week"><br><sub>Earlier weeks</sub></td>
+    <td align="center"><img src="assets/screenshots/phone-settings.png" width="180" alt="Settings"><br><sub>Settings</sub></td>
+    <td align="center"><img src="assets/screenshots/phone-settings-about.png" width="180" alt="Settings: connections and about"><br><sub>Connections &amp; credits</sub></td>
+  </tr>
+</table>
+
+### Unfolded and tablet
+
+<table>
+  <tr>
+    <td align="center"><img src="assets/screenshots/unfolded-map-and-panel.png" width="330" alt="Map with the drivers list as a side panel"><br><sub>Map and side panel</sub></td>
+    <td align="center"><img src="assets/screenshots/unfolded-vehicles-panel.png" width="330" alt="Vehicles in the side panel"><br><sub>Vehicles</sub></td>
+    <td align="center"><img src="assets/screenshots/unfolded-places-panel.png" width="330" alt="Places in the side panel"><br><sub>Places</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="assets/screenshots/unfolded-detail-panel.png" width="330" alt="Detail view in the side panel"><br><sub>Detail</sub></td>
+    <td align="center"><img src="assets/screenshots/unfolded-map-styles.png" width="330" alt="Map style picker on a wide screen"><br><sub>Map styles</sub></td>
+    <td align="center"><img src="assets/screenshots/unfolded-driving-report.png" width="330" alt="Driving report on a wide screen"><br><sub>Driving report</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="assets/screenshots/unfolded-popup-miles.png" width="330" alt="Statistic popup on a wide screen"><br><sub>Statistic popup</sub></td>
+    <td align="center"><img src="assets/screenshots/unfolded-settings.png" width="330" alt="Settings on a wide screen"><br><sub>Settings</sub></td>
+    <td></td>
+  </tr>
+</table>
+
+<details>
+<summary><b>Quiet states: nothing to show, nothing known, nothing reachable</b></summary>
+<br>
+
+The app says what it does not know instead of inventing it.
+
+<table>
+  <tr>
+    <td align="center"><img src="assets/screenshots/phone-report-empty.png" width="200" alt="A report week with no record yet: every figure is a dash"><br><sub>No record yet for a week</sub></td>
+    <td align="center"><img src="assets/screenshots/phone-state-ha-unreachable.png" width="200" alt="The map with a banner saying Home Assistant cannot be reached and the app is retrying"><br><sub>Home Assistant unreachable: banner, retry, clears by itself</sub></td>
+  </tr>
+</table>
+
+</details>
 
 ## Install
 
@@ -56,10 +194,64 @@ the installation fails with a pull error (for example `unauthorized` or `denied`
 either wait until the package is public, or give your Home Assistant a registry login for `ghcr.io` (a GitHub account
 name and a token that may read packages).
 
+## Privacy
+
+- **Your data stays on your Home Assistant.** Positions, trips and vehicle samples live in a local SQLite file inside the
+  add-on and are included in your backups. Positions are kept for 120 days by default.
+- **No cloud, no analytics, no telemetry, no update checks, no geocoding.** Ingress is the only door in; the app opens no port.
+- **No Life360 login.** It reads Home Assistant's entities and never calls Life360's API. The one exception is member
+  pictures served from `life360.com`, fetched without credentials; set a member's `avatar` to `none` to use initials.
+- **Map tiles** are fetched by your browser from public servers (OpenFreeMap, and USGS for Satellite), which see your IP
+  address and the area in view, not who is on the map. Demo mode uses an offline map and fetches nothing.
+
+Details: [realm/DOCS.md](realm/DOCS.md#what-is-stored-and-where).
+
+## FAQ
+
+<details>
+<summary><b>Why is the add-on called HA Cartographer but the sidebar says "The Realm"?</b></summary>
+<br>
+On purpose. The add-on store lists the project by its name, HA Cartographer. Inside Home Assistant the sidebar entry,
+with the crown icon, is called <b>The Realm</b>, the in-app theme of kings, courts and royal scribes.
+</details>
+
+<details>
+<summary><b>Do I need a Life360 account?</b></summary>
+<br>
+Not for the app itself. It reads what Home Assistant's Life360 integration and the companion app already publish; it holds
+no Life360 login or token. Without them, only what Home Assistant knows is shown.
+</details>
+
+<details>
+<summary><b>Does it work on Home Assistant Container or Core?</b></summary>
+<br>
+Not today. Add-ons need the Supervisor (Home Assistant OS or Supervised), and the image is built for amd64.
+</details>
+
+<details>
+<summary><b>The phone-use figure is a dash.</b></summary>
+<br>
+Enable the disabled <code>binary_sensor.&lt;device&gt;_interactive</code> entity of the companion app. The app never changes
+your Home Assistant configuration for you. See <a href="realm/DOCS.md#phone-use-stat">the docs</a>.
+</details>
+
+<details>
+<summary><b>I cannot see the sidebar entry.</b></summary>
+<br>
+Switch on <b>Show in sidebar</b> on the app's page. Home Assistant keeps that as a per-install setting.
+</details>
+
+<details>
+<summary><b>The install fails with a pull error.</b></summary>
+<br>
+The image may still be private. See the registry note under <a href="#install">Install</a>.
+</details>
+
 ## Build
 
 - .NET 10 SDK (see `global.json`): `dotnet build Realm.slnx` and `dotnet test Realm.slnx`.
 - CI: `.github/workflows/ci.yml`. Every run publishes a summary to the `ci-artifacts` branch; see `tools/ci/README.md`.
+  The screenshots above come from its gallery run.
 - Releases: pushing a tag `vMAJOR.MINOR.PATCH` runs `.github/workflows/release.yml`. It refuses a tag that differs from
   `version` in `realm/config.yaml` or has no `## MAJOR.MINOR.PATCH` section in `realm/CHANGELOG.md`, then builds the
   image and pushes `ghcr.io/versile2/ha-cartographer:<version>` (never `latest`).
@@ -68,7 +260,7 @@ name and a token that may read packages).
 
 HA Cartographer is released under the MIT licence ([LICENSE](LICENSE)). The components it bundles or fetches, and the
 licences and credits they ask for, are listed in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md). The image carries
-both files in `/app`.
+both files in `/app`. Map data &copy; OpenStreetMap contributors; interface built with MudBlazor.
 
 ## Trademarks
 
