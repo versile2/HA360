@@ -96,8 +96,9 @@ A test that failed and then passed on its retry is `flaky`: listed under `## Fla
 `flaky` or `missing` and where the tests were found. A criterion is read from the test titles that carry `[AC-nn]` (a suffix
 such as `[AC-49a]` counts for AC-49): the display names in the `.trx` files (dotnet), the titles in `e2e/results.json` (retries
 turn a pass into `flaky`) and the TAP of the `js` job (`js-tests.tap`). With several tests the worst status wins: failed, flaky,
-passed, skipped; no test at all is `missing`. The matrix is report-only until S15 (D50): it never changes the verdict, a failed
-test fails the run through the rules above. The `ac-coverage` guard still checks the titles themselves.
+passed, skipped; no test at all is `missing`. The matrix itself derives no verdict (a failed test fails the run through the rules above; a flaky criterion is listed, not failed,
+04 section 1.6). Since S15 (D50) `tools/ci/ac-scope.json` is `"enforce"` with all 50 ids: `ac-coverage` FAILs a missing or unknown AC id and
+`testid-contract` FAILs a test id of `testids.json` that is absent from `src/`.
 
 ## Authentication of the publish step
 

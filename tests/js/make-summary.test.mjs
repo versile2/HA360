@@ -740,7 +740,7 @@ test('AC matrix: 50 rows built from the .trx, results.json and the js TAP; repor
   assert.match(run.summary, /^- result: success$/m, 'a flaky test and 44 missing criteria do not fail the run');
   const matrix = section(run.summary, 'Acceptance criteria');
   assert.ok(matrix, 'the section exists');
-  assert.match(matrix, /Report-only until S15 \(D50\)/);
+  assert.match(matrix, /Since S15 \(D50\)/);
   assert.match(matrix, /^50 criteria: 4 passed, 0 partial, 0 failed, 1 skipped, 1 flaky, 44 missing\.$/m);
   const rows = acRows(run.summary);
   assert.equal(rows.size, 50, 'one row per criterion');

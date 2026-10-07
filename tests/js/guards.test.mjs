@@ -665,10 +665,24 @@ test('the real tree prints only PASS and REPORT lines and does not fail', () => 
   for (const name of GUARD_NAMES) assert.ok(linesOf(result, name).length > 0, `${name} printed nothing`);
 });
 
-test('tools/ci/ac-scope.json and testids.json are created empty, in report mode (D50)', () => {
+test('tools/ci/ac-scope.json enforces all fifty ids and testids.json is the closed Appendix B list (S15, D50)', () => {
   const read = (name) => JSON.parse(fs.readFileSync(path.join(repoRoot, 'tools', 'ci', name), 'utf8'));
-  assert.deepEqual(read('ac-scope.json'), { mode: 'report', enforced: [] });
-  assert.deepEqual(read('testids.json'), { testids: [] });
+  const scope = read('ac-scope.json');
+  assert.equal(scope.mode, 'enforce');
+  assert.deepEqual(scope.enforced, Array.from({ length: 50 }, (_, i) => `AC-${String(i + 1).padStart(2, '0')}`));
+  const { testids } = read('testids.json');
+  assert.ok(testids.length >= 40 && new Set(testids).size === testids.length);
+  for (const id of ['map-canvas', 'sheet', 'settings-dialog', 'banner-{ha|life360|reconnect}', 'pin-{member|vehicle}-{id}', 'map-style-tile-{id}']) {
+    assert.ok(testids.includes(id), `${id} missing from testids.json`);
+  }
+  assert.ok(!testids.includes('slot-add'), 'slot-add is never rendered in v1, so it cannot be a src literal');
+});
+
+test('enforce on the real tree: no FAIL and no REPORT line from testid-contract or ac-coverage', () => {
+  const result = runGuards(repoRoot);
+  for (const name of ['testid-contract', 'ac-coverage']) {
+    assert.deepEqual(linesOf(result, name), [`PASS ${name}`], dump(result));
+  }
 });
 
 test('this file never spells an AC id in the title form (ac-coverage scans tests/js on the real tree)', () => {
@@ -696,4 +710,15 @@ test('guards.mjs on the command line: exit 0 on PASS/REPORT, 1 on FAIL, 64 on a 
   const usage = spawnSync('node', [script, '--bogus'], { encoding: 'utf8' });
   assert.equal(usage.status, 64);
   assert.match(usage.stderr, /usage: guards\.mjs/);
+});
+
+test('enforce: an enforced scope with one AC id removed from the tests, or one unknown id, fails the run', () => {
+  const enforced = SCOPE('enforce', Array.from({ length: 50 }, (_, i) => `AC-${pad(i + 1)}`));
+  expectPass({ ...allFifty(), ...enforced }, 'ac-coverage');
+  const gone = run({ ...allFifty([7, 49]), ...enforced });
+  assert.equal(gone.failed, true);
+  assert.deepEqual(linesOf(gone, 'ac-coverage'), ['FAIL ac-coverage: AC-07 missing', 'FAIL ac-coverage: AC-49 missing']);
+  // a suffix counts for its number: 49a and 49b alone satisfy AC-49
+  const suffixed = { ...allFifty([49]), 'tests/e2e/b.spec.ts': `test('${ac('49a')} x', () => {});\ntest('${ac('49b')} y', () => {});` };
+  expectPass({ ...suffixed, ...enforced }, 'ac-coverage');
 });

@@ -363,7 +363,7 @@ export function smokeSection(smoke) {
 // ---------------------------------------------------------------------------------------------
 // The AC matrix (D68, 04 card S6a): AC-01..AC-50, each passed / partial / failed / skipped / flaky / missing, from every test title that
 // carries [AC-nn] (a suffix such as [AC-49a] counts for AC-49): the .trx files (dotnet), Playwright's results.json (e2e) and the node TAP
-// of the js job. Report-only until S15 (D50): it never changes the verdict.
+// of the js job. Informational since S15 (D50): the enforcing is done by the ac-coverage guard (every id has a titled test) and by the failed-test rules, so the matrix itself derives no verdict.
 // ---------------------------------------------------------------------------------------------
 
 const AC_TOKEN_RE = /\[AC-(\d{2})([a-z]?)\]/g;
@@ -579,13 +579,13 @@ export function buildAcMatrix(tests) {
   }));
 }
 
-// The "## Acceptance criteria" section. Report-only: no verdict is derived from it.
+// The "## Acceptance criteria" section. Informational: no verdict is derived from it (a failed test fails the run, the ac-coverage guard enforces presence).
 export function acSection(rows) {
   const counts = Object.fromEntries(AC_STATUSES.map((status) => [status, rows.filter((row) => row.status === status).length]));
   const lines = rows.map((row) => `| ${row.id} | ${row.status} | ${row.found === '' ? '—' : `${row.found}${row.parts.length > 0 ? ` (${row.parts.join(', ')})` : ''}`} |`);
   const parts = [
     '## Acceptance criteria',
-    'Report-only until S15 (D50): this table never changes the verdict. A criterion is read from the test titles that carry `[AC-nn]` (a suffix such as `[AC-49a]` counts for AC-49) in the .trx files (dotnet), Playwright\'s `e2e/results.json` (e2e) and the node TAP of the js job (node); one with no such test is missing. When it has several, failed beats flaky beats partial beats passed. `partial` means a test of the criterion passed and another was skipped, fixme\'d or expected to fail: part of the criterion is not verified, so it is never read as `passed`; when every test of it is skipped it is `skipped`.',
+    'Since S15 (D50) the guards enforce all 50 ids (ac-coverage) and a failed test fails the run; this table itself never changes the verdict, and a flaky criterion is listed, not failed (04 section 1.6 blocks the merge at two flaky runs in three, by hand). A criterion is read from the test titles that carry `[AC-nn]` (a suffix such as `[AC-49a]` counts for AC-49) in the .trx files (dotnet), Playwright\'s `e2e/results.json` (e2e) and the node TAP of the js job (node); one with no such test is missing. When it has several, failed beats flaky beats partial beats passed. `partial` means a test of the criterion passed and another was skipped, fixme\'d or expected to fail: part of the criterion is not verified, so it is never read as `passed`; when every test of it is skipped it is `skipped`.',
     `${rows.length} criteria: ${counts.passed} passed, ${counts.partial} partial, ${counts.failed} failed, ${counts.skipped} skipped, ${counts.flaky} flaky, ${counts.missing} missing.`,
     ['| AC | status | found in |', '|---|---|---|', ...lines].join('\n'),
   ];
