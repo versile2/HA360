@@ -319,6 +319,107 @@ div[mudsheet] .mud-sheet-container.mud-sheet-position-bottom[data-testid="sheet"
   list-style: none;
 }
 
+/* ---- before the first data snapshot (01 sections 3.8 and 8.6) ----
+   Three skeleton rows: an avatar circle and two text bars, drawn with the .realm-skeleton shimmer of realm-driving.css (1.2 s, off with reduced motion). Each row has the box of the real row of its
+   section (the .realm-sheet-item border above it and the same minimum height), so nothing shifts when the data arrives. The selectors carry two classes because .realm-skeleton, which loads
+   after this file, sets its own radius. */
+.realm-skeleton-row {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 84px;
+  padding: 12px 16px;
+}
+
+.realm-skeleton-row--vehicle {
+  min-height: 96px;
+}
+
+.realm-skeleton-row--place {
+  min-height: 72px;
+}
+
+.realm-skeleton-row .realm-skeleton-avatar {
+  flex: 0 0 auto;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+}
+
+.realm-skeleton-row--place .realm-skeleton-avatar {
+  width: 48px;
+  height: 48px;
+}
+
+.realm-skeleton-row .realm-skeleton-lines {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.realm-skeleton-row .realm-skeleton-bar {
+  display: block;
+  height: 14px;
+  border-radius: 7px;
+}
+
+.realm-skeleton-row .realm-skeleton-bar--name {
+  width: 52%;
+}
+
+.realm-skeleton-row .realm-skeleton-bar--line {
+  width: 78%;
+  height: 12px;
+}
+
+/* The first-data-failed error (FirstDataState): the sentence and a 48 px Retry pill, centred in the body where the rows would be. */
+.realm-first-data-error {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 24px 16px;
+  color: var(--realm-text);
+  text-align: center;
+}
+
+.realm-first-data-error .realm-first-data-error-icon.mud-icon-root {
+  width: 32px;
+  height: 32px;
+  font-size: 32px;
+  color: var(--realm-warning);
+}
+
+.realm-first-data-error-text {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.4;
+}
+
+.realm-first-data-retry {
+  min-width: 96px;
+  min-height: 48px;
+  padding: 0 24px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--realm-primary);
+  color: var(--realm-on-primary);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.realm-first-data-retry:focus-visible {
+  outline: 3px solid var(--realm-focus);
+  outline-offset: 3px;
+}
+
 /* ---- the rows (01 sections 5.1 to 5.3): one button each, drawn the same in the bottom sheet and in the left panel. Heights are minimums so nothing shifts when data arrives:
    84 px a person (three lines), 96 px a vehicle (four), 72 px a place. MudIcon draws an svg sized by font-size, so the icon rules below set font-size, not width. ---- */
 

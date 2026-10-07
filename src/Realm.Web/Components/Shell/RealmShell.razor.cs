@@ -39,6 +39,7 @@ public sealed partial class RealmShell : IAsyncDisposable
     ];
 
     private IRealmSession? _session;
+    private FirstDataWatch? _firstData;
     private DemoUiOverrides _overrides = DemoUiOverrides.None;
     private bool _disposed;
 
@@ -63,6 +64,9 @@ public sealed partial class RealmShell : IAsyncDisposable
 
     private DemoUiOverrides Overrides => _overrides;
 
+    // The circuit's first-data deadlines, on the session's own clock; created beside the session, started on the first render of the circuit.
+    private FirstDataWatch FirstData => _firstData ?? throw new InvalidOperationException("The first-data watch is created in OnInitialized.");
+
     /// <inheritdoc />
     protected override void OnInitialized()
     {
@@ -80,6 +84,17 @@ public sealed partial class RealmShell : IAsyncDisposable
             Week: ParseWeek(First(query, "week")));
 
         _session = SessionFactory.Create(demo);
+        _firstData = new FirstDataWatch(() => Session.Time);
+    }
+
+    /// <inheritdoc />
+    protected override void OnAfterRender(bool firstRender)
+    {
+        // Only the circuit renders after: a prerender pass runs no OnAfterRender, so no timer is started on a throw-away session's behalf.
+        if (firstRender)
+        {
+            FirstData.Begin();
+        }
     }
 
     /// <summary>Disposes the circuit's session once; later calls do nothing.</summary>
@@ -91,6 +106,7 @@ public sealed partial class RealmShell : IAsyncDisposable
         }
 
         _disposed = true;
+        _firstData?.Dispose();
         return _session?.DisposeAsync() ?? ValueTask.CompletedTask;
     }
 
