@@ -298,7 +298,11 @@
 
             await LoadAsync(_loadedWeek, blank: false);
             StateHasChanged();
-        });
+        }).ContinueWith(
+            static task => _ = task.Exception, // R3-14: observe a dispatcher fault of a closed circuit
+            CancellationToken.None,
+            TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
     }
 
     public ValueTask DisposeAsync()

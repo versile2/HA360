@@ -5,9 +5,9 @@ Nobody reads a console, so every run, pass or fail, ends in a readable summary o
 
 | File | Role |
 |---|---|
-| `make-summary.mjs` | Reads the downloaded job artifacts and writes `SUMMARY.md`, `errors.log`, `build.tail.log`, `tests/*.trx` and, from the `e2e` job, `e2e/results.json`, `e2e/contract.tap`, `e2e/app.log`, `shots/` and `failures/`. Renders `## E2E` and the AC matrix `## Acceptance criteria`. Node built-ins only. |
+| `make-summary.mjs` | Reads the downloaded job artifacts and writes `SUMMARY.md`, `errors.log`, `build.tail.log`, `tests/*.trx` and, from the `e2e` job, `e2e/results.json`, `e2e/contract.tap`, `e2e/app.log`, `shots/` and `failures/`, and from the `js` job `js/js-tests.tap`, `js/tsc.log` and `js/styles.log`. Renders `## Jobs`, `## Guards`, `## E2E`, `## JS`, `## Map styles`, `## Docker smoke`, `## Screenshots` and the AC matrix `## Acceptance criteria`. Node built-ins only. |
 | `guards.mjs` | The twelve guards of 03 section 7.3: one `PASS`/`FAIL`/`REPORT` line per finding, exit 1 on any `FAIL`. The `guards` job tees its whole output to `guards.log` (uploaded with the `guards` artifact, also when a guard fails). |
-| `image-smoke.sh` | Runs the built image the way the Supervisor does (Demo data, no Home Assistant) and checks items 1 to 4, 9 and 10 of 03 section 7.8; prints one `PASS`/`WARN`/`FAIL`/`SKIP` line per item and writes `ci-out/smoke.json` (sizes, time to healthy, one entry per item, and `failing_requests`: the response headers of a failed request, plus what the image holds for static web assets when the Blazor script is not served), which `make-summary.mjs` renders as `## Docker smoke`. Item 4 (`Set-Cookie` on `/`) is informational (D61): `WARN` with the cookie names, never `FAIL`. Needs Docker, so only the `docker-smoke` job runs it. |
+| `image-smoke.sh` | Runs the built image the way the Supervisor does (Demo data, no Home Assistant) and checks items 1 to 12 of 03 section 7.8 (Demo container: healthz, base href, content types, cookie, healthcheck mode, diagnostics.json, logs, image size, root, forbidden paths, licence notices; and a second, Live container with Home Assistant unreachable: item 11); prints one `PASS`/`WARN`/`FAIL`/`SKIP` line per item and writes `ci-out/smoke.json` (sizes, time to healthy, one entry per item, and `failing_requests`: the response headers of a failed request, plus what the image holds for static web assets when the Blazor script is not served), which `make-summary.mjs` renders as `## Docker smoke`. Item 4 (`Set-Cookie` on `/`) is informational (D61): `WARN` with the cookie names, never `FAIL`. Needs Docker, so only the `docker-smoke` job runs it. |
 | `validate-styles.mjs` | Validates the map styles against the MapLibre style specification: the styles built in `mapStyles.js` (satellite, demo-offline) with the zone and halo overlay appended are a `FAIL` on any error (exit 1); the three OpenFreeMap styles are fetched and an unreachable URL or a problem in the published style is only a `WARN`. `--offline` skips the fetches. The `js` job runs it as a soft step (`continue-on-error`) and keeps the output in `styles.log`. |
 | `publish-ci-artifacts.sh` | Publishes that folder to `ci-artifacts` as one new orphan commit (the `publish-ci` job runs it). |
 | `wait-for-ci.sh` | Waits for the run of one pushed commit and prints its `SUMMARY.md`. |
@@ -65,7 +65,8 @@ runs/<branch-slug>/<run>-<sha7>/
     e2e/results.json                       Playwright's JSON report (the e2e job)
     e2e/contract.tap                       the payload contract run (tests/contract, node --test)
     e2e/app.log                            the last 300 lines of the Demo app's log during the e2e run
-    shots/<project>/<scene>.png            the screenshot gallery (S6b), when there is one
+    js/js-tests.tap, js/tsc.log, js/styles.log   the js job's Node TAP, type check and style validation (each cut to its last 400 KB)
+    shots/<project>/<scene>.png            the screenshot gallery (S6b), indexed in SUMMARY.md under `## Screenshots`
     failures/<test>.<project>.png          the first 20 screenshots of failing e2e tests
 ```
 
@@ -86,6 +87,11 @@ the run left no input at all.
 guard with id ranges compressed (`REPORT ac-coverage: 50 AC ids missing (AC-01 … AC-50)`) and the `PASS` count; when guards
 fail, `- why:` and the Notes say `guards failed: <guard names>` instead of the compiler or test-host wording.
 
+`## Jobs` is the job table from the workflow's `needs`. `## Docker smoke` renders `smoke.json` (one line per item, sizes, time to healthy,
+`failing_requests`); a missing `smoke.json` after a `docker-smoke` job that succeeded fails the run. `## JS` gives the Node test counts and the
+type errors of `tsc.log` (failed tests and type errors fail the run); `## Map styles` the result of `validate-styles.mjs` (a `FAIL` line fails the
+run, a `WARN` for a third-party style does not). `## Screenshots (n)` lists the gallery.
+
 `## E2E` (after the job table, when the `e2e` job left a `results.json` or `contract.tap`) gives the Playwright counts (passed, failed,
 flaky, skipped), then one block per failed test (project, file, title, the acceptance criteria in its title, the first 15 lines of
 the error), the payload contract result, and the tail of the app log when something failed. A failed test, a failed contract test,
@@ -93,10 +99,11 @@ an unreadable `results.json` or one with no test fails the run; so does an `e2e`
 A test that failed and then passed on its retry is `flaky`: listed under `## Flaky tests`, never a failure of the run.
 
 `## Acceptance criteria` is the AC matrix: one row per criterion, AC-01 to AC-50, with the status `passed`, `failed`, `skipped`,
-`flaky` or `missing` and where the tests were found. A criterion is read from the test titles that carry `[AC-nn]` (a suffix
+`flaky`, `partial` or `missing` and where the tests were found. A criterion is read from the test titles that carry `[AC-nn]` (a suffix
 such as `[AC-49a]` counts for AC-49): the display names in the `.trx` files (dotnet), the titles in `e2e/results.json` (retries
 turn a pass into `flaky`) and the TAP of the `js` job (`js-tests.tap`). With several tests the worst status wins: failed, flaky,
-passed, skipped; no test at all is `missing`. The matrix itself derives no verdict (a failed test fails the run through the rules above; a flaky criterion is listed, not failed,
+partial, passed, skipped; `partial` means a test of the criterion passed while another was skipped, fixme'd or expected to fail; no test at all
+is `missing`. The matrix itself derives no verdict (a failed test fails the run through the rules above; a flaky criterion is listed, not failed,
 04 section 1.6). Since S15 (D50) `tools/ci/ac-scope.json` is `"enforce"` with all 50 ids: `ac-coverage` FAILs a missing or unknown AC id and
 `testid-contract` FAILs a test id of `testids.json` that is absent from `src/`.
 

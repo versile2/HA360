@@ -90,7 +90,7 @@ jobs:
       - name: Build the image on the runner (loaded into the local daemon, nothing is pushed anywhere)
         uses: docker/build-push-action@v7
         with: { context: ., load: true, push: false, tags: "realm:smoke", cache-from: "type=gha,scope=smoke", cache-to: "type=gha,scope=smoke,mode=max" }
-      - name: Image smoke (items 1 to 4, 9 and 10 of 03 section 7.8; Demo data, no Home Assistant; writes smoke.json)
+      - name: Image smoke (items 1 to 12 of 03 section 7.8, Demo container plus the Live start of item 11 with Home Assistant unreachable; writes smoke.json)
         run: |
           set -o pipefail
           mkdir -p ci-out

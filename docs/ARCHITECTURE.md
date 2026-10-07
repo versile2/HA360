@@ -99,8 +99,9 @@ push, wait, read one short markdown file, fix, push.
    (exit 0 success, 1 failure, 2 timeout, 3 superseded by a newer push, 64 usage error). Details are in
    `tools/ci/README.md`.
 
-CI grows with the code it checks: repository guards, JS unit tests, the Playwright end-to-end suite and a Docker image
-smoke test are added by the change that first needs them, each as one more job that `publish-ci` waits for.
+The jobs are `guards` (repository policy, seconds; the others wait for it), `dotnet`, `js` (types, Node tests, map style
+validation), `docker-smoke` (the image built and exercised on every push), `e2e` (Playwright against the published Demo
+app) and `publish-ci`, which waits for all of them. `SUMMARY.md` has a section for each, plus the AC matrix.
 
 ## Releasing
 
