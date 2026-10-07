@@ -37,13 +37,13 @@ ENV ASPNETCORE_HTTP_PORTS=8099 \
     DOTNET_EnableDiagnostics=0 \
     DOTNET_TieredPGO=0 \
     DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=0
-LABEL org.opencontainers.image.title="The Realm" \
+LABEL org.opencontainers.image.title="HA Cartographer" \
       org.opencontainers.image.description="Map-first family map and weekly driving reports for Home Assistant" \
       org.opencontainers.image.source="https://github.com/Versile2/ha-cartographer" \
       org.opencontainers.image.licenses="MIT AND BSD-3-Clause AND Apache-2.0 AND OFL-1.1" \
       org.opencontainers.image.version="${VERSION}" \
       org.opencontainers.image.revision="${REVISION}" \
-      io.hass.type="addon" io.hass.name="The Realm" io.hass.version="${VERSION}" \
+      io.hass.type="addon" io.hass.name="HA Cartographer" io.hass.version="${VERSION}" \
       io.hass.description="Map-first family map and weekly driving reports for Home Assistant" \
       io.hass.url="https://github.com/Versile2/ha-cartographer"
 EXPOSE 8099
