@@ -1,6 +1,8 @@
 @using Microsoft.AspNetCore.Components.Web
 @using Microsoft.JSInterop
+@using Realm.Web.Shell
 @inject IJSRuntime JS
+@implements IAsyncDisposable
 
 @* The four week chips (01 section 6.2; 03 section 3.4): This week, Last week, then the two earlier weeks as date ranges. One radio group, so one tab stop (the selected
    chip) and the arrow keys move the selection, as in SheetSegments. The row scrolls sideways with scroll snap, and the selected chip is scrolled into view after the
@@ -26,6 +28,7 @@
 @code {
     private readonly ElementReference[] _chips = new ElementReference[WeekMath.ChipCount];
     private int _scrolledTo = -1;
+    private IJSObjectReference? _module;
 
     /// <summary>The four chips, this week first (<c>WeekMath.Chips</c>).</summary>
     [Parameter]
@@ -80,8 +83,9 @@
         }
     }
 
-    // Interop is allowed only after the first render (prerendering has no browser). Element.prototype.scrollIntoView.call(element, options) is the browser's own
-    // function reached through the JS runtime, so no script file is needed; the row scrolls, the page does not ("nearest" on the block axis).
+    // Interop is allowed only after the first render (prerendering has no browser). The scroll is a function of realmShell.js (R3-12): the earlier call of
+    // "Element.prototype.scrollIntoView.call" through the JS runtime left the selected chip unscrolled in the browser (the runtime does not invoke it with the owner as `this`).
+    // The row scrolls, the page does not ("nearest" on the block axis).
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (Selected < 0 || Selected >= _chips.Length)
@@ -94,12 +98,31 @@
             if (_scrolledTo != Selected)
             {
                 _scrolledTo = Selected;
-                await JS.InvokeVoidAsync("Element.prototype.scrollIntoView.call", _chips[Selected], new { block = "nearest", inline = "center" });
+                _module ??= await JS.InvokeAsync<IJSObjectReference>("import", ShellInterop.ModulePath);
+                await _module.InvokeVoidAsync("scrollChipIntoView", _chips[Selected]);
             }
         }
         catch (Exception exception) when (exception is JSException or JSDisconnectedException or InvalidOperationException or TaskCanceledException)
         {
             // A chip that is already in view, a circuit that is gone or a browser without the function: the selection is right either way.
+        }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        if (_module is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await _module.DisposeAsync();
+        }
+        catch (Exception exception) when (exception is JSException or JSDisconnectedException or InvalidOperationException or TaskCanceledException)
+        {
+            // The circuit is gone; nothing is left to release.
         }
     }
 }

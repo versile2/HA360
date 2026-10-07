@@ -285,6 +285,18 @@ export function dispose() {
 }
 
 /**
+ * Scrolls a week chip into the centre of its row (Driving, R3-12). The row scrolls, the page does not.
+ * @param {Element | null} chip
+ */
+export function scrollChipIntoView(chip) {
+  try {
+    chip?.scrollIntoView({ block: 'nearest', inline: 'center' });
+  } catch (error) {
+    console.warn('[realmShell] scrollChipIntoView failed', error);
+  }
+}
+
+/**
  * Sets <html data-layout> (`compact` or `expanded`), which the CSS reads; null removes it. Re-derives the "sheet is tall" flag, which depends on it.
  * @param {'compact' | 'expanded' | null} mode
  */

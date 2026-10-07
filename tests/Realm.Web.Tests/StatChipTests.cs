@@ -513,9 +513,12 @@ public sealed class StatChipTests : ComponentTestBase
     [Fact]
     public void WeekChips_ScrollTheSelectedChipIntoView_AfterTheFirstRender()
     {
+        var module = JSInterop.SetupModule(Realm.Web.Shell.ShellInterop.ModulePath);
+        module.Mode = JSRuntimeMode.Loose;
+
         WeekChipsAt(1, _ => { });
 
-        JSInterop.VerifyInvoke("Element.prototype.scrollIntoView.call");
+        module.VerifyInvoke("scrollChipIntoView");
     }
 
     [Theory]
