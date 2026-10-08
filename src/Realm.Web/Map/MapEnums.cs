@@ -48,7 +48,7 @@ public enum PinBadge
     Home,
 }
 
-/// <summary>The glyph of a vehicle pin (01 section 4.7).</summary>
+/// <summary>The glyph of a pin (01 section 4.7): a tracker's by default, and any pin's when the owner chose one (0.2.1).</summary>
 [JsonConverter(typeof(JsonStringEnumConverter<MapGlyph>))]
 public enum MapGlyph
 {
@@ -57,6 +57,18 @@ public enum MapGlyph
 
     [JsonStringEnumMemberName("car")]
     Car,
+
+    [JsonStringEnumMemberName("person")]
+    Person,
+
+    [JsonStringEnumMemberName("pet")]
+    Pet,
+
+    [JsonStringEnumMemberName("phone")]
+    Phone,
+
+    [JsonStringEnumMemberName("tag")]
+    Tag,
 }
 
 /// <summary>The two layout modes of v1 (01 section 3.1).</summary>

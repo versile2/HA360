@@ -103,7 +103,8 @@ public sealed class SqliteRealmQueries : IRealmQueries
     public Task<IReadOnlyList<RosterEntry>> GetRosterAsync(CancellationToken cancellationToken = default)
     {
         return QueryAsync(
-            "SELECT entity_id, kind, grp, display_name, lore_title, color, sort_order, source, first_seen, last_active, auto_moved_at "
+            "SELECT entity_id, kind, grp, display_name, lore_title, color, sort_order, source, first_seen, last_active, auto_moved_at, "
+            + "source_name, source_title, source_color, name_override, title_override, color_override, icon "
             + "FROM roster ORDER BY CASE grp WHEN 'people' THEN 0 WHEN 'vehicles' THEN 1 ELSE 2 END, sort_order, entity_id",
             ReadRoster,
             cancellationToken);
@@ -122,7 +123,16 @@ public sealed class SqliteRealmQueries : IRealmQueries
             Source: reader.GetString(7),
             FirstSeenUtc: SqlValues.FromMillis(reader.GetInt64(8)),
             LastActiveUtc: SqlValues.FromMillis(reader.GetInt64(9)),
-            AutoMovedUtc: SqlValues.NullableMillis(reader, 10));
+            AutoMovedUtc: SqlValues.NullableMillis(reader, 10))
+        {
+            SourceName = SqlValues.NullableText(reader, 11),
+            SourceTitle = SqlValues.NullableText(reader, 12),
+            SourceColor = SqlValues.NullableText(reader, 13),
+            NameOverride = SqlValues.NullableText(reader, 14),
+            TitleOverride = SqlValues.NullableText(reader, 15),
+            ColorOverride = SqlValues.NullableText(reader, 16),
+            Icon = SqlValues.NullableText(reader, 17),
+        };
     }
 
     private static StatsTrip ReadTrip(DbDataReader reader)

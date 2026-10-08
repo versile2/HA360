@@ -268,4 +268,165 @@ public class RosterRulesTests
         Assert.Null(kept.LoreTitle);
         Assert.Equal("#E8BC4E", kept.Color);
     }
+
+    // ---- the owner's values and the source's (0.2.1, D117) ---------------------------------------------------------------
+
+    private static RosterEntry Found(string objectId = "alden", string name = "Alden") =>
+        Assert.Single(RosterRules.Reconcile([], [Person(objectId, name)], NoTrackers, Now).Entries);
+
+    [Fact]
+    public void A_new_entry_records_the_name_and_colour_the_source_gave()
+    {
+        var entry = Found();
+
+        Assert.Equal("Alden", entry.SourceName);
+        Assert.Equal(entry.Color, entry.SourceColor);
+        Assert.False(entry.IsCustomised);
+    }
+
+    [Fact]
+    public void Edit_keeps_the_owners_values_as_overrides_and_the_values_in_effect_follow()
+    {
+        var entry = Found();
+
+        var edited = Assert.Single(RosterRules.Edit([entry], entry.EntityId, "Al", "The Bold", "#112233", RosterIcons.Initial));
+
+        Assert.Equal("Al", edited.DisplayName);
+        Assert.Equal("Al", edited.NameOverride);
+        Assert.Equal("Alden", edited.SourceName);
+        Assert.Equal("The Bold", edited.LoreTitle);
+        Assert.Equal("The Bold", edited.TitleOverride);
+        Assert.Equal("#112233", edited.Color);
+        Assert.Equal("#112233", edited.ColorOverride);
+        Assert.Equal(RosterIcons.Initial, edited.Icon);
+        Assert.True(edited.IsCustomised);
+    }
+
+    [Fact]
+    public void Edit_with_the_sources_own_values_stores_no_override()
+    {
+        var entry = Found();
+
+        var edited = Assert.Single(RosterRules.Edit([entry], entry.EntityId, entry.DisplayName, null, entry.Color, null));
+
+        Assert.Null(edited.NameOverride);
+        Assert.Null(edited.TitleOverride);
+        Assert.Null(edited.ColorOverride);
+        Assert.Null(edited.Icon);
+        Assert.False(edited.IsCustomised);
+    }
+
+    [Fact]
+    public void An_unknown_picture_means_automatic()
+    {
+        var entry = Found();
+
+        Assert.Null(Assert.Single(RosterRules.Edit([entry], entry.EntityId, "Alden", null, null, "glyph:rocket")).Icon);
+        Assert.Equal("glyph:pet", Assert.Single(RosterRules.Edit([entry], entry.EntityId, "Alden", null, null, "glyph:pet")).Icon);
+    }
+
+    [Fact]
+    public void Update_leaves_the_picture_as_it_is()
+    {
+        var entry = Found();
+        var withIcon = Assert.Single(RosterRules.Edit([entry], entry.EntityId, "Alden", null, null, "glyph:tag"));
+
+        var renamed = Assert.Single(RosterRules.Update([withIcon], entry.EntityId, "Al", null, null));
+
+        Assert.Equal("glyph:tag", renamed.Icon);
+    }
+
+    [Fact]
+    public void A_later_change_of_the_source_name_never_replaces_the_owners_name()
+    {
+        var entry = Assert.Single(RosterRules.Edit([Found()], "person.alden", "Al", "The Bold", "#112233", "glyph:car"));
+
+        var later = RosterRules.Reconcile([entry], [Person("alden", "Alden Smith")], NoTrackers, Now.AddDays(1));
+
+        var kept = Assert.Single(later.Entries);
+        Assert.Equal("Al", kept.DisplayName);
+        Assert.Equal("Al", kept.NameOverride);
+        Assert.Equal("Alden Smith", kept.SourceName);
+        Assert.Equal("#112233", kept.Color);
+        Assert.Equal("The Bold", kept.LoreTitle);
+        Assert.Equal("glyph:car", kept.Icon);
+    }
+
+    [Fact]
+    public void A_later_change_of_the_source_name_shows_where_the_owner_set_none()
+    {
+        var entry = Found();
+
+        var later = RosterRules.Reconcile([entry], [Person("alden", "Alden Smith")], NoTrackers, Now.AddDays(1));
+
+        var followed = Assert.Single(later.Entries);
+        Assert.Equal("Alden Smith", followed.DisplayName);
+        Assert.Equal("Alden Smith", followed.SourceName);
+        Assert.Contains(followed, later.Changed);
+        Assert.True(later.VisibleChange);
+    }
+
+    [Fact]
+    public void A_row_of_0_2_0_has_its_name_taken_as_the_owners_until_the_source_is_known_and_a_name_equal_to_it_is_dropped()
+    {
+        // The migration (0003) turns what 0.2.0 stored into source_name = name_override = display_name.
+        var stored = Entry("person.alden", RosterGroup.People) with { DisplayName = "Alden", SourceName = "Alden", NameOverride = "Alden", SourceColor = "#E8BC4E" };
+
+        var same = RosterRules.Reconcile([stored], [Person("alden", "Alden")], NoTrackers, Now);
+        var renamedAtTheSource = RosterRules.Reconcile([stored with { DisplayName = "Al", NameOverride = "Al" }], [Person("alden", "Alden")], NoTrackers, Now);
+
+        Assert.Null(Assert.Single(same.Entries).NameOverride);
+        Assert.Equal("Al", Assert.Single(renamedAtTheSource.Entries).DisplayName);
+    }
+
+    [Fact]
+    public void Reset_clears_the_owners_values_and_the_sources_are_in_effect_again()
+    {
+        var entry = Found();
+        var edited = Assert.Single(RosterRules.Edit([entry], entry.EntityId, "Al", "The Bold", "#112233", "glyph:pet"));
+        var renamedAtTheSource = Assert.Single(RosterRules.Reconcile([edited], [Person("alden", "Alden Smith")], NoTrackers, Now).Entries);
+
+        var reset = Assert.Single(RosterRules.Reset([renamedAtTheSource], entry.EntityId));
+
+        Assert.Equal("Alden Smith", reset.DisplayName);
+        Assert.Null(reset.LoreTitle);
+        Assert.Equal(entry.SourceColor, reset.Color);
+        Assert.Null(reset.NameOverride);
+        Assert.Null(reset.TitleOverride);
+        Assert.Null(reset.ColorOverride);
+        Assert.Null(reset.Icon);
+        Assert.False(reset.IsCustomised);
+    }
+
+    [Fact]
+    public void Reset_and_Edit_of_an_unknown_entity_change_nothing()
+    {
+        var roster = new[] { Found() };
+
+        Assert.Equal(roster, RosterRules.Reset(roster, "person.zzz"));
+        Assert.Equal(roster, RosterRules.Edit(roster, "person.zzz", "x", null, null, null));
+    }
+
+    [Fact]
+    public void Clearing_a_title_the_source_has_is_the_owners_choice_and_Reset_brings_it_back()
+    {
+        var withSourceTitle = Found() with { SourceTitle = "The Royal Jester", LoreTitle = "The Royal Jester" };
+
+        var cleared = Assert.Single(RosterRules.Edit([withSourceTitle], withSourceTitle.EntityId, "Alden", "  ", null, null));
+        Assert.Null(cleared.LoreTitle);
+        Assert.True(cleared.IsCustomised);
+
+        Assert.Equal("The Royal Jester", Assert.Single(RosterRules.Reset([cleared], cleared.EntityId)).LoreTitle);
+    }
+
+    [Fact]
+    public void The_notice_for_a_new_entry_says_Trackers()
+    {
+        var first = RosterRules.Reconcile([], [Person("alden")], NoTrackers, Now);
+        var later = RosterRules.Reconcile(first.Entries, [Person("alden"), Person("briar", "Briar")], NoTrackers, Now.AddMinutes(5));
+
+        var notice = Assert.Single(later.Notices);
+        Assert.Contains("move it to Trackers or Not tracked", notice.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("Vehicles", notice.Message, StringComparison.Ordinal);
+    }
 }

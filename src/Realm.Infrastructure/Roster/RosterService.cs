@@ -18,6 +18,7 @@ public sealed class RosterService : IRosterEditor
     private readonly ILogger _logger;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private volatile IReadOnlyList<RosterEntry> _entries = [];
+    private volatile IReadOnlyDictionary<string, RosterIdentity> _identities = new Dictionary<string, RosterIdentity>();
     private bool _loaded;
 
     public RosterService(IRealmQueries queries, IRealmWriter writer, TimeProvider time, ILogger<RosterService> logger)
@@ -96,6 +97,31 @@ public sealed class RosterService : IRosterEditor
     /// <inheritdoc />
     public Task UpdateAsync(string entityId, string displayName, string? loreTitle, string? color, CancellationToken cancellationToken = default) =>
         ApplyAsync(entries => RosterRules.Update(entries, entityId, displayName, loreTitle, color), cancellationToken);
+
+    /// <inheritdoc />
+    public Task EditAsync(string entityId, string displayName, string? loreTitle, string? color, string? icon, CancellationToken cancellationToken = default) =>
+        ApplyAsync(entries => RosterRules.Edit(entries, entityId, displayName, loreTitle, color, icon), cancellationToken);
+
+    /// <inheritdoc />
+    public Task ResetAsync(string entityId, CancellationToken cancellationToken = default) =>
+        ApplyAsync(entries => RosterRules.Reset(entries, entityId), cancellationToken);
+
+    /// <inheritdoc />
+    public RosterIdentity IdentityOf(string entityId) => _identities.GetValueOrDefault(entityId) ?? RosterIdentity.Unknown;
+
+    /// <summary>Replaces what is known about who each entity is (the last discovery's entities and friendly names). Raises <see cref="Changed"/> when it differs from before, so Settings shows it.</summary>
+    public void SetIdentities(IReadOnlyDictionary<string, RosterIdentity> identities)
+    {
+        var before = _identities;
+        _identities = identities;
+        if (before.Count != identities.Count || identities.Any(pair => !before.TryGetValue(pair.Key, out var old) || !SameIdentity(old, pair.Value)))
+        {
+            RaiseChanged();
+        }
+    }
+
+    private static bool SameIdentity(RosterIdentity left, RosterIdentity right) =>
+        left.HasPhoto == right.HasPhoto && left.Life360Name == right.Life360Name && left.Entities.SequenceEqual(right.Entities);
 
     // Computes the next roster from the current one under the gate, stores the rows that differ, and only then makes it current.
     private async Task ApplyAsync(Func<IReadOnlyList<RosterEntry>, IReadOnlyList<RosterEntry>> edit, CancellationToken cancellationToken)

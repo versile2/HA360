@@ -17,7 +17,7 @@
 
 <table>
   <tr>
-    <td align="center"><img src="assets/screenshots/phone-map-peek.png" width="210" alt="The map with four people, a vehicle and the bottom sheet resting at its peek height"></td>
+    <td align="center"><img src="assets/screenshots/phone-map-peek.png" width="210" alt="The map with four people, a tracker and the bottom sheet resting at its peek height"></td>
     <td align="center"><img src="assets/screenshots/phone-sheet-drivers.png" width="210" alt="The bottom sheet opened to 80 percent, listing five drivers with status and battery"></td>
     <td align="center"><img src="assets/screenshots/phone-driving-report.png" width="210" alt="The weekly Driving report with speeding, phone use, top speed, drives and miles"></td>
     <td align="center"><img src="assets/screenshots/phone-map-styles.png" width="210" alt="The map style picker offering Night, Day, Streets and Satellite"></td>
@@ -42,18 +42,18 @@ Status: experimental. [realm/CHANGELOG.md](realm/CHANGELOG.md) lists what each v
   <tr>
     <td width="50%" valign="top">
       <h3>Map first</h3>
-      A full-screen map with pins for people, vehicles and your saved places. Tap a pin to select it; the sheet follows.
+      A full-screen map with pins for people, trackers and your saved places. Tap a pin to select it; the sheet follows.
       Those who are far away do not shrink the view: they wait at the edge as <b>edge bubbles</b> that point the way.
     </td>
     <td width="50%" valign="top">
       <h3>One sheet, two heights</h3>
       A bottom sheet rests at a <b>Peek</b> so the map stays yours, and opens to <b>80 percent</b> for the full
-      <b>Drivers</b>, <b>Vehicles</b> and <b>Places</b> lists. On a wide screen it becomes a side panel.
+      <b>Drivers</b>, <b>Trackers</b> and <b>Places</b> lists. On a wide screen it becomes a side panel.
     </td>
   </tr>
   <tr>
     <td align="center"><img src="assets/screenshots/phone-member-selected.png" width="230" alt="A selected member, Cass, shown in a compact card at the peek height"></td>
-    <td align="center"><img src="assets/screenshots/phone-sheet-vehicles.png" width="230" alt="The Vehicles tab listing the vehicles that are on the map"></td>
+    <td align="center"><img src="assets/screenshots/phone-sheet-vehicles.png" width="230" alt="The Trackers tab listing the trackers that are on the map"></td>
   </tr>
   <tr>
     <td width="50%" valign="top">
@@ -109,7 +109,7 @@ Phone first, then unfolded. Each frame is a real capture of the running app in D
   </tr>
   <tr>
     <td align="center"><img src="assets/screenshots/phone-sheet-drivers.png" width="180" alt="Drivers list at 80 percent"><br><sub>Drivers, 80%</sub></td>
-    <td align="center"><img src="assets/screenshots/phone-sheet-vehicles.png" width="180" alt="Vehicles list at 80 percent"><br><sub>Vehicles</sub></td>
+    <td align="center"><img src="assets/screenshots/phone-sheet-vehicles.png" width="180" alt="Trackers list at 80 percent"><br><sub>Trackers</sub></td>
     <td align="center"><img src="assets/screenshots/phone-sheet-places.png" width="180" alt="Places list at 80 percent"><br><sub>Places</sub></td>
     <td align="center"><img src="assets/screenshots/phone-place-detail.png" width="180" alt="Place detail"><br><sub>Place detail</sub></td>
   </tr>
@@ -132,7 +132,7 @@ Phone first, then unfolded. Each frame is a real capture of the running app in D
 <table>
   <tr>
     <td align="center"><img src="assets/screenshots/unfolded-map-and-panel.png" width="330" alt="Map with the drivers list as a side panel"><br><sub>Map and side panel</sub></td>
-    <td align="center"><img src="assets/screenshots/unfolded-vehicles-panel.png" width="330" alt="Vehicles in the side panel"><br><sub>Vehicles</sub></td>
+    <td align="center"><img src="assets/screenshots/unfolded-vehicles-panel.png" width="330" alt="Trackers in the side panel"><br><sub>Trackers</sub></td>
     <td align="center"><img src="assets/screenshots/unfolded-places-panel.png" width="330" alt="Places in the side panel"><br><sub>Places</sub></td>
   </tr>
   <tr>
@@ -184,7 +184,7 @@ These are captures of the add-on installed on a real Home Assistant instance, ru
     <td align="center"><img src="assets/screenshots/live-phone-sheet-drivers.png" width="180" alt="The bottom sheet opened to 80 percent, listing five drivers with status and battery"><br><sub>Drivers, 80%</sub></td>
     <td align="center"><img src="assets/screenshots/live-phone-member-selected-edge-bubbles.png" width="180" alt="Alden selected: the map centred on him in a compact card, with the other members as edge bubbles"><br><sub>Selected member, edge bubbles</sub></td>
     <td align="center"><img src="assets/screenshots/live-phone-layers-popover.png" width="180" alt="The layers popover with Night, Day, Streets, Satellite and a Show places switch"><br><sub>Layers popover</sub></td>
-    <td align="center"><img src="assets/screenshots/live-phone-sheet-vehicles.png" width="180" alt="The Vehicles tab listing the vehicles that are on the map"><br><sub>Vehicles</sub></td>
+    <td align="center"><img src="assets/screenshots/live-phone-sheet-vehicles.png" width="180" alt="The Trackers tab listing the trackers that are on the map"><br><sub>Trackers</sub></td>
   </tr>
   <tr>
     <td align="center"><img src="assets/screenshots/live-phone-sheet-places.png" width="180" alt="The Places tab listing fourteen places and who is at each"><br><sub>Places</sub></td>
@@ -209,8 +209,8 @@ These are captures of the add-on installed on a real Home Assistant instance, ru
 
 <table>
   <tr>
-    <td align="center"><img src="assets/screenshots/live-phone-vehicle-detail.png" width="180" alt="The pickup's detail: location and last update"><br><sub>Vehicle detail</sub></td>
-    <td align="center"><img src="assets/screenshots/live-phone-place-detail.png" width="180" alt="Hearth Haven with its radius and the people and vehicles there now"><br><sub>Place detail</sub></td>
+    <td align="center"><img src="assets/screenshots/live-phone-vehicle-detail.png" width="180" alt="The pickup's detail: location and last update"><br><sub>Tracker detail</sub></td>
+    <td align="center"><img src="assets/screenshots/live-phone-place-detail.png" width="180" alt="Hearth Haven with its radius and the people and trackers there now"><br><sub>Place detail</sub></td>
   </tr>
 </table>
 
@@ -265,15 +265,15 @@ The unfolded two-pane layout, one capture per view.
   <tr>
     <td align="center"><img src="assets/screenshots/live-desktop-member-dara-stale.png" width="330" alt="Dara with the last-seen warning"><br><sub>Dara, stale</sub></td>
     <td align="center"><img src="assets/screenshots/live-desktop-member-elio-static-pin.png" width="330" alt="Elio's static pin"><br><sub>Elio</sub></td>
-    <td align="center"><img src="assets/screenshots/live-desktop-panel-vehicles.png" width="330" alt="The Vehicles panel"><br><sub>Vehicles</sub></td>
+    <td align="center"><img src="assets/screenshots/live-desktop-panel-vehicles.png" width="330" alt="The Trackers panel"><br><sub>Trackers</sub></td>
   </tr>
   <tr>
-    <td align="center"><img src="assets/screenshots/live-desktop-vehicle-awaiting-integration.png" width="330" alt="The Vehicles panel on a wide screen"><br><sub>Vehicles</sub></td>
+    <td align="center"><img src="assets/screenshots/live-desktop-vehicle-awaiting-integration.png" width="330" alt="The Trackers panel on a wide screen"><br><sub>Trackers</sub></td>
     <td align="center"><img src="assets/screenshots/live-desktop-panel-places.png" width="330" alt="The Places panel"><br><sub>Places</sub></td>
     <td align="center"><img src="assets/screenshots/live-desktop-place-detail.png" width="330" alt="Place detail in the side panel"><br><sub>Place detail</sub></td>
   </tr>
   <tr>
-    <td align="center"><img src="assets/screenshots/live-desktop-vehicle-detail.png" width="330" alt="Vehicle detail in the side panel"><br><sub>Vehicle detail</sub></td>
+    <td align="center"><img src="assets/screenshots/live-desktop-vehicle-detail.png" width="330" alt="Tracker detail in the side panel"><br><sub>Tracker detail</sub></td>
     <td align="center"><img src="assets/screenshots/live-desktop-settings.png" width="330" alt="Settings dialog on the desktop layout"><br><sub>Settings</sub></td>
     <td align="center"><img src="assets/screenshots/live-desktop-settings-about.png" width="330" alt="The Settings dialog scrolled to connections and about"><br><sub>Credits</sub></td>
   </tr>
@@ -313,8 +313,8 @@ that has the Supervisor (Home Assistant OS or Supervised) on an amd64 machine.
 5. **Switch to your own household.** Turn **Demo mode** off and restart the app. Everyone Home Assistant knows
    (its `person` entities and its GPS `device_tracker`s that have reported in the last 30 days) is put on the map
    at the first start, and you get one notification in Home Assistant saying so. Then open **Settings -> Who's on the
-   map** inside the app to sort them: drag a row (or use its menu) between **People**, **Vehicles** and **Not tracked**,
-   and tap a row to change its name, title and colour. Nothing is typed into the add-on options: they hold six switches
+   map** inside the app to sort them: drag a row (or use its menu) between **People**, **Trackers** and **Not tracked**,
+   and tap a row to see which Home Assistant entity it is and to change its name, title, colour and picture. Nothing is typed into the add-on options: they hold six switches
    and thresholds only (Demo mode, the demo address parameter, the log level, how long positions are kept, the week
    start and the speeding limit). Your names and entity ids stay in the app's database on your own Home Assistant.
    They are never part of this repository or the image.

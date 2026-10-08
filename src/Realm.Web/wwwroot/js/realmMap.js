@@ -122,6 +122,7 @@ async function loadMapLibre() {
 // ---- payload types (03 section 4.5; realm.d.ts is not part of this slice, so the shapes live here as JSDoc) ----------------------
 
 /** @typedef {'away' | 'default' | 'me'} RecenterState */
+/** @typedef {'pickup' | 'car' | 'person' | 'pet' | 'phone' | 'tag'} Glyph */
 /** @typedef {{ color: string, dashed: boolean, widthPx: number }} Ring */
 /** @typedef {'driving' | 'stale' | 'offline' | 'home' | null} Badge */
 /**
@@ -150,13 +151,14 @@ async function loadMapLibre() {
  * @property {string} tooltip
  * @property {string} bubbleLabel
  * @property {string} bubbleTooltip
+ * @property {Glyph | null} glyph the glyph the owner chose instead of the initial (0.2.1); null otherwise
  */
 /** @typedef {{ version: number, meId: string, members: MemberPayloadItem[] }} MembersPayload */
 /**
  * @typedef {object} VehiclePayloadItem
  * @property {string} id
  * @property {string} name
- * @property {'pickup' | 'car'} glyph
+ * @property {Glyph} glyph
  * @property {number | null} lat
  * @property {number | null} lon
  * @property {Ring} ring
@@ -164,14 +166,17 @@ async function loadMapLibre() {
  * @property {string | null} chip
  * @property {string} ariaLabel
  * @property {string} tooltip
+ * @property {string} initial the first letter of the name, drawn instead of the glyph when `showInitial`
+ * @property {string} color the roster colour the face is drawn on
+ * @property {string | null} avatarUrl the photo, when the face is the photo
+ * @property {boolean} showInitial
  */
 /** @typedef {{ version: number, vehicles: VehiclePayloadItem[] }} VehiclesPayload */
 /** @typedef {{ id: string, name: string, lat: number, lon: number, radiusM: number, occupied: boolean }} ZoneItem */
 /** @typedef {{ lineColor: string, fillAlpha: number, fillAlphaOccupied: number, casing: boolean }} ZoneAppearance */
 /**
- * `maxRadiusM` is optional and not part of 03 section 4.5: when absent JS applies the 5 km default of 01 section 4.1, so a payload
- * that still carries the 32,187 m arrival zone never draws it.
- * @typedef {{ version: number, show: boolean, zones: ZoneItem[], maxRadiusM?: number,
+ * (0.2.1: no maximum radius; every zone is drawn.)
+ * @typedef {{ version: number, show: boolean, zones: ZoneItem[],
  *             appearances: { dark: ZoneAppearance, light: ZoneAppearance, imagery: ZoneAppearance } }} ZonesPayload
  */
 /** @typedef {{ version: number, default: { bounds: Bounds, maxZoom: number }, me: { center: LngLat, zoom: number } | null }} DefaultTargets */
@@ -221,8 +226,8 @@ const STYLE_TIMEOUT_MS = 8000;
 const ERROR_WINDOW_MS = 10000;
 const ZONE_MIN_RADIUS_PX = 14;
 const ZONE_LABEL_MIN_ZOOM = 14;
-/** 01 section 4.1 (`ui_max_zone_radius_km` default): a zone with a larger radius, such as the arrival zone, is never drawn. */
-const DEFAULT_MAX_ZONE_RADIUS_M = 5000;
+/** 0.2.1: every Home Assistant zone is drawn, whatever its radius. A circle wider than the map view is outline only (its fill is faint and a tap inside it is a map tap). */
+const HUGE_ZONE_FILL_FACTOR = 0.25;
 const MEMBER_SIZE_PX = 48;
 const MEMBER_SELECTED_SIZE_PX = 60;
 const VEHICLE_SIZE_PX = 44;
@@ -241,6 +246,11 @@ const ICONS = {
   schedule: ['M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z', 'M12.5 7H11v6l5.25 3.15.75-1.23-4.5-2.67z'],
   cloudOff: ['M19.35 10.04A7.49 7.49 0 0 0 12 4c-1.48 0-2.85.43-4.01 1.17l1.46 1.46a5.497 5.497 0 0 1 8.05 4.87v.5H19c1.66 0 3 1.34 3 3 0 1.13-.64 2.11-1.56 2.62l1.45 1.45C23.16 18.16 24 16.68 24 15c0-2.64-2.05-4.78-4.65-4.96zM3 5.27l2.75 2.74C2.56 8.15 0 10.77 0 14c0 3.31 2.69 6 6 6h11.73l2 2L21 20.73 4.27 4 3 5.27zM7.73 10l8 8H6c-2.21 0-4-1.79-4-4s1.79-4 4-4h1.73z'],
   home: ['M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z'],
+  // The glyphs the owner may choose for a pin (0.2.1). The same paths are in src/Realm.Domain/GlyphPaths.cs, which Settings draws with; a test keeps the two equal.
+  person: ['M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'],
+  pet: ['M12 12.5c-2.2 0-5 2.1-5 4.4 0 1.6 1.2 2.6 2.6 2.6.9 0 1.6-.3 2.4-.3s1.5.3 2.4.3c1.4 0 2.6-1 2.6-2.6 0-2.3-2.8-4.4-5-4.4z', 'M6.3 8.3a1.9 1.9 0 1 0 0 3.8 1.9 1.9 0 0 0 0-3.8z', 'M9.6 4.2a2 2 0 1 0 0 4 2 2 0 0 0 0-4z', 'M14.4 4.2a2 2 0 1 0 0 4 2 2 0 0 0 0-4z', 'M17.7 8.3a1.9 1.9 0 1 0 0 3.8 1.9 1.9 0 0 0 0-3.8z'],
+  phone: ['M17 1.01L7 1c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-1.99-2-1.99zM17 19H7V5h10v14z'],
+  tag: ['M21.41 11.41l-8.83-8.83c-.37-.37-.88-.58-1.41-.58H4c-1.1 0-2 .9-2 2v7.17c0 .53.21 1.04.59 1.41l8.83 8.83c.78.78 2.05.78 2.83 0l7.17-7.17c.78-.78.78-2.04-.01-2.83zM6.5 8C5.67 8 5 7.33 5 6.5S5.67 5 6.5 5 8 5.67 8 6.5 7.33 8 6.5 8z'],
   batteryAlert: ['M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4zM13 18h-2v-2h2v2zm0-4h-2V9h2v5z'],
   place: ['M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 0 1 0-5 2.5 2.5 0 0 1 0 5z'],
   // A pickup truck seen from the side, facing right: open bed, cab with a windshield, two wheels. The window is wound the other way
@@ -553,12 +563,13 @@ function applyStatusBadge(pin, badge) {
  */
 function applyFace(pin, item) {
   const url = item.avatarUrl ? new URL(item.avatarUrl, document.baseURI).href : null;
-  if (!changed(pin, 'face', `${url}|${item.initial}|${item.isStatic}`)) return;
+  if (!changed(pin, 'face', `${url}|${item.initial}|${item.isStatic}|${item.glyph ?? ''}`)) return;
   const face = /** @type {HTMLElement} */ (pin.el.querySelector('.realm-pin__face'));
   face.replaceChildren();
   const initials = document.createElement('span');
   initials.className = 'realm-pin__initials';
-  if (item.isStatic) initials.innerHTML = icon('home');
+  if (item.glyph) initials.innerHTML = icon(item.glyph);
+  else if (item.isStatic) initials.innerHTML = icon('home');
   else initials.textContent = item.initial;
   face.appendChild(initials);
   if (url) {
@@ -599,6 +610,36 @@ function applyMember(r, pin, item) {
 }
 
 /**
+ * The face of a tracker pin (0.2.1): the photo over the glyph (or the initial, when the owner chose it) on the roster colour; a failed photo removes itself.
+ * @param {Pin} pin
+ * @param {VehiclePayloadItem} item
+ */
+function applyTrackerFace(pin, item) {
+  const url = item.avatarUrl ? new URL(item.avatarUrl, document.baseURI).href : null;
+  if (!changed(pin, 'face', `${url}|${item.glyph}|${item.showInitial}|${item.initial}`)) return;
+  const face = /** @type {HTMLElement} */ (pin.el.querySelector('.realm-pin__face'));
+  face.replaceChildren();
+  const mark = document.createElement('span');
+  if (item.showInitial) {
+    mark.className = 'realm-pin__initials';
+    mark.textContent = item.initial;
+  } else {
+    mark.className = 'realm-pin__glyph';
+    mark.innerHTML = icon(item.glyph);
+  }
+  face.appendChild(mark);
+  if (url) {
+    const photo = document.createElement('img');
+    photo.className = 'realm-pin__photo';
+    photo.alt = '';
+    photo.decoding = 'async';
+    photo.addEventListener('error', () => photo.remove(), { once: true });
+    photo.src = url;
+    face.appendChild(photo);
+  }
+}
+
+/**
  * @param {Runtime} r
  * @param {Pin} pin
  * @param {VehiclePayloadItem} item
@@ -607,10 +648,8 @@ function applyVehicle(r, pin, item) {
   const selected = isSelected(r, 'vehicle', item.id);
   if (changed(pin, 'selected', selected)) toggle(pin.el, 'realm-pin--selected', selected);
   applyRing(pin, item.ring.color, item.ring.dashed, item.ring.widthPx);
-  if (changed(pin, 'glyph', item.glyph)) {
-    const face = /** @type {HTMLElement} */ (pin.el.querySelector('.realm-pin__face'));
-    face.innerHTML = `<span class="realm-pin__glyph">${icon(item.glyph === 'pickup' ? 'pickup' : 'car')}</span>`;
-  }
+  if (changed(pin, 'color', item.color)) pin.el.style.setProperty('--realm-pin-member', item.color);
+  applyTrackerFace(pin, item);
   if (changed(pin, 'stale', item.stale)) toggle(pin.el, 'realm-pin--stale', item.stale);
   if (changed(pin, 'aria', item.ariaLabel)) pin.el.setAttribute('aria-label', item.ariaLabel);
   if (changed(pin, 'title', item.tooltip)) pin.el.title = item.tooltip;
@@ -751,7 +790,7 @@ function updateHalos(r) {
 }
 
 /**
- * Zone circles as geodesic 64-gons (01 section 4.6): none above the maximum radius (the arrival zone), none while "Show places" is
+ * Zone circles as geodesic 64-gons (01 section 4.6): every zone whatever its radius, none while "Show places" is
  * off, never below 14 px on screen (the radius is rebuilt on a zoom quantised to 0.05, rounded down so the circle is never under
  * 14 px at the actual zoom). Colours and alphas come from the payload's appearance for the active style.
  * @param {Runtime} r
@@ -767,17 +806,20 @@ function updateZones(r) {
   const state = new Map();
   if (payload && Array.isArray(payload.zones)) {
     const appearance = payload.appearances?.[r.appearance] ?? FALLBACK_ZONE_APPEARANCE;
-    const maxRadiusM = typeof payload.maxRadiusM === 'number' ? payload.maxRadiusM : DEFAULT_MAX_ZONE_RADIUS_M;
+    const canvas = r.map.getCanvas();
+    const viewPx = Math.max(canvas?.clientWidth ?? 0, canvas?.clientHeight ?? 0, 1);
     for (const zone of payload.zones) {
-      const drawn = payload.show === true && zone.radiusM <= maxRadiusM;
+      const drawn = payload.show === true;
       const fillAlpha = zone.occupied ? appearance.fillAlphaOccupied : appearance.fillAlpha;
       let drawnRadiusM = 0;
       if (drawn) {
-        drawnRadiusM = Math.max(zone.radiusM, ZONE_MIN_RADIUS_PX * metersPerPixel(qz, zone.lat));
+        const mpp = metersPerPixel(qz, zone.lat);
+        drawnRadiusM = Math.max(zone.radiusM, ZONE_MIN_RADIUS_PX * mpp);
+        const huge = drawnRadiusM / mpp > viewPx;
         features.push(
           circlePolygon([zone.lon, zone.lat], drawnRadiusM, 64, {
-            id: zone.id, name: zone.name, occupied: zone.occupied, radiusM: zone.radiusM,
-            lineColor: appearance.lineColor, fillAlpha, casing: appearance.casing,
+            id: zone.id, name: zone.name, occupied: zone.occupied, radiusM: zone.radiusM, huge,
+            lineColor: appearance.lineColor, fillAlpha: huge ? fillAlpha * HUGE_ZONE_FILL_FACTOR : fillAlpha, casing: appearance.casing,
           }),
         );
       }
@@ -1424,7 +1466,8 @@ function bindMap(r) {
     const target = event.originalEvent?.target;
     if (target instanceof Element && target.closest('.realm-ui')) return;
     if (r.styleReady && map.getLayer('realm-zones-fill')) {
-      const hits = map.queryRenderedFeatures(event.point, { layers: ['realm-zones-fill'] });
+      // A circle wider than the view (a huge zone) is outline only: a tap inside it is a map tap, so it never blocks deselecting.
+      const hits = map.queryRenderedFeatures(event.point, { layers: ['realm-zones-fill'] }).filter((hit) => !hit.properties?.huge);
       if (hits.length > 0) {
         // The smallest circle wins where zones overlap.
         const smallest = hits.reduce((a, b) => (Number(b.properties?.radiusM) < Number(a.properties?.radiusM) ? b : a));
@@ -2531,12 +2574,13 @@ function applyBubble(r, rec, bubble, byId, selected) {
  */
 function applyBubbleFace(rec, item) {
   const url = item.avatarUrl ? new URL(item.avatarUrl, document.baseURI).href : null;
-  if (!bubbleChanged(rec, 'face', `${url}|${item.initial}|${item.isStatic}`)) return;
+  if (!bubbleChanged(rec, 'face', `${url}|${item.initial}|${item.isStatic}|${item.glyph ?? ''}`)) return;
   const face = /** @type {HTMLElement} */ (rec.el.querySelector('.realm-bubble__face'));
   face.replaceChildren();
   const initials = document.createElement('span');
   initials.className = 'realm-bubble__initials';
-  if (item.isStatic) initials.innerHTML = icon('home');
+  if (item.glyph) initials.innerHTML = icon(item.glyph);
+  else if (item.isStatic) initials.innerHTML = icon('home');
   else initials.textContent = item.initial;
   face.appendChild(initials);
   if (url) {

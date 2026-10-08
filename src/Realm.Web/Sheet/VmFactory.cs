@@ -79,7 +79,8 @@ public static class VmFactory
                 _ => LineTone.Normal,
             },
             Battery: battery,
-            AccessibleName: MemberTextFormatter.AccessibleName(member.DisplayName, member.LoreTitle, status, statusLine, timePart, battery?.AccessibleName, distanceWords));
+            AccessibleName: MemberTextFormatter.AccessibleName(member.DisplayName, member.LoreTitle, status, statusLine, timePart, battery?.AccessibleName, distanceWords),
+            Glyph: member.Glyph);
     }
 
     /// <summary>One vehicle's row.</summary>

@@ -293,8 +293,30 @@ public sealed class SheetStateMachineTests
     [Theory]
     [InlineData(SheetSize.Peek)]
     [InlineData(SheetSize.Tall)]
-    public void SegmentTap_NoSelection_ShowsTheListOfThatSection(SheetSize size) =>
-        Assert.Equal(At(null, size, Section.Places), Reduce(At(null, size, Section.Drivers), new SheetEvent.SegmentTap(Section.Places)));
+    public void SegmentTap_NoSelection_ShowsTheListOfThatSection_AtTall(SheetSize size) =>
+        Assert.Equal(At(null, SheetSize.Tall, Section.Places), Reduce(At(null, size, Section.Drivers), new SheetEvent.SegmentTap(Section.Places)));
+
+    [Theory]
+    [InlineData(Section.Drivers)]
+    [InlineData(Section.Vehicles)]
+    [InlineData(Section.Places)]
+    public void SegmentTap_AtPeek_OpensTheSheetToTall_AndBackReturnsToPeek(Section section)
+    {
+        var opened = Reduce(At(null, SheetSize.Peek, Section.Drivers), new SheetEvent.SegmentTap(section));
+
+        Assert.Equal(new SheetState(section, null, SheetSize.Tall), opened);
+        var (back, step) = BackReducer.Reduce(opened, LayoutMode.Compact);
+        Assert.Equal(BackStep.List, step);
+        Assert.Equal(new SheetState(section, null, SheetSize.Peek), back);
+    }
+
+    [Fact]
+    public void SegmentTap_InTheExpandedPanel_OnlySwitchesTheTab()
+    {
+        var next = Reduce(At(null, SheetSize.Peek, Section.Drivers), new SheetEvent.SegmentTap(Section.Places), LayoutMode.Expanded);
+
+        Assert.Equal(new SheetState(Section.Places, null, SheetSize.Peek), next);
+    }
 
     [Theory]
     [InlineData(false, SheetSize.Peek)]
@@ -400,7 +422,7 @@ public sealed class SheetStateMachineTests
         foreach (var edge in SheetWalk.Run().Edges.Where(e => e.From.Size == SheetSize.Peek && e.To.Size == SheetSize.Tall))
         {
             Assert.Equal(LayoutMode.Compact, edge.Mode);
-            Assert.True(edge.Event is SheetEvent.HandleToggle or SheetEvent.HandleSet { Size: SheetSize.Tall }, $"{edge.Event} took {edge.From} to {edge.To}");
+            Assert.True(edge.Event is SheetEvent.HandleToggle or SheetEvent.HandleSet { Size: SheetSize.Tall } or SheetEvent.SegmentTap, $"{edge.Event} took {edge.From} to {edge.To}");
         }
     }
 
@@ -440,7 +462,7 @@ public sealed class SheetStateMachineTests
             {
                 Assert.Equal(segment.Section, edge.To.Section);
                 Assert.Null(edge.To.Selection);
-                Assert.Equal(edge.From.Size, edge.To.Size);
+                Assert.Equal(edge.Mode == LayoutMode.Expanded ? edge.From.Size : SheetSize.Tall, edge.To.Size);
             }
             else
             {

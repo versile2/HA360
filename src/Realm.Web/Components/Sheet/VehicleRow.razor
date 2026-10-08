@@ -57,7 +57,7 @@
 
     private string AriaLabel => Row.AccessibleName + " Double tap to show on map.";
 
-    private string GlyphIcon => Row.Glyph == VehicleGlyph.Pickup ? PickupGlyph : Icons.Material.Filled.DirectionsCar;
+    private string GlyphIcon => Row.Glyph == VehicleGlyph.Pickup ? PickupGlyph : GlyphPaths.Markup(Row.Glyph);
 
     private string RowClass => "realm-row realm-row--vehicle" + (Selected ? " realm-row--selected" : string.Empty);
 

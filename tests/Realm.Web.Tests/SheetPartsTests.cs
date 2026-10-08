@@ -152,7 +152,7 @@ public sealed class SheetPartsTests : ComponentTestBase
 
         var tabs = cut.FindAll("[role='tab']");
         Assert.Equal(["tab-drivers", "tab-vehicles", "tab-places"], tabs.Select(tab => tab.GetAttribute("data-testid")));
-        Assert.Equal(["Drivers", "Vehicles", "Places"], tabs.Select(tab => tab.QuerySelector(".realm-segment-label")!.TextContent));
+        Assert.Equal(["Drivers", "Trackers", "Places"], tabs.Select(tab => tab.QuerySelector(".realm-segment-label")!.TextContent));
         Assert.Equal(["true", "false", "false"], tabs.Select(tab => tab.GetAttribute("aria-selected")));
         Assert.Equal(["0", "-1", "-1"], tabs.Select(tab => tab.GetAttribute("tabindex")));
         Assert.Equal("tablist", cut.Find("[data-testid='sheet-segments']").GetAttribute("role"));

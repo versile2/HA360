@@ -24,12 +24,12 @@ const pinIds = async (page: Page): Promise<string[]> => [
 ].sort();
 
 test.describe("Settings, Who's on the map", () => {
-  test('[ROSTER] the section is first, with PEOPLE 4, VEHICLES 1 and NOT TRACKED 2, and every row reads kind · source', { tag: ['@phone', '@unfolded'] }, async ({ page }) => {
+  test('[ROSTER] the section is first, with PEOPLE 4, TRACKERS 1 and NOT TRACKED 2, and every row reads kind · source', { tag: ['@phone', '@unfolded'] }, async ({ page }) => {
     const cast = loadDemoCast();
     await openRoster(page);
 
     await expect(dialog(page).locator('.realm-settings__section h3').first(), 'the roster is the first section').toHaveText("Who's on the map");
-    await expect(section(page).locator('.realm-roster__heading'), 'the three groups and their counts').toHaveText(['PEOPLE 4', 'VEHICLES 1', 'NOT TRACKED 2']);
+    await expect(section(page).locator('.realm-roster__heading'), 'the three groups and their counts').toHaveText(['PEOPLE 4', 'TRACKERS 1', 'NOT TRACKED 2']);
     for (const entry of cast.roster) {
       const slug = entry.entityId.replace(/[._]/g, '-');
       const row = page.getByTestId(`roster-row-${slug}`);
@@ -61,7 +61,7 @@ test.describe("Settings, Who's on the map", () => {
     await page.keyboard.press('Enter');
     await expect(button, 'the button says the menu is open').toHaveAttribute('aria-expanded', 'true');
     const items = page.getByTestId('roster-menu').getByRole('button');
-    await expect(items, 'the other groups, then Move down (the king is first)').toHaveText(['Move to Vehicles', 'Move to Not tracked', 'Move down']);
+    await expect(items, 'the other groups, then Move down (the king is first)').toHaveText(['Move to Trackers', 'Move to Not tracked', 'Move down']);
     await expect(page.getByTestId('roster-menu'), 'the menu has the focus').toBeFocused();
 
     await page.keyboard.press('Escape');

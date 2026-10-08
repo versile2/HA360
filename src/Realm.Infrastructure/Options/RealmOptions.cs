@@ -51,9 +51,6 @@ public sealed record RealmOptions
     /// <summary>Radius in kilometres of the area the map fits when it first opens.</summary>
     public int UiDefaultViewRadiusKm { get; init; } = 40;
 
-    /// <summary>Zones with a larger radius (km) are never drawn or listed.</summary>
-    public double UiMaxZoneRadiusKm { get; init; } = 5;
-
     /// <summary>Distance in kilometres from "me" beyond which a person's city and state are shown.</summary>
     public int UiFarAwayKm { get; init; } = 80;
 

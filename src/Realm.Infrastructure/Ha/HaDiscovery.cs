@@ -15,6 +15,7 @@ namespace Realm.Infrastructure.Ha;
 /// <param name="Active">It reports a usable state now: the person, or one of its trackers, is not unavailable or unknown.</param>
 /// <param name="UserId">The HA user id of the person; only ever compared, never shown or logged.</param>
 /// <param name="AvatarUpstream">The servable picture (an HA <c>image/serve</c> path or a Life360 HTTPS URL); null for none.</param>
+/// <param name="Identity">The entities behind it with their friendly names, for Settings (D117).</param>
 public sealed record DiscoveredEntity(
     string EntityId,
     RosterKind Kind,
@@ -26,7 +27,8 @@ public sealed record DiscoveredEntity(
     string? Life360TrackerId,
     string? CompanionTrackerId,
     CompanionSensors? Sensors,
-    string? AvatarUpstream)
+    string? AvatarUpstream,
+    RosterIdentity? Identity = null)
 {
     /// <summary>The tracker a vehicle follows: the phone app's (it has the speed) before Life360's.</summary>
     public string? PrimaryTrackerId => CompanionTrackerId ?? Life360TrackerId;
@@ -120,7 +122,11 @@ public static class HaDiscovery
                 Life360TrackerId: isLife360 ? snapshot.EntityId : null,
                 CompanionTrackerId: companion,
                 Sensors: sensors,
-                AvatarUpstream: ServablePicture(Text(snapshot, "entity_picture"))));
+                AvatarUpstream: ServablePicture(Text(snapshot, "entity_picture")),
+                Identity: new RosterIdentity(
+                    [new RosterIdentityEntity(snapshot.EntityId, Text(snapshot, "friendly_name"), isLife360 ? "Life360 tracker" : "Tracker")],
+                    isLife360 ? Life360FullName(snapshot) : null,
+                    ServablePicture(Text(snapshot, "entity_picture")) is not null)));
         }
 
         return found;
@@ -175,7 +181,8 @@ public static class HaDiscovery
                     StaticAddress: null,
                     StaticLat: null,
                     StaticLon: null,
-                    StaticShowAddress: false));
+                    StaticShowAddress: false,
+                    Icon: entry.Icon));
             }
             else if (entry.Group == RosterGroup.Vehicles)
             {
@@ -186,7 +193,10 @@ public static class HaDiscovery
                     Glyph: VehicleGlyph.Car,
                     SortOrder: entry.SortOrder,
                     TrackerId: entity.PrimaryTrackerId,
-                    Source: entity.PrimaryTrackerId is not null && entity.PrimaryTrackerId == entity.Life360TrackerId ? FixSource.Life360 : FixSource.Companion));
+                    Source: entity.PrimaryTrackerId is not null && entity.PrimaryTrackerId == entity.Life360TrackerId ? FixSource.Life360 : FixSource.Companion,
+                    Color: entry.Color,
+                    Icon: entry.Icon,
+                    AvatarUpstream: entity.AvatarUpstream));
             }
         }
 
@@ -216,6 +226,18 @@ public static class HaDiscovery
             || (life360Snapshot is not null && IsAvailable(life360Snapshot))
             || (companionSnapshot is not null && IsAvailable(companionSnapshot));
         var source = life360Tracker is null ? HomeAssistantSource : companion is null ? Life360Source : HomeAssistantSource + " + " + Life360Source;
+        var picture = ServablePicture(person.Picture) ?? ServablePicture(Text(life360Snapshot, "entity_picture"));
+        var entities = new List<RosterIdentityEntity> { new(person.Id, person.FriendlyName, "Person") };
+        if (life360Tracker is not null)
+        {
+            entities.Add(new RosterIdentityEntity(life360Tracker, Text(life360Snapshot, "friendly_name"), "Life360 tracker"));
+        }
+
+        if (companion is not null)
+        {
+            entities.Add(new RosterIdentityEntity(companion, Text(companionSnapshot, "friendly_name"), "Phone app tracker"));
+        }
+
         return new DiscoveredEntity(
             EntityId: person.Id,
             Kind: RosterKind.Person,
@@ -227,7 +249,8 @@ public static class HaDiscovery
             Life360TrackerId: life360Tracker,
             CompanionTrackerId: companion,
             Sensors: SensorsOf(companion, byId),
-            AvatarUpstream: ServablePicture(person.Picture) ?? ServablePicture(Text(life360Snapshot, "entity_picture")));
+            AvatarUpstream: picture,
+            Identity: new RosterIdentity(entities, life360Snapshot is null ? null : Life360FullName(life360Snapshot), picture is not null));
     }
 
     // A person's GPS tracker that is not Life360's: the phone app's (mobile_app) before any other, then the one that reported last, then the lower entity id,
@@ -305,6 +328,18 @@ public static class HaDiscovery
 
         var stem = ObjectId(snapshot.EntityId);
         return Capitalize(stem.StartsWith("life360_", StringComparison.Ordinal) ? stem["life360_".Length..] : stem);
+    }
+
+    // The member's name in Life360: the tracker's friendly name without the "Life360 " prefix, whole (Life360 words it "Life360 Alden Smith").
+    private static string? Life360FullName(HaEntitySnapshot snapshot)
+    {
+        var name = Text(snapshot, "friendly_name");
+        if (name is not null && name.StartsWith("Life360 ", StringComparison.OrdinalIgnoreCase))
+        {
+            name = name["Life360 ".Length..].Trim();
+        }
+
+        return string.IsNullOrWhiteSpace(name) ? null : name;
     }
 
     private static string? FirstToken(string? text) =>

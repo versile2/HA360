@@ -147,7 +147,7 @@ public static class MapPayloadFactory
         return "Parked";
     }
 
-    /// <summary>The zones: every place whose radius is above 0 and at most <see cref="MapPayloadOptions.MaxZoneRadiusKm"/> (the arrival zone is never sent), with the occupied flag (people only) and the three appearances.</summary>
+    /// <summary>The zones: every place whose radius is above 0 (no maximum: the map shows the zones exactly as Home Assistant has them), with the occupied flag (people only) and the three appearances.</summary>
     public static ZonesPayload Zones(IReadOnlyList<PlaceVm> places, bool show, MapPayloadOptions options, int version)
     {
         // 01 section 5.3 (R2-009): "A place is occupied when at least one person is inside it ... a vehicle never makes a place occupied", and the zone's occupied fill (4.6) counts people only.
@@ -181,14 +181,13 @@ public static class MapPayloadFactory
             MapLayout.NavHeightPx);
     }
 
-    // Zones the map draws, by id: a radius above the maximum (the 32,187 m arrival zone) is excluded, as is a degenerate zero radius.
+    // Zones the map draws, by id: all of them whatever their radius (0.2.1), except a degenerate zero radius.
     private static Dictionary<string, PlaceVm> DrawnPlaces(IReadOnlyList<PlaceVm> places, MapPayloadOptions options)
     {
-        var maxRadiusM = options.MaxZoneRadiusKm * 1000;
         var drawn = new Dictionary<string, PlaceVm>(places.Count);
         foreach (var place in places)
         {
-            if (place.RadiusM > 0 && place.RadiusM <= maxRadiusM)
+            if (place.RadiusM > 0)
             {
                 drawn[place.Id] = place;
             }
@@ -266,7 +265,8 @@ public static class MapPayloadFactory
             AriaLabel: PinName(member, status, place, poorAccuracy, lowBattery, far, fromMe?.Meters, now, zone, units),
             Tooltip: MapText.Title(member.DisplayName, member.LoreTitle),
             BubbleLabel: BubbleTextFormatter.Label(member.DisplayName, fromMe),
-            BubbleTooltip: BubbleTextFormatter.Tooltip(member.DisplayName, fromMe));
+            BubbleTooltip: BubbleTextFormatter.Tooltip(member.DisplayName, fromMe),
+            Glyph: member.Glyph is { } glyph ? GlyphOf(glyph) : null);
     }
 
     // 01 section 4.3: the first matching row wins. "At a place" means inside a zone the map draws.
@@ -338,13 +338,27 @@ public static class MapPayloadFactory
         return new VehiclePayloadItem(
             Id: vehicle.Id,
             Name: vehicle.Name,
-            Glyph: vehicle.Glyph == VehicleGlyph.Pickup ? MapGlyph.Pickup : MapGlyph.Car,
+            Glyph: GlyphOf(vehicle.Glyph),
             Lat: hasPin ? vehicle.Lat : null,
             Lon: hasPin ? vehicle.Lon : null,
             Ring: ring,
             Stale: stale,
             Chip: chip,
             AriaLabel: MapText.VehiclePinName(vehicle, place),
-            Tooltip: MapText.Title(vehicle.Name, vehicle.LoreTitle));
+            Tooltip: MapText.Title(vehicle.Name, vehicle.LoreTitle),
+            Initial: MapText.Initial(vehicle.Name),
+            Color: vehicle.Color,
+            AvatarUrl: string.IsNullOrEmpty(vehicle.AvatarUrl) ? null : vehicle.AvatarUrl,
+            ShowInitial: vehicle.ShowInitial);
     }
+
+    private static MapGlyph GlyphOf(VehicleGlyph glyph) => glyph switch
+    {
+        VehicleGlyph.Pickup => MapGlyph.Pickup,
+        VehicleGlyph.Person => MapGlyph.Person,
+        VehicleGlyph.Pet => MapGlyph.Pet,
+        VehicleGlyph.Phone => MapGlyph.Phone,
+        VehicleGlyph.Tag => MapGlyph.Tag,
+        _ => MapGlyph.Car,
+    };
 }

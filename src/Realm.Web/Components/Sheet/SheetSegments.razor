@@ -1,7 +1,7 @@
 @using Microsoft.JSInterop
 @using Realm.Domain
 
-@* The three-tab control under the handle (01 section 5.0; 03 section 3.4): Drivers, Vehicles, Places. role=tablist with a roving tabindex and arrow-key
+@* The three-tab control under the handle (01 section 5.0; 03 section 3.4): Drivers, Trackers, Places (the test id of the Trackers tab stays tab-vehicles). role=tablist with a roving tabindex and arrow-key
    focus; below 360 px only the icons show (the label stays for the accessible name). The count of the section that shows ("5 drivers") is announced by the sheet's one live region
    (SheetContent), which stays on the page while the selection header takes this control's place. A new FocusRequest for the section tab (01 section 10.2: the selection was cleared) puts the
    focus on the tab that shows, once per request. *@
@@ -36,7 +36,7 @@
     private static readonly Segment[] All =
     [
         new(Section.Drivers, "Drivers", Icons.Material.Filled.Group, "tab-drivers"),
-        new(Section.Vehicles, "Vehicles", Icons.Material.Filled.DirectionsCar, "tab-vehicles"),
+        new(Section.Vehicles, "Trackers", Icons.Material.Filled.DirectionsCar, "tab-vehicles"),
         new(Section.Places, "Places", Icons.Material.Filled.Place, "tab-places"),
     ];
 

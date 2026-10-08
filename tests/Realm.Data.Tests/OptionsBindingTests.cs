@@ -144,7 +144,6 @@ public class OptionsBindingTests
         Assert.Equal(15, options.UiLowBatteryPercent);
         Assert.Equal(500, options.UiPoorAccuracyMeters);
         Assert.Equal(40, options.UiDefaultViewRadiusKm);
-        Assert.Equal(5.0, options.UiMaxZoneRadiusKm);
         Assert.Equal(80, options.UiFarAwayKm);
         Assert.True(options.UiHistoryTokens);
         Assert.Equal(10, options.FusionStaleGraceMinutes);

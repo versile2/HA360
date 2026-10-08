@@ -75,8 +75,8 @@ public sealed partial class AvatarService : IAvatarSource
         ArgumentNullException.ThrowIfNull(memberId);
 
         // The id is checked against the member id form first and then against the members themselves, so nothing a client sends reaches a path or a URL.
-        if (!IdForm().IsMatch(memberId)
-            || _discovery.Current.Members.FirstOrDefault(m => string.Equals(m.Id, memberId, StringComparison.Ordinal)) is not { AvatarUpstream: { } upstream })
+        var upstream = IdForm().IsMatch(memberId) ? UpstreamOf(memberId) : null;
+        if (upstream is null)
         {
             _logger.LogWarning("An avatar was requested for a member that has none");
             return null;
@@ -113,6 +113,11 @@ public sealed partial class AvatarService : IAvatarSource
             gate.Release();
         }
     }
+
+    // A person's pin or a tracker's pin: both can show the source's photo (0.2.1).
+    private string? UpstreamOf(string id) =>
+        _discovery.Current.Members.FirstOrDefault(m => string.Equals(m.Id, id, StringComparison.Ordinal))?.AvatarUpstream
+        ?? _discovery.Current.Vehicles.FirstOrDefault(v => string.Equals(v.Id, id, StringComparison.Ordinal))?.AvatarUpstream;
 
     // ---- fetching -----------------------------------------------------------------------------------------------
 

@@ -40,6 +40,7 @@ const member = (over = {}) => ({
   tooltip: 'King',
   bubbleLabel: 'King, 2 miles east, off screen. Double tap to include on the map.',
   bubbleTooltip: 'King',
+  glyph: null,
   ...over,
 });
 
@@ -54,6 +55,10 @@ const vehicle = (over = {}) => ({
   chip: null,
   ariaLabel: "The King's Wagon, parked at the Keep.",
   tooltip: "The King's Wagon",
+  initial: 'T',
+  color: '#A5B4FC',
+  avatarUrl: null,
+  showInitial: false,
   ...over,
 });
 
@@ -155,7 +160,7 @@ test('a value outside an enum fails', () => {
   assert.ok(mentions(errorsOf('MemberPayloadItem', { ...SAMPLES.MemberPayloadItem(), badge: 'battery' }), '$.badge: expected one of'));
   assert.ok(mentions(errorsOf('MemberPayloadItem', { ...SAMPLES.MemberPayloadItem(), zClass: 5 }), '$.zClass: expected one of'));
   assert.ok(mentions(errorsOf('LayoutPayload', { ...SAMPLES.LayoutPayload(), mode: 'medium' }), '$.mode: expected one of'));
-  assert.ok(mentions(errorsOf('VehiclePayloadItem', { ...SAMPLES.VehiclePayloadItem(), glyph: 'truck' }), '$.glyph: expected one of'));
+  assert.ok(mentions(errorsOf('VehiclePayloadItem', { ...SAMPLES.VehiclePayloadItem(), glyph: 'rocket' }), '$.glyph: expected one of'));
   assert.ok(mentions(errorsOf('SelectionPayload', { kind: 'zone', id: 'forge', follow: false }), '$.kind: expected one of'));
   assert.ok(mentions(errorsOf('CameraState', { ...SAMPLES.CameraState(), recenter: 'home' }), '$.recenter: expected one of'));
   assert.ok(mentions(errorsOf('StyleResult', { styleId: 'parchment', ok: true }), '$.styleId: expected one of'));

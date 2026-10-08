@@ -148,7 +148,8 @@ public sealed class DemoDataSource
                 SinceUtc: spot.Since,
                 LastUpdateUtc: fused.Ts,
                 SortOrder: entry.SortOrder,
-                Freshness: freshness);
+                Freshness: freshness,
+                Glyph: GlyphOf(entry));
         }
 
         MemberVm Static(RosterEntry entry, Spot spot) => new(
@@ -175,13 +176,14 @@ public sealed class DemoDataSource
             LastUpdateUtc: null,
             SortOrder: entry.SortOrder,
             Freshness: FreshnessRules.ForMember(MemberKind.Static, now, null, staleAfter, OfflineAfterHours),
-            StaticLabel: spot.StaticLabel);
+            StaticLabel: spot.StaticLabel,
+            Glyph: GlyphOf(entry));
 
         VehicleVm Vehicle(RosterEntry entry, Spot spot) => new(
             Id: spot.Id,
             Name: entry.DisplayName,
             LoreTitle: entry.LoreTitle,
-            Glyph: spot.Glyph,
+            Glyph: RosterIcons.GlyphOf(entry.Icon) ?? spot.Glyph,
             Lat: double.IsNaN(spot.Lat) ? null : spot.Lat,
             Lon: double.IsNaN(spot.Lon) ? null : spot.Lon,
             Street: null,
@@ -189,7 +191,10 @@ public sealed class DemoDataSource
             LastUpdateUtc: spot.Fix?.Ts,
             SpeedMps: spot.Fix?.SpeedMps,
             IsMoving: VehicleRules.IsMoving(spot.Fix?.SpeedMps, spot.Fix?.Ts, now),
-            Freshness: FreshnessRules.ForVehicle(now, spot.Fix?.Ts, VehicleStaleAfterMinutes));
+            Freshness: FreshnessRules.ForVehicle(now, spot.Fix?.Ts, VehicleStaleAfterMinutes),
+            Color: entry.Color,
+            AvatarUrl: null,
+            ShowInitial: entry.Icon == RosterIcons.Initial);
 
         // 02 section 9.3: positions, accuracies, batteries and fix ages are Appendix A.1 verbatim; "since" is the local time of the table.
         var spots = Spots();
@@ -335,6 +340,9 @@ public sealed class DemoDataSource
         SpeedMps: speedMps,
         BatteryPct: battery,
         Charging: charging);
+
+    // The Demo has no photos, so a person's face is the initial unless the owner chose a glyph.
+    private static VehicleGlyph? GlyphOf(RosterEntry entry) => RosterIcons.GlyphOf(entry.Icon);
 
     private static bool CastIdByEntity(string entityId, out string castId) => DemoRoster.CastIdByEntity.TryGetValue(entityId, out castId!);
 

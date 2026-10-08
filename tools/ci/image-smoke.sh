@@ -433,7 +433,6 @@ cat >"$live_dir/options.json" <<'EOF'
   "ui_low_battery_percent": 15,
   "ui_poor_accuracy_meters": 500,
   "ui_default_view_radius_km": 40,
-  "ui_max_zone_radius_km": 5,
   "ui_far_away_km": 80,
   "ui_history_tokens": true,
   "features_temp_bubble": false,
