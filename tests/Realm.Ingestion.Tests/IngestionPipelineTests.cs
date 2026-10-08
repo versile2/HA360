@@ -226,32 +226,24 @@ public sealed class IngestionPipelineTests : IDisposable
     }
 
     [Fact]
-    public async Task TheZonesAsDrawn_FollowTheOptions_AndTheOversizedAreLeftOut()
+    public async Task TheZonesAsDrawn_AreNamedByHomeAssistant_AndTheOversizedAreLeftOut()
     {
-        var options = OptionsBinding.Defaults with
-        {
-            Places =
-            [
-                new PlaceOption("zone.home", "Hearth", "The keep", PlaceKind.Home, Hidden: false),
-                new PlaceOption("zone.hall", null, null, PlaceKind.Fun, Hidden: true),
-            ],
-        };
-        var rig = NewRig(options);
+        var rig = NewRig();
         RawPlace[] zones =
         [
             Home,
             new("hall", "Jester's Hall", 33.1, -84.1, 80, false),
             new("arrival", "Arrival", 33.2, -84.2, 6000, false),
-            new("shed", "Hearth", 33.3, -84.3, 50, false),   // the same name as the renamed home
+            new("shed", "Shed", 33.3, -84.3, 50, false),
         ];
 
         await rig.DiscoverWithAsync(zones, null, Plans.Member("king", life360: Plans.KingTracker));
 
         var places = rig.State.Current.Places;
-        Assert.Equal(new[] { "home", "shed" }, places.Select(p => p.Id));
-        Assert.Equal(new[] { "Hearth", "Hearth (2)" }, places.Select(p => p.DisplayName));
-        Assert.Equal("The keep", places[0].Subtitle);
-        Assert.Equal(PlaceKind.Home, places[0].Kind);
+        Assert.Equal(new[] { "hall", "home", "shed" }, places.Select(p => p.Id).Order(StringComparer.Ordinal));
+        Assert.DoesNotContain(places, p => p.Id == "arrival");
+        Assert.Equal("Hearth Haven", places.Single(p => p.Id == "home").DisplayName);
+        Assert.Equal(PlaceKind.Home, places.Single(p => p.Id == "home").Kind);
     }
 
     [Fact]
