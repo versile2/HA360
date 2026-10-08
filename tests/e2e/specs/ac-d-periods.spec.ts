@@ -34,7 +34,7 @@ async function openDriverYear(page: Page): Promise<void> {
 
 /** Types a date into an editable picker, commits it with Enter and closes the picker's popover so that it cannot cover Apply. */
 async function typeDate(page: Page, testId: string, value: string): Promise<void> {
-  const input = page.getByTestId(testId).locator('input');
+  const input = page.locator(`input[data-testid="${testId}"], [data-testid="${testId}"] input`).first();
   await input.fill(value, { timeout: 5_000 });
   await input.press('Enter');
   await input.press('Escape');
