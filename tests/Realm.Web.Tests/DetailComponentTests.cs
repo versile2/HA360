@@ -248,7 +248,7 @@ public sealed class DetailComponentTests : ComponentTestBase
 
         Assert.Contains("on I-65", cut.Find(".realm-detail-status-line").TextContent, StringComparison.Ordinal);
         Assert.Empty(cut.FindAll(".realm-detail-address"));
-        Assert.Equal(1, Regex.Matches(cut.Markup, "I-65").Count);
+        Assert.Single(Regex.Matches(cut.Markup, "I-65"));
     }
 
     [Theory]
