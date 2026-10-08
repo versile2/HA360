@@ -31,98 +31,17 @@ backup_exclude:
 
 watchdog: "http://[HOST]:[PORT:8099]/healthz"   # liveness only; used if the owner switches Watchdog on
 
-options:                          # personal configuration lives here, never in the repository: the lists stay empty
+options:                          # the only add-on options (0.2.0, D114): who is on the map is chosen in the app, in Settings
   demo_mode: false                # first on purpose: Home Assistant renders options in this order
   allow_demo_param: false
   log_level: information
-  ui_stale_after_minutes: 30
-  ui_offline_after_hours: 24
-  ui_vehicle_stale_after_minutes: 45
-  ui_low_battery_percent: 15
-  ui_poor_accuracy_meters: 500
-  ui_default_view_radius_km: 40
-  ui_max_zone_radius_km: 5
-  ui_far_away_km: 80
-  ui_history_tokens: true         # Back-gesture switch; false stops the history steps (see DOCS.md, Troubleshooting)
-  features_temp_bubble: false
-  features_add_rows: false
-  fusion_stale_grace_minutes: 10
-  trips_start_speed_mph: 15
-  trips_stop_merge_seconds: 180
-  trips_min_distance_miles: 0.3
-  trips_min_duration_seconds: 120
   driving_week_start: monday
   driving_speeding_mph: 80
-  driving_speeding_min_seconds: 30
-  driving_phone_min_seconds: 10
   retention_fix_days: 120
-  backfill_days: 10
-  privacy_log_positions: false    # debug logs carry positions only when true
-  ignore_entities: []
-  members: []
-  vehicles: []
-  places: []
-  # me_fallback_member is optional (str?) and therefore deliberately NOT listed here:
-  # the Supervisor treats an optional key that has a default as required.
-schema:                           # list-of-dict only (nesting depth 2); enumerated values are lower-case
+schema:                           # enumerated values are lower-case
   demo_mode: bool
   allow_demo_param: bool
   log_level: "list(trace|debug|information|warning|error)"
-  ui_stale_after_minutes: "int(5,720)"
-  ui_offline_after_hours: "int(1,168)"
-  ui_vehicle_stale_after_minutes: "int(5,720)"
-  ui_low_battery_percent: "int(1,50)"
-  ui_poor_accuracy_meters: "int(50,5000)"
-  ui_default_view_radius_km: "int(1,2000)"
-  ui_max_zone_radius_km: "float(0.1,100)"
-  ui_far_away_km: "int(5,5000)"
-  ui_history_tokens: bool
-  features_temp_bubble: bool
-  features_add_rows: bool
-  fusion_stale_grace_minutes: "int(0,60)"
-  trips_start_speed_mph: "int(8,40)"
-  trips_stop_merge_seconds: "int(60,600)"
-  trips_min_distance_miles: "float(0.1,5)"
-  trips_min_duration_seconds: "int(30,900)"
   driving_week_start: "list(monday|sunday)"
   driving_speeding_mph: "int(50,150)"
-  driving_speeding_min_seconds: "int(10,120)"
-  driving_phone_min_seconds: "int(3,60)"
   retention_fix_days: "int(14,730)"
-  backfill_days: "int(0,14)"
-  privacy_log_positions: bool
-  me_fallback_member: "str?"      # optional: no line in `options` above
-  ignore_entities:
-    - str
-  members:
-    - id: "match(^[a-z][a-z0-9_]{0,23}$)"
-      display_name: "str(1,32)"
-      lore_title: "str(,48)?"
-      kind: "list(live|static)?"
-      person: "str?"
-      life360_tracker: "str?"
-      companion_tracker: "str?"
-      avatar: "list(auto|person|life360|none)?"
-      color: "match(^#[0-9A-Fa-f]{6}$)?"
-      sort_order: "int(0,99)?"
-      in_driving_report: "bool?"
-      static_label: "str(,40)?"
-      static_address: "str(,120)?"
-      static_latitude: "float(-90,90)?"
-      static_longitude: "float(-180,180)?"
-      static_show_address: "bool?"
-  vehicles:
-    - id: "match(^[a-z][a-z0-9_]{0,23}$)"
-      name: "str(1,40)"
-      lore_title: "str(,48)?"
-      glyph: "list(pickup|car)"
-      integration: "list(fordpass|none)"
-      entity_prefix: "str?"
-      placeholder_note: "str(,80)?"
-      sort_order: "int(0,99)?"
-  places:
-    - zone: "str"
-      display_name: "str(,40)?"
-      subtitle: "str(,48)?"
-      kind: "list(home|work|family|fun|park|vet|cemetery|other)?"
-      hidden: "bool?"
