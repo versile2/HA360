@@ -304,7 +304,7 @@ public sealed class DriverWeekPageTests : ComponentTestBase
     }
 
     [Fact]
-    public void ADriveRow_DrawsAChipOnlyForACountAboveZero_ASingularName_AndUnknownPlaces()
+    public void ADriveRow_DrawsAChipOnlyForACountAboveZero_ASingularName_AndUnnamedPlaces()
     {
         var start = new DateTimeOffset(2026, 9, 30, 13, 0, 0, TimeSpan.Zero);
         var events = new Dictionary<string, int?> { [EventKeys.Speeding] = 1, [EventKeys.Phone] = 0, [EventKeys.Accel] = null, [EventKeys.Braking] = 2 };
@@ -314,7 +314,7 @@ public sealed class DriverWeekPageTests : ComponentTestBase
         var cut = Body(week, topSpeedMps: null);
 
         var row = cut.Find("[data-testid='drive-row-0']");
-        Assert.Equal("Unknown place → Unknown place", row.QuerySelector(".realm-drive-row__route")!.TextContent);
+        Assert.Equal("Somewhere in the Realm → Somewhere in the Realm", row.QuerySelector(".realm-drive-row__route")!.TextContent);
         Assert.Equal("5.0 mi · Top —", row.QuerySelector(".realm-drive-row__detail")!.TextContent);
         Assert.Equal(["1 speeding event", "2 hard-braking events"], row.QuerySelectorAll(".realm-drive-event").Select(chip => chip.GetAttribute("aria-label")));
         Assert.Equal(["1", "2"], row.QuerySelectorAll(".realm-drive-event__count").Select(count => count.TextContent));
@@ -378,6 +378,10 @@ public sealed class DriverWeekPageTests : ComponentTestBase
 
         public ValueTask<WeekReportVm> GetWeekReportAsync(int weekOffset, DayOfWeek weekStart, CancellationToken ct) =>
             OnReport is null ? _inner.GetWeekReportAsync(weekOffset, weekStart, ct) : OnReport(weekOffset, weekStart, ct);
+
+        public ValueTask<WeekReportVm> GetPeriodReportAsync(ReportWindow window, CancellationToken ct) => _inner.GetPeriodReportAsync(window, ct);
+
+        public ValueTask<DriverWeek?> GetDriverPeriodAsync(string memberId, ReportWindow window, CancellationToken ct) => _inner.GetDriverPeriodAsync(memberId, window, ct);
 
         public ValueTask<DriverWeek?> GetDriverWeekAsync(string memberId, int weekOffset, DayOfWeek weekStart, CancellationToken ct) =>
             OnDriverWeek is null ? _inner.GetDriverWeekAsync(memberId, weekOffset, weekStart, ct) : OnDriverWeek(memberId, weekOffset, weekStart, ct);

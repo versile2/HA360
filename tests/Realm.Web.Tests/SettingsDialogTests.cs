@@ -543,6 +543,10 @@ public sealed class SettingsDialogTests : ComponentTestBase
 
         public ValueTask<WeekReportVm> GetWeekReportAsync(int weekOffset, DayOfWeek weekStart, CancellationToken ct) => inner.GetWeekReportAsync(weekOffset, weekStart, ct);
 
+        public ValueTask<WeekReportVm> GetPeriodReportAsync(ReportWindow window, CancellationToken ct) => inner.GetPeriodReportAsync(window, ct);
+
+        public ValueTask<DriverWeek?> GetDriverPeriodAsync(string memberId, ReportWindow window, CancellationToken ct) => inner.GetDriverPeriodAsync(memberId, window, ct);
+
         public ValueTask<DriverWeek?> GetDriverWeekAsync(string memberId, int weekOffset, DayOfWeek weekStart, CancellationToken ct) =>
             inner.GetDriverWeekAsync(memberId, weekOffset, weekStart, ct);
 

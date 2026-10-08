@@ -180,6 +180,10 @@ public sealed class ViewerResolverTests
         public ValueTask<WeekReportVm> GetWeekReportAsync(int weekOffset, DayOfWeek weekStart, CancellationToken ct) =>
             _inner.GetWeekReportAsync(weekOffset, weekStart, ct);
 
+        public ValueTask<WeekReportVm> GetPeriodReportAsync(ReportWindow window, CancellationToken ct) => _inner.GetPeriodReportAsync(window, ct);
+
+        public ValueTask<DriverWeek?> GetDriverPeriodAsync(string memberId, ReportWindow window, CancellationToken ct) => _inner.GetDriverPeriodAsync(memberId, window, ct);
+
         public ValueTask<DriverWeek?> GetDriverWeekAsync(string memberId, int weekOffset, DayOfWeek weekStart, CancellationToken ct) =>
             _inner.GetDriverWeekAsync(memberId, weekOffset, weekStart, ct);
 
