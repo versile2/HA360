@@ -92,7 +92,7 @@ test.describe('Driving periods', () => {
     const query = new URL(page.url()).searchParams;
     expect(query.get('from')).toBe('2026-09-01');
     expect(query.get('to')).toBe('2026-09-10');
-    await expect(page.getByText('Sep 1 – Sep 10', { exact: false }).first()).toBeVisible();
+    await expect(page.locator('.realm-driving__range')).toContainText('Sep 1 – Sep 10');
   });
 });
 
