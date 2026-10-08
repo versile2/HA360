@@ -294,16 +294,16 @@ public class DemoDataTests
         Assert.Equal(Freshness.Fresh, wagon.Freshness);
     }
 
-    // The hatchback is a tracker that has not reported for 20 days: parked near home, stale, not moving.
+    // The hatchback is a tracker that has not reported a position for 20 days: it has none to draw (it is "last heard" only), stale, not moving.
     [Fact]
-    public void Chariot_is_a_stale_tracker_near_home()
+    public void Chariot_is_a_stale_tracker_with_no_position()
     {
         var chariot = Vehicle("chariot");
 
         Assert.Equal("The Queen's Chariot", chariot.LoreTitle);
         Assert.Equal(VehicleGlyph.Car, chariot.Glyph);
-        Assert.Equal(31.0995, chariot.Lat);
-        Assert.Equal(-85.3405, chariot.Lon);
+        Assert.Null(chariot.Lat);
+        Assert.Null(chariot.Lon);
         Assert.Equal(Now.AddDays(-20), chariot.LastUpdateUtc);
         Assert.Equal(0.0, chariot.SpeedMps);
         Assert.False(chariot.IsMoving);
