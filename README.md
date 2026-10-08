@@ -384,10 +384,11 @@ The image may still be private. See the registry note under <a href="#install">I
 - .NET 10 SDK (see `global.json`): `dotnet build Realm.slnx` and `dotnet test Realm.slnx`.
 - CI: `.github/workflows/ci.yml`. Every run publishes a summary to the `ci-artifacts` branch; see `tools/ci/README.md`.
   The screenshots above come from its gallery run.
-- Releases: merge a PR that bumps `version` in `realm/config.yaml` to main. `.github/workflows/release.yml` then refuses a
-  version with no `## MAJOR.MINOR.PATCH` section in `realm/CHANGELOG.md`, builds the image and pushes
-  `ghcr.io/versile2/ha-cartographer:<version>` (never `latest`), and only then creates the tag `v<version>` and a GitHub
-  release whose notes are generated from the merged PRs. A version that already has a tag is skipped.
+- Releases: merge the PR that bumps `version` in `realm/config.yaml` and adds its `## MAJOR.MINOR.PATCH` section to
+  `realm/CHANGELOG.md`, then run the release workflow (Actions -> release -> Run workflow, on main). It builds the image and
+  pushes `ghcr.io/versile2/ha-cartographer:<version>` (never `latest`), and only then creates the tag `v<version>` and a
+  GitHub release whose notes are the CHANGELOG section plus notes generated from the merged PRs. It refuses a version that
+  already has a tag. The HA store offers the new version as soon as main has it, so run the workflow right after merging.
 
 ## Licence
 

@@ -40,7 +40,7 @@ src/Realm.Demo/            the fictional fixture and the Demo implementations of
 src/Realm.Web/             the Blazor app and its JS modules (wwwroot)
 tests/                     xUnit and bUnit projects, JS unit tests, Playwright end-to-end tests (each added with its code)
 tools/ci/                  the CI feedback scripts and option-bindings.json
-.github/workflows/         ci.yml (and, later, the release workflow)
+.github/workflows/         ci.yml, release.yml (run by hand)
 docs/ARCHITECTURE.md       this file
 ```
 
@@ -106,8 +106,9 @@ app) and `publish-ci`, which waits for all of them. `SUMMARY.md` has a section f
 ## Releasing
 
 The add-on version in `realm/config.yaml` equals the image tag, and every version has a section in
-`realm/CHANGELOG.md`. A release is made by merging a PR that bumps `version` in `realm/config.yaml` to main: the
-release workflow builds and pushes the image, then creates the tag `vX.Y.Z` and the GitHub release (notes generated from the
-merged PRs). The store sees the new version as soon as the merge lands, a few minutes before the image is pushed; an update
+`realm/CHANGELOG.md`. A release is made by merging the PR that bumps `version` in `realm/config.yaml` and adds the CHANGELOG section, then
+running the release workflow by hand (Actions -> release -> Run workflow, on main): it builds and pushes the image, then
+creates the tag `vX.Y.Z` and the GitHub release (CHANGELOG section plus notes generated from the merged PRs). The store
+offers the new version as soon as main has it, before the image is pushed, so run the workflow right after merging; an update
 attempted in that window fails to pull and succeeds on retry. Install in Home Assistant by adding `https://github.com/Versile2/ha-cartographer` as an app
 repository.

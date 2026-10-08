@@ -1,24 +1,27 @@
 name: release
-# 03 section 7.6, S16a. A push to main that leaves `version` in realm/config.yaml without a tag releases it: the workflow builds the image and pushes
-# ghcr.io/versile2/ha-cartographer:X.Y.Z, and only after that push succeeded creates the tag vX.Y.Z on that commit and a GitHub release whose notes are
-# generated from the merged PRs (.github/release.yml categories) followed by the CHANGELOG section. Merging the version bump is the whole release; nobody
-# tags by hand. (Tags and releases made with GITHUB_TOKEN start no other workflow, which is why this is one workflow and not a tag-triggered second one.)
-# A version that already has a tag is never released again (6.6), and nothing runs from a ref other than main. workflow_dispatch (on main) re-runs it after
-# a failure: the tag only exists once the image does, so a re-run picks up where it stopped. Not checked: that ci.yml was green; docker-smoke has already
-# run this Dockerfile on every push, and the person who merges has read the CI summary.
-on:
-  push: { branches: [main], paths: [realm/config.yaml] }
-  workflow_dispatch:
+# 03 section 7.6, S16a. Run by hand: Actions -> release -> Run workflow, on main. It is the only way a release is made (no tag or merge triggers it). It reads
+# `version` (V) from realm/config.yaml, builds the image and pushes ghcr.io/versile2/ha-cartographer:V, and only after that push succeeded creates the tag vV
+# on that commit and a GitHub release vV whose notes are the realm/CHANGELOG.md section for V followed by notes generated from the merged PRs
+# (.github/release.yml categories). Merge the PR that bumps the version and adds the CHANGELOG section first, then run this right away: the HA store offers V
+# as soon as main has it. Refuses any ref other than main, a V that already has a tag (6.6: never re-release), and a V with no `## V` CHANGELOG section.
+# The tag only exists once the image does, so a run that failed before the end can simply be run again. Not checked: that ci.yml was green; docker-smoke has
+# already run this Dockerfile on every push, and the person who runs this has read the CI summary.
+on: workflow_dispatch
 permissions: {}
 concurrency: { group: release, cancel-in-progress: false }
 defaults: { run: { shell: bash } }               # explicit shell = bash -eo pipefail
 jobs:
   release:
-    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     permissions: { contents: write, packages: write }
     steps:
+      - name: Only from main
+        run: |
+          if [[ $GITHUB_REF != refs/heads/main ]]; then
+            echo "::error::the release workflow runs on main only (this run is on $GITHUB_REF); choose main in 'Use workflow from'"
+            exit 1
+          fi
       - uses: actions/checkout@v7
         with: { fetch-depth: 0 }
       - name: Commit must be on origin/main
@@ -29,7 +32,7 @@ jobs:
             exit 1
           fi
       - id: v
-        name: Read the version; skip when it is already released; CHANGELOG must have its section
+        name: Read the version; it must be unreleased and have its CHANGELOG section
         run: |
           v=$(sed -n -E 's/^version:[[:space:]]*"?([0-9]+\.[0-9]+\.[0-9]+)"?[[:space:]]*(#.*)?$/\1/p' realm/config.yaml)
           v=${v%%$'\n'*}
@@ -39,28 +42,23 @@ jobs:
           fi
           echo "version=$v" >> "$GITHUB_OUTPUT"
           if [[ -n $(git ls-remote --tags origin "refs/tags/v$v") ]]; then
-            echo "Version $v already has the tag v$v; nothing to release." | tee -a "$GITHUB_STEP_SUMMARY"
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            exit 0
+            echo "::error::the tag v$v already exists on origin; a released version is never released again. Bump version in realm/config.yaml (and add its CHANGELOG section) in a PR, merge it, then run this again."
+            exit 1
           fi
           if ! grep -qE "^## ${v//./\\.}([[:space:]]|\$)" realm/CHANGELOG.md; then
             echo "::error::realm/CHANGELOG.md has no section '## $v'"
             exit 1
           fi
       - uses: docker/setup-buildx-action@v4
-        if: steps.v.outputs.skip != 'true'
       - uses: docker/login-action@v4
-        if: steps.v.outputs.skip != 'true'
         with: { registry: ghcr.io, username: "${{ github.actor }}", password: "${{ secrets.GITHUB_TOKEN }}" }
       - id: meta
-        if: steps.v.outputs.skip != 'true'
         uses: docker/metadata-action@v6
         with:
           images: ghcr.io/versile2/ha-cartographer
           tags: type=raw,value=${{ steps.v.outputs.version }}
           flavor: latest=false                  # no "latest" tag: the Supervisor never uses it
       - name: Exactly one tag, the version (no latest)
-        if: steps.v.outputs.skip != 'true'
         env:
           TAGS: ${{ steps.meta.outputs.tags }}
           WANT: ghcr.io/versile2/ha-cartographer:${{ steps.v.outputs.version }}
@@ -70,7 +68,6 @@ jobs:
             exit 1
           fi
       - uses: docker/build-push-action@v7
-        if: steps.v.outputs.skip != 'true'
         with:
           context: .
           platforms: linux/amd64                # config.yaml: arch amd64
@@ -87,7 +84,6 @@ jobs:
           cache-from: type=gha,scope=release
           cache-to: type=gha,scope=release,mode=max
       - name: Anonymous pull check
-        if: steps.v.outputs.skip != 'true'
         env:
           IMAGE: ghcr.io/versile2/ha-cartographer:${{ steps.v.outputs.version }}
         run: |
@@ -98,15 +94,12 @@ jobs:
             echo "::notice title=GHCR package is private::Make ghcr.io/versile2/ha-cartographer public once in the GitHub UI (03 section 6.7); until then the Supervisor cannot pull it without registry credentials."
           fi
       - name: Tag and publish the release (after the image is pushed)
-        if: steps.v.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           V: ${{ steps.v.outputs.version }}
         run: |
-          # The CHANGELOG section for V (up to the next "## " heading) goes after the generated notes.
-          awk -v v="$V" 'BEGIN{h="## " v} $0==h || index($0,h " ")==1 {on=1; next} /^## /{on=0} on' realm/CHANGELOG.md > changelog-section.md
-          # Generated from the merged PRs since the previous release tag, grouped by .github/release.yml.
-          gh api -X POST "repos/${GITHUB_REPOSITORY}/releases/generate-notes" -f tag_name="v$V" -f target_commitish="$GITHUB_SHA" --jq .body > notes.md
-          { cat notes.md; printf '\n\n## Add-on changelog\n\n'; cat changelog-section.md; } > body.md
-          gh api -X POST "repos/${GITHUB_REPOSITORY}/releases" -f tag_name="v$V" -f target_commitish="$GITHUB_SHA" -f name="v$V" -F body=@body.md -F draft=false -F prerelease=false >/dev/null
+          # The CHANGELOG section for V (up to the next "## " heading) goes first; --generate-notes appends the notes generated from the merged PRs since the
+          # previous release tag, grouped by .github/release.yml. gh creates the tag vV on $GITHUB_SHA.
+          awk -v v="$V" 'BEGIN{h="## " v} $0==h || index($0,h " ")==1 {on=1; next} /^## /{on=0} on' realm/CHANGELOG.md > "$RUNNER_TEMP/changelog-section.md"
+          gh release create "v$V" --target "$GITHUB_SHA" --title "v$V" --notes-file "$RUNNER_TEMP/changelog-section.md" --generate-notes
           echo "Released v$V: image ghcr.io/versile2/ha-cartographer:$V, tag and release created." >> "$GITHUB_STEP_SUMMARY"

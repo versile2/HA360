@@ -1,5 +1,5 @@
 name: "HA Cartographer"
-version: "0.1.2"                  # equals the image tag; merging a bump to main makes the release workflow build the image and tag it; a CHANGELOG.md section of the same name must exist
+version: "0.1.2"                  # equals the image tag; after merging a bump, running the release workflow (by hand, on main) builds the image and tags it; a CHANGELOG.md section of the same name must exist
 slug: realm
 description: "Map-first family map and weekly driving reports, inside Home Assistant."
 url: "https://github.com/Versile2/ha-cartographer"
