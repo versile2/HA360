@@ -10,6 +10,7 @@ using Realm.Infrastructure.Ha;
 using Realm.Infrastructure.Ingestion;
 using Realm.Infrastructure.Options;
 using Realm.Infrastructure.Retention;
+using Realm.Infrastructure.Roster;
 using Realm.Infrastructure.Stats;
 using Realm.TestKit;
 using Xunit;
@@ -45,6 +46,7 @@ internal sealed class StoreRig : IAsyncDisposable
         var factory = _provider.GetRequiredService<IDbContextFactory<RealmDb>>();
         Writer = new DbWriter(factory, Time, new RecordingLogger<DbWriter>(), Counters);
         Queries = new SqliteRealmQueries(factory);
+        Roster = new RosterService(Queries, Writer, Time, new RecordingLogger<RosterService>());
         Gateway = new FakeHaGateway { History = History.Answer };
         (State, Notifier, Discovery, Hydrator, Stats, Pipeline, PipelineLog) = NewProcess();
     }
@@ -61,6 +63,9 @@ internal sealed class StoreRig : IAsyncDisposable
     public DbWriter Writer { get; }
 
     public SqliteRealmQueries Queries { get; }
+
+    /// <summary>The Live roster over the rig's database (D113).</summary>
+    public RosterService Roster { get; }
 
     /// <summary>The columns that make a stored trip comparable from one run to another (everything but its generated id).</summary>
     public const string TripColumns =
