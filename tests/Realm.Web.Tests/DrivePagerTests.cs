@@ -311,6 +311,8 @@ public sealed class DrivePagerTests : ComponentTestBase
             remove => inner.Changed -= value;
         }
 
+        public IRosterEditor Roster => inner.Roster;
+
         public TimeProvider Time => inner.Time;
 
         public TimeZoneInfo Zone => inner.Zone;
