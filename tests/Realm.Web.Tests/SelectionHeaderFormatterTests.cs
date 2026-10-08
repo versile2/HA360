@@ -377,6 +377,48 @@ public sealed class SelectionHeaderFormatterTests
 
     // ---- the detail strings ---------------------------------------------------------------------------------------------------------------
 
+    [Fact]
+    public void MemberCard_AddsUpdated_ForAFreshMember_AfterTheArrivalTime_AndOnTheTitleWhileDriving()
+    {
+        var jester = MemberOf(DemoCast.Jester.Id);
+        var card = SelectionHeaderFormatter.MemberCard(jester, VmFactory.Member(jester, Facts), Facts);
+        Assert.Equal("Since 9:06 pm · updated 3 min ago · 1.0 mi away", card.Detail);
+
+        var queen = MemberOf(DemoCast.Queen.Id);
+        var drive = VmFactory.Member(queen, Facts);
+        var driving = SelectionHeaderFormatter.MemberCard(queen, drive, Facts);
+        Assert.StartsWith(drive.StatusLine + " · updated ", driving.Title, StringComparison.Ordinal);
+        Assert.Equal(drive.DetailLine, driving.Detail);
+    }
+
+    [Fact]
+    public void MemberCard_ReadsJustNow_UnderAMinute_AndKeepsTheArrivalLessMemberOnItsOwnUpdatedLine()
+    {
+        var fresh = MemberOf(DemoCast.King.Id) with { LastUpdateUtc = DemoNow };
+        Assert.Contains("updated just now", SelectionHeaderFormatter.MemberCard(fresh, VmFactory.Member(fresh, Facts), Facts).Detail, StringComparison.Ordinal);
+
+        var noSince = MemberOf(DemoCast.Jester.Id) with { SinceUtc = null };
+        var row = VmFactory.Member(noSince, Facts);
+        var card = SelectionHeaderFormatter.MemberCard(noSince, row, Facts);
+        Assert.Equal(row.DetailLine, card.Detail);
+        Assert.StartsWith("Updated 3 min ago", card.Detail, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(MemberStatus.Stale)]
+    [InlineData(MemberStatus.Offline)]
+    [InlineData(MemberStatus.NoFix)]
+    [InlineData(MemberStatus.Static)]
+    public void MemberCard_IsTheRowsOwn_ForStaleOfflineNoFixAndStaticMembers(MemberStatus status)
+    {
+        var member = MemberOf(DemoCast.Cryptid.Id);
+        var row = VmFactory.Member(member, Facts) with { Status = status };
+        var card = SelectionHeaderFormatter.MemberCard(member, row, Facts);
+
+        Assert.Equal(row.StatusLine, card.Title);
+        Assert.Equal(row.DetailLine, card.Detail);
+    }
+
     [Fact(DisplayName = "[AC-30b] The battery chip reads 12% · Low battery and 19% · Charging, and both parts when both apply")]
     public void BatteryChip_ReadsTheStateAfterThePercentage()
     {

@@ -496,7 +496,7 @@ test.describe('S8c: selecting from the lists', () => {
     await expect(page.locator('.realm-detail-heading .realm-detail-eyebrow'), 'the eyebrow is the lore title (drawn in capitals by the style)').toHaveText(jester.lore);
     await expect(page.locator('.realm-detail-updated'), 'no freshness line in the header (D106): it lives in the status card').toHaveCount(0);
     await expect(page.locator('.realm-detail-status-line'), 'the status').toHaveText(`At ${hall.name}`);
-    await expect(page.locator('.realm-detail-line'), 'since, and how far away').toHaveText('Since 9:06 pm · 1.0 mi away');
+    await expect(page.locator('.realm-detail-line'), 'since, how fresh, and how far away').toHaveText('Since 9:06 pm · updated 3 min ago · 1.0 mi away');
     await expect(page.locator('.realm-detail-chips .realm-detail-chip').first(), 'the battery chip').toHaveText('12% · Low battery');
     await expect(page.locator('.realm-detail-address'), 'the address of the cast').toHaveText(jester.address ?? '');
 
