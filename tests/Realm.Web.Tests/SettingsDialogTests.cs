@@ -14,7 +14,7 @@ namespace Realm.Web.Tests;
 
 /// <summary>
 /// The Settings dialog (01 sections 7.9 and 8.9) opened as the Settings tab of the bottom nav opens it, with IDialogService into a MudDialogProvider, and the device preferences behind it
-/// (<see cref="DevicePrefs"/>) against a fake browser storage: the four sections and every string, the rows that must not exist (theme, units, week start, reset), the
+/// (<see cref="DevicePrefs"/>) against a fake browser storage: the five sections and every string, the rows that must not exist (theme, units, week start, reset), the
 /// Diagnostics row and where it points, the Connections chips of the session, and that a choice is current at once and stored under its key. Esc, the scrim and the
 /// full-screen layout below 600 px are CSS and keys that only a browser exercises (the Playwright gallery shows both sizes).
 /// </summary>
@@ -34,11 +34,11 @@ public sealed class SettingsDialogTests : ComponentTestBase
     // ---- the anatomy ---------------------------------------------------------------------------------------------------------------------------
 
     [Fact]
-    public async Task TheDialog_HasTheFourSections_TheTitleAndTheSubtitle()
+    public async Task TheDialog_HasTheFiveSections_TheTitleAndTheSubtitle()
     {
         var cut = await OpenAsync();
 
-        Assert.Equal(["Map", "Appearance", "Connections", "About"], Texts(cut, ".realm-settings__section h3"));
+        Assert.Equal(["Who's on the map", "Map", "Appearance", "Connections", "About"], Texts(cut, ".realm-settings__section h3"));
         Assert.Equal("Settings", cut.Find(".realm-popup__title").TextContent);
         Assert.Equal("Royal decrees", cut.Find(".realm-settings__subtitle").TextContent);
         Assert.Single(cut.FindAll("[data-testid='settings-dialog']"));
