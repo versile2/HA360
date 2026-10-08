@@ -23,7 +23,7 @@ public sealed class SheetSelectionHeaderTests : ComponentTestBase
 
     private const string Battery = "[data-testid='sheet-selection-battery']";
 
-    private static readonly IRealmSession Session = new DemoRealmSessionFactory().Create(null);
+    private static readonly IRealmSession Session = FullCast.Session(null);
 
     private static readonly RealmSnapshot Demo = Session.Current;
 

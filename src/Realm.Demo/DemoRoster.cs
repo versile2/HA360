@@ -22,7 +22,21 @@ public sealed class DemoRoster : IRosterEditor
     };
 
     private readonly object _gate = new();
-    private IReadOnlyList<RosterEntry> _entries = Seed();
+    private IReadOnlyList<RosterEntry> _entries;
+
+    /// <summary>The roster a Demo session starts with (see the class remarks).</summary>
+    public DemoRoster()
+        : this(everyone: false)
+    {
+    }
+
+    private DemoRoster(bool everyone) => _entries = Seed(everyone);
+
+    /// <summary>
+    /// A roster with all seven roles on the map: the prince under People and the hatchback under Vehicles, as the Demo of 0.1 showed them. For tests that
+    /// need the whole cast; the Demo itself starts with the prince and the hatchback under Not tracked.
+    /// </summary>
+    public static DemoRoster EveryoneOnTheMap() => new(everyone: true);
 
     /// <inheritdoc />
     public IReadOnlyList<RosterEntry> Entries
@@ -63,7 +77,7 @@ public sealed class DemoRoster : IRosterEditor
         Changed?.Invoke();
     }
 
-    private static IReadOnlyList<RosterEntry> Seed()
+    private static IReadOnlyList<RosterEntry> Seed(bool everyone)
     {
         var anchor = DemoDataSource.Anchor;
         const string both = "Home Assistant + Life360";
@@ -78,8 +92,12 @@ public sealed class DemoRoster : IRosterEditor
             Person("person.jester", DemoCast.Jester, "Life360", RosterGroup.People, 2),
             Person("person.cryptid", DemoCast.Cryptid, "Life360", RosterGroup.People, 3),
             new RosterEntry("device_tracker.wagon", RosterKind.Tracker, RosterGroup.Vehicles, DemoCast.Wagon.Name, DemoCast.Wagon.Lore, "#A5B4FC", 0, "Home Assistant", anchor.AddDays(-60), anchor, null),
-            Person("person.prince", DemoCast.Prince, "Home Assistant", RosterGroup.NotTracked, 0, autoMoved: anchor.AddDays(-2)),
-            new RosterEntry("device_tracker.hatchback", RosterKind.Tracker, RosterGroup.NotTracked, DemoCast.Chariot.Name, DemoCast.Chariot.Lore, "#F9A8D4", 1, "Home Assistant", anchor.AddDays(-60), anchor.AddDays(-20), null),
+            everyone
+                ? Person("person.prince", DemoCast.Prince, "Home Assistant", RosterGroup.People, 4)
+                : Person("person.prince", DemoCast.Prince, "Home Assistant", RosterGroup.NotTracked, 0, autoMoved: anchor.AddDays(-2)),
+            everyone
+                ? new RosterEntry("device_tracker.hatchback", RosterKind.Tracker, RosterGroup.Vehicles, DemoCast.Chariot.Name, DemoCast.Chariot.Lore, "#F9A8D4", 1, "Home Assistant", anchor.AddDays(-60), anchor.AddDays(-20), null)
+                : new RosterEntry("device_tracker.hatchback", RosterKind.Tracker, RosterGroup.NotTracked, DemoCast.Chariot.Name, DemoCast.Chariot.Lore, "#F9A8D4", 1, "Home Assistant", anchor.AddDays(-60), anchor.AddDays(-20), null),
         ]);
     }
 }

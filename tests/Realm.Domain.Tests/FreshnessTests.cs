@@ -182,7 +182,7 @@ public class FreshnessTests
         Assert.Equal(TimeSpan.FromMinutes(90), FreshnessRules.Heartbeat(new[] { times }, uiStaleAfterMinutes: 45));
     }
 
-    // The fixture's vehicle was refreshed 20 minutes before the clock: Fresh, because the 45-minute floor exceeds FordPass's 20-minute poll.
+    // The fixture's vehicle was refreshed 20 minutes before the clock: Fresh, because the 45-minute threshold exceeds 20 minutes.
     [Theory]
     [InlineData(0, Freshness.Fresh)]
     [InlineData(20 * 60, Freshness.Fresh)]

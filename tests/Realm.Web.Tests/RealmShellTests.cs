@@ -342,6 +342,8 @@ public sealed class RealmShellTests : ComponentTestBase
             remove => inner.Changed -= value;
         }
 
+        public IRosterEditor Roster => inner.Roster;
+
         public TimeProvider Time
         {
             get

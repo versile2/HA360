@@ -137,10 +137,10 @@ public sealed class SettingsDialogTests : ComponentTestBase
         var cut = await OpenAsync(session);
 
         Assert.Equal(
-            ["Home Assistant", "Life360", "FordPass", "Second vehicle (maker's app)"],
+            ["Home Assistant", "Life360"],
             Texts(cut, ".realm-settings__connection-name"));
-        Assert.Equal(["Connected", "Connected", "Connected", "Not connected"], Texts(cut, ".realm-settings__chip"));
-        Assert.Equal(["Last sync just now", "Last sync just now", "Last sync just now"], Texts(cut, ".realm-settings__connection .realm-settings__help"));
+        Assert.Equal(["Connected", "Connected"], Texts(cut, ".realm-settings__chip"));
+        Assert.Equal(["Last sync just now", "Last sync just now"], Texts(cut, ".realm-settings__connection .realm-settings__help"));
     }
 
     [Theory]
@@ -536,6 +536,8 @@ public sealed class SettingsDialogTests : ComponentTestBase
             add { }
             remove { }
         }
+
+        public IRosterEditor Roster => inner.Roster;
 
         public TimeProvider Time => inner.Time;
 

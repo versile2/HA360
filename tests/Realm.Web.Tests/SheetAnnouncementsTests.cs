@@ -15,7 +15,7 @@ namespace Realm.Web.Tests;
 /// </summary>
 public sealed class SheetAnnouncementsTests
 {
-    private static readonly RealmSnapshot Demo = new DemoRealmSessionFactory().Create(null).Current;
+    private static readonly RealmSnapshot Demo = FullCast.Session(null).Current;
 
     private static readonly EntityRef Jester = new(EntityKind.Member, DemoCast.Jester.Id);
     private static readonly EntityRef King = new(EntityKind.Member, DemoCast.King.Id);

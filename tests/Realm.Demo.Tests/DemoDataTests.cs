@@ -14,7 +14,16 @@ public class DemoDataTests
 {
     private static readonly DateTimeOffset Now = DateTimeOffset.Parse("2026-09-30T21:25:00-05:00", CultureInfo.InvariantCulture);
 
-    private static IRealmSession NewSession() => new DemoRealmSessionFactory().Create(null);
+    // Most of these tests describe the whole fixture of 02 section 9.3, so they start from the roster that has all seven roles on the map (the prince and the hatchback included).
+    // The default roster of the Demo (four people, the wagon, two under Not tracked) has its own tests at the end of the file.
+    private static IRealmSession NewSession() => FullCast(null);
+
+    private static IRealmSession FullCast(DemoUrlParams? demo)
+    {
+        var variants = DemoVariants.Parse(demo?.Variants);
+        var start = demo?.Now ?? DemoDataSource.Anchor;
+        return new DemoRealmSession(new DemoDataSource(new DemoTimeProvider(start, variants.HaDown), variants, DemoRoster.EveryoneOnTheMap()));
+    }
 
     private static RealmSnapshot Snapshot() => NewSession().Current;
 
@@ -67,7 +76,7 @@ public class DemoDataTests
 
         foreach (var member in snapshot.Members)
         {
-            var cast = DemoCast.Members.Single(c => c.Id == member.Id);
+            var cast = DemoCast.AllMembers.Single(c => c.Id == member.Id);
 
             Assert.Equal(cast.Name, member.DisplayName);
             Assert.Equal(cast.Lore, member.LoreTitle);
@@ -99,16 +108,14 @@ public class DemoDataTests
     }
 
     [Fact]
-    public void Connections_are_the_four_names_with_three_connected_and_the_placeholder_not()
+    public void Connections_are_the_two_names_and_both_are_connected()
     {
         var connections = Snapshot().Connections;
 
-        Assert.Equal("HomeAssistant,Life360Trackers,FordPass,VehiclePlaceholder", string.Join(",", connections.Select(c => c.Name)));
-        Assert.Equal("Connected,Connected,Connected,NotConnected", string.Join(",", connections.Select(c => c.State)));
+        Assert.Equal("HomeAssistant,Life360Trackers", string.Join(",", connections.Select(c => c.Name)));
+        Assert.Equal("Connected,Connected", string.Join(",", connections.Select(c => c.State)));
         Assert.Equal(Now, connections[0].LastSyncUtc);
         Assert.Equal(Now, connections[1].LastSyncUtc);
-        Assert.Equal(Now, connections[2].LastSyncUtc);
-        Assert.Null(connections[3].LastSyncUtc);
     }
 
     // ---- members: 02 section 9.3, row by row -----------------------------------------------------------------
@@ -266,9 +273,9 @@ public class DemoDataTests
 
     // ---- vehicles -------------------------------------------------------------------------------------------
 
-    // 02 section 9.3: the pickup is 7.78 m from the king, inside home, ignition off, 71% fuel, 18 432 mi, last update 21:05.
+    // 02 section 9.3: the pickup is 7.78 m from the king, inside home, standing still, last update 21:05.
     [Fact]
-    public void Wagon_is_parked_at_home_with_the_ignition_off()
+    public void Wagon_is_parked_at_home()
     {
         var snapshot = Snapshot();
         var king = snapshot.Members.Single(m => m.Id == "king");
@@ -281,39 +288,26 @@ public class DemoDataTests
         Assert.InRange(Geo.DistanceM(king.Lat!.Value, king.Lon!.Value, wagon.Lat!.Value, wagon.Lon!.Value), 7.7, 7.9);
         Assert.Equal("home", wagon.PlaceId);
         Assert.Null(wagon.Street);
-        Assert.Equal(IgnitionState.Off, wagon.Ignition);
-        Assert.Null(wagon.RemoteStartSecondsLeft);
         Assert.Equal(0.0, wagon.SpeedMps);
         Assert.False(wagon.IsMoving);
-        Assert.Equal(71, wagon.FuelPct);
-        Assert.InRange(wagon.OdometerM!.Value, 29_663_428.0, 29_663_429.0);
         Assert.Equal(LocalTime(21, 5), wagon.LastUpdateUtc);
         Assert.Equal(Freshness.Fresh, wagon.Freshness);
-        Assert.False(wagon.IsPlaceholder);
-        Assert.Null(wagon.PlaceholderNote);
     }
 
-    // The second vehicle is a placeholder: no position, no sensors, never connected.
+    // The hatchback is a tracker that has not reported for 20 days: parked near home, stale, not moving.
     [Fact]
-    public void Chariot_is_a_placeholder_with_no_position()
+    public void Chariot_is_a_stale_tracker_near_home()
     {
         var chariot = Vehicle("chariot");
 
         Assert.Equal("The Queen's Chariot", chariot.LoreTitle);
         Assert.Equal(VehicleGlyph.Car, chariot.Glyph);
-        Assert.True(chariot.IsPlaceholder);
-        Assert.Equal("Awaiting the royal scribes (the maker's app)", chariot.PlaceholderNote);
-        Assert.Equal(DemoCast.ChariotNote, chariot.PlaceholderNote);
-        Assert.Null(chariot.Lat);
-        Assert.Null(chariot.Lon);
-        Assert.Null(chariot.PlaceId);
-        Assert.Null(chariot.Ignition);
-        Assert.Null(chariot.FuelPct);
-        Assert.Null(chariot.OdometerM);
-        Assert.Null(chariot.LastUpdateUtc);
-        Assert.Null(chariot.SpeedMps);
+        Assert.Equal(31.0995, chariot.Lat);
+        Assert.Equal(-85.3405, chariot.Lon);
+        Assert.Equal(Now.AddDays(-20), chariot.LastUpdateUtc);
+        Assert.Equal(0.0, chariot.SpeedMps);
         Assert.False(chariot.IsMoving);
-        Assert.Equal(Freshness.NoFix, chariot.Freshness);
+        Assert.Equal(Freshness.Stale, chariot.Freshness);
     }
 
     // ---- places ---------------------------------------------------------------------------------------------
@@ -428,7 +422,7 @@ public class DemoDataTests
     public void A_later_now_ages_the_fixes_without_moving_them()
     {
         var later = Now.AddMinutes(10);
-        var session = new DemoRealmSessionFactory().Create(new DemoUrlParams(later, []));
+        var session = FullCast(new DemoUrlParams(later, []));
         var snapshot = session.Current;
 
         Assert.Equal(later, session.Time.GetUtcNow());
@@ -443,7 +437,7 @@ public class DemoDataTests
     [Fact]
     public void An_hour_later_every_live_member_is_stale_and_nobody_is_driving()
     {
-        var session = new DemoRealmSessionFactory().Create(new DemoUrlParams(Now.AddHours(1), []));
+        var session = FullCast(new DemoUrlParams(Now.AddHours(1), []));
         var members = session.Current.Members;
 
         Assert.Equal("Stale,Stale,Stale,Stale,Static", string.Join(",", members.Select(m => m.Freshness)));
@@ -538,7 +532,7 @@ public class DemoDataTests
     ];
 
     private static IRealmSession SessionWith(string variants, DateTimeOffset? now = null) =>
-        new DemoRealmSessionFactory().Create(new DemoUrlParams(now, variants.Length == 0 ? [] : variants.Split(',')));
+        FullCast(new DemoUrlParams(now, variants.Length == 0 ? [] : variants.Split(',')));
 
     private static async Task<WeekReportVm> ReportOf(string variants, int week, DayOfWeek weekStart = DayOfWeek.Monday) =>
         await SessionWith(variants).GetWeekReportAsync(week, weekStart, CancellationToken.None);
@@ -654,7 +648,7 @@ public class DemoDataTests
             var report = await session.GetWeekReportAsync(week, DayOfWeek.Monday, CancellationToken.None);
             lines.Add($"week {week} {Text(report.Start)} {Text(report.End)}");
             lines.Add(Figures(report));
-            foreach (var id in DemoCast.Members.Select(m => m.Id))
+            foreach (var id in DemoCast.AllMembers.Select(m => m.Id))
             {
                 var driverWeek = await session.GetDriverWeekAsync(id, week, DayOfWeek.Monday, CancellationToken.None);
                 lines.Add(driverWeek is null
@@ -1560,7 +1554,7 @@ public class DemoDataTests
         var session = SessionWith("all-sources,phone-unavailable,life360-down,ha-down,poor-accuracy,no-fix,all-near,empty-week,fresh-install");
         var report = await session.GetWeekReportAsync(1, DayOfWeek.Monday, CancellationToken.None);
 
-        Assert.Equal("Unavailable,Unavailable,Connected,NotConnected", string.Join(",", session.Current.Connections.Select(c => c.State)));
+        Assert.Equal("Unavailable,Unavailable", string.Join(",", session.Current.Connections.Select(c => c.State)));
         Assert.Equal(WeekCoverage.Partial, report.Coverage);
         Assert.Equal(45, report.Totals.Drives);
         Assert.Null(report.Events[EventKeys.Speeding].Total);
@@ -1576,7 +1570,7 @@ public class DemoDataTests
         var snapshot = SessionWith("life360-down").Current;
         var normal = Snapshot();
 
-        Assert.Equal("Connected,Unavailable,Connected,NotConnected", string.Join(",", snapshot.Connections.Select(c => c.State)));
+        Assert.Equal("Connected,Unavailable", string.Join(",", snapshot.Connections.Select(c => c.State)));
         Assert.All(snapshot.Members.Where(m => m.Kind == MemberKind.Live), m =>
         {
             Assert.Null(m.Street);
@@ -1603,7 +1597,7 @@ public class DemoDataTests
     {
         var connections = SessionWith("ha-down").Current.Connections;
 
-        Assert.Equal("Unavailable,Connected,Connected,NotConnected", string.Join(",", connections.Select(c => c.State)));
+        Assert.Equal("Unavailable,Connected", string.Join(",", connections.Select(c => c.State)));
         Assert.InRange(connections[0].LastSyncUtc!.Value, Now, Now.AddSeconds(30));
     }
 
@@ -1681,7 +1675,7 @@ public class DemoDataTests
         session.RestoreHomeAssistant();
 
         Assert.Equal(1, raised);
-        Assert.Equal("Connected,Connected,Connected,NotConnected", string.Join(",", session.Current.Connections.Select(c => c.State)));
+        Assert.Equal("Connected,Connected", string.Join(",", session.Current.Connections.Select(c => c.State)));
     }
 
     // Without ha-down the clock is frozen and nothing changes: Changed is never raised, even with a very short tick.
@@ -1697,6 +1691,103 @@ public class DemoDataTests
         session.RestoreHomeAssistant();
 
         Assert.Equal(0, Volatile.Read(ref raised));
+    }
+
+    // ---- the roster (D113): who is on the map ---------------------------------------------------------------------
+
+    private static IRealmSession DefaultSession() => new DemoRealmSessionFactory().Create(null);
+
+    [Fact]
+    public void The_default_roster_is_four_people_the_wagon_and_two_examples_under_Not_tracked()
+    {
+        var session = (DemoRealmSession)DefaultSession();
+
+        var entries = session.Roster.Entries;
+
+        Assert.Equal(["person.king", "person.queen", "person.jester", "person.cryptid"], entries.Where(e => e.Group == RosterGroup.People).Select(e => e.EntityId));
+        Assert.Equal(["device_tracker.wagon"], entries.Where(e => e.Group == RosterGroup.Vehicles).Select(e => e.EntityId));
+        Assert.Equal(["person.prince", "device_tracker.hatchback"], entries.Where(e => e.Group == RosterGroup.NotTracked).Select(e => e.EntityId));
+        Assert.NotNull(entries.Single(e => e.EntityId == "person.prince").AutoMovedUtc);
+        Assert.Null(entries.Single(e => e.EntityId == "device_tracker.hatchback").AutoMovedUtc);
+    }
+
+    [Fact]
+    public void The_default_snapshot_shows_the_people_and_the_vehicle_of_the_roster_only()
+    {
+        var session = (DemoRealmSession)DefaultSession();
+
+        var snapshot = session.Current;
+
+        Assert.Equal("king,queen,jester,cryptid", string.Join(",", snapshot.Members.Select(m => m.Id)));
+        Assert.Equal("wagon", Assert.Single(snapshot.Vehicles).Id);
+        Assert.Equal("Connected,Connected", string.Join(",", snapshot.Connections.Select(c => c.State)));
+        Assert.Equal("Alden,Briar,Cass,Dara", string.Join(",", snapshot.Members.Select(m => m.DisplayName)));
+    }
+
+    [Fact]
+    public async Task Moving_an_entry_out_of_Not_tracked_puts_it_on_the_map_and_raises_Changed()
+    {
+        await using var session = (DemoRealmSession)DefaultSession();
+        var raised = 0;
+        session.Changed += () => raised++;
+
+        await session.Roster.MoveAsync("person.prince", RosterGroup.People);
+        await session.Roster.MoveAsync("device_tracker.hatchback", RosterGroup.Vehicles);
+
+        Assert.Equal(2, raised);
+        Assert.Equal("king,queen,jester,cryptid,prince", string.Join(",", session.Current.Members.Select(m => m.Id)));
+        Assert.Equal("wagon,chariot", string.Join(",", session.Current.Vehicles.Select(v => v.Id)));
+        Assert.Null(session.Roster.Entries.Single(e => e.EntityId == "person.prince").AutoMovedUtc);
+    }
+
+    [Fact]
+    public async Task Moving_an_entry_to_Not_tracked_takes_it_off_the_map()
+    {
+        await using var session = (DemoRealmSession)DefaultSession();
+
+        await session.Roster.MoveAsync("person.queen", RosterGroup.NotTracked);
+        await session.Roster.MoveAsync("device_tracker.wagon", RosterGroup.NotTracked);
+
+        Assert.DoesNotContain(session.Current.Members, m => m.Id == "queen");
+        Assert.Empty(session.Current.Vehicles);
+        Assert.Equal(4, session.Roster.Entries.Count(e => e.Group == RosterGroup.NotTracked));
+    }
+
+    [Fact]
+    public async Task A_person_can_be_moved_to_Vehicles_and_a_tracker_to_People()
+    {
+        await using var session = (DemoRealmSession)DefaultSession();
+
+        await session.Roster.MoveAsync("person.jester", RosterGroup.Vehicles);
+        await session.Roster.MoveAsync("device_tracker.wagon", RosterGroup.People);
+
+        Assert.Contains(session.Current.Vehicles, v => v.Id == "jester");
+        Assert.Contains(session.Current.Members, m => m.Id == "wagon" && m.Kind == MemberKind.Live);
+    }
+
+    [Fact]
+    public async Task A_rename_a_title_and_a_colour_reach_the_snapshot()
+    {
+        await using var session = (DemoRealmSession)DefaultSession();
+
+        await session.Roster.UpdateAsync("person.king", "Alden the Bold", "The Old King", "#5cc8ff");
+
+        var king = session.Current.Members.Single(m => m.Id == "king");
+        Assert.Equal("Alden the Bold", king.DisplayName);
+        Assert.Equal("The Old King", king.LoreTitle);
+        Assert.Equal("#5CC8FF", king.Color);
+    }
+
+    [Fact]
+    public async Task The_roster_of_one_session_is_not_the_roster_of_another()
+    {
+        await using var first = (DemoRealmSession)DefaultSession();
+        await using var second = (DemoRealmSession)DefaultSession();
+
+        await first.Roster.MoveAsync("person.king", RosterGroup.NotTracked);
+
+        Assert.Equal(RosterGroup.People, second.Roster.Entries.Single(e => e.EntityId == "person.king").Group);
+        Assert.Contains(second.Current.Members, m => m.Id == "king");
     }
 
     // ---- no network (02 section 9.7) ---------------------------------------------------------------------------

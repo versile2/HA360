@@ -22,7 +22,7 @@ public sealed class LiveDiagnosticsEndpointTests
         "schema", "version", "mode", "uptimeSeconds", "zone", "zoneDataOk", "circuits", "connections", "counts", "ha", "ingestion", "db", "members", "warnings",
     ];
 
-    private static readonly string[] NineCodes =
+    private static readonly string[] EightCodes =
     [
         WarningCodes.HaUnavailable,
         WarningCodes.HaAuthFailed,
@@ -32,7 +32,6 @@ public sealed class LiveDiagnosticsEndpointTests
         WarningCodes.UncleanShutdown,
         WarningCodes.ZoneDataMissing,
         WarningCodes.PayloadSchemaMismatch,
-        WarningCodes.VehicleSensorStale,
     ];
 
     [Fact(DisplayName = "[X-09] GET diagnostics.json returns the schema of 2.11 in Live with mode live")]
@@ -112,7 +111,7 @@ public sealed class LiveDiagnosticsEndpointTests
         var root = document.RootElement;
         var warnings = root.GetProperty("warnings").EnumerateArray().Select(warning => warning.GetString()).ToArray();
 
-        Assert.All(warnings, code => Assert.Contains(code, NineCodes));
+        Assert.All(warnings, code => Assert.Contains(code, EightCodes));
         Assert.Equal(warnings.Distinct(StringComparer.Ordinal).Count(), warnings.Length);
 
         // Whatever else the first moments of a host raise, the connection is not refused and nothing was shut down badly on a database that is new.
@@ -122,7 +121,6 @@ public sealed class LiveDiagnosticsEndpointTests
         Assert.DoesNotContain(WarningCodes.IngestDrops, warnings);
         Assert.DoesNotContain(WarningCodes.WriterQueueOver80Pct, warnings);
         Assert.DoesNotContain(WarningCodes.PayloadSchemaMismatch, warnings);
-        Assert.DoesNotContain(WarningCodes.VehicleSensorStale, warnings);
 
         // The zone flag and its warning say the same thing, whether or not the machine of the test has zone data.
         Assert.Equal(!root.GetProperty("zoneDataOk").GetBoolean(), warnings.Contains(WarningCodes.ZoneDataMissing));

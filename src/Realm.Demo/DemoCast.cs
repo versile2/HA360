@@ -88,4 +88,10 @@ public static class DemoCast
 
     /// <summary>The vehicle the demo roster starts with. The chariot starts under Not tracked.</summary>
     public static readonly IReadOnlyList<DemoVehicle> Vehicles = [Wagon];
+
+    /// <summary>All five people of the fixture in sort order, the prince included (he starts under Not tracked).</summary>
+    public static readonly IReadOnlyList<DemoMember> AllMembers = [King, Queen, Jester, Cryptid, Prince];
+
+    /// <summary>Both vehicles of the fixture in sort order, the chariot included (it starts under Not tracked).</summary>
+    public static readonly IReadOnlyList<DemoVehicle> AllVehicles = [Wagon, Chariot];
 }

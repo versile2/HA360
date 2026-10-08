@@ -50,14 +50,15 @@ public sealed class DemoDataSource
 
     /// <param name="time">The session's clock; the snapshot is evaluated at its current instant.</param>
     /// <param name="variants">The active variants; null for the default fixture.</param>
-    public DemoDataSource(TimeProvider time, DemoVariants? variants = null)
+    /// <param name="roster">The roster to start from; null for the default one (<see cref="DemoRoster"/>).</param>
+    public DemoDataSource(TimeProvider time, DemoVariants? variants = null, DemoRoster? roster = null)
     {
         Time = time;
         Variants = variants ?? DemoVariants.None;
         Zone = TimeZoneInfo.FindSystemTimeZoneById(ZoneId);
         _driving = new DemoDrivingData(Variants, Zone);
         _startedUtc = time.GetUtcNow();
-        Roster = new DemoRoster();
+        Roster = roster ?? new DemoRoster();
     }
 
     /// <summary>The roster of this session: in memory, editable from Settings.</summary>

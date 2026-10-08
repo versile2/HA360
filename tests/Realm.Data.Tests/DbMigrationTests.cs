@@ -36,11 +36,12 @@ public class DbMigrationTests
             C("battery_pct", "INTEGER"), C("charging", "INTEGER"), C("driving", "INTEGER"), C("address", "TEXT"),
             C("track", "INTEGER", notNull: true, dflt: "1"), C("reason", "TEXT"),
         ],
-        ["vehicle_samples"] =
+        ["roster"] =
         [
-            C("id", "INTEGER", pk: 1), C("vehicle_id", "TEXT", notNull: true), C("ts", "INTEGER", notNull: true),
-            C("odo_m", "REAL"), C("fuel_pct", "INTEGER"), C("ignition", "TEXT"), C("gear", "TEXT"),
-            C("speed_mps", "REAL"), C("remote_start_s", "INTEGER"), C("lat", "REAL"), C("lon", "REAL"),
+            C("entity_id", "TEXT", pk: 1), C("kind", "TEXT", notNull: true), C("grp", "TEXT", notNull: true),
+            C("display_name", "TEXT", notNull: true), C("lore_title", "TEXT"), C("color", "TEXT", notNull: true),
+            C("sort_order", "INTEGER", notNull: true), C("source", "TEXT", notNull: true),
+            C("first_seen", "INTEGER", notNull: true), C("last_active", "INTEGER", notNull: true), C("auto_moved_at", "INTEGER"),
         ],
         ["signals"] =
         [
@@ -91,7 +92,7 @@ public class DbMigrationTests
         ["meta"] = ["pk unique (key)"],
         ["members"] = ["pk unique (id)"],
         ["fixes"] = ["u unique (member_id, ts, source)"],
-        ["vehicle_samples"] = ["u unique (vehicle_id, ts)"],
+        ["roster"] = ["pk unique (entity_id)"],
         ["signals"] = ["u unique (member_id, ts, kind)"],
         ["vehicle_drives"] = ["u unique (vehicle_id, start_ts)"],
         ["trips"] = ["u unique (member_id, start_ts)", "c ix_trips_start plain (start_ts)"],
@@ -107,7 +108,7 @@ public class DbMigrationTests
         ["meta"] = [],
         ["members"] = [],
         ["fixes"] = [ToMembers],
-        ["vehicle_samples"] = [],
+        ["roster"] = [],
         ["signals"] = [ToMembers],
         ["vehicle_drives"] = [],
         ["trips"] = [ToMembers, "vehicle_drive_id -> vehicle_drives.id (update NO ACTION, delete NO ACTION)"],
@@ -137,6 +138,35 @@ public class DbMigrationTests
         Assert.Contains("Sql/0001_init.sql", typeof(SchemaRunner).Assembly.GetManifestResourceNames());
         Assert.Contains(scripts, s => s.Version == 1 && s.Name == "Sql/0001_init.sql" && s.Sql.Contains("CREATE TABLE meta"));
         Assert.Equal(scripts.Select(s => s.Version).Order().ToArray(), scripts.Select(s => s.Version).ToArray());
+    }
+
+    [Fact]
+    public void The_roster_script_is_embedded_as_Sql_0002_roster_sql()
+    {
+        var scripts = SchemaRunner.LoadEmbeddedScripts();
+
+        Assert.Contains("Sql/0002_roster.sql", typeof(SchemaRunner).Assembly.GetManifestResourceNames());
+        Assert.Contains(scripts, s => s.Version == 2 && s.Name == "Sql/0002_roster.sql" && s.Sql.Contains("CREATE TABLE roster", StringComparison.Ordinal));
+    }
+
+    // 0.2.0 (D114): a database of 0.1 has vehicle_samples; the new script drops it and adds the roster, and keeps everything else.
+    [Fact]
+    public void Upgrading_from_the_first_script_drops_vehicle_samples_and_adds_the_roster()
+    {
+        using var db = new TempDatabase();
+        using var connection = RealmDb.OpenConnection(db.FilePath, pooling: false);
+        var scripts = SchemaRunner.LoadEmbeddedScripts();
+        Assert.Equal(1, SchemaRunner.Apply(connection, scripts.Where(s => s.Version == 1).ToArray(), NullLogger.Instance));
+        Exec(connection, "INSERT INTO members(id, first_seen_utc, last_configured_utc) VALUES ('king', 1, 2)");
+        Exec(connection, "INSERT INTO vehicle_samples(vehicle_id, ts, fuel_pct) VALUES ('wagon', 1, 55)");
+        Assert.Equal(1, ScalarInt(connection, "SELECT count(*) FROM vehicle_samples"));
+
+        var version = SchemaRunner.Apply(connection, scripts, NullLogger.Instance);
+
+        Assert.Equal(HighestScriptNumber(), version);
+        Assert.Equal(0, ScalarInt(connection, "SELECT count(*) FROM sqlite_master WHERE name = 'vehicle_samples'"));
+        Assert.Equal(1, ScalarInt(connection, "SELECT count(*) FROM sqlite_master WHERE name = 'roster'"));
+        Assert.Equal(1, ScalarInt(connection, "SELECT count(*) FROM members"));
     }
 
     [Fact]
@@ -275,6 +305,13 @@ public class DbMigrationTests
     [InlineData("trip_events.kind", "speeding", true)]
     [InlineData("trip_events.kind", "phone", true)]
     [InlineData("trip_events.kind", "braking", false)]
+    [InlineData("roster.kind", "person", true)]
+    [InlineData("roster.kind", "tracker", true)]
+    [InlineData("roster.kind", "vehicle", false)]
+    [InlineData("roster.grp", "people", true)]
+    [InlineData("roster.grp", "vehicles", true)]
+    [InlineData("roster.grp", "not_tracked", true)]
+    [InlineData("roster.grp", "hidden", false)]
     public void Check_constraints_accept_only_the_listed_values(string column, string value, bool accepted)
     {
         using var db = new TempDatabase();
@@ -291,6 +328,8 @@ public class DbMigrationTests
             "trips.quality" => InsertTrip(quality: value),
             "trips.ended_by" => InsertTrip(endedBy: value),
             "trip_events.kind" => $"INSERT INTO trip_events(trip_id, kind, start_ts, end_ts) VALUES (1, '{value}', 0, 1)",
+            "roster.kind" => $"INSERT INTO roster(entity_id, kind, grp, display_name, color, sort_order, source, first_seen, last_active) VALUES ('person.a', '{value}', 'people', 'A', '#E8BC4E', 0, 'Home Assistant', 1, 2)",
+            "roster.grp" => $"INSERT INTO roster(entity_id, kind, grp, display_name, color, sort_order, source, first_seen, last_active) VALUES ('person.a', 'person', '{value}', 'A', '#E8BC4E', 0, 'Home Assistant', 1, 2)",
             _ => throw new ArgumentOutOfRangeException(nameof(column), column, "No such check constraint in 02 section 7.2"),
         };
 

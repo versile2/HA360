@@ -372,6 +372,8 @@ public sealed class DriverWeekPageTests : ComponentTestBase
             remove => _inner.Changed -= value;
         }
 
+        public IRosterEditor Roster => _inner.Roster;
+
         public TimeProvider Time => _inner.Time;
 
         public TimeZoneInfo Zone => _inner.Zone;

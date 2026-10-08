@@ -113,7 +113,7 @@ public sealed class PayloadContractTests
     // File name -> JSON. One entry per shape of payloadShape.mjs that C# writes or reads (SelectionPayload is S8's).
     private static async Task<Dictionary<string, string>> BuildGoldensAsync()
     {
-        await using var session = new DemoRealmSessionFactory().Create(null);
+        await using var session = FullCast.Session(null);
         var snapshot = session.Current;
         var now = session.Time.GetUtcNow();
         var options = MapPayloadOptions.Default;

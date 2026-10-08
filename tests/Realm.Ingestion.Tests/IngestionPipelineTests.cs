@@ -347,17 +347,15 @@ public sealed class IngestionPipelineTests : IDisposable
     // ---- connections -----------------------------------------------------------------------------------------------
 
     [Fact]
-    public async Task TheSnapshot_HasExactlyTheFourConnections_InOrder()
+    public async Task TheSnapshot_HasExactlyTheTwoConnections_InOrder()
     {
         var rig = NewRig();
 
         await rig.DiscoverAsync(Plans.Member("king", life360: Plans.KingTracker));
 
         Assert.Equal(
-            new[] { ConnectionNames.HomeAssistant, ConnectionNames.Life360Trackers, ConnectionNames.FordPass, ConnectionNames.VehiclePlaceholder },
+            new[] { ConnectionNames.HomeAssistant, ConnectionNames.Life360Trackers },
             rig.State.Current.Connections.Select(c => c.Name));
-        Assert.Equal(ConnectionState.NotConnected, rig.State.Current.Connections[3].State);
-        Assert.Equal(ConnectionState.NotConnected, rig.State.Current.Connections[2].State);   // no vehicle
     }
 
     [Fact]
@@ -690,73 +688,74 @@ public sealed class IngestionPipelineTests : IDisposable
         Assert.All(rig.Writer.Signals, s => Assert.Equal(PhoneSignalKind.Screen, s.Signal.Kind));
     }
 
-    [Fact]
-    public async Task AFordPassVehicle_ShowsItsSensors_AndIsQueuedAsOneSample()
-    {
-        var car = new ResolvedVehicle(
-            "wagon",
-            "Wagon",
-            null,
-            VehicleGlyph.Car,
-            false,
-            null,
-            0,
-            "fordpass_test",
-            "device_tracker.fordpass_test",
-            ["sensor.fordpass_test_odometer", "sensor.fordpass_test_fuel", "sensor.fordpass_test_lastrefresh"]);
-        var rig = NewRig();
-        await rig.DiscoverWithAsync(null, [car], Plans.Member("king", life360: Plans.KingTracker));
-        var refreshed = Start.AddMinutes(-2);
+    private static ResolvedVehicle Pickup(string trackerId = "device_tracker.pickup_gps", FixSource source = FixSource.Companion) =>
+        new("tracker_pickup_gps", "Pickup", null, VehicleGlyph.Pickup, 0, trackerId, source);
 
-        await rig.FeedAsync(
-            Entity("sensor.fordpass_test_odometer", "12000", refreshed, ("unit_of_measurement", "mi")),
-            Entity("sensor.fordpass_test_fuel", "62", refreshed),
-            Entity("sensor.fordpass_test_lastrefresh", refreshed.ToString("O"), refreshed));
+    // A vehicle is a GPS tracker (D113): it follows the tracker's position and update time, and nothing about it is stored.
+    [Fact]
+    public async Task AVehicle_FollowsItsTracker_AndIsNeverStored()
+    {
+        var rig = NewRig();
+        await rig.DiscoverWithAsync(null, [Pickup()], Plans.Member("king", life360: Plans.KingTracker));
+        var seen = Start.AddMinutes(-2);
+
+        await rig.FeedAsync(Companion("device_tracker.pickup_gps", seen, HomeLat + 0.01, HomeLon));
 
         var vehicle = Assert.Single(rig.State.Current.Vehicles);
-        Assert.Equal(62, vehicle.FuelPct);
-        Assert.Equal(12000 * 1609.344, vehicle.OdometerM);
-        Assert.Equal(refreshed, vehicle.LastUpdateUtc);
+        Assert.Equal("tracker_pickup_gps", vehicle.Id);
+        Assert.Equal(HomeLat + 0.01, vehicle.Lat);
+        Assert.Equal(HomeLon, vehicle.Lon);
+        Assert.Equal(seen, vehicle.LastUpdateUtc);
         Assert.Equal(Freshness.Fresh, vehicle.Freshness);
-        Assert.Equal(ConnectionState.Connected, rig.State.Current.Connections[2].State);
-        var sample = rig.Writer.Samples.Last();
-        Assert.Equal("wagon", sample.VehicleId);
-        Assert.Equal(refreshed, sample.Ts);
-        Assert.Equal(62, sample.FuelPct);
+        Assert.Empty(rig.Writer.Fixes);
     }
 
-    // T23 (02 section 5.10) through the whole path: the sensors, the parser and the snapshot's IsMoving (Domain VehicleRules, CR1-002).
     [Fact]
-    public async Task AVehicleIsMovingOnlyWithTheIgnitionOn_AndAFreshSpeed_T23()
+    public async Task AVehicleWithoutAFix_HasNoPositionAndNoFix()
     {
-        var car = new ResolvedVehicle(
-            "wagon",
-            "Wagon",
-            null,
-            VehicleGlyph.Car,
-            false,
-            null,
-            0,
-            "fordpass_test",
-            "device_tracker.fordpass_test",
-            ["sensor.fordpass_test_ignitionstatus", "sensor.fordpass_test_speed", "sensor.fordpass_test_lastrefresh"]);
         var rig = NewRig();
-        await rig.DiscoverWithAsync(null, [car], Plans.Member("king", life360: Plans.KingTracker));
-        var refreshed = Start.AddMinutes(-3);
-        HaEntitySnapshot Speed(string mph) => Entity("sensor.fordpass_test_speed", mph, refreshed, ("unit_of_measurement", "mph"));
 
-        // Parked with the brake on: the ignition reads ON and the speed 0.
-        await rig.FeedAsync(
-            Entity("sensor.fordpass_test_ignitionstatus", "ON", refreshed),
-            Speed("0"),
-            Entity("sensor.fordpass_test_lastrefresh", refreshed.ToString("O"), refreshed));
+        await rig.DiscoverWithAsync(null, [Pickup()], Plans.Member("king", life360: Plans.KingTracker));
+
+        var vehicle = Assert.Single(rig.State.Current.Vehicles);
+        Assert.Null(vehicle.Lat);
+        Assert.Null(vehicle.Lon);
+        Assert.Equal(Freshness.NoFix, vehicle.Freshness);
+        Assert.False(vehicle.IsMoving);
+    }
+
+    [Fact]
+    public async Task AVehicleGoesStale_AfterFortyFiveMinutes()
+    {
+        var rig = NewRig();
+        await rig.DiscoverWithAsync(null, [Pickup()], Plans.Member("king", life360: Plans.KingTracker));
+        await rig.FeedAsync(Companion("device_tracker.pickup_gps", Start, HomeLat + 0.01, HomeLon));
+
+        rig.Time.Advance(TimeSpan.FromMinutes(46));
+        rig.Pipeline.Tick();
+
+        Assert.Equal(Freshness.Stale, Assert.Single(rig.State.Current.Vehicles).Freshness);
+    }
+
+    // T23 (02 section 5.10) through the whole path: the tracker's speed, the parser and the snapshot's IsMoving (Domain VehicleRules, CR1-002).
+    [Fact]
+    public async Task AVehicleIsMovingOnlyWithAFreshSpeedAboveOneMetrePerSecond_T23()
+    {
+        var rig = NewRig();
+        await rig.DiscoverWithAsync(null, [Pickup()], Plans.Member("king", life360: Plans.KingTracker));
+        var seen = Start.AddMinutes(-3);
+        HaEntitySnapshot Moving(double mps, DateTimeOffset at, double lat) =>
+            Entity("device_tracker.pickup_gps", "not_home", at, ("latitude", lat), ("longitude", HomeLon), ("gps_accuracy", 9.0), ("speed", mps));
+
+        // Parked with a speed of 0.
+        await rig.FeedAsync(Moving(0, seen, HomeLat + 0.01));
         var parked = Assert.Single(rig.State.Current.Vehicles);
 
-        // 25 mph in a sample three minutes old.
-        await rig.FeedAsync(Speed("25"));
+        // 25 mph in a fix three minutes old.
+        await rig.FeedAsync(Moving(11.176, seen.AddSeconds(30), HomeLat + 0.011));
         var driving = Assert.Single(rig.State.Current.Vehicles);
 
-        // The same sample is twelve minutes old after nine more minutes: older than the 600 s of Vehicle.SpeedMaxAgeS.
+        // The same fix is twelve minutes old after nine more minutes: older than the 600 s of Vehicle.SpeedMaxAgeS.
         rig.Time.Advance(TimeSpan.FromMinutes(9));
         rig.Pipeline.Tick();
         var old = Assert.Single(rig.State.Current.Vehicles);
@@ -767,20 +766,6 @@ public sealed class IngestionPipelineTests : IDisposable
         Assert.Equal(11.176, driving.SpeedMps ?? double.NaN, 3);
         Assert.False(old.IsMoving);
         Assert.Null(old.SpeedMps);
-    }
-
-    [Fact]
-    public async Task APlaceholderVehicle_IsARowWithNoData_AndTheFordPassConnectionStaysNotConnected()
-    {
-        var chariot = new ResolvedVehicle("chariot", "Chariot", null, VehicleGlyph.Car, true, "Coming soon", 1, null, null, []);
-        var rig = NewRig();
-
-        await rig.DiscoverWithAsync(null, [chariot], Plans.Member("king", life360: Plans.KingTracker));
-
-        var vehicle = Assert.Single(rig.State.Current.Vehicles);
-        Assert.True(vehicle.IsPlaceholder);
-        Assert.Equal("Coming soon", vehicle.PlaceholderNote);
-        Assert.Equal(ConnectionState.NotConnected, rig.State.Current.Connections[2].State);
     }
 
     // ---- the queue and the consumer --------------------------------------------------------------------------------
@@ -996,7 +981,6 @@ public sealed class IngestionPipelineTests : IDisposable
         private readonly object _gate = new();
         private readonly List<(string MemberId, RawFix Fix, bool InTrack, TrackReason? Reason)> _fixes = [];
         private readonly List<(string MemberId, PhoneSignal Signal)> _signals = [];
-        private readonly List<VehicleSample> _samples = [];
         private readonly List<string> _trips = [];
         private readonly List<(string Key, string Value)> _metas = [];
 
@@ -1025,17 +1009,6 @@ public sealed class IngestionPipelineTests : IDisposable
                 lock (_gate)
                 {
                     return _signals.ToArray();
-                }
-            }
-        }
-
-        public IReadOnlyList<VehicleSample> Samples
-        {
-            get
-            {
-                lock (_gate)
-                {
-                    return _samples.ToArray();
                 }
             }
         }
@@ -1079,15 +1052,7 @@ public sealed class IngestionPipelineTests : IDisposable
             return true;
         }
 
-        public bool EnqueueVehicleSample(VehicleSample sample)
-        {
-            lock (_gate)
-            {
-                _samples.Add(sample);
-            }
-
-            return true;
-        }
+        public Task WriteRosterAsync(IReadOnlyList<RosterEntry> entries, CancellationToken cancellationToken = default) => Task.CompletedTask;
 
         public bool EnqueueSignal(string memberId, PhoneSignal signal)
         {
@@ -1155,6 +1120,9 @@ public sealed class IngestionPipelineTests : IDisposable
             FixRanges.Add((memberId, fromUtc, toUtc));
             return Answer<IReadOnlyList<RawFix>>([.. Fixes.Where(f => f.Ts >= fromUtc && f.Ts < toUtc).OrderBy(f => f.Ts)]);
         }
+
+        public Task<IReadOnlyList<RosterEntry>> GetRosterAsync(CancellationToken cancellationToken = default) =>
+            Answer<IReadOnlyList<RosterEntry>>([]);
 
         public Task<RawFix?> GetLatestFixAsync(string memberId, FixSource source, CancellationToken cancellationToken = default) =>
             Answer<RawFix?>(Latest.GetValueOrDefault((memberId, source)));

@@ -17,7 +17,7 @@ namespace Realm.Web.Tests;
 /// </summary>
 public sealed class SheetPartsTests : ComponentTestBase
 {
-    private static readonly RealmSnapshot Demo = new DemoRealmSessionFactory().Create(null).Current;
+    private static readonly RealmSnapshot Demo = FullCast.Session(null).Current;
 
     // ---- the handle ------------------------------------------------------------------------------------------------------------------------
 

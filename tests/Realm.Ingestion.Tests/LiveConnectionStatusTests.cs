@@ -170,14 +170,14 @@ public class LiveConnectionStatusTests
     {
         public bool EnqueueFix(string memberId, RawFix fix, bool inTrack = true, TrackReason? reason = null) => true;
 
-        public bool EnqueueVehicleSample(VehicleSample sample) => true;
-
         public bool EnqueueSignal(string memberId, PhoneSignal signal) => true;
 
         public bool EnqueueMeta(string key, string value) => true;
 
         public Task<bool> WriteTripAsync(string memberId, DetectedTrip trip, int algoVersion, string deriveHash, CancellationToken cancellationToken = default) =>
             Task.FromResult(true);
+
+        public Task WriteRosterAsync(IReadOnlyList<RosterEntry> entries, CancellationToken cancellationToken = default) => Task.CompletedTask;
 
         public Task FlushAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
@@ -195,6 +195,9 @@ public class LiveConnectionStatusTests
 
         public Task<RawFix?> GetLatestFixAsync(string memberId, FixSource source, CancellationToken cancellationToken = default) =>
             Task.FromResult<RawFix?>(null);
+
+        public Task<IReadOnlyList<RosterEntry>> GetRosterAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<RosterEntry>>([]);
 
         public Task<IReadOnlyList<DateTimeOffset>> GetFixTimesAsync(string memberId, FixSource source, DateTimeOffset fromUtc, DateTimeOffset toUtc, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<DateTimeOffset>>([]);

@@ -14,14 +14,14 @@ namespace Realm.Web.Tests;
 
 /// <summary>
 /// The body of the sheet (<see cref="SheetContent"/>, 01 sections 5.1 to 5.3): the rows of each section from the Demo cast, in the order of the spec, with the test ids of 01
-/// Appendix B and the summary's counts; the placeholder vehicle; the entity a tap raises for S8; the same markup in the bottom sheet and in the panel; and the clock and zone, which
+/// Appendix B and the summary's counts; the entity a tap raises for S8; the same markup in the bottom sheet and in the panel; and the clock and zone, which
 /// come from the parameters or the cascaded session and never from the browser. The row components themselves are covered by <see cref="MemberRowTests"/>. The body that
 /// <see cref="SheetBody.BodyOf"/> derives (D45, 01 section 5.7) is rendered through the component at the end: the list, the selection header at Peek (no back button) and the detail at
 /// Tall or in the panel, an entity that has left the lists, and the callbacks the header and the details raise.
 /// </summary>
 public sealed class SheetContentTests : ComponentTestBase
 {
-    private static readonly IRealmSession Session = new DemoRealmSessionFactory().Create(null);
+    private static readonly IRealmSession Session = FullCast.Session(null);
 
     private static readonly RealmSnapshot Demo = Session.Current;
 
@@ -107,8 +107,8 @@ public sealed class SheetContentTests : ComponentTestBase
 
     // ---- Vehicles -----------------------------------------------------------------------------------------------------------------------
 
-    [Fact(DisplayName = "[AC-28a] Vehicles lists the pickup with its four lines and the chariot placeholder, aria-disabled, with DemoCast.ChariotNote")]
-    public void Vehicles_ThePickupAndThePlaceholder()
+    [Fact(DisplayName = "[AC-28a] Vehicles lists the pickup with its three lines and the hatchback, both rows tappable")]
+    public void Vehicles_ThePickupAndTheHatchback()
     {
         var cut = Content(Section.Vehicles);
 
@@ -119,19 +119,16 @@ public sealed class SheetContentTests : ComponentTestBase
         Assert.Equal(DemoCast.Wagon.Name, wagon.QuerySelector(".realm-row-name")!.TextContent);
         Assert.Equal(DemoCast.Wagon.Lore, wagon.QuerySelector(".realm-row-lore")!.TextContent);
         Assert.Equal("At " + DemoPlaces.Home.Name, wagon.QuerySelector(".realm-row-status")!.TextContent);
-        Assert.Equal(["Engine off", "Fuel 71%"], wagon.QuerySelectorAll(".realm-row-part").Select(part => part.TextContent.Trim()));
+        Assert.Empty(wagon.QuerySelectorAll(".realm-row-part"));   // no engine, no fuel: a vehicle is a device tracker (D107)
         Assert.Equal("Updated 20 min ago", wagon.QuerySelector(".realm-row-detail-text")!.TextContent);
         Assert.Null(wagon.GetAttribute("aria-disabled"));
         Assert.Single(wagon.QuerySelectorAll(".realm-row-chevron"));
 
         var chariot = cut.Find("[data-testid='row-vehicle-chariot']");
-        Assert.Equal("true", chariot.GetAttribute("aria-disabled"));
-        Assert.Equal(DemoCast.ChariotNote, chariot.QuerySelector(".realm-row-note")!.TextContent);
-        Assert.Contains(DemoCast.ChariotNote, chariot.GetAttribute("aria-label"), StringComparison.Ordinal);
-        Assert.DoesNotContain("Double tap", chariot.GetAttribute("aria-label"), StringComparison.Ordinal);
-        Assert.Empty(chariot.QuerySelectorAll(".realm-row-chevron"));
-        Assert.Empty(chariot.QuerySelectorAll(".realm-row-part"));
-        Assert.Contains("realm-row--placeholder", chariot.ClassName, StringComparison.Ordinal);
+        Assert.Null(chariot.GetAttribute("aria-disabled"));
+        Assert.Contains("Double tap", chariot.GetAttribute("aria-label"), StringComparison.Ordinal);
+        Assert.Single(chariot.QuerySelectorAll(".realm-row-chevron"));
+        Assert.DoesNotContain("realm-row--placeholder", chariot.ClassName, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -146,43 +143,15 @@ public sealed class SheetContentTests : ComponentTestBase
     }
 
     [Fact]
-    public async Task Vehicles_TheInfoButtonOpensTheExplanation_AndTappingTheRowDoesNothing()
+    public async Task Vehicles_TappingARow_SelectsTheVehicle()
     {
         var selected = new List<EntityRef>();
         var cut = Content(Section.Vehicles, selected.Add);
 
-        var info = cut.Find(".realm-row-info");
-        Assert.Equal("false", info.GetAttribute("aria-expanded"));
-        Assert.Empty(cut.FindAll(".realm-row-popover"));
-
-        await info.TriggerEventAsync("onclick", new MouseEventArgs());
-        Assert.Equal("true", cut.Find(".realm-row-info").GetAttribute("aria-expanded"));
-        Assert.Equal(
-            "This vehicle's maker has no official Home Assistant integration yet. When one exists, the Chariot will appear on the map.",
-            cut.Find(".realm-row-popover").TextContent);
-        Assert.Equal(cut.Find(".realm-row-popover").Id, cut.Find(".realm-row-info").GetAttribute("aria-controls"));
-
-        await cut.Find(".realm-row-info").TriggerEventAsync("onkeydown", new KeyboardEventArgs { Key = "Escape" });
-        Assert.Empty(cut.FindAll(".realm-row-popover"));
-
-        await cut.Find(".realm-row-info").TriggerEventAsync("onclick", new MouseEventArgs());
-        await cut.Find(".realm-row-popover").TriggerEventAsync("onclick", new MouseEventArgs());
-        Assert.Empty(cut.FindAll(".realm-row-popover"));
-
         await cut.Find("[data-testid='row-vehicle-chariot']").TriggerEventAsync("onclick", new MouseEventArgs());
-        Assert.Empty(selected);
-    }
 
-    [Fact]
-    public void Vehicles_TheInfoButtonIsASiblingOfTheRow_NotInsideIt()
-    {
-        var cut = Content(Section.Vehicles);
-
-        // A button cannot hold a button: the info control sits beside the aria-disabled row, in the same list item.
-        var item = cut.FindAll("[data-testid='sheet-list'] > li")[1];
-        Assert.Equal(2, item.QuerySelectorAll("button").Length);
-        Assert.Empty(cut.Find("[data-testid='row-vehicle-chariot']").QuerySelectorAll("button"));
-        Assert.Equal("About this vehicle", item.QuerySelector(".realm-row-info")!.GetAttribute("aria-label"));
+        Assert.Equal([new EntityRef(EntityKind.Vehicle, DemoCast.Chariot.Id)], selected);
+        Assert.Empty(cut.FindAll(".realm-row-info"));   // the maker-has-no-integration button is gone with the placeholder
     }
 
     // ---- Places -------------------------------------------------------------------------------------------------------------------------

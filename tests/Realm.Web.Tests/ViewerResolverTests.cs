@@ -161,7 +161,7 @@ public sealed class ViewerResolverTests
     // A Demo session that has no members and no person links.
     private sealed class EmptySession : IRealmSession
     {
-        private readonly IRealmSession _inner = new DemoRealmSessionFactory().Create(null);
+        private readonly IRealmSession _inner = FullCast.Session(null);
 
         public bool Disposed { get; private set; }
 
@@ -172,6 +172,8 @@ public sealed class ViewerResolverTests
             add => _inner.Changed += value;
             remove => _inner.Changed -= value;
         }
+
+        public IRosterEditor Roster => _inner.Roster;
 
         public TimeProvider Time => _inner.Time;
 

@@ -15,7 +15,7 @@ namespace Realm.Web.Tests;
 /// </summary>
 public sealed class MemberRowTests : ComponentTestBase
 {
-    private static readonly IRealmSession Session = new DemoRealmSessionFactory().Create(null);
+    private static readonly IRealmSession Session = FullCast.Session(null);
 
     private static readonly RealmSnapshot Demo = Session.Current;
 
