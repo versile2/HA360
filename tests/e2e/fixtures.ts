@@ -80,6 +80,11 @@ export interface DemoOptions {
   variant?: string | string[];
   /** `week`: 0..3, an ordinary route query. */
   week?: number;
+  /**
+   * Open the Demo with the roster it starts with (four people, the wagon, two entries under Not tracked) instead of the full cast. The acceptance suite describes the
+   * seven roles of the cast on the map, so `demo()` adds the `full-cast` variant (02 section 9.5) unless this is true; only Settings, "Who's on the map" asks for the default.
+   */
+  defaultRoster?: boolean;
   /** Wait for `window.__realm` and `settled()`. The default is true on Location, the only page with a map (and so with hooks). */
   hooks?: boolean;
 }
@@ -130,6 +135,13 @@ export async function waitForInteractive(page: Page, url: string): Promise<void>
     });
 }
 
+/** The options with the `full-cast` variant added, unless the test asked for the roster the Demo starts with. */
+function withFullCast(opts: DemoOptions): DemoOptions {
+  if (opts.defaultRoster === true) return opts;
+  const names = opts.variant === undefined ? [] : Array.isArray(opts.variant) ? opts.variant : [opts.variant];
+  return names.includes('full-cast') ? opts : { ...opts, variant: [...names, 'full-cast'] };
+}
+
 /**
  * Opens the Demo app through the proxy and waits until the page is interactive, on every path, and then (on Location) until the map is settled.
  *
@@ -140,7 +152,8 @@ export async function waitForInteractive(page: Page, url: string): Promise<void>
  * circuit, the bottom-nav links drop the query string, and so a `page.reload()` after an in-app navigation comes back without `variant`, `now` and
  * `style` (and, in Live with `?demo=1`, as a Live session).
  */
-export async function demo(page: Page, opts: DemoOptions = {}): Promise<void> {
+export async function demo(page: Page, given: DemoOptions = {}): Promise<void> {
+  const opts = withFullCast(given);
   await page.goto(demoUrl(opts));
   await waitForInteractive(page, demoUrl(opts));
   if (opts.hooks ?? (opts.path ?? '') === '') {
@@ -265,10 +278,12 @@ export interface CastMember {
   address: string | null;
   staticLabel: string | null;
 }
-export interface CastVehicle { id: string; name: string; lore: string; glyph: 'pickup' | 'car'; sortOrder: number; isPlaceholder: boolean; placeholderNote: string | null }
+export interface CastVehicle { id: string; name: string; lore: string; glyph: 'pickup' | 'car'; sortOrder: number }
+/** One entry of the roster a Demo session starts with (D113): `group` is `people`, `vehicles` or `notTracked`. */
+export interface CastRosterEntry { entityId: string; kind: 'person' | 'tracker'; group: 'people' | 'vehicles' | 'notTracked'; name: string; title: string | null; source: string; autoMoved: boolean }
 /** `drawn` is false only for the arrival zone (radius above the 5 km maximum), which is never drawn or listed. */
 export interface CastPlace { id: string; zoneName: string; name: string; subtitle: string; kind: string; lat: number; lon: number; radiusM: number; drawn: boolean }
-export interface DemoCastFile { members: CastMember[]; vehicles: CastVehicle[]; chariotNote: string; places: CastPlace[] }
+export interface DemoCastFile { members: CastMember[]; vehicles: CastVehicle[]; roster: CastRosterEntry[]; places: CastPlace[] }
 
 let demoCast: DemoCastFile | undefined;
 

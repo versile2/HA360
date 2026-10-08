@@ -3,12 +3,12 @@ using Xunit;
 
 namespace Realm.Demo.Tests;
 
-// The variants of 02 section 9.5, parsed in one place: nine names, each switching one aspect, combined with commas and
-// applied left to right; a name that is not one of the nine is ignored. What each variant does to the data is asserted
+// The variants of 02 section 9.5, parsed in one place: ten names, each switching one aspect, combined with commas and
+// applied left to right; a name that is not one of the ten is ignored. What each variant does to the data is asserted
 // through the session in DemoDataTests.
 public class DemoVariantsTests
 {
-    private static readonly string[] NineNames =
+    private static readonly string[] AllNames =
     [
         "all-sources",
         "phone-unavailable",
@@ -19,6 +19,7 @@ public class DemoVariantsTests
         "all-near",
         "empty-week",
         "fresh-install",
+        "full-cast",
     ];
 
     // The flags of a parsed result that are on.
@@ -29,10 +30,10 @@ public class DemoVariantsTests
             .Order(StringComparer.Ordinal)];
 
     [Fact]
-    public void The_variant_names_are_exactly_the_nine_of_the_spec()
+    public void The_variant_names_are_exactly_the_ten_of_the_spec()
     {
-        Assert.Equal(9, DemoVariants.Names.Count);
-        Assert.Equal(NineNames.Order(StringComparer.Ordinal), DemoVariants.Names.Order(StringComparer.Ordinal));
+        Assert.Equal(10, DemoVariants.Names.Count);
+        Assert.Equal(AllNames.Order(StringComparer.Ordinal), DemoVariants.Names.Order(StringComparer.Ordinal));
     }
 
     [Fact]
@@ -53,6 +54,7 @@ public class DemoVariantsTests
     [InlineData("all-near", "AllNear")]
     [InlineData("empty-week", "EmptyWeek")]
     [InlineData("fresh-install", "FreshInstall")]
+    [InlineData("full-cast", "FullCast")]
     public void Each_name_switches_exactly_its_own_aspect(string name, string flag)
     {
         Assert.Equal(flag, Assert.Single(FlagsOn(DemoVariants.Parse([name]))));
@@ -84,9 +86,9 @@ public class DemoVariantsTests
     [Fact]
     public void Any_two_variants_compose_in_either_order()
     {
-        foreach (var first in NineNames)
+        foreach (var first in AllNames)
         {
-            foreach (var second in NineNames)
+            foreach (var second in AllNames)
             {
                 Assert.Equal(DemoVariants.Parse([first, second]), DemoVariants.Parse([second, first]));
                 Assert.Equal(first == second ? 1 : 2, FlagsOn(DemoVariants.Parse([first, second])).Length);
@@ -95,9 +97,9 @@ public class DemoVariantsTests
     }
 
     [Fact]
-    public void All_nine_names_together_switch_all_nine_aspects()
+    public void All_ten_names_together_switch_all_ten_aspects()
     {
-        Assert.Equal(9, FlagsOn(DemoVariants.Parse(NineNames)).Length);
-        Assert.Equal(DemoVariants.Parse(NineNames), DemoVariants.Parse([string.Join(",", NineNames)]));
+        Assert.Equal(10, FlagsOn(DemoVariants.Parse(AllNames)).Length);
+        Assert.Equal(DemoVariants.Parse(AllNames), DemoVariants.Parse([string.Join(",", AllNames)]));
     }
 }

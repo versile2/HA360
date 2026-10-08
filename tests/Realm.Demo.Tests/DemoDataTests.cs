@@ -7,7 +7,7 @@ namespace Realm.Demo.Tests;
 
 // The data-layer tests of 02 section 9.7. The first half is the snapshot at the frozen instant 2026-09-30T21:25:00-05:00,
 // as 02 section 9.3 and 01 Appendix A.1 to A.3 give it; the second half (from "The driving half") is the week reports, the
-// drive lists, the nine variants and the session hooks of 02 sections 9.4 and 9.5. Expected values are the spec's own numbers
+// drive lists, the ten variants and the session hooks of 02 sections 9.4 and 9.5. Expected values are the spec's own numbers
 // typed out here (positions, batteries, accuracies, fix ages, "since" times, distances and bearings; drives, miles, top
 // speeds and event counts), never read back from the data under test.
 public class DemoDataTests
@@ -1549,9 +1549,20 @@ public class DemoDataTests
     }
 
     [Fact]
-    public async Task All_nine_variants_compose_in_one_session()
+    public void Full_cast_puts_the_prince_and_the_hatchback_on_the_map()
     {
-        var session = SessionWith("all-sources,phone-unavailable,life360-down,ha-down,poor-accuracy,no-fix,all-near,empty-week,fresh-install");
+        var snapshot = SessionWith("full-cast").Current;
+
+        Assert.Equal(5, snapshot.Members.Count);
+        Assert.Equal(2, snapshot.Vehicles.Count);
+        Assert.Equal(4, Snapshot().Members.Count);
+        Assert.Single(Snapshot().Vehicles);
+    }
+
+    [Fact]
+    public async Task All_ten_variants_compose_in_one_session()
+    {
+        var session = SessionWith("all-sources,phone-unavailable,life360-down,ha-down,poor-accuracy,no-fix,all-near,empty-week,fresh-install,full-cast");
         var report = await session.GetWeekReportAsync(1, DayOfWeek.Monday, CancellationToken.None);
 
         Assert.Equal("Unavailable,Unavailable", string.Join(",", session.Current.Connections.Select(c => c.State)));
