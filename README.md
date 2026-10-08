@@ -60,7 +60,7 @@ Status: experimental. [realm/CHANGELOG.md](realm/CHANGELOG.md) lists what each v
       <h3>Weekly driving report</h3>
       Trips are recorded as they close and kept on your server, so reports reach back further than Home Assistant's
       recorder does. Six statistics (speeding, phone use, rapid acceleration, hard braking, top speed, drives and miles),
-      a card per driver and a week-by-week picker.
+      a card per driver and a week-by-week picker, plus last month, 3, 6 and 12 month periods and a custom date range. Every Driving screen can be printed or saved as PDF, and long drive lists are paged.
     </td>
     <td width="50%" valign="top">
       <h3>Every number explained</h3>

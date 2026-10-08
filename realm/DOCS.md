@@ -1,7 +1,7 @@
 # HA Cartographer
 
 HA Cartographer is a map-first family tracker that runs inside Home Assistant. It shows where everyone is on a full-screen
-map with a bottom sheet (Drivers, Vehicles, Places) and keeps its own history, so it can show weekly driving reports
+map with a bottom sheet (Drivers, Vehicles, Places) and keeps its own history, so it can show driving reports (by week, month, 3, 6 or 12 months, or a custom range; printable)
 that go back further than Home Assistant's recorder does. It opens from the Home Assistant sidebar, so Home Assistant's
 own login is the only login.
 
