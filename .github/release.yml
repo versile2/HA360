@@ -1,0 +1,5 @@
+# Categories for GitHub's generated release notes (built from the merged PRs).
+changelog:
+  categories:
+    - title: Changes
+      labels: ["*"]
