@@ -1690,6 +1690,7 @@
 }
 
 /* The sheet and the right stack give way while a place is placed; the bottom nav stays. */
+html[data-placing] div[mudsheet],
 html[data-placing] [data-testid="sheet"],
 html[data-placing] .realm-right-stack {
   visibility: hidden;

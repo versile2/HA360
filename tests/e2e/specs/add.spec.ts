@@ -14,6 +14,12 @@ async function openList(page: Page, tab: 'tab-drivers' | 'tab-vehicles' | 'tab-p
   await expect(page.getByTestId(tab), 'the tab is selected').toHaveAttribute('aria-selected', 'true');
 }
 
+// The selection shows as the header in the bottom sheet and as the detail in the panel (D45), so both are read.
+const selected = (page: Page): Locator => page.locator('[data-testid="sheet-selection-header"], .realm-detail-name');
+const clearSelection = async (page: Page): Promise<void> => {
+  await page.locator('[data-testid="sheet-selection-clear"], [data-testid="detail-back"]').first().click();
+};
+
 const pinIds = async (page: Page): Promise<string[]> => [
   ...(await readHook(page, 'pins')).map((pin) => pin.id),
   ...(await readHook(page, 'bubbles')).flatMap((bubble) => bubble.ids),
@@ -60,8 +66,8 @@ test.describe('Adding drivers, trackers and places', () => {
 
     await pick.click();
     await expect(dialog(page), 'a pick closes the picker').toHaveCount(0);
-    await expect(page.getByTestId('sheet-selection-header'), 'the hatchback is selected').toContainText(hatchback?.name ?? 'missing from the cast file');
-    await page.getByTestId('sheet-selection-clear').click();
+    await expect(selected(page), 'the hatchback is selected').toContainText(hatchback?.name ?? 'missing from the cast file');
+    await clearSelection(page);
     await expect(page.getByTestId('row-vehicle-chariot'), 'and it is in Trackers now').toHaveCount(1);
   });
 
@@ -91,7 +97,9 @@ test.describe('Adding drivers, trackers and places', () => {
     await expect(page.getByTestId('placement-radius-text'), 'the radius starts at 100 m').toHaveText('100 m · 328 ft');
 
     const before = await page.getByTestId('placement-pin').boundingBox();
-    await page.getByTestId('map-canvas').click({ position: { x: 90, y: 160 } });
+    const canvas = await page.getByTestId('map-canvas').boundingBox();
+    // 70 px to the right of the pin: free map at both layouts (the panel is on the left or at the bottom).
+    await page.getByTestId('map-canvas').click({ position: { x: (before?.x ?? 0) + 22 + 70 - (canvas?.x ?? 0), y: (before?.y ?? 0) + 22 - (canvas?.y ?? 0) } });
     await expect.poll(async () => (await page.getByTestId('placement-pin').boundingBox())?.x, { message: 'a tap on the map moves the pin' }).not.toBe(before?.x);
 
     await page.getByTestId('placement-radius').fill('300');
@@ -105,7 +113,7 @@ test.describe('Adding drivers, trackers and places', () => {
     await page.getByTestId('placement-save').click();
     await expect(panel, 'saving closes the panel').toHaveCount(0);
     await expect(page.getByText('Dog Park was added to Places.'), 'a toast says so').toBeVisible();
-    await expect(page.getByTestId('sheet-selection-header'), 'the new place is selected').toContainText('Dog Park');
+    await expect(selected(page), 'the new place is selected').toContainText('Dog Park');
   });
 
   test('[ADD] Esc and Cancel leave placement without adding anything', { tag: ['@phone', '@unfolded'] }, async ({ page }) => {
