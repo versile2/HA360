@@ -22,6 +22,25 @@ async function chooseFromMenu(page: Page, value: string): Promise<void> {
   }).toPass({ timeout: 20_000 });
 }
 
+/** The team report in the 1-year period, then Cass's page: the period travels in the link of the card. */
+async function openDriverYear(page: Page): Promise<void> {
+  await openDriving(page);
+  await chooseFromMenu(page, '1y');
+  await expect(async () => {
+    await page.getByTestId('driver-card-jester').click();
+    await expect(page.getByTestId('drive-list')).toBeVisible({ timeout: 1_500 });
+  }).toPass({ timeout: 20_000 });
+}
+
+/** Types a date into an editable picker, commits it with Enter and closes the picker's popover so that it cannot cover Apply. */
+async function typeDate(page: Page, testId: string, value: string): Promise<void> {
+  const input = page.getByTestId(testId).locator('input');
+  await input.fill(value, { timeout: 5_000 });
+  await input.press('Enter');
+  await input.press('Escape');
+  await expect(page.locator('.mud-popover-open.mud-picker-popover-paper'), 'the picker is closed').toHaveCount(0, { timeout: 5_000 });
+}
+
 test.describe('Driving periods', () => {
   test('the menu offers every period at 400 days of history and choosing one puts it in the URL', async ({ page }) => {
     await openDriving(page);
@@ -58,23 +77,16 @@ test.describe('Driving periods', () => {
     }).toPass({ timeout: 20_000 });
     await expect(page.getByTestId('custom-range'), 'the custom range panel is open').toBeVisible();
 
-    const from = page.getByTestId('custom-from').locator('input');
-    const to = page.getByTestId('custom-to').locator('input');
-
     // Start after end is refused with a message.
-    await from.fill('2026-09-10');
-    await from.press('Enter');
-    await to.fill('2026-09-01');
-    await to.press('Enter');
+    await typeDate(page, 'custom-from', '2026-09-10');
+    await typeDate(page, 'custom-to', '2026-09-01');
     await page.getByTestId('custom-apply').click();
     await expect(page.getByTestId('custom-message')).toBeVisible();
     expect(periodOf(page)).not.toBe('custom');
 
     // A valid range is applied and lands in the address.
-    await from.fill('2026-09-01');
-    await from.press('Enter');
-    await to.fill('2026-09-10');
-    await to.press('Enter');
+    await typeDate(page, 'custom-from', '2026-09-01');
+    await typeDate(page, 'custom-to', '2026-09-10');
     await page.getByTestId('custom-apply').click();
     await expect.poll(() => periodOf(page)).toBe('custom');
     const query = new URL(page.url()).searchParams;
@@ -86,8 +98,7 @@ test.describe('Driving periods', () => {
 
 test.describe('Driver events pager', () => {
   test('25 rows by default, 50 and 100 on request, and a single page shows only the bottom pager', async ({ page }) => {
-    await openDriving(page, 'driving/jester');
-    await chooseFromMenu(page, '1y');
+    await openDriverYear(page);
 
     const rows = page.getByTestId('drive-list').locator('li');
     await expect(page.getByTestId('events-pager-bottom')).toBeVisible();
@@ -108,7 +119,11 @@ test.describe('Driver events pager', () => {
   });
 
   test('a short week fits one page: no top pager', async ({ page }) => {
-    await openDriving(page, 'driving/jester');
+    await openDriving(page);
+    await expect(async () => {
+      await page.getByTestId('driver-card-jester').click();
+      await expect(page.getByTestId('drive-list')).toBeVisible({ timeout: 1_500 });
+    }).toPass({ timeout: 20_000 });
     await expect(page.getByTestId('events-pager-top')).toHaveCount(0);
     await expect(page.getByTestId('events-pager-bottom')).toBeVisible();
   });
@@ -116,8 +131,7 @@ test.describe('Driver events pager', () => {
 
 test.describe('Printing', () => {
   test('the print stylesheet hides the chrome and lists every event', async ({ page }) => {
-    await openDriving(page, 'driving/jester');
-    await chooseFromMenu(page, '1y');
+    await openDriverYear(page);
     const total = await page.getByTestId('print-event-row').count();
     expect(total).toBeGreaterThan(0);
 

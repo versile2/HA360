@@ -17,6 +17,9 @@ public sealed class PeriodBarTests : ComponentTestBase
     private static readonly TimeZoneInfo Chicago = TimeZoneInfo.FindSystemTimeZoneById("America/Chicago");
     private static readonly DateTimeOffset Now = new(2026, 9, 30, 21, 25, 0, TimeSpan.FromHours(-5));
 
+    private static Task OpenMenu(IRenderedComponent<PeriodBar> cut) =>
+        cut.Find(".realm-period-split__menu button").TriggerEventAsync("onclick", new MouseEventArgs());
+
     [Fact]
     public void TheMainPart_ReadsLastMonthByDefault_AndTheFourWeekChipsStay()
     {
@@ -61,9 +64,10 @@ public sealed class PeriodBarTests : ComponentTestBase
     [InlineData(365, new[] { "last-month", "3m", "6m", "custom" })]
     [InlineData(366, new[] { "last-month", "3m", "6m", "1y", "custom" })]
     [InlineData(400, new[] { "last-month", "3m", "6m", "1y", "custom" })]
-    public void TheMenu_OffersSixMonthsAndAYearOnlyWhenTheRetentionCoversThem(int retentionDays, string[] expected)
+    public async Task TheMenu_OffersSixMonthsAndAYearOnlyWhenTheRetentionCoversThem(int retentionDays, string[] expected)
     {
-        Bar(new List<ReportPeriod>(), retentionDays: retentionDays);
+        var cut = Bar(new List<ReportPeriod>(), retentionDays: retentionDays);
+        await OpenMenu(cut);
 
         var items = PopoverProvider!.FindAll("[data-testid^='period-item-']").Select(item => item.GetAttribute("data-testid")!["period-item-".Length..]);
         Assert.Equal(expected, items);
@@ -73,7 +77,8 @@ public sealed class PeriodBarTests : ComponentTestBase
     public async Task AMenuEntry_ReportsItsPeriod()
     {
         var chosen = new List<ReportPeriod>();
-        Bar(chosen, retentionDays: 400);
+        var cut = Bar(chosen, retentionDays: 400);
+        await OpenMenu(cut);
 
         await PopoverProvider!.Find("[data-testid='period-item-1y']").TriggerEventAsync("onclick", new MouseEventArgs());
 
@@ -87,6 +92,7 @@ public sealed class PeriodBarTests : ComponentTestBase
         var cut = Bar(chosen);
         Assert.Empty(cut.FindAll("[data-testid='custom-range']"));
 
+        await OpenMenu(cut);
         await PopoverProvider!.Find("[data-testid='period-item-custom']").TriggerEventAsync("onclick", new MouseEventArgs());
 
         Assert.Equal(2, cut.FindComponents<MudDatePicker>().Count);
@@ -103,6 +109,7 @@ public sealed class PeriodBarTests : ComponentTestBase
     {
         var chosen = new List<ReportPeriod>();
         var cut = Bar(chosen, retentionDays: 100);
+        await OpenMenu(cut);
         await PopoverProvider!.Find("[data-testid='period-item-custom']").TriggerEventAsync("onclick", new MouseEventArgs());
         var pickers = cut.FindComponents<MudDatePicker>();
 

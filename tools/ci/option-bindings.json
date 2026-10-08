@@ -54,7 +54,7 @@
     "driving_speeding_mph": { "path": "Driving:SpeedingMps", "default": 80, "factor": 0.44704 },
     "driving_speeding_min_seconds": { "path": "Driving:SpeedingMinS", "default": 30 },
     "driving_phone_min_seconds": { "path": "Driving:PhoneMinS", "default": 10 },
-    "retention_fix_days": { "path": "Retention:FixDays", "default": 120 },
+    "retention_fix_days": { "path": "Retention:FixDays", "default": 100 },
     "backfill_days": { "path": "Backfill:Days", "default": 10 },
     "privacy_log_positions": { "path": "Privacy:LogPositions", "default": false },
     "demo_mode": { "path": "Demo:Mode", "default": false },
