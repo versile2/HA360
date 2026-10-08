@@ -1,12 +1,16 @@
 name: release
-# 03 section 7.6, S16a. Run by hand: Actions -> release -> Run workflow, on main. It is the only way a release is made (no tag or merge triggers it). It reads
-# `version` (V) from realm/config.yaml, builds the image and pushes ghcr.io/versile2/ha-cartographer:V, and only after that push succeeded creates the tag vV
-# on that commit and a GitHub release vV whose notes are the realm/CHANGELOG.md section for V followed by notes generated from the merged PRs
-# (.github/release.yml categories). Merge the PR that bumps the version and adds the CHANGELOG section first, then run this right away: the HA store offers V
-# as soon as main has it. Refuses any ref other than main, a V that already has a tag (6.6: never re-release), and a V with no `## V` CHANGELOG section.
-# The tag only exists once the image does, so a run that failed before the end can simply be run again. Not checked: that ci.yml was green; docker-smoke has
-# already run this Dockerfile on every push, and the person who runs this has read the CI summary.
-on: workflow_dispatch
+# 03 section 7.6, S16a. Runs automatically on every push to main (that is, when a PR is merged) and can also be run by hand: Actions -> release -> Run workflow,
+# on main. It reads `version` (V) from realm/config.yaml, builds the image and pushes ghcr.io/versile2/ha-cartographer:V, and only after that push succeeded
+# creates the tag vV on that commit and a GitHub release vV whose notes are the realm/CHANGELOG.md section for V followed by notes generated from the merged PRs
+# (.github/release.yml categories). So a PR that bumps the version and adds the CHANGELOG section releases itself when it is merged; the HA store offers V as
+# soon as main has it, and the image follows within minutes. If the tag vV already exists, a push run SKIPS cleanly (notice and job summary: bump the version
+# to release; this is every merge that does not bump it), while a by-hand run fails with that message (6.6: never re-release). Refuses any ref other than main
+# and, when it would release, a V with no `## V` CHANGELOG section. The tag only exists once the image does, so a run that failed before the end can simply be
+# run again by hand. The tag is created with GITHUB_TOKEN, which starts no further workflow; this one workflow does everything. Not checked: that ci.yml was
+# green; docker-smoke runs this Dockerfile on every push.
+on:
+  push: { branches: [main] }
+  workflow_dispatch:
 permissions: {}
 concurrency: { group: release, cancel-in-progress: false }
 defaults: { run: { shell: bash } }               # explicit shell = bash -eo pipefail
@@ -41,24 +45,35 @@ jobs:
             exit 1
           fi
           echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "skip=false" >> "$GITHUB_OUTPUT"
           if [[ -n $(git ls-remote --tags origin "refs/tags/v$v") ]]; then
-            echo "::error::the tag v$v already exists on origin; a released version is never released again. Bump version in realm/config.yaml (and add its CHANGELOG section) in a PR, merge it, then run this again."
+            if [[ $GITHUB_EVENT_NAME == push ]]; then
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              echo "::notice title=Nothing to release::v$v already released; bump realm/config.yaml version to release"
+              echo "v$v already released; bump realm/config.yaml version to release" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            echo "::error::the tag v$v already exists on origin; a released version is never released again. Bump version in realm/config.yaml (and add its CHANGELOG section) in a PR, merge it (that releases it), or run this again after bumping."
             exit 1
           fi
           if ! grep -qE "^## ${v//./\\.}([[:space:]]|\$)" realm/CHANGELOG.md; then
             echo "::error::realm/CHANGELOG.md has no section '## $v'"
             exit 1
           fi
-      - uses: docker/setup-buildx-action@v4
-      - uses: docker/login-action@v4
+      - if: steps.v.outputs.skip != 'true'
+        uses: docker/setup-buildx-action@v4
+      - if: steps.v.outputs.skip != 'true'
+        uses: docker/login-action@v4
         with: { registry: ghcr.io, username: "${{ github.actor }}", password: "${{ secrets.GITHUB_TOKEN }}" }
       - id: meta
+        if: steps.v.outputs.skip != 'true'
         uses: docker/metadata-action@v6
         with:
           images: ghcr.io/versile2/ha-cartographer
           tags: type=raw,value=${{ steps.v.outputs.version }}
           flavor: latest=false                  # no "latest" tag: the Supervisor never uses it
       - name: Exactly one tag, the version (no latest)
+        if: steps.v.outputs.skip != 'true'
         env:
           TAGS: ${{ steps.meta.outputs.tags }}
           WANT: ghcr.io/versile2/ha-cartographer:${{ steps.v.outputs.version }}
@@ -67,7 +82,8 @@ jobs:
             echo "::error::the image tags are '$TAGS', expected only '$WANT'"
             exit 1
           fi
-      - uses: docker/build-push-action@v7
+      - if: steps.v.outputs.skip != 'true'
+        uses: docker/build-push-action@v7
         with:
           context: .
           platforms: linux/amd64                # config.yaml: arch amd64
@@ -84,6 +100,7 @@ jobs:
           cache-from: type=gha,scope=release
           cache-to: type=gha,scope=release,mode=max
       - name: Anonymous pull check
+        if: steps.v.outputs.skip != 'true'
         env:
           IMAGE: ghcr.io/versile2/ha-cartographer:${{ steps.v.outputs.version }}
         run: |
@@ -94,6 +111,7 @@ jobs:
             echo "::notice title=GHCR package is private::Make ghcr.io/versile2/ha-cartographer public once in the GitHub UI (03 section 6.7); until then the Supervisor cannot pull it without registry credentials."
           fi
       - name: Tag and publish the release (after the image is pushed)
+        if: steps.v.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           V: ${{ steps.v.outputs.version }}

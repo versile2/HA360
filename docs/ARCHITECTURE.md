@@ -40,7 +40,7 @@ src/Realm.Demo/            the fictional fixture and the Demo implementations of
 src/Realm.Web/             the Blazor app and its JS modules (wwwroot)
 tests/                     xUnit and bUnit projects, JS unit tests, Playwright end-to-end tests (each added with its code)
 tools/ci/                  the CI feedback scripts and option-bindings.json
-.github/workflows/         ci.yml, release.yml (run by hand)
+.github/workflows/         ci.yml, release.yml (on merge to main, or by hand)
 docs/ARCHITECTURE.md       this file
 ```
 
@@ -106,9 +106,10 @@ app) and `publish-ci`, which waits for all of them. `SUMMARY.md` has a section f
 ## Releasing
 
 The add-on version in `realm/config.yaml` equals the image tag, and every version has a section in
-`realm/CHANGELOG.md`. A release is made by merging the PR that bumps `version` in `realm/config.yaml` and adds the CHANGELOG section, then
-running the release workflow by hand (Actions -> release -> Run workflow, on main): it builds and pushes the image, then
-creates the tag `vX.Y.Z` and the GitHub release (CHANGELOG section plus notes generated from the merged PRs). The store
-offers the new version as soon as main has it, before the image is pushed, so run the workflow right after merging; an update
-attempted in that window fails to pull and succeeds on retry. Install in Home Assistant by adding `https://github.com/Versile2/ha-cartographer` as an app
+`realm/CHANGELOG.md`. A release is made automatically by merging a PR to main
+whose `realm/config.yaml` has a `version` that has no tag yet (and whose CHANGELOG has the section): the release workflow builds and pushes
+the image, then creates the tag `vX.Y.Z` and the GitHub release (CHANGELOG section plus notes generated from the merged PRs). A merge
+that leaves the version unchanged releases nothing. Actions -> release -> Run workflow re-runs it by hand. The store
+offers the new version as soon as main has it, before the image is pushed; an update attempted in that window fails to pull and
+succeeds on retry. Install in Home Assistant by adding `https://github.com/Versile2/ha-cartographer` as an app
 repository.
