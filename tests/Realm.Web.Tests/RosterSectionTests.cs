@@ -212,9 +212,9 @@ public sealed class RosterSectionTests : ComponentTestBase
     }
 
     [Fact]
-    public void EveryRow_HasTheSameStructure_AndTheAvatarOfThePin()
+    public async Task EveryRow_HasTheSameStructure_AndTheAvatarOfThePin()
     {
-        using var session = new DemoRealmSessionFactory().Create(null);
+        await using var session = new DemoRealmSessionFactory().Create(null);
         var cut = Open(session);
 
         var rows = cut.FindAll(".realm-roster__item");
