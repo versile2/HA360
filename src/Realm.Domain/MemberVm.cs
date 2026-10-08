@@ -36,5 +36,5 @@ public record MemberVm(
     DateTimeOffset? LastUpdateUtc,
     int SortOrder,
     Freshness Freshness,
-    string? StaticLabel = null,
-    VehicleGlyph? Glyph = null);
+    VehicleGlyph? Glyph = null,
+    string? StaticLabel = null);

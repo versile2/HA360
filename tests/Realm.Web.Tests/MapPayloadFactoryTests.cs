@@ -91,14 +91,14 @@ public sealed class MapPayloadFactoryTests
     }
 
     [Fact]
-    public void AtAPlace_MeansInsideAZoneTheMapDraws_NotTheArrivalZone()
+    public void AtAPlace_MeansInsideAnyZone_TheLargeArrivalZoneIncluded()
     {
         var inArrivalZone = Member("a", placeId: "approach");
         var places = new[] { Place("approach", 32_187), Place("park", 200) };
 
         var item = Assert.Single(Members([inArrivalZone], places, meId: "a").Members);
 
-        Assert.Equal(MemberStatus.Out, item.Status);
+        Assert.Equal(MemberStatus.AtPlace, item.Status);
     }
 
     // ---- the accuracy halo and the other flags ------------------------------------------------------------------------------------------

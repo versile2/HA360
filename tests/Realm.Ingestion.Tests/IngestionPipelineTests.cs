@@ -226,7 +226,7 @@ public sealed class IngestionPipelineTests : IDisposable
     }
 
     [Fact]
-    public async Task TheZonesAsDrawn_AreNamedByHomeAssistant_AndTheOversizedAreLeftOut()
+    public async Task TheZonesAsDrawn_AreNamedByHomeAssistant_AndTheOversizedAreKept()
     {
         var rig = NewRig();
         RawPlace[] zones =
@@ -240,8 +240,7 @@ public sealed class IngestionPipelineTests : IDisposable
         await rig.DiscoverWithAsync(zones, null, Plans.Member("king", life360: Plans.KingTracker));
 
         var places = rig.State.Current.Places;
-        Assert.Equal(new[] { "hall", "home", "shed" }, places.Select(p => p.Id).Order(StringComparer.Ordinal));
-        Assert.DoesNotContain(places, p => p.Id == "arrival");
+        Assert.Equal(new[] { "arrival", "hall", "home", "shed" }, places.Select(p => p.Id).Order(StringComparer.Ordinal));
         Assert.Equal("Hearth Haven", places.Single(p => p.Id == "home").DisplayName);
         Assert.Equal(PlaceKind.Home, places.Single(p => p.Id == "home").Kind);
     }

@@ -1101,7 +1101,7 @@
   display: grid;
   grid-template-columns: 24px minmax(0, 1fr) 48px;
   align-items: center;
-  column-gap: 4px;
+  column-gap: 8px;
   min-height: 64px;
   margin: 0;
   padding: 0;
