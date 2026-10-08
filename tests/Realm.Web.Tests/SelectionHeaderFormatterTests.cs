@@ -377,33 +377,6 @@ public sealed class SelectionHeaderFormatterTests
 
     // ---- the detail strings ---------------------------------------------------------------------------------------------------------------
 
-    [Fact]
-    public void MemberUpdated_ReadsUpdated_ForAFreshMember_AndTheWarningLine_ForAStaleOne()
-    {
-        var jester = MemberOf(DemoCast.Jester.Id);
-        var dara = MemberOf(DemoCast.Cryptid.Id);
-
-        Assert.Equal("Updated 3 min ago", SelectionHeaderFormatter.MemberUpdated(jester, MemberStatus.AtPlace, Facts));
-        Assert.Equal("The raven's late — last seen 42 min ago", SelectionHeaderFormatter.MemberUpdated(dara, MemberStatus.Stale, Facts));
-        Assert.StartsWith("Gone dark — last seen ", SelectionHeaderFormatter.MemberUpdated(dara with { Freshness = Freshness.Offline }, MemberStatus.Offline, Facts), StringComparison.Ordinal);
-    }
-
-    [Theory]
-    [InlineData(MemberStatus.NoFix)]
-    [InlineData(MemberStatus.Static)]
-    public void MemberUpdated_IsNull_WithNoFixAndForTheStaticMember(MemberStatus status)
-    {
-        Assert.Null(SelectionHeaderFormatter.MemberUpdated(MemberOf(DemoCast.Jester.Id), status, Facts));
-    }
-
-    [Fact]
-    public void MemberUpdated_JustNow_ReadsUpdatedJustNow()
-    {
-        var fresh = MemberOf(DemoCast.King.Id) with { LastUpdateUtc = DemoNow };
-
-        Assert.Equal("Updated just now", SelectionHeaderFormatter.MemberUpdated(fresh, MemberStatus.AtPlace, Facts));
-    }
-
     [Fact(DisplayName = "[AC-30b] The battery chip reads 12% · Low battery and 19% · Charging, and both parts when both apply")]
     public void BatteryChip_ReadsTheStateAfterThePercentage()
     {

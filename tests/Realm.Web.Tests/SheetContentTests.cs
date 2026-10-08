@@ -564,9 +564,9 @@ public sealed class SheetContentTests : ComponentTestBase
         var list = Content(Section.Vehicles);
         var detail = Selected(new EntityRef(EntityKind.Vehicle, DemoCast.Wagon.Id), SheetSize.Tall, LayoutMode.Compact);
 
-        Assert.Equal(
-            list.Find("[data-testid='row-vehicle-wagon'] .realm-row-detail-text").TextContent,
-            detail.Find("section.realm-detail--vehicle .realm-detail-updated").TextContent);
+        Assert.Empty(detail.FindAll("section.realm-detail--vehicle .realm-detail-updated"));
+        var relative = list.Find("[data-testid='row-vehicle-wagon'] .realm-row-detail-text").TextContent.Replace("Updated ", string.Empty, StringComparison.Ordinal);
+        Assert.Contains(relative, detail.Find("section.realm-detail--vehicle .realm-detail-rows").TextContent, StringComparison.Ordinal);
     }
 
     // ---- helpers ---------------------------------------------------------------------------------------------------------------------------

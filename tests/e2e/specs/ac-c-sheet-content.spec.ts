@@ -494,7 +494,7 @@ test.describe('S8c: selecting from the lists', () => {
 
     await expect(page.locator('.realm-detail-name'), 'the name').toHaveText(jester.name);
     await expect(page.locator('.realm-detail-heading .realm-detail-eyebrow'), 'the eyebrow is the lore title (drawn in capitals by the style)').toHaveText(jester.lore);
-    await expect(page.locator('.realm-detail-updated'), 'the freshness line').toHaveText('Updated 3 min ago');
+    await expect(page.locator('.realm-detail-updated'), 'no freshness line in the header (D106): it lives in the status card').toHaveCount(0);
     await expect(page.locator('.realm-detail-status-line'), 'the status').toHaveText(`At ${hall.name}`);
     await expect(page.locator('.realm-detail-line'), 'since, and how far away').toHaveText('Since 9:06 pm · 1.0 mi away');
     await expect(page.locator('.realm-detail-chips .realm-detail-chip').first(), 'the battery chip').toHaveText('12% · Low battery');
@@ -510,6 +510,21 @@ test.describe('S8c: selecting from the lists', () => {
     await expect(page.getByTestId('btn-show-trail'), 'no Show trail button').toHaveCount(0);
     await expect(page.getByRole('button', { name: /trail/i }), 'nothing in the sheet is a trail control').toHaveCount(0);
     await expect(page.locator('.realm-detail').getByText(/timeline|today/i), 'no Today timeline').toHaveCount(0);
+  });
+
+  // [AC-30] D106: nothing is said twice. Dara is stale and far away: her freshness line shows once (in the status card), and her address is not repeated under the card's title.
+  test('[AC-30] a stale member\'s detail says the freshness line and the place once', { tag: ['@phone'] }, async ({ page }) => {
+    await openListWithMap(page, 'drivers');
+
+    await row(page, 'member', 'cryptid').click();
+    await expectSelectedAtPeek(page, 'Dara selected from her row');
+    await openDetail(page, 'after the handle tap');
+
+    const detail = page.locator('.realm-detail--member');
+    await expect(detail.getByText("The raven's late — last seen 42 min ago"), 'the stale line appears once').toHaveCount(1);
+    await expect(detail.locator('.realm-detail-heading .realm-detail-updated'), 'not in the header').toHaveCount(0);
+    await expect(detail.locator('.realm-detail-status .realm-detail-line'), 'it is in the card').toHaveText("The raven's late — last seen 42 min ago");
+    await expect(detail.locator('.realm-detail-address'), 'the address is the card title already').toHaveCount(0);
   });
 
   // [AC-30] The last sentence: Elio's detail shows no street address (`static_show_address` is off by default), and no week (he shares nothing); he is a static member.

@@ -18,15 +18,15 @@
 @{
     var row = VmFactory.Member(Member, Facts);
     var isStatic = Member.Kind == MemberKind.Static || row.Status == MemberStatus.Static;
-    var updated = SelectionHeaderFormatter.MemberUpdated(Member, row.Status, Facts);
     var dot = DotClass(Member.Freshness);
     var place = Facts.PlaceOf(Member.PlaceId);
     var accuracy = SelectionHeaderFormatter.AccuracyChip(Member, row.Status, Facts);
     var staticDistance = isStatic ? SelectionHeaderFormatter.StaticDistance(Member, Facts) : null;
     var sentence = isStatic ? SelectionHeaderFormatter.StaticSentence(Member) : null;
+    var address = SelectionHeaderFormatter.MemberAddress(Member, row.StatusLine);
     var colorStyle = row.Color is { } hex ? "--realm-row-color:" + hex : null;
 }
-<section class="realm-detail realm-detail--member" aria-labelledby="realm-detail-title">
+<section class="realm-detail realm-detail--member" aria-labelledby="realm-detail-title" aria-describedby="realm-detail-status">
     <header class="realm-detail-head">
         <button type="button"
                 class="realm-detail-back"
@@ -49,10 +49,6 @@
             {
                 <p class="realm-detail-eyebrow">@lore</p>
             }
-            @if (updated is not null)
-            {
-                <p class="@("realm-detail-updated" + RowClasses.Tone(row.DetailTone))">@updated</p>
-            }
         </div>
         @if (dot is not null)
         {
@@ -60,7 +56,7 @@
         }
     </header>
     <div class="realm-detail-body">
-        <div class="realm-detail-status">
+        <div class="realm-detail-status" id="realm-detail-status">
             <div class="realm-detail-status-text">
                 <p class="realm-detail-status-line">@row.StatusLine</p>
                 @if (row.DetailLine.Length > 0)
@@ -103,9 +99,9 @@
                 }
             </div>
         }
-        @if (!string.IsNullOrWhiteSpace(Member.FullAddress))
+        @if (address is not null)
         {
-            <p class="realm-detail-address">@Member.FullAddress</p>
+            <p class="realm-detail-address">@address</p>
         }
         @if (!isStatic)
         {

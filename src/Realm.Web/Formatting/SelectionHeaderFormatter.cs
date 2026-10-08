@@ -171,20 +171,25 @@ public static class SelectionHeaderFormatter
     public const string PlacesCaption = "Places are set up in Home Assistant.";
 
     /// <summary>
-    /// The line under a person's name in the detail header (01 section 5.4): "Updated 3 min ago" for a fresh member, the row's warning line for a stale or offline one ("The raven's late — last seen
-    /// 42 min ago"), nothing for a member with no fix (no "Updated" line) and for the static prince. Null when there is none.
+    /// The full address line of the person detail (01 section 5.4): the data layer's address, or null when there is none or when the status line above it (the card's title) already says the
+    /// same place. Compared with the middle dot, commas, full stops, spacing and case ignored, and as whole words, so "Eastgate Avenue, Pinebrook, AL" is not repeated under
+    /// "Eastgate Avenue · Pinebrook, AL" and "I-65" is not repeated under "Driving · 54 mph on I-65".
     /// </summary>
-    public static string? MemberUpdated(MemberVm member, MemberStatus status, RowFacts facts)
+    public static string? MemberAddress(MemberVm member, string statusLine)
     {
         ArgumentNullException.ThrowIfNull(member);
-        ArgumentNullException.ThrowIfNull(facts);
-        return status switch
+        if (string.IsNullOrWhiteSpace(member.FullAddress))
         {
-            MemberStatus.NoFix or MemberStatus.Static => null,
-            MemberStatus.Stale or MemberStatus.Offline => MemberTextFormatter.TimePart(member, status, facts.Now, facts.Zone),
-            _ => member.LastUpdateUtc is { } at ? UpdatedLead + TimeFormatter.Relative(at, facts.Now, facts.Zone) : null,
-        };
+            return null;
+        }
+
+        var address = NormalisePlaceText(member.FullAddress);
+        var status = NormalisePlaceText(statusLine ?? string.Empty);
+        return address.Length > 0 && (" " + status + " ").Contains(" " + address + " ", StringComparison.Ordinal) ? null : member.FullAddress;
     }
+
+    private static string NormalisePlaceText(string text) =>
+        string.Join(' ', text.Split(['·', ',', '.', ' ', '\t', '\u00A0'], StringSplitOptions.RemoveEmptyEntries)).ToLowerInvariant();
 
     /// <summary>The battery chip of the person detail (01 section 5.4): "19% · Charging", "12% · Low battery", both parts when both apply. The chip's accessible name is the badge's.</summary>
     public static string BatteryChip(BatteryBadgeVm battery)

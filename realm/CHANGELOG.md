@@ -17,6 +17,10 @@
 
 - **Map credits no longer cover the map controls** on phones. The credits pill folds after five seconds from the start
   of the page (it no longer waits for every map tile), and folds on the first tap without swallowing it.
+- **Detail views no longer say things twice.** A person's freshness line ("The raven's late, last seen 42 min ago")
+  now shows once, in the status card under the place, not also under the name; the street address line is left out when
+  it is the same place the card already shows (a stale Dara, Briar on I-65). A vehicle's "Updated 20 min ago" under its
+  name is gone too (its Last update row and stale warning say it). Screen readers still hear the status.
 - **Satellite map style no longer fails to load** when the page is in the background or throttled. Styles built in the
   app are now loaded through a blob URL, which does not wait for an animation frame.
 

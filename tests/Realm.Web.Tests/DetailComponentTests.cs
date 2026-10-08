@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Bunit;
 using Microsoft.AspNetCore.Components.Web;
 using Realm.Demo;
@@ -47,7 +48,7 @@ public sealed class DetailComponentTests : ComponentTestBase
 
     // ---- a person: Cass ---------------------------------------------------------------------------------------------------------------------
 
-    [Fact(DisplayName = "[AC-30e] Cass's detail: name, lore, Updated 3 min ago, the status block, the 12% low battery chip, the address, and the week's three tiles with the link to his report")]
+    [Fact(DisplayName = "[AC-30e] Cass's detail: name, lore, the status block, the 12% low battery chip, the address, and the week's three tiles with the link to his report")]
     public void Cass_ShowsTheHeader_TheStatusBlock_TheChip_TheAddress_AndTheWeek()
     {
         var cass = Cass();
@@ -56,7 +57,7 @@ public sealed class DetailComponentTests : ComponentTestBase
         Assert.Equal(DemoCast.Jester.Name, cut.Find("h2#realm-detail-title").TextContent);
         Assert.Equal("realm-detail-title", cut.Find("section.realm-detail--member").GetAttribute("aria-labelledby"));
         Assert.Equal(DemoCast.Jester.Lore, cut.Find(".realm-detail-heading .realm-detail-eyebrow").TextContent);
-        Assert.Equal("Updated 3 min ago", cut.Find(".realm-detail-heading .realm-detail-updated").TextContent);
+        Assert.Empty(cut.FindAll(".realm-detail-heading .realm-detail-updated"));
         Assert.Single(cut.FindAll(".realm-detail-dot--fresh"));
         Assert.Equal("C", cut.Find(".realm-detail-avatar .realm-row-initial").TextContent);
         Assert.Equal("--realm-row-color:" + DemoCast.Jester.Color, cut.Find(".realm-detail-avatar").GetAttribute("style"));
@@ -140,7 +141,8 @@ public sealed class DetailComponentTests : ComponentTestBase
 
         Assert.Single(cut.FindAll(".realm-detail-dot--stale"));
         Assert.Empty(cut.FindAll(".realm-detail-dot--fresh"));
-        var updated = cut.Find(".realm-detail-heading .realm-detail-updated");
+        Assert.Empty(cut.FindAll(".realm-detail-heading .realm-detail-updated"));
+        var updated = cut.Find(".realm-detail-status .realm-detail-line");
         Assert.Equal("The raven's late — last seen 42 min ago", updated.TextContent);
         Assert.Contains("realm-row-detail--warning", updated.ClassList);
         Assert.Equal(row.StatusLine, cut.Find(".realm-detail-status-line").TextContent);
@@ -158,8 +160,9 @@ public sealed class DetailComponentTests : ComponentTestBase
         var cut = RenderMember(offline);
 
         Assert.Single(cut.FindAll(".realm-detail-dot--offline"));
-        Assert.StartsWith("Gone dark — last seen ", cut.Find(".realm-detail-heading .realm-detail-updated").TextContent, StringComparison.Ordinal);
-        Assert.Contains("realm-row-detail--stale", cut.Find(".realm-detail-heading .realm-detail-updated").ClassList);
+        Assert.Empty(cut.FindAll(".realm-detail-heading .realm-detail-updated"));
+        Assert.StartsWith("Gone dark — last seen ", cut.Find(".realm-detail-status .realm-detail-line").TextContent, StringComparison.Ordinal);
+        Assert.Contains("realm-row-detail--stale", cut.Find(".realm-detail-status .realm-detail-line").ClassList);
     }
 
     [Fact(DisplayName = "[AC-30g] A member with no fix has no dot and no Updated line; the status reads Location unavailable and The scouts have not reported")]
@@ -213,6 +216,59 @@ public sealed class DetailComponentTests : ComponentTestBase
         var cut = RenderMember(Cass() with { FullAddress = null });
 
         Assert.Empty(cut.FindAll(".realm-detail-address"));
+    }
+
+    // ---- nothing is said twice (D106) ------------------------------------------------------------------------------------------------------
+
+    private static int Count(IRenderedComponent<MemberDetail> cut, string text) => cut.FindAll("*").Count(element => element.Children.Length == 0 && element.TextContent.Trim() == text);
+
+    [Fact(DisplayName = "[AC-30i] Dara's stale line and her place appear once: the freshness line only in the status card, and no address line that repeats the card's title")]
+    public void Dara_SaysHerStaleLineOnce_AndHerPlaceOnce()
+    {
+        var dara = MemberOf(DemoCast.Cryptid.Id);
+        var row = VmFactory.Member(dara, Facts);
+        var cut = RenderMember(dara);
+
+        Assert.Equal(1, Count(cut, "The raven's late — last seen 42 min ago"));
+        Assert.Empty(cut.FindAll(".realm-detail-heading .realm-detail-updated"));
+        Assert.Equal(1, Count(cut, row.StatusLine));
+        Assert.False(string.IsNullOrWhiteSpace(dara.FullAddress));
+        Assert.Empty(cut.FindAll(".realm-detail-address"));
+
+        // Screen readers still get the status: the section is described by the status card.
+        Assert.Equal("realm-detail-status", cut.Find("section.realm-detail--member").GetAttribute("aria-describedby"));
+        Assert.Contains("last seen 42 min ago", cut.Find("#realm-detail-status").TextContent, StringComparison.Ordinal);
+    }
+
+    [Fact(DisplayName = "[AC-30j] Briar's street shows once: 'I-65' in the driving status line and not again as an address line")]
+    public void Briar_SaysHerStreetOnce()
+    {
+        var briar = MemberOf(DemoCast.Queen.Id);
+        var cut = RenderMember(briar with { FullAddress = "I-65" });
+
+        Assert.Contains("on I-65", cut.Find(".realm-detail-status-line").TextContent, StringComparison.Ordinal);
+        Assert.Empty(cut.FindAll(".realm-detail-address"));
+        Assert.Equal(1, Regex.Matches(cut.Markup, "I-65").Count);
+    }
+
+    [Theory]
+    [InlineData("Eastgate Avenue, Pinebrook, AL", "Eastgate Avenue · Pinebrook, AL", false)]
+    [InlineData("  eastgate   avenue,Pinebrook,al ", "Eastgate Avenue · Pinebrook, AL", false)]
+    [InlineData("I-65", "Driving · 54 mph on I-65", false)]
+    [InlineData("12 Eastgate Avenue, Pinebrook, AL", "Eastgate Avenue · Pinebrook, AL", true)]
+    [InlineData("I-6", "Driving · 54 mph on I-65", true)]
+    [InlineData("Pinebrook, AL 36301", "At Hearth Haven", true)]
+    public void MemberAddress_IsOmitted_OnlyWhenTheStatusLineSaysTheSamePlace(string address, string statusLine, bool shown)
+    {
+        var member = Cass() with { FullAddress = address };
+
+        Assert.Equal(shown ? address : null, SelectionHeaderFormatter.MemberAddress(member, statusLine));
+    }
+
+    [Fact]
+    public void MemberAddress_IsNull_WithNoAddress()
+    {
+        Assert.Null(SelectionHeaderFormatter.MemberAddress(Cass() with { FullAddress = null }, "At Hearth Haven"));
     }
 
     // ---- the static prince -----------------------------------------------------------------------------------------------------------------
@@ -397,7 +453,8 @@ public sealed class DetailComponentTests : ComponentTestBase
 
         Assert.Equal(DemoCast.Wagon.Name, cut.Find("h2#realm-detail-title").TextContent);
         Assert.Equal(DemoCast.Wagon.Lore, cut.Find(".realm-detail-eyebrow").TextContent);
-        Assert.Equal("Updated 20 min ago", cut.Find(".realm-detail-updated").TextContent);
+        Assert.Empty(cut.FindAll(".realm-detail-updated"));
+        Assert.DoesNotContain("Updated 20 min ago", cut.Markup, StringComparison.Ordinal);
         Assert.Empty(cut.FindAll(".realm-detail-warning"));
 
         Assert.Equal(["Location", "Engine", "Fuel", "Odometer", "Last update"], cut.FindAll(".realm-detail-row dt").Select(label => label.TextContent));
@@ -452,7 +509,7 @@ public sealed class DetailComponentTests : ComponentTestBase
     }
 
     [Fact]
-    public void AStaleWagon_ShowsTheWarningLineAtTheTop_AndTheUpdateLineInTheWarningTone()
+    public void AStaleWagon_ShowsTheWarningLineAtTheTop_OnceAndNotAgainInTheHeader()
     {
         var stale = VehicleOf(DemoCast.Wagon.Id) with { Freshness = Freshness.Stale, LastUpdateUtc = DemoNow - TimeSpan.FromMinutes(80) };
 
@@ -462,7 +519,8 @@ public sealed class DetailComponentTests : ComponentTestBase
         Assert.Equal(SelectionHeaderFormatter.VehicleStaleWarning(stale, Facts), warning.TextContent.Trim());
         Assert.Equal("Last heard 1 hr ago.", warning.TextContent.Trim());
         Assert.Contains("realm-detail-warning", cut.Find(".realm-detail-body").FirstElementChild!.ClassList);
-        Assert.Contains("realm-row-detail--warning", cut.Find(".realm-detail-updated").ClassList);
+        Assert.Empty(cut.FindAll(".realm-detail-updated"));
+        Assert.Single(Regex.Matches(cut.Markup, "Last heard 1 hr ago"));
     }
 
     [Fact]

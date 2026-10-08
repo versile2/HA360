@@ -17,7 +17,7 @@
     var odometer = SelectionHeaderFormatter.VehicleOdometer(Vehicle);
     var lastUpdate = SelectionHeaderFormatter.VehicleLastUpdate(Vehicle, Facts);
 }
-<section class="realm-detail realm-detail--vehicle" aria-labelledby="realm-detail-title">
+<section class="realm-detail realm-detail--vehicle" aria-labelledby="realm-detail-title" aria-describedby="realm-detail-rows">
     <header class="realm-detail-head">
         <button type="button"
                 class="realm-detail-back"
@@ -36,10 +36,6 @@
             {
                 <p class="realm-detail-eyebrow">@lore</p>
             }
-            @if (row.Updated.Length > 0)
-            {
-                <p class="@("realm-detail-updated" + RowClasses.Tone(row.UpdatedTone))">@row.Updated</p>
-            }
         </div>
     </header>
     <div class="realm-detail-body">
@@ -50,7 +46,7 @@
                 <span>@warning</span>
             </p>
         }
-        <dl class="realm-detail-rows">
+        <dl class="realm-detail-rows" id="realm-detail-rows">
             <div class="realm-detail-row">
                 <dt>Location</dt>
                 <dd>@SelectionHeaderFormatter.VehicleLocation(Vehicle, Facts)</dd>
