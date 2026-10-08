@@ -68,10 +68,11 @@ public static class RealmHostingExtensions
 
     /// <summary>
     /// Where the key ring lives (03 section 5.7): beside the database file, which in Live mode in the add-on is <c>/data/dp-keys</c>. A Demo host, which has no
-    /// database, uses that place only when <c>Realm:Db</c> (or <c>REALM_DB</c>) names one; otherwise null, so the framework's user-profile location applies and
-    /// <c>/data</c> is never touched.
+    /// database, uses that place when <c>Realm:Db</c> (or <c>REALM_DB</c>) names one, else <c>/data/dp-keys</c> where the add-on's <c>/data</c> volume exists
+    /// (so an add-on update does not lose the keys, which the container's own profile would); otherwise null, so the framework's user-profile location applies.
     /// </summary>
-    public static string? DataProtectionDirectory(RuntimeOptions runtime, IConfiguration? configuration)
+    /// <param name="addOnDataDirectory">The add-on's persistent volume; a parameter so a test does not depend on whether the machine has a <c>/data</c>.</param>
+    public static string? DataProtectionDirectory(RuntimeOptions runtime, IConfiguration? configuration, string addOnDataDirectory = "/data")
     {
         if (configuration is null)
         {
@@ -81,7 +82,7 @@ public static class RealmHostingExtensions
         var configured = !string.IsNullOrEmpty(configuration["REALM_DB"]) || !string.IsNullOrEmpty(configuration["Realm:Db"]);
         if (runtime.Mode != RealmMode.Live && !configured)
         {
-            return null;
+            return Directory.Exists(addOnDataDirectory) ? Path.Combine(Path.GetFullPath(addOnDataDirectory), DataProtectionDirectoryName) : null;
         }
 
         var database = RealmLiveServiceCollectionExtensions.ResolveDatabasePath(configuration);
