@@ -1044,6 +1044,248 @@
   color: var(--realm-primary);
 }
 
+/* Who's on the map (01 section 7.9): three groups of rows; a row is a drag handle, an avatar, the text and the ⋮ button. */
+.realm-roster__status {
+  margin: 0;
+  min-height: 0;
+  font-size: 0.8125rem;
+  color: var(--realm-text-2);
+}
+
+.realm-roster__status:empty {
+  display: none;
+}
+
+.realm-roster__group {
+  padding: 8px 0 4px;
+}
+
+.realm-roster__heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 24px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--realm-text-2);
+}
+
+.realm-roster__count {
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: var(--realm-surface-2);
+  color: var(--realm-text);
+  font-size: 0.75rem;
+  line-height: 20px;
+  text-align: center;
+}
+
+.realm-roster__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.realm-roster__item {
+  border-bottom: 1px solid var(--realm-line);
+}
+
+.realm-roster__row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 56px;
+}
+
+.realm-roster__handle {
+  display: flex;
+  align-items: center;
+  flex: none;
+  color: var(--realm-text-2);
+  cursor: grab;
+}
+
+.realm-roster__main {
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;
+  gap: 12px;
+  min-width: 0;
+  min-height: 48px;
+  margin: 0;
+  padding: 4px 4px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--realm-text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.realm-roster__avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: var(--roster-color, var(--realm-surface-2));
+  color: var(--realm-bg);
+  font-weight: 700;
+}
+
+.realm-roster__avatar .mud-icon-root {
+  width: 20px;
+  height: 20px;
+  font-size: 20px;
+}
+
+.realm-roster__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.realm-roster__name {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 8px;
+  font-weight: 700;
+}
+
+.realm-roster__lore,
+.realm-roster__meta {
+  font-size: 0.8125rem;
+  font-weight: 400;
+  color: var(--realm-text-2);
+}
+
+.realm-roster__more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 48px;
+  height: 48px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 24px;
+  background: transparent;
+  color: var(--realm-text);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.realm-roster__main:focus-visible,
+.realm-roster__more:focus-visible,
+.realm-roster__menu:focus-visible,
+.realm-roster__menu-item:focus-visible,
+.realm-roster__swatch:focus-visible,
+.realm-roster__action:focus-visible,
+.realm-roster__input:focus-visible {
+  outline: 2px solid var(--realm-focus);
+  outline-offset: 2px;
+}
+
+.realm-roster__menu,
+.realm-roster__edit {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 8px 28px;
+  padding: 8px;
+  border: 1px solid var(--realm-line);
+  border-radius: 12px;
+  background: var(--realm-surface);
+}
+
+.realm-roster__menu-item,
+.realm-roster__action {
+  box-sizing: border-box;
+  min-height: 48px;
+  margin: 0;
+  padding: 0 16px;
+  border: 1px solid var(--realm-line);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--realm-text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.realm-roster__action--primary {
+  border-color: var(--realm-primary);
+  background: var(--realm-primary);
+  color: var(--realm-on-primary);
+  font-weight: 700;
+}
+
+.realm-roster__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.realm-roster__input {
+  box-sizing: border-box;
+  min-height: 48px;
+  padding: 0 12px;
+  border: 1px solid var(--realm-line-strong);
+  border-radius: 12px;
+  background: var(--realm-bg);
+  color: var(--realm-text);
+  font: inherit;
+}
+
+.realm-roster__swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.realm-roster__swatch {
+  box-sizing: border-box;
+  width: 48px;
+  height: 48px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 24px;
+  background: transparent;
+  cursor: pointer;
+  position: relative;
+}
+
+.realm-roster__swatch::before {
+  content: "";
+  position: absolute;
+  inset: 8px;
+  border-radius: 50%;
+  background: var(--roster-color);
+}
+
+.realm-roster__swatch[aria-checked="true"]::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border: 2px solid var(--realm-text);
+  border-radius: 50%;
+}
+
+.realm-roster__actions {
+  display: flex;
+  gap: 8px;
+}
+
 .realm-settings__connections {
   margin: 0;
   padding: 0;

@@ -86,29 +86,17 @@ public static class VmFactory
     public static VehicleRowVm Vehicle(VehicleVm vehicle, RowFacts facts)
     {
         var lore = string.IsNullOrWhiteSpace(vehicle.LoreTitle) ? null : vehicle.LoreTitle;
-        if (vehicle.IsPlaceholder)
-        {
-            var note = string.IsNullOrWhiteSpace(vehicle.PlaceholderNote) ? VehicleTextFormatter.LocationUnavailable : vehicle.PlaceholderNote;
-            return new VehicleRowVm(vehicle.Id, vehicle.Name, lore, vehicle.Glyph, true, note, null, false, null, false, string.Empty, LineTone.Normal, VehicleTextFormatter.AccessibleName(vehicle, note, null, string.Empty));
-        }
-
         var location = VehicleTextFormatter.Location(vehicle, facts.PlaceOf(vehicle.PlaceId)?.DisplayName, facts.Units);
-        var engine = VehicleTextFormatter.Engine(vehicle);
         var updated = VehicleTextFormatter.Updated(vehicle, facts.Now, facts.Zone);
         return new VehicleRowVm(
             Id: vehicle.Id,
             Name: vehicle.Name,
             Lore: lore,
             Glyph: vehicle.Glyph,
-            IsPlaceholder: false,
             LocationLine: location,
-            Engine: engine,
-            RemoteStart: vehicle.Ignition == IgnitionState.RemoteStart,
-            Fuel: vehicle.FuelPct is { } fuel ? VehicleTextFormatter.Fuel(fuel) : null,
-            LowFuel: vehicle.FuelPct is { } level && VehicleTextFormatter.IsLowFuel(level),
             Updated: updated,
             UpdatedTone: vehicle.Freshness == Freshness.Stale ? LineTone.Warning : LineTone.Normal,
-            AccessibleName: VehicleTextFormatter.AccessibleName(vehicle, location, engine, updated));
+            AccessibleName: VehicleTextFormatter.AccessibleName(vehicle, location, updated));
     }
 
     /// <summary>One place's row.</summary>

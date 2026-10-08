@@ -86,7 +86,7 @@ internal static class DefaultViewPlanner
             : null;
 
     private static (double Lat, double Lon)? Position(VehicleVm vehicle) =>
-        !vehicle.IsPlaceholder && vehicle.Freshness != Freshness.NoFix && vehicle.Lat is { } lat && vehicle.Lon is { } lon
+        vehicle.Freshness != Freshness.NoFix && vehicle.Lat is { } lat && vehicle.Lon is { } lon
             ? (lat, lon)
             : null;
 

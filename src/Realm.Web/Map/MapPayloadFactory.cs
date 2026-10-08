@@ -63,7 +63,7 @@ public static class MapPayloadFactory
         Vehicles(vehicles, places, version, selection: null, now: default, zone: TimeZoneInfo.Utc);
 
     /// <summary>
-    /// The vehicle payload (01 section 4.7): the ring follows <c>Freshness</c> first and <c>IsMoving</c> second; a vehicle without a position, and the placeholder, have no coordinates and so no pin.
+    /// The vehicle payload (01 section 4.7): the ring follows <c>Freshness</c> first and <c>IsMoving</c> second; a vehicle without a position has no coordinates and so no pin.
     /// Only the selected vehicle carries a chip (01 section 4.4, <see cref="VehicleChip"/>).
     /// </summary>
     public static VehiclesPayload Vehicles(
@@ -121,10 +121,9 @@ public static class MapPayloadFactory
     }
 
     /// <summary>
-    /// The chip text of the selected vehicle (01 section 4.4). A stale vehicle reads "Last heard 1 hr ago" and never "Driving", whatever the engine says; a fresh moving one "Driving · 62 mph" (the
-    /// speed only when <see cref="VehicleVm.SpeedMps"/> is known, else "Driving"); a fresh one that is not moving "Parked · Engine off" or "Parked · Accessory on", and "Engine on" alone with the engine
-    /// running (a vehicle that idles is not parked; the remote start reads the same way, with its minutes left). Without an ignition reading the chip is "Parked". A vehicle with no fix or no position has
-    /// no pin and the placeholder none, so no chip; a stale one with no update time has no chip either.
+    /// The chip text of the selected vehicle (01 section 4.4). A stale vehicle reads "Last heard 1 hr ago" and never "Driving"; a fresh moving one "Driving · 62 mph" (the speed only when
+    /// <see cref="VehicleVm.SpeedMps"/> is known, else "Driving"); a fresh one that is not moving "Parked". A vehicle with no fix or no position has no pin, so no chip; a stale one with no update
+    /// time has no chip either.
     /// </summary>
     public static string? VehicleChip(VehicleVm vehicle, DateTimeOffset now, TimeZoneInfo zone, UnitSystem units = UnitSystem.Imperial)
     {
@@ -145,12 +144,7 @@ public static class MapPayloadFactory
             return vehicle.SpeedMps is { } speed ? "Driving · " + UnitFormatter.Speed(speed, units) : "Driving";
         }
 
-        var engine = VehicleTextFormatter.Engine(vehicle);
-        return vehicle.Ignition switch
-        {
-            IgnitionState.On or IgnitionState.RemoteStart => engine,
-            _ => engine is null ? "Parked" : "Parked · " + engine,
-        };
+        return "Parked";
     }
 
     /// <summary>The zones: every place whose radius is above 0 and at most <see cref="MapPayloadOptions.MaxZoneRadiusKm"/> (the arrival zone is never sent), with the occupied flag (people only) and the three appearances.</summary>
@@ -325,9 +319,9 @@ public static class MapPayloadFactory
         _ => 0,
     };
 
-    // A vehicle has a pin when it is not the placeholder and has a fix and a position.
+    // A vehicle has a pin when it has a fix and a position.
     private static bool HasPin(VehicleVm vehicle) =>
-        !vehicle.IsPlaceholder && vehicle.Freshness != Freshness.NoFix && vehicle.Lat is not null && vehicle.Lon is not null;
+        vehicle.Freshness != Freshness.NoFix && vehicle.Lat is not null && vehicle.Lon is not null;
 
     private static VehiclePayloadItem Vehicle(VehicleVm vehicle, IReadOnlyList<PlaceVm> places, string? chip)
     {
