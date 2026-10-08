@@ -3,15 +3,14 @@
 // fifty acceptance criteria are unchanged.
 import type { Locator, Page } from '@playwright/test';
 
-import { demo, expect, mapReady, readHook, test } from '../fixtures.js';
+import { demo, expect, loadDemoCast, mapReady, readHook, test } from '../fixtures.js';
 
 const dialog = (page: Page): Locator => page.getByTestId('add-picker');
 
 async function openList(page: Page, tab: 'tab-drivers' | 'tab-vehicles' | 'tab-places'): Promise<void> {
   await demo(page, { defaultRoster: true });
   await mapReady(page);
-  await page.getByTestId('sheet-handle').click();
-  await page.getByTestId(tab).click();
+  await page.getByTestId(tab).click();   // in the bottom sheet a tab opens the list to 80 % (D117); in the panel the list is already open
   await expect(page.getByTestId(tab), 'the tab is selected').toHaveAttribute('aria-selected', 'true');
 }
 
@@ -38,8 +37,9 @@ test.describe('Adding drivers, trackers and places', () => {
   });
 
   test('[ADD] Add tracker lists every candidate, greys out those on the map, searches, and a pick moves the hatchback into Trackers and selects it', { tag: ['@phone', '@unfolded'] }, async ({ page }) => {
+    const hatchback = loadDemoCast().roster.find((entry) => entry.entityId === 'device_tracker.hatchback');
     await openList(page, 'tab-vehicles');
-    expect(await pinIds(page), 'the hatchback starts off the map').not.toContain('chariot');
+    await expect(page.getByTestId('row-vehicle-chariot'), 'the hatchback is not in Trackers yet').toHaveCount(0);
 
     await page.getByTestId('add-tracker').click();
     await expect(dialog(page), 'the picker is open').toBeVisible();
@@ -49,8 +49,8 @@ test.describe('Adding drivers, trackers and places', () => {
     await expect(wagon, 'and says why').toContainText('Already on the map');
     await expect(wagon.locator('.realm-roster__avatar'), 'with the avatar the map draws').toBeVisible();
     await expect(wagon.locator('code'), 'and its entity id').toHaveText('device_tracker.wagon');
-    const hatchback = page.getByTestId('add-pick-device-tracker-hatchback');
-    await expect(hatchback, 'the hatchback is Not tracked, so it can be chosen').toBeEnabled();
+    const pick = page.getByTestId('add-pick-device-tracker-hatchback');
+    await expect(pick, 'the hatchback is Not tracked, so it can be chosen').toBeEnabled();
 
     await page.getByTestId('add-search').fill('hatch');
     await expect(page.locator('[data-testid^="add-pick-"]'), 'the search narrows the list').toHaveCount(1);
@@ -58,10 +58,11 @@ test.describe('Adding drivers, trackers and places', () => {
     await expect(page.getByTestId('add-none'), 'nothing matches').toBeVisible();
     await page.getByTestId('add-search').fill('');
 
-    await hatchback.click();
+    await pick.click();
     await expect(dialog(page), 'a pick closes the picker').toHaveCount(0);
-    await expect.poll(() => pinIds(page), { message: 'the hatchback is on the map' }).toContain('chariot');
-    await expect(page.getByTestId('sheet-selection-header'), 'and selected').toBeVisible();
+    await expect(page.getByTestId('sheet-selection-header'), 'the hatchback is selected').toContainText(hatchback?.name ?? 'missing from the cast file');
+    await page.getByTestId('sheet-selection-clear').click();
+    await expect(page.getByTestId('row-vehicle-chariot'), 'and it is in Trackers now').toHaveCount(1);
   });
 
   test('[ADD] Add driver puts the prince on the map the same way, and Back closes the picker', { tag: ['@phone', '@unfolded'] }, async ({ page }) => {

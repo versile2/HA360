@@ -655,6 +655,7 @@
         }
 
         var zone = new NewZone(draft.Name, latitude, longitude, _placeRadius, PlaceKindIcons.HaIcon(draft.Kind));
+        var known = Snapshot.Places.Select(place => place.Id).ToHashSet(StringComparer.Ordinal);   // before the call: the Demo adds the place at once
         _placeBusy = true;
         _placeError = null;
         StateHasChanged();
@@ -680,7 +681,6 @@
 
         Snackbar.Add(zone.Name + " was added to Places.", Severity.Success);
         EndPlacement();
-        var known = Snapshot.Places.Select(place => place.Id).ToHashSet(StringComparer.Ordinal);
         var name = zone.Name;
         _pending = new PendingSelection(EntityKind.Place, snapshot => snapshot.Places.FirstOrDefault(place => !known.Contains(place.Id) && place.DisplayName == name)?.Id, Session.Time.GetUtcNow() + PendingWindow);
         SelectPending();

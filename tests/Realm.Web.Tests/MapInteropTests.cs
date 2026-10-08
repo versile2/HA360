@@ -293,7 +293,7 @@ public sealed class MapInteropTests
             Assert.Null(entry.Attribute.Identifier);   // the C# method name is the name the script uses
         });
         Assert.Equal(
-            ["OnBubbleTap", "OnCameraChanged", "OnError", "OnFollowEnded", "OnMapTap", "OnPinTap", "OnReady", "OnStyleResult", "OnWebGlUnavailable"],
+            ["OnBubbleTap", "OnCameraChanged", "OnError", "OnFollowEnded", "OnMapTap", "OnPinTap", "OnPlacementMoved", "OnReady", "OnStyleResult", "OnWebGlUnavailable"],
             invokable.Select(entry => entry.Method.Name).Order(StringComparer.Ordinal));
         Assert.Empty(called.Except(invokable.Select(entry => entry.Method.Name)));
         Assert.Contains("OnReady", called);
