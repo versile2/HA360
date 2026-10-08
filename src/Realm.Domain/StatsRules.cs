@@ -44,11 +44,22 @@ public static class StatsRules
         TimeZoneInfo zone,
         int weekOffset,
         IReadOnlyList<StatsMember> members,
+        IReadOnlyList<StatsTrip> trips) =>
+        PeriodReport(PeriodMath.Resolve(ReportPeriod.OfWeek(weekOffset), now, weekStart, zone), members, trips);
+
+    /// <summary>
+    /// Builds the report of any period (a week, a calendar month, a rolling window or a custom range) for the report drivers, by the same rules as a week: the
+    /// trips that start in [window start, window end) count, and the trend is taken against <see cref="ReportWindow.Comparator"/>. <paramref name="trips"/> must hold the
+    /// valid trips of both windows; trips of other members or outside both windows are ignored.
+    /// </summary>
+    public static WeekReportVm PeriodReport(
+        ReportWindow window,
+        IReadOnlyList<StatsMember> members,
         IReadOnlyList<StatsTrip> trips)
     {
-        var week = WeekMath.Week(now, weekStart, zone, weekOffset);
-        var current = new TimeWindow(WeekMath.StartUtc(now, weekStart, zone, weekOffset), WeekMath.EndUtc(now, weekStart, zone, weekOffset));
-        var comparator = ComparatorWindow(now, weekStart, zone, weekOffset);
+        ArgumentNullException.ThrowIfNull(window);
+        var current = new TimeWindow(window.StartUtc, window.EndUtc);
+        var comparator = window.Comparator;
 
         var drivers = members.Select(m => Evaluate(m, current, comparator, trips)).ToList();
         var ordered = drivers
@@ -70,15 +81,16 @@ public static class StatsRules
         var bases = covered.SelectMany(d => d.Trips).Select(t => t.DistanceBasis).Distinct().ToList();
 
         return new WeekReportVm(
-            Start: week.Start,
-            End: week.End,
-            IsCurrent: weekOffset == 0,
+            Start: window.Start,
+            End: window.End,
+            IsCurrent: window.IsCurrent,
             Coverage: coverage,
             DistanceBasis: bases.Count > 1 ? DistanceBasis.Mixed : bases.Count == 1 ? bases[0] : DistanceBasis.Gps,
             Events: events,
             TopSpeed: top,
             Totals: totals,
-            Drivers: ordered.Select(d => d.Summary).ToList());
+            Drivers: ordered.Select(d => d.Summary).ToList(),
+            Period: window.Period);
     }
 
     /// <summary>
@@ -86,7 +98,7 @@ public static class StatsRules
     /// Null for a member who is not a report driver. A driver who is not covered for the week gets a summary
     /// with Covered false, null counts and no trips.
     /// </summary>
-    /// <param name="placeNames">The display names of the zones that still exist, by place id: a deleted zone falls back to the street.</param>
+    /// <param name="placeNames">The display names of the zones that still exist, by place id: a deleted zone falls back to the street (see <see cref="PlaceLabeler"/>).</param>
     public static DriverWeek? DriverWeekOf(
         DateTimeOffset now,
         DayOfWeek weekStart,
@@ -95,23 +107,34 @@ public static class StatsRules
         string memberId,
         IReadOnlyList<StatsMember> members,
         IReadOnlyList<StatsTrip> trips,
-        IReadOnlyDictionary<string, string> placeNames)
+        IReadOnlyDictionary<string, string> placeNames) =>
+        DriverPeriodOf(PeriodMath.Resolve(ReportPeriod.OfWeek(weekOffset), now, weekStart, zone), memberId, members, trips, PlaceLabeler.FromNames(placeNames));
+
+    /// <summary>One driver's period (any window): the summary and the trips that start in it, newest first, with the ends named by <paramref name="labels"/>. Null for a member who is not a report driver.</summary>
+    public static DriverWeek? DriverPeriodOf(
+        ReportWindow window,
+        string memberId,
+        IReadOnlyList<StatsMember> members,
+        IReadOnlyList<StatsTrip> trips,
+        PlaceLabeler labels)
     {
+        ArgumentNullException.ThrowIfNull(window);
+        ArgumentNullException.ThrowIfNull(labels);
         var member = members.FirstOrDefault(m => string.Equals(m.MemberId, memberId, StringComparison.Ordinal));
         if (member is null)
         {
             return null;
         }
 
-        var current = new TimeWindow(WeekMath.StartUtc(now, weekStart, zone, weekOffset), WeekMath.EndUtc(now, weekStart, zone, weekOffset));
-        var driver = Evaluate(member, current, ComparatorWindow(now, weekStart, zone, weekOffset), trips);
+        var current = new TimeWindow(window.StartUtc, window.EndUtc);
+        var driver = Evaluate(member, current, window.Comparator, trips);
         var drives = driver.Trips
             .OrderByDescending(t => t.StartUtc)
             .Select(t => new DriveVm(
                 StartUtc: t.StartUtc,
                 EndUtc: t.EndUtc,
-                FromLabel: Label(t.StartPlaceId, t.StartStreet, placeNames),
-                ToLabel: Label(t.EndPlaceId, t.EndStreet, placeNames),
+                FromLabel: labels.Label(t, end: false),
+                ToLabel: labels.Label(t, end: true),
                 Meters: t.Meters,
                 TopSpeedMps: t.Quality == TripQuality.Coarse ? null : t.TopSpeedMps,
                 Events: EventCounts(t.SpeedingCount, t.PhoneCount)))
@@ -230,9 +253,6 @@ public static class StatsRules
             [EventKeys.Accel] = null,
             [EventKeys.Braking] = null,
         };
-
-    private static string? Label(string? placeId, string? street, IReadOnlyDictionary<string, string> placeNames) =>
-        placeId is not null && placeNames.TryGetValue(placeId, out var name) ? name : street;
 
     // ---- one event type across drivers (02 section 6.4) -----------------------------------------------------------
 

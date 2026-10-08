@@ -20,6 +20,9 @@ public abstract class ComponentTestBase : BunitContext, IAsyncLifetime
 {
     private bool _providersRendered;
 
+    /// <summary>The popover provider <see cref="RenderWithProviders{TComponent}"/> rendered, where a menu's items are drawn; null before the first render.</summary>
+    protected IRenderedComponent<MudPopoverProvider>? PopoverProvider { get; private set; }
+
     protected ComponentTestBase()
     {
         // Loose mode answers every JS call with a default, so a component never needs its own setup to render.
@@ -41,7 +44,7 @@ public abstract class ComponentTestBase : BunitContext, IAsyncLifetime
         if (!_providersRendered)
         {
             _providersRendered = true;
-            Render<MudPopoverProvider>();
+            PopoverProvider = Render<MudPopoverProvider>();
             Render<MudXProvider>();
         }
 

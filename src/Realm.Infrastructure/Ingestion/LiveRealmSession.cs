@@ -59,6 +59,9 @@ public sealed class LiveRealmSession : IRealmSession
     }
 
     /// <inheritdoc />
+    public IRosterEditor Roster => _source.Roster;
+
+    /// <inheritdoc />
     public TimeProvider Time => _source.Time;
 
     /// <inheritdoc />
@@ -71,6 +74,14 @@ public sealed class LiveRealmSession : IRealmSession
     /// <inheritdoc />
     public ValueTask<DriverWeek?> GetDriverWeekAsync(string memberId, int weekOffset, DayOfWeek weekStart, CancellationToken ct) =>
         _source.GetDriverWeekAsync(memberId, weekOffset, weekStart, ct);
+
+    /// <inheritdoc />
+    public ValueTask<WeekReportVm> GetPeriodReportAsync(ReportWindow window, CancellationToken ct) =>
+        _source.GetPeriodReportAsync(window, ct);
+
+    /// <inheritdoc />
+    public ValueTask<DriverWeek?> GetDriverPeriodAsync(string memberId, ReportWindow window, CancellationToken ct) =>
+        _source.GetDriverPeriodAsync(memberId, window, ct);
 
     /// <inheritdoc />
     public string? ResolveMe(string? haUserId) => _source.ResolveMe(haUserId);

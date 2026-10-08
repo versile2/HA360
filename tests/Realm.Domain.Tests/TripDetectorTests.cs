@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Xunit;
 using static Realm.Domain.Tests.TripFixtures;
 
@@ -692,53 +691,6 @@ public class TripDetectorTests
         Assert.InRange(trip.DistanceGpsM, 12_000.0, 12_200.0);
         Assert.Equal(stopNorth, trip.DistanceGpsM, 0.01);
         Assert.False(trip.HasGap);
-    }
-
-    // ---- T9 0,0 bursts of the vehicle tracker ----------------------------------------------------------------
-
-    [Fact]
-    public void T9_zero_zero_fixes_of_the_vehicle_tracker_are_dropped_at_parsing_and_cause_no_spike_or_trip()
-    {
-        // The FordPass tracker bursts 0,0 between real fixes: FixParser drops each one, so the detector never sees it.
-        var parsedAway = 0;
-        var fordPass = new List<RawFix>();
-        var realFixes = DriveAndStop(0, 29).Fixes;
-        foreach (var fix in realFixes)
-        {
-            var snapshot = new HaEntitySnapshot(
-                "device_tracker.fordpass_vin_tracker",
-                "home",
-                new Dictionary<string, JsonElement>
-                {
-                    ["latitude"] = JsonSerializer.SerializeToElement(0.0),
-                    ["longitude"] = JsonSerializer.SerializeToElement(0.0),
-                },
-                fix.Ts.AddSeconds(1),
-                fix.Ts.AddSeconds(1));
-            if (FixParser.ParseTracker(snapshot, FixSource.FordPass, fix.Ts.AddSeconds(2)) is { } parsed)
-            {
-                fordPass.Add(parsed);
-            }
-            else
-            {
-                parsedAway++;
-            }
-        }
-
-        Assert.Equal(realFixes.Count, parsedAway);
-        Assert.Empty(fordPass);
-
-        var result = Replay([.. realFixes, .. fordPass], 10_000);
-
-        Assert.All(result.Decisions, d => Assert.True(d.InTrack));
-        Assert.Single(result.Closed);
-
-        // And a vehicle tracker alone makes no trip: its fixes never feed a member's track.
-        var vehicleOnly = realFixes.Select(f => f with { Source = FixSource.FordPass, EntityId = "device_tracker.fordpass_vin_tracker" });
-        var nothing = Replay(vehicleOnly, 10_000);
-        Assert.Empty(nothing.Closed);
-        Assert.Empty(nothing.Discarded);
-        Assert.All(nothing.Decisions, d => Assert.Equal(TrackReason.Priority, d.Reason));
     }
 
     // ---- T10 tunnel, T11 dead zone ---------------------------------------------------------------------------

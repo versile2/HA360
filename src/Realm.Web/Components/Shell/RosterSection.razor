@@ -1,0 +1,366 @@
+@implements IDisposable
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.JSInterop
+@using Realm.Domain
+@using Realm.Web.Map
+@inject IJSRuntime JS
+
+@* Settings, "Who's on the map" (01 section 7.9; D113): the roster in three groups, PEOPLE, VEHICLES and NOT TRACKED, each with its count. A row is a drag handle, an avatar (the initial of a person, a car for a
+   tracker), the name with its title, and a second line "kind · source" (a row moved by the rules adds "moved automatically"), then the ⋮ button. The ⋮ button opens "Move to..." (the other groups, and Move up and
+   Move down inside the group): it is the keyboard and touch alternative to the drag, which is the native HTML5 drag and drop of the browser (wwwroot/js/roster.js fills in the transfer and allows the drop). It is a
+   disclosure, not an ARIA menu: a button with aria-expanded and a labelled group of buttons that Tab walks through, Esc closes it and the focus goes back to the ⋮ button. Tapping the row opens an editor
+   under it for the name, the title and the colour. Every change is applied at once through the session's IRosterEditor (stored in Live, kept for the circuit in Demo); a polite status line says what moved. *@
+<section class="realm-settings__section realm-roster" aria-labelledby="realm-settings-roster" data-testid="roster-section">
+    <h3 id="realm-settings-roster" class="realm-settings__heading">Who's on the map</h3>
+    <p class="realm-settings__help">Drag a row to another group, or use its ⋮ button. Tap a row to rename it. Not tracked means off the map, the lists and the reports, and nothing new is stored.</p>
+    <p class="realm-roster__status" role="status" aria-live="polite" data-testid="roster-status">@_status</p>
+    @if (Entries.Count == 0)
+    {
+        <p class="realm-settings__help" data-testid="roster-empty">Nothing found yet. People and trackers that Home Assistant reports appear here.</p>
+    }
+    @foreach (var group in Groups)
+    {
+        var rows = RowsOf(group.Group);
+        <div @key="group.Key"
+             class="realm-roster__group"
+             role="group"
+             aria-labelledby="@("realm-roster-heading-" + group.Key)"
+             data-roster-drop="@group.Key"
+             data-testid="@("roster-group-" + group.Key)"
+             @ondrop="() => DropOnGroupAsync(group.Group)">
+            <h4 id="@("realm-roster-heading-" + group.Key)" class="realm-roster__heading">
+                <span>@group.Heading</span>
+                <span class="realm-roster__count" data-testid="@("roster-count-" + group.Key)">@rows.Count</span>
+            </h4>
+            <ul class="realm-roster__list">
+                @for (var index = 0; index < rows.Count; index++)
+                {
+                    var entry = rows[index];
+                    var position = index;
+                    var slug = Slug(entry.EntityId);
+                    var editing = _editFor == entry.EntityId;
+                    var menuOpen = _menuFor == entry.EntityId;
+                    <li @key="entry.EntityId" class="realm-roster__item" data-testid="@("roster-row-" + slug)" @ondrop="() => DropOnRowAsync(entry, position)" @ondrop:stopPropagation>
+                        <div class="realm-roster__row" draggable="true" data-roster-entity="@entry.EntityId" @ondragstart="() => _dragging = entry.EntityId">
+                            <span class="realm-roster__handle" aria-hidden="true"><MudIcon Icon="@Icons.Material.Filled.DragIndicator" /></span>
+                            <button type="button"
+                                    id="@("realm-roster-main-" + slug)"
+                                    class="realm-roster__main"
+                                    aria-expanded="@(editing ? "true" : "false")"
+                                    aria-controls="@("realm-roster-edit-" + slug)"
+                                    data-testid="@("roster-open-" + slug)"
+                                    @onclick="() => ToggleEdit(entry)">
+                                <span class="realm-roster__avatar" style="@AvatarStyle(entry)" aria-hidden="true">
+                                    @if (entry.Kind == RosterKind.Tracker)
+                                    {
+                                        <MudIcon Icon="@Icons.Material.Filled.DirectionsCar" />
+                                    }
+                                    else
+                                    {
+                                        @MapText.Initial(entry.DisplayName)
+                                    }
+                                </span>
+                                <span class="realm-roster__text">
+                                    <span class="realm-roster__name">
+                                        <span>@entry.DisplayName</span>
+                                        @if (!string.IsNullOrWhiteSpace(entry.LoreTitle))
+                                        {
+                                            <span class="realm-roster__lore">@entry.LoreTitle</span>
+                                        }
+                                    </span>
+                                    <span class="realm-roster__meta" data-testid="@("roster-meta-" + slug)">@MetaOf(entry)</span>
+                                </span>
+                            </button>
+                            <button type="button"
+                                    id="@("realm-roster-more-" + slug)"
+                                    class="realm-roster__more"
+                                    aria-label="@("Move " + entry.DisplayName + " to…")"
+                                    aria-haspopup="true"
+                                    aria-expanded="@(menuOpen ? "true" : "false")"
+                                    aria-controls="@("realm-roster-menu-" + slug)"
+                                    data-testid="@("roster-more-" + slug)"
+                                    @onclick="() => ToggleMenu(entry)">
+                                <MudIcon Icon="@Icons.Material.Filled.MoreVert" />
+                            </button>
+                        </div>
+                        @if (menuOpen)
+                        {
+                            <div id="@("realm-roster-menu-" + slug)"
+                                 class="realm-roster__menu"
+                                 role="group"
+                                 aria-label="@("Move " + entry.DisplayName + " to")"
+                                 tabindex="-1"
+                                 data-testid="roster-menu"
+                                 @onkeydown="(KeyboardEventArgs args) => MenuKeyDownAsync(args, entry)"
+                                 @onkeydown:stopPropagation>
+                                @foreach (var target in Groups.Where(other => other.Group != entry.Group))
+                                {
+                                    <button type="button" class="realm-roster__menu-item" data-testid="@("roster-move-" + target.Key)" @onclick="() => MoveToAsync(entry, target.Group, null)">Move to @target.Title</button>
+                                }
+                                @if (position > 0)
+                                {
+                                    <button type="button" class="realm-roster__menu-item" data-testid="roster-move-up" @onclick="() => MoveToAsync(entry, entry.Group, position - 1)">Move up</button>
+                                }
+                                @if (position < rows.Count - 1)
+                                {
+                                    <button type="button" class="realm-roster__menu-item" data-testid="roster-move-down" @onclick="() => MoveToAsync(entry, entry.Group, position + 1)">Move down</button>
+                                }
+                            </div>
+                        }
+                        @if (editing)
+                        {
+                            <div id="@("realm-roster-edit-" + slug)"
+                                 class="realm-roster__edit"
+                                 role="group"
+                                 aria-label="@("Edit " + entry.DisplayName)"
+                                 data-testid="roster-edit"
+                                 @onkeydown="(KeyboardEventArgs args) => EditKeyDownAsync(args, entry)"
+                                 @onkeydown:stopPropagation>
+                                <label class="realm-roster__field">
+                                    <span class="realm-settings__label">Name</span>
+                                    <input id="@("realm-roster-name-" + slug)" class="realm-roster__input" type="text" maxlength="@RosterRules.MaxNameLength" data-testid="roster-name" @bind="_name" @bind:event="oninput" />
+                                </label>
+                                <label class="realm-roster__field">
+                                    <span class="realm-settings__label">Title</span>
+                                    <input class="realm-roster__input" type="text" maxlength="@RosterRules.MaxTitleLength" placeholder="Optional" data-testid="roster-title" @bind="_title" @bind:event="oninput" />
+                                </label>
+                                <div class="realm-roster__field">
+                                    <span id="@("realm-roster-color-label-" + slug)" class="realm-settings__label">Colour</span>
+                                    <div class="realm-roster__swatches" role="radiogroup" aria-labelledby="@("realm-roster-color-label-" + slug)">
+                                        @for (var swatch = 0; swatch < Swatches.Count; swatch++)
+                                        {
+                                            var colour = Swatches[swatch];
+                                            var label = SwatchName(colour);
+                                            <button type="button"
+                                                    role="radio"
+                                                    class="realm-roster__swatch"
+                                                    style="@("--roster-color:" + colour)"
+                                                    aria-checked="@(string.Equals(_color, colour, StringComparison.OrdinalIgnoreCase) ? "true" : "false")"
+                                                    aria-label="@label"
+                                                    data-testid="@("roster-color-" + swatch)"
+                                                    @onclick="() => _color = colour"></button>
+                                        }
+                                    </div>
+                                </div>
+                                <div class="realm-roster__actions">
+                                    <button type="button" class="realm-roster__action realm-roster__action--primary" data-testid="roster-save" @onclick="() => SaveAsync(entry)">Save</button>
+                                    <button type="button" class="realm-roster__action" data-testid="roster-cancel" @onclick="() => CancelEditAsync(entry)">Cancel</button>
+                                </div>
+                            </div>
+                        }
+                    </li>
+                }
+            </ul>
+        </div>
+    }
+</section>
+
+@code {
+    private static readonly string[] PaletteNames = ["Gold", "Violet", "Sky", "Rose", "Mint", "Orange", "Periwinkle", "Pink"];
+
+    private static readonly RosterGroupInfo[] Groups =
+    [
+        new(RosterGroup.People, "people", "PEOPLE", "People"),
+        new(RosterGroup.Vehicles, "vehicles", "VEHICLES", "Vehicles"),
+        new(RosterGroup.NotTracked, "not-tracked", "NOT TRACKED", "Not tracked"),
+    ];
+
+    private IRosterEditor? _roster;
+    private string? _dragging;
+    private string? _menuFor;
+    private string? _editFor;
+    private string? _focusId;
+    private string _status = string.Empty;
+    private string _name = string.Empty;
+    private string _title = string.Empty;
+    private string _color = string.Empty;
+
+    /// <summary>The circuit's session, cascaded by <c>RealmShell</c>; without one the section lists nobody.</summary>
+    [CascadingParameter]
+    private IRealmSession? Session { get; set; }
+
+    private IReadOnlyList<RosterEntry> Entries => _roster?.Entries ?? [];
+
+    private IReadOnlyList<string> Swatches
+    {
+        get
+        {
+            var palette = RosterRules.Palette;
+            if (!string.IsNullOrEmpty(_color) && RosterRules.IsColor(_color) && !palette.Contains(_color, StringComparer.OrdinalIgnoreCase))
+            {
+                return [_color, .. palette];
+            }
+
+            return palette;
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        _roster = Session?.Roster;
+        if (_roster is not null)
+        {
+            _roster.Changed += OnChanged;
+        }
+    }
+
+    public void Dispose()
+    {
+        if (_roster is not null)
+        {
+            _roster.Changed -= OnChanged;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusId is not { } id)
+        {
+            return;
+        }
+
+        _focusId = null;
+        try
+        {
+            await JS.InvokeVoidAsync("realmRoster.focus", id);
+        }
+        catch (Exception exception) when (exception is JSException or JSDisconnectedException or InvalidOperationException or TaskCanceledException)
+        {
+            // A circuit that is gone: there is nothing to focus.
+        }
+    }
+
+    // A discovery or an edit changed the roster; it arrives off the renderer's context.
+    private void OnChanged() => _ = InvokeAsync(StateHasChanged);
+
+    private List<RosterEntry> RowsOf(RosterGroup group) => [.. Entries.Where(entry => entry.Group == group)];
+
+    private static string Slug(string entityId) => entityId.Replace('.', '-').Replace('_', '-');
+
+    private static string AvatarStyle(RosterEntry entry) => RosterRules.IsColor(entry.Color) ? "--roster-color:" + entry.Color : string.Empty;
+
+    private static string MetaOf(RosterEntry entry)
+    {
+        var kind = entry.Kind == RosterKind.Person ? "Person" : "Tracker";
+        var meta = kind + " · " + entry.Source;
+        return entry is { Group: RosterGroup.NotTracked, AutoMovedUtc: not null } ? meta + " · moved automatically" : meta;
+    }
+
+    private static string SwatchName(string colour)
+    {
+        var index = RosterRules.Palette.ToList().FindIndex(item => string.Equals(item, colour, StringComparison.OrdinalIgnoreCase));
+        return index >= 0 && index < PaletteNames.Length ? PaletteNames[index] : "Current colour";
+    }
+
+    private static string TitleOf(RosterGroup group) => Groups.First(info => info.Group == group).Title;
+
+    private void ToggleMenu(RosterEntry entry)
+    {
+        _editFor = null;
+        if (_menuFor == entry.EntityId)
+        {
+            _menuFor = null;
+            return;
+        }
+
+        _menuFor = entry.EntityId;
+        _focusId = "realm-roster-menu-" + Slug(entry.EntityId);
+    }
+
+    private Task MenuKeyDownAsync(KeyboardEventArgs args, RosterEntry entry)
+    {
+        if (args.Key == "Escape")
+        {
+            _menuFor = null;
+            _focusId = "realm-roster-more-" + Slug(entry.EntityId);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private async Task MoveToAsync(RosterEntry entry, RosterGroup group, int? index)
+    {
+        _menuFor = null;
+        _focusId = "realm-roster-more-" + Slug(entry.EntityId);
+        if (_roster is null)
+        {
+            return;
+        }
+
+        await _roster.MoveAsync(entry.EntityId, group, index);
+        _status = group == entry.Group ? entry.DisplayName + " moved" : entry.DisplayName + " moved to " + TitleOf(group);
+    }
+
+    private async Task DropOnGroupAsync(RosterGroup group)
+    {
+        var id = _dragging;
+        _dragging = null;
+        if (id is null || _roster is null)
+        {
+            return;
+        }
+
+        var entry = Entries.FirstOrDefault(item => item.EntityId == id);
+        await _roster.MoveAsync(id, group, null);
+        if (entry is not null)
+        {
+            _status = entry.DisplayName + " moved to " + TitleOf(group);
+        }
+    }
+
+    // Dropping on a row puts the dragged entry where that row is.
+    private async Task DropOnRowAsync(RosterEntry target, int position)
+    {
+        var id = _dragging;
+        _dragging = null;
+        if (id is null || id == target.EntityId || _roster is null)
+        {
+            return;
+        }
+
+        var entry = Entries.FirstOrDefault(item => item.EntityId == id);
+        await _roster.MoveAsync(id, target.Group, position);
+        if (entry is not null)
+        {
+            _status = entry.DisplayName + " moved to " + TitleOf(target.Group);
+        }
+    }
+
+    private void ToggleEdit(RosterEntry entry)
+    {
+        _menuFor = null;
+        if (_editFor == entry.EntityId)
+        {
+            _editFor = null;
+            return;
+        }
+
+        _editFor = entry.EntityId;
+        _name = entry.DisplayName;
+        _title = entry.LoreTitle ?? string.Empty;
+        _color = entry.Color;
+        _focusId = "realm-roster-name-" + Slug(entry.EntityId);
+    }
+
+    private async Task SaveAsync(RosterEntry entry)
+    {
+        _editFor = null;
+        _focusId = "realm-roster-main-" + Slug(entry.EntityId);
+        if (_roster is not null)
+        {
+            await _roster.UpdateAsync(entry.EntityId, _name, _title, _color);
+            _status = "Saved";
+        }
+    }
+
+    private Task CancelEditAsync(RosterEntry entry)
+    {
+        _editFor = null;
+        _focusId = "realm-roster-main-" + Slug(entry.EntityId);
+        return Task.CompletedTask;
+    }
+
+    private Task EditKeyDownAsync(KeyboardEventArgs args, RosterEntry entry) => args.Key == "Escape" ? CancelEditAsync(entry) : Task.CompletedTask;
+
+    private sealed record RosterGroupInfo(RosterGroup Group, string Key, string Heading, string Title);
+}

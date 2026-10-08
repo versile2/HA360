@@ -28,8 +28,6 @@ public sealed class RetentionTests
         await rig.DiscoverAsync(Plans.Member("king", life360: Plans.KingTracker));
         await rig.StoreFixesAsync("king", [Fix(old), Fix(Cutoff.AddMilliseconds(-1)), Fix(Cutoff), Fix(Cutoff.AddDays(1)), Fix(Cutoff.AddDays(27))]);
         await rig.StoreSignalsAsync("king", [new PhoneSignal(old, PhoneSignalKind.Screen, true), new PhoneSignal(Cutoff.AddDays(1), PhoneSignalKind.Screen, false)]);
-        Assert.True(rig.Writer.EnqueueVehicleSample(new VehicleSample("wagon", old, FuelPct: 40)));
-        Assert.True(rig.Writer.EnqueueVehicleSample(new VehicleSample("wagon", Cutoff.AddDays(2), FuelPct: 38)));
         await rig.Writer.FlushAsync();
         Assert.True(await rig.Stats.RecordTripAsync("king", Drives.ClosedTrip(old), CancellationToken.None));
         var members = rig.Rows("SELECT id, recording_start FROM members");
@@ -38,10 +36,9 @@ public sealed class RetentionTests
 
         var deleted = await retention.PruneAsync(CancellationToken.None);
 
-        Assert.Equal(2 + 1 + 1, deleted);   // two old fixes, one signal, one vehicle sample
+        Assert.Equal(2 + 1, deleted);   // two old fixes, one signal
         Assert.Equal(3, rig.Count("fixes"));   // the one exactly at the cutoff stays: only what is older goes
         Assert.Equal(1, rig.Count("signals"));
-        Assert.Equal(1, rig.Count("vehicle_samples"));
         Assert.Equal(1, rig.Count("trips"));   // trips are never pruned, however old
         Assert.Equal(members, rig.Rows("SELECT id, recording_start FROM members"));   // coverage refers to when the Realm began recording, not to what it kept
         Assert.Equal(meta, rig.Rows("SELECT key, value FROM meta WHERE key <> 'clean_shutdown' ORDER BY key"));

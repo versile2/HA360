@@ -158,8 +158,6 @@ public sealed class TripRecorderTests
 
         public bool EnqueueFix(string memberId, RawFix fix, bool inTrack = true, TrackReason? reason = null) => inner.EnqueueFix(memberId, fix, inTrack, reason);
 
-        public bool EnqueueVehicleSample(VehicleSample sample) => inner.EnqueueVehicleSample(sample);
-
         public bool EnqueueSignal(string memberId, PhoneSignal signal) => inner.EnqueueSignal(memberId, signal);
 
         public bool EnqueueMeta(string key, string value) => inner.EnqueueMeta(key, value);
@@ -168,6 +166,8 @@ public sealed class TripRecorderTests
             Interlocked.Exchange(ref _failed, 1) == 0
                 ? Task.FromException<bool>(new IOException("database is locked"))
                 : inner.WriteTripAsync(memberId, trip, algoVersion, deriveHash, cancellationToken);
+
+        public Task WriteRosterAsync(IReadOnlyList<RosterEntry> entries, CancellationToken cancellationToken = default) => inner.WriteRosterAsync(entries, cancellationToken);
 
         public Task FlushAsync(CancellationToken cancellationToken = default) => inner.FlushAsync(cancellationToken);
     }

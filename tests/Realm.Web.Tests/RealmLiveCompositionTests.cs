@@ -69,8 +69,7 @@ public sealed class RealmLiveCompositionTests
     {
         var logs = new InMemoryLogSink();
         var settings = LiveSettings();
-        settings["Ui:StaleAfterMinutes"] = "120";
-        settings["Ui:OfflineAfterHours"] = "1";   // 60 minutes, which is not above 120 (02 section 3.3)
+        settings["Retention:FixDays"] = "not-a-number";   // an option that cannot be read is refused (02 section 3.3)
 
         await using var host = await RealmTestHost.StartAsync(logs, settings);
         using var client = host.CreateClient();
@@ -84,7 +83,7 @@ public sealed class RealmLiveCompositionTests
         Assert.DoesNotContain(typeof(TripRecorder), hosted);
         Assert.DoesNotContain(typeof(BackfillService), hosted);
         Assert.DoesNotContain(typeof(RetentionService), hosted);
-        Assert.Contains(logs.Entries, entry => entry.Level == LogLevel.Error && entry.Message.Contains("ui_offline_after_hours", StringComparison.Ordinal));
+        Assert.Contains(logs.Entries, entry => entry.Level == LogLevel.Error && entry.Message.Contains("Retention:FixDays", StringComparison.Ordinal));
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 

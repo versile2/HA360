@@ -1,106 +1,77 @@
-using System.Globalization;
-using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using Realm.Domain;
 using Realm.Infrastructure.Avatars;
-using Realm.Infrastructure.Options;
 
 namespace Realm.Infrastructure.Ha;
 
 /// <summary>
-/// Discovery as a pure function (02 sections 1.2 and 2.3): the options, HA's configuration, the integration entity lists and the states in; the resolved
-/// members, vehicles, zones and the websocket watch list out. No clock is read and nothing is logged: what is worth a warning comes back in
-/// <see cref="HaDiscoveryResult.Warnings"/>, naming a member id or an option key and never a position.
+/// One thing Home Assistant reports that can be on the map (02 section 2.3): a <c>person</c> merged with its device trackers, or a GPS <c>device_tracker</c> that no
+/// person owns, with every entity that feeds it. Discovery finds these; the roster (<see cref="RosterEntry"/>) says which of them are on the map and what they
+/// are called. A null entity id means that source does not exist for it.
 /// </summary>
-public static partial class HaDiscovery
+/// <param name="EntityId">The roster key: the person's entity id, or the standalone tracker's.</param>
+/// <param name="Name">The name a new roster entry takes: the person's first name, or the tracker's friendly name.</param>
+/// <param name="Source">The word for where it comes from (<see cref="RosterEntry.Source"/>).</param>
+/// <param name="Active">It reports a usable state now: the person, or one of its trackers, is not unavailable or unknown.</param>
+/// <param name="UserId">The HA user id of the person; only ever compared, never shown or logged.</param>
+/// <param name="AvatarUpstream">The servable picture (an HA <c>image/serve</c> path or a Life360 HTTPS URL); null for none.</param>
+public sealed record DiscoveredEntity(
+    string EntityId,
+    RosterKind Kind,
+    string Name,
+    string Source,
+    bool Active,
+    string? PersonId,
+    string? UserId,
+    string? Life360TrackerId,
+    string? CompanionTrackerId,
+    CompanionSensors? Sensors,
+    string? AvatarUpstream)
 {
-    /// <summary>A person's companion tracker must have reported a position this recently for the person to become a member of their own (02 section 2.3 rule 3).</summary>
-    public static readonly TimeSpan CompanionMaxAge = TimeSpan.FromDays(7);
+    /// <summary>The tracker a vehicle follows: the phone app's (it has the speed) before Life360's.</summary>
+    public string? PrimaryTrackerId => CompanionTrackerId ?? Life360TrackerId;
 
-    private const string Life360Prefix = "device_tracker.life360_";
+    /// <summary>What the lifecycle rules need to know about it.</summary>
+    public RosterCandidate ToCandidate() => new(EntityId, Kind, Name, Source, Active);
+}
+
+/// <summary>
+/// Discovery as a pure function (02 sections 1.2 and 2.3): the integration entity lists, the states and the roster in; the discovered entities, and from them the
+/// resolved members, vehicles, zones and the websocket watch list out. No clock is read and nothing is logged: what is worth a warning comes back in
+/// <see cref="HaDiscoveryResult.Warnings"/>, naming an entity or a member id and never a position.
+/// </summary>
+public static class HaDiscovery
+{
+    /// <summary>The source word of Home Assistant's own trackers (the companion app and any other GPS tracker).</summary>
+    public const string HomeAssistantSource = "Home Assistant";
+
+    /// <summary>The source word of Life360.</summary>
+    public const string Life360Source = "Life360";
+
     private const string PersonPrefix = "person.";
     private const string TrackerPrefix = "device_tracker.";
     private const string ZonePrefix = "zone.";
 
-    // 01 section 7.5: the colours that members without an option colour take in turn.
-    private static readonly string[] Palette = ["#E8BC4E", "#C792EA", "#5CC8FF", "#FF8FB1", "#7EE0A5", "#FFA657", "#A5B4FC", "#F9A8D4"];
-
-    // 02 section 1.2 step 6 (the unused doorlock, doorstatus, battery and gps entities are not subscribed).
-    private static readonly string[] VehicleSensors =
-        ["odometer", "fuel", "ignitionstatus", "speed", "gearleverposition", "remotestartcountdown", "remotestartstatus", "lastrefresh"];
-
     /// <summary>
-    /// Which states of <c>GET states</c> discovery needs: persons, zones and trackers, and every entity of the mobile_app and fordpass integrations
-    /// (their sensors), plus the entities the options name by prefix, in case an integration list does not report them.
+    /// Which states of <c>GET states</c> discovery needs: persons, zones and trackers, and every entity of the mobile_app integration (the phone's sensors).
     /// </summary>
-    public static Func<string, bool> StateFilter(RealmOptions options, HaIntegrationEntities integration)
+    public static Func<string, bool> StateFilter(HaIntegrationEntities integration)
     {
-        var listed = new HashSet<string>(integration.MobileApp.Concat(integration.FordPass), StringComparer.Ordinal);
-        var prefixes = new List<string>();
-        foreach (var vehicle in options.Vehicles.Where(IsFordPass))
-        {
-            prefixes.Add($"sensor.{vehicle.EntityPrefix}_");
-            prefixes.Add($"{TrackerPrefix}{vehicle.EntityPrefix}_");
-        }
-
-        foreach (var companion in options.Members.Select(m => m.CompanionTracker).Where(id => id is not null))
-        {
-            var stem = ObjectId(companion!);
-            prefixes.Add($"sensor.{stem}_");
-            prefixes.Add($"binary_sensor.{stem}_");
-        }
-
+        var listed = new HashSet<string>(integration.MobileApp, StringComparer.Ordinal);
         return id => id.StartsWith(PersonPrefix, StringComparison.Ordinal)
             || id.StartsWith(ZonePrefix, StringComparison.Ordinal)
             || id.StartsWith(TrackerPrefix, StringComparison.Ordinal)
-            || listed.Contains(id)
-            || prefixes.Any(prefix => id.StartsWith(prefix, StringComparison.Ordinal));
+            || listed.Contains(id);
     }
 
     /// <summary>
-    /// The entity ids the options name explicitly (persons, trackers, companion sensors, vehicle entities): the watch list to subscribe with before the first
-    /// discovery has finished, so the first snapshot is not the whole of Home Assistant. Zones are not in it; the first discovery adds them.
+    /// Every candidate for the roster (02 section 2.3): all <c>person</c> entities, each merged with its trackers, then every <c>device_tracker</c> with a GPS
+    /// position (numeric <c>latitude</c> and <c>longitude</c>) that no person owns. Persons first, each group by entity id.
     /// </summary>
-    public static IReadOnlyList<string> SeedWatchList(RealmOptions options)
-    {
-        var ids = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var member in options.Members)
-        {
-            AddIfPresent(ids, member.Person);
-            AddIfPresent(ids, member.Life360Tracker);
-            if (member.CompanionTracker is { } companion)
-            {
-                ids.Add(companion);
-                foreach (var sensor in CompanionSensorIds(companion))
-                {
-                    ids.Add(sensor);
-                }
-            }
-        }
-
-        foreach (var vehicle in options.Vehicles.Where(IsFordPass))
-        {
-            ids.Add($"{TrackerPrefix}{vehicle.EntityPrefix}_tracker");
-            foreach (var sensor in VehicleSensors)
-            {
-                ids.Add($"sensor.{vehicle.EntityPrefix}_{sensor}");
-            }
-        }
-
-        return ids.Order(StringComparer.Ordinal).ToArray();
-    }
-
-    /// <summary>Resolves the members, vehicles, zones and watch list (02 sections 2.3, 2.4 and 1.2 step 8).</summary>
-    /// <param name="states">The states <see cref="StateFilter"/> let through.</param>
-    /// <param name="now">Only used for the seven-day rule of a person without Life360.</param>
-    public static HaDiscoveryResult Resolve(
-        RealmOptions options,
-        HaConfig config,
+    public static IReadOnlyList<DiscoveredEntity> FindEntities(
         HaIntegrationEntities integration,
         IReadOnlyList<HaEntitySnapshot> states,
-        DateTimeOffset now)
+        List<string>? warnings = null)
     {
         var byId = new Dictionary<string, HaEntitySnapshot>(StringComparer.Ordinal);
         foreach (var state in states)
@@ -108,253 +79,189 @@ public static partial class HaDiscovery
             byId[state.EntityId] = state;
         }
 
-        var ignored = new HashSet<string>(options.IgnoreEntities, StringComparer.Ordinal);
-        var life360 = new HashSet<string>(integration.Life360.Where(id => id.StartsWith(TrackerPrefix, StringComparison.Ordinal) && !ignored.Contains(id)), StringComparer.Ordinal);
-        var mobileApp = new HashSet<string>(integration.MobileApp.Where(id => id.StartsWith(TrackerPrefix, StringComparison.Ordinal) && !ignored.Contains(id)), StringComparer.Ordinal);
+        var life360 = new HashSet<string>(integration.Life360.Where(id => id.StartsWith(TrackerPrefix, StringComparison.Ordinal)), StringComparer.Ordinal);
+        var mobileApp = new HashSet<string>(integration.MobileApp.Where(id => id.StartsWith(TrackerPrefix, StringComparison.Ordinal)), StringComparer.Ordinal);
         var persons = states
             .Where(s => s.EntityId.StartsWith(PersonPrefix, StringComparison.Ordinal))
             .Select(ParsePerson)
             .OrderBy(p => p.Id, StringComparer.Ordinal)
             .ToList();
 
-        var warnings = new List<string>();
-        var members = new List<ResolvedMember>();
-        var claimedTrackers = new HashSet<string>(StringComparer.Ordinal);
-        var claimedPersons = new HashSet<string>(StringComparer.Ordinal);
-        var colour = 0;
-
-        string NextColour() => Palette[colour++ % Palette.Length];
-
-        // 1. Configured members, in the order of the options.
-        for (var i = 0; i < options.Members.Count; i++)
+        var found = new List<DiscoveredEntity>();
+        var owned = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var person in persons)
         {
-            var option = options.Members[i];
-            var member = option.Kind == MemberKind.Static
-                ? ResolveStatic(option, i, persons, byId, ignored, warnings, NextColour)
-                : ResolveLive(option, i, persons, byId, life360, mobileApp, ignored, warnings, NextColour);
-            members.Add(member);
-            ClaimSources(member, claimedTrackers, claimedPersons);
+            foreach (var tracker in person.Trackers)
+            {
+                owned.Add(tracker);
+            }
+
+            found.Add(FromPerson(person, byId, life360, mobileApp, warnings));
         }
 
-        // 2. A Life360 tracker no options entry claims is a member of its own (02 section 2.3 rule 2): everyone in Life360 shows up.
-        var auto = 0;
-        foreach (var trackerId in life360.Where(id => !claimedTrackers.Contains(id)).Order(StringComparer.Ordinal))
+        foreach (var snapshot in states.Where(s => s.EntityId.StartsWith(TrackerPrefix, StringComparison.Ordinal)).OrderBy(s => s.EntityId, StringComparer.Ordinal))
         {
-            var person = persons.FirstOrDefault(p => p.Trackers.Contains(trackerId, StringComparer.Ordinal));
-            var companion = person is null ? null : ChooseCompanion(person, mobileApp, byId, ignored, null, warnings);
-            var snapshot = byId.GetValueOrDefault(trackerId);
-            var id = AutoLife360Id(trackerId, snapshot);
-            var personPicture = person?.Picture;
-            var member = new ResolvedMember(
-                Id: id,
-                DisplayName: Life360FirstName(trackerId, snapshot),
-                LoreTitle: null,
-                Kind: MemberKind.Live,
-                Color: NextColour(),
-                SortOrder: options.Members.Count + auto++,
-                InDrivingReport: true,
-                PersonId: person?.Id,
-                UserId: person?.UserId,
-                Life360TrackerId: trackerId,
-                CompanionTrackerId: companion,
-                Sensors: SensorsOf(companion, byId),
-                PhoneCapable: false,
-                AvatarUpstream: ChooseAvatar("auto", personPicture, Text(snapshot, "entity_picture")),
-                StaticLabel: null,
-                StaticAddress: null,
-                StaticLat: null,
-                StaticLon: null,
-                StaticShowAddress: false);
-            members.Add(WithPhoneCapable(member));
-            ClaimSources(member, claimedTrackers, claimedPersons);
-        }
-
-        // 3. A person without a Life360 tracker joins only with a companion tracker that reported lately (02 section 2.3 rule 3).
-        foreach (var person in persons.Where(p => !claimedPersons.Contains(p.Id) && !p.Trackers.Any(life360.Contains)))
-        {
-            var companion = ChooseCompanion(person, mobileApp, byId, ignored, null, warnings: null, requireRecent: now - CompanionMaxAge);
-            if (companion is null || claimedTrackers.Contains(companion))
+            if (owned.Contains(snapshot.EntityId) || !HasPosition(snapshot) || !IsGps(snapshot))
             {
                 continue;
             }
 
-            var member = new ResolvedMember(
-                Id: "ha_" + Hash8(person.Id),
-                DisplayName: FirstToken(person.FriendlyName) ?? Capitalize(ObjectId(person.Id)),
-                LoreTitle: null,
-                Kind: MemberKind.Live,
-                Color: NextColour(),
-                SortOrder: options.Members.Count + auto++,
-                InDrivingReport: true,
-                PersonId: person.Id,
-                UserId: person.UserId,
-                Life360TrackerId: null,
+            var isLife360 = life360.Contains(snapshot.EntityId);
+            var companion = isLife360 ? null : snapshot.EntityId;
+            var sensors = SensorsOf(companion, byId);
+            found.Add(new DiscoveredEntity(
+                EntityId: snapshot.EntityId,
+                Kind: RosterKind.Tracker,
+                Name: TrackerName(snapshot, isLife360),
+                Source: isLife360 ? Life360Source : HomeAssistantSource,
+                Active: IsAvailable(snapshot),
+                PersonId: null,
+                UserId: null,
+                Life360TrackerId: isLife360 ? snapshot.EntityId : null,
                 CompanionTrackerId: companion,
-                Sensors: SensorsOf(companion, byId),
-                PhoneCapable: false,
-                AvatarUpstream: ChooseAvatar("auto", person.Picture, null),
-                StaticLabel: null,
-                StaticAddress: null,
-                StaticLat: null,
-                StaticLon: null,
-                StaticShowAddress: false);
-            members.Add(WithPhoneCapable(member));
-            ClaimSources(member, claimedTrackers, claimedPersons);
+                Sensors: sensors,
+                AvatarUpstream: ServablePicture(Text(snapshot, "entity_picture"))));
         }
 
-        var vehicles = ResolveVehicles(options, byId);
+        return found;
+    }
+
+    /// <summary>
+    /// Resolves the members, vehicles, zones and watch list (02 sections 2.3, 2.4 and 1.2 step 8) from what was found and the roster: an entry in People
+    /// becomes a member, one in Vehicles a vehicle, one in Not tracked is left out (it has no sources, so nothing about it is watched or stored), and an entry
+    /// Home Assistant no longer reports is left out until the lifecycle rules retire it.
+    /// </summary>
+    public static HaDiscoveryResult Resolve(
+        HaConfig config,
+        IReadOnlyList<DiscoveredEntity> found,
+        IReadOnlyList<HaEntitySnapshot> states,
+        IReadOnlyList<RosterEntry> roster,
+        IReadOnlyList<string>? warnings = null)
+    {
+        var byId = new Dictionary<string, HaEntitySnapshot>(StringComparer.Ordinal);
+        foreach (var state in states)
+        {
+            byId[state.EntityId] = state;
+        }
+
+        var entities = found.ToDictionary(e => e.EntityId, StringComparer.Ordinal);
+        var members = new List<ResolvedMember>();
+        var vehicles = new List<ResolvedVehicle>();
+        foreach (var entry in RosterRules.Sorted(roster))
+        {
+            if (!entities.TryGetValue(entry.EntityId, out var entity))
+            {
+                continue;
+            }
+
+            if (entry.Group == RosterGroup.People)
+            {
+                members.Add(new ResolvedMember(
+                    Id: entry.Id,
+                    DisplayName: entry.DisplayName,
+                    LoreTitle: entry.LoreTitle,
+                    Kind: MemberKind.Live,
+                    Color: entry.Color,
+                    SortOrder: entry.SortOrder,
+                    InDrivingReport: true,
+                    PersonId: entity.PersonId,
+                    UserId: entity.UserId,
+                    Life360TrackerId: entity.Life360TrackerId,
+                    CompanionTrackerId: entity.CompanionTrackerId,
+                    Sensors: entity.Sensors,
+                    PhoneCapable: entity.Sensors?.Interactive is not null,
+                    AvatarUpstream: entity.AvatarUpstream,
+                    StaticLabel: null,
+                    StaticAddress: null,
+                    StaticLat: null,
+                    StaticLon: null,
+                    StaticShowAddress: false));
+            }
+            else if (entry.Group == RosterGroup.Vehicles)
+            {
+                vehicles.Add(new ResolvedVehicle(
+                    Id: entry.Id,
+                    Name: entry.DisplayName,
+                    LoreTitle: entry.LoreTitle,
+                    Glyph: VehicleGlyph.Car,
+                    SortOrder: entry.SortOrder,
+                    TrackerId: entity.PrimaryTrackerId,
+                    Source: entity.PrimaryTrackerId is not null && entity.PrimaryTrackerId == entity.Life360TrackerId ? FixSource.Life360 : FixSource.Companion));
+            }
+        }
+
         var zones = states
             .Select(FixParser.ParseZone)
             .OfType<RawPlace>()
             .OrderBy(z => z.Id, StringComparer.Ordinal)
             .ToList();
-
-        // An unmatched places[].zone is logged once and ignored (02 section 3.2): an entity id wins over an exact trimmed zone name.
-        for (var i = 0; i < options.Places.Count; i++)
-        {
-            if (MatchZone(options.Places[i].Zone, zones) is null)
-            {
-                warnings.Add($"places[{i.ToString(CultureInfo.InvariantCulture)}].zone: no such zone in Home Assistant; the entry is ignored");
-            }
-        }
-
-        return new HaDiscoveryResult(config.TimeZone, config.Version, members, vehicles, zones, WatchListOf(members, vehicles, states, byId), warnings);
+        return new HaDiscoveryResult(config.TimeZone, config.Version, members, vehicles, zones, WatchListOf(members, vehicles, states, byId), warnings ?? []);
     }
 
-    /// <summary>The zone a <c>places[].zone</c> value names: its entity id (with the <c>zone.</c> prefix), else the one whose trimmed name matches exactly (case-sensitive). Null when none.</summary>
-    public static RawPlace? MatchZone(string zone, IReadOnlyList<RawPlace> zones)
-    {
-        var value = zone.Trim();
-        return zones.FirstOrDefault(z => ZonePrefix + z.Id == value)
-            ?? zones.OrderBy(z => z.Id, StringComparer.Ordinal).FirstOrDefault(z => z.Name.Trim() == value);
-    }
+    // ---- persons ------------------------------------------------------------------------------------------------
 
-    // ---- members ------------------------------------------------------------------------------------------------
-
-    private static ResolvedMember ResolveLive(
-        MemberOption option,
-        int index,
-        List<Person> persons,
+    private static DiscoveredEntity FromPerson(
+        Person person,
         Dictionary<string, HaEntitySnapshot> byId,
         HashSet<string> life360,
         HashSet<string> mobileApp,
-        HashSet<string> ignored,
-        List<string> warnings,
-        Func<string> nextColour)
+        List<string>? warnings)
     {
-        var trackerId = Explicit(option.Life360Tracker, byId, ignored, warnings, option.Id, "life360_tracker");
-        var person = Explicit(option.Person, byId, ignored, warnings, option.Id, "person") is { } explicitPerson
-            ? persons.FirstOrDefault(p => p.Id == explicitPerson)
-            : trackerId is null ? null : persons.FirstOrDefault(p => p.Trackers.Contains(trackerId, StringComparer.Ordinal));
-        trackerId ??= person?.Trackers.FirstOrDefault(life360.Contains);
-
-        var companion = Explicit(option.CompanionTracker, byId, ignored, warnings, option.Id, "companion_tracker")
-            ?? (person is null ? null : ChooseCompanion(person, mobileApp, byId, ignored, option.Id, warnings));
-
-        var snapshot = trackerId is null ? null : byId.GetValueOrDefault(trackerId);
-        var member = new ResolvedMember(
-            Id: option.Id,
-            DisplayName: string.IsNullOrWhiteSpace(option.DisplayName) ? Life360FirstName(trackerId ?? option.Id, snapshot) : option.DisplayName,
-            LoreTitle: option.LoreTitle,
-            Kind: MemberKind.Live,
-            Color: option.Color ?? nextColour(),
-            SortOrder: option.SortOrder ?? index,
-            InDrivingReport: option.InDrivingReport,
-            PersonId: person?.Id,
-            UserId: person?.UserId,
-            Life360TrackerId: trackerId,
+        var life360Tracker = person.Trackers.FirstOrDefault(id => life360.Contains(id) && byId.ContainsKey(id));
+        var companion = ChooseCompanion(person, life360, mobileApp, byId, warnings);
+        var personSnapshot = byId.GetValueOrDefault(person.Id);
+        var life360Snapshot = life360Tracker is null ? null : byId.GetValueOrDefault(life360Tracker);
+        var companionSnapshot = companion is null ? null : byId.GetValueOrDefault(companion);
+        var active = (personSnapshot is not null && IsAvailable(personSnapshot))
+            || (life360Snapshot is not null && IsAvailable(life360Snapshot))
+            || (companionSnapshot is not null && IsAvailable(companionSnapshot));
+        var source = life360Tracker is null ? HomeAssistantSource : companion is null ? Life360Source : HomeAssistantSource + " + " + Life360Source;
+        return new DiscoveredEntity(
+            EntityId: person.Id,
+            Kind: RosterKind.Person,
+            Name: FirstToken(person.FriendlyName) ?? Capitalize(ObjectId(person.Id)),
+            Source: source,
+            Active: active,
+            PersonId: person.Id,
+            UserId: person.UserId,
+            Life360TrackerId: life360Tracker,
             CompanionTrackerId: companion,
             Sensors: SensorsOf(companion, byId),
-            PhoneCapable: false,
-            AvatarUpstream: ChooseAvatar(option.Avatar, person?.Picture, Text(snapshot, "entity_picture")),
-            StaticLabel: null,
-            StaticAddress: null,
-            StaticLat: null,
-            StaticLon: null,
-            StaticShowAddress: false);
-        return WithPhoneCapable(member);
+            AvatarUpstream: ServablePicture(person.Picture) ?? ServablePicture(Text(life360Snapshot, "entity_picture")));
     }
 
-    private static ResolvedMember ResolveStatic(
-        MemberOption option,
-        int index,
-        List<Person> persons,
-        Dictionary<string, HaEntitySnapshot> byId,
-        HashSet<string> ignored,
-        List<string> warnings,
-        Func<string> nextColour)
-    {
-        var personId = Explicit(option.Person, byId, ignored, warnings, option.Id, "person");
-        var person = personId is null ? null : persons.FirstOrDefault(p => p.Id == personId);
-        return new ResolvedMember(
-            Id: option.Id,
-            DisplayName: option.DisplayName,
-            LoreTitle: option.LoreTitle,
-            Kind: MemberKind.Static,
-            Color: option.Color ?? nextColour(),
-            SortOrder: option.SortOrder ?? index,
-            InDrivingReport: false,
-            PersonId: person?.Id,
-            UserId: person?.UserId,
-            Life360TrackerId: null,
-            CompanionTrackerId: null,
-            Sensors: null,
-            PhoneCapable: false,
-            AvatarUpstream: ChooseAvatar(option.Avatar, person?.Picture, null),
-            StaticLabel: option.StaticLabel,
-            StaticAddress: option.StaticAddress,
-            StaticLat: option.StaticLatitude,
-            StaticLon: option.StaticLongitude,
-            StaticShowAddress: option.StaticShowAddress);
-    }
-
-    // An explicit entity id of an options entry: used when it exists in HA and is not ignored; an id HA does not know is skipped with a warning.
-    private static string? Explicit(string? entityId, Dictionary<string, HaEntitySnapshot> byId, HashSet<string> ignored, List<string> warnings, string memberId, string key)
-    {
-        if (string.IsNullOrWhiteSpace(entityId) || ignored.Contains(entityId))
-        {
-            return null;
-        }
-
-        if (byId.ContainsKey(entityId))
-        {
-            return entityId;
-        }
-
-        warnings.Add($"member '{memberId}': {key} names an entity that Home Assistant does not have; that source is skipped");
-        return null;
-    }
-
-    // A person's one mobile_app tracker (02 section 2.3 rule 1). Two or more need companion_tracker (R-065): one warning, no companion source, and nothing is
-    // picked by recency, which would flip the source silently after a restart.
-    private static string? ChooseCompanion(
-        Person person,
-        HashSet<string> mobileApp,
-        Dictionary<string, HaEntitySnapshot> byId,
-        HashSet<string> ignored,
-        string? memberId,
-        List<string>? warnings,
-        DateTimeOffset? requireRecent = null)
+    // A person's GPS tracker that is not Life360's: the phone app's (mobile_app) before any other, then the one that reported last, then the lower entity id,
+    // so the same states always give the same tracker. With two or more candidates the choice is reported as a warning (the owner's R-065 option is gone).
+    private static string? ChooseCompanion(Person person, HashSet<string> life360, HashSet<string> mobileApp, Dictionary<string, HaEntitySnapshot> byId, List<string>? warnings)
     {
         var candidates = person.Trackers
-            .Where(id => mobileApp.Contains(id) && !ignored.Contains(id) && byId.TryGetValue(id, out var snapshot) && IsGps(snapshot))
-            .Where(id => requireRecent is not { } since || ReportedSince(byId[id], since))
+            .Where(id => !life360.Contains(id)
+                && byId.TryGetValue(id, out var snapshot)
+                && IsGps(snapshot)
+                && (mobileApp.Contains(id) || HasPosition(snapshot)))
+            .OrderByDescending(id => mobileApp.Contains(id))
+            .ThenByDescending(id => byId[id].LastUpdatedUtc ?? DateTimeOffset.MinValue)
+            .ThenBy(id => id, StringComparer.Ordinal)
             .ToList();
         if (candidates.Count > 1)
         {
-            warnings?.Add($"member '{memberId}': the person owns {candidates.Count} companion trackers; set companion_tracker, no companion source is used");
+            warnings?.Add($"{person.Id}: the person owns {candidates.Count} GPS trackers; {candidates[0]} is used as the phone's source");
         }
 
-        return candidates.Count == 1 ? candidates[0] : null;
+        return candidates.Count == 0 ? null : candidates[0];
     }
 
+    private static bool IsAvailable(HaEntitySnapshot snapshot) =>
+        !(string.Equals(snapshot.State, "unavailable", StringComparison.OrdinalIgnoreCase) || string.Equals(snapshot.State, "unknown", StringComparison.OrdinalIgnoreCase));
+
+    // A GPS tracker: it reports numeric latitude and longitude.
+    private static bool HasPosition(HaEntitySnapshot snapshot) =>
+        snapshot.Attributes.TryGetValue("latitude", out var lat) && lat.ValueKind == JsonValueKind.Number
+        && snapshot.Attributes.TryGetValue("longitude", out var lon) && lon.ValueKind == JsonValueKind.Number;
+
+    // source_type "gps" or none: a router or bluetooth tracker is not a position.
     private static bool IsGps(HaEntitySnapshot snapshot) =>
         Text(snapshot, "source_type") is not { } type || string.Equals(type, "gps", StringComparison.OrdinalIgnoreCase);
-
-    private static bool ReportedSince(HaEntitySnapshot snapshot, DateTimeOffset since) =>
-        snapshot.Attributes.TryGetValue("latitude", out var lat) && lat.ValueKind == JsonValueKind.Number
-        && snapshot.Attributes.TryGetValue("longitude", out var lon) && lon.ValueKind == JsonValueKind.Number
-        && snapshot.LastUpdatedUtc >= since;
 
     private static CompanionSensors? SensorsOf(string? companionId, Dictionary<string, HaEntitySnapshot> byId)
     {
@@ -378,63 +285,26 @@ public static partial class HaDiscovery
             Found("binary_sensor", "android_auto"));
     }
 
-    private static ResolvedMember WithPhoneCapable(ResolvedMember member) =>
-        member with { PhoneCapable = member.Sensors?.Interactive is not null };
+    private static string? ServablePicture(string? picture) => AvatarUpstream.IsServable(picture) ? picture!.Trim() : null;
 
-    private static void ClaimSources(ResolvedMember member, HashSet<string> trackers, HashSet<string> persons)
-    {
-        if (member.Life360TrackerId is not null)
-        {
-            trackers.Add(member.Life360TrackerId);
-        }
+    // ---- names --------------------------------------------------------------------------------------------------
 
-        if (member.CompanionTrackerId is not null)
-        {
-            trackers.Add(member.CompanionTrackerId);
-        }
-
-        if (member.PersonId is not null)
-        {
-            persons.Add(member.PersonId);
-        }
-    }
-
-    // 02 section 2.6: auto takes the person's picture, then the Life360 tracker's; person and life360 take that one only; none takes none.
-    private static string? ChooseAvatar(string mode, string? personPicture, string? life360Picture)
-    {
-        string? Servable(string? picture) => AvatarUpstream.IsServable(picture) ? picture!.Trim() : null;
-        return mode switch
-        {
-            "none" => null,
-            "person" => Servable(personPicture),
-            "life360" => Servable(life360Picture),
-            _ => Servable(personPicture) ?? Servable(life360Picture),
-        };
-    }
-
-    // ---- ids and names ------------------------------------------------------------------------------------------
-
-    // l360_<first 8 hex of the Life360 member uuid>, the path segment after user_images/ of the tracker's picture; else the first 8 hex of the SHA-256 of the entity id.
-    private static string AutoLife360Id(string trackerId, HaEntitySnapshot? snapshot)
-    {
-        var match = Text(snapshot, "entity_picture") is { } picture ? UserImages().Match(picture) : Match.Empty;
-        return "l360_" + (match.Success ? match.Groups[1].Value[..8].ToLowerInvariant() : Hash8(trackerId));
-    }
-
-    private static string Hash8(string text) =>
-        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text)))[..8].ToLowerInvariant();
-
-    // 02 section 1.5: the Life360 first name, from the tracker's friendly name without its "Life360 " prefix.
-    private static string Life360FirstName(string trackerOrMemberId, HaEntitySnapshot? snapshot)
+    // The friendly name of a tracker without the "Life360 " prefix (and, for a Life360 tracker, the first name only, as for a person); the entity's own words when it has none.
+    private static string TrackerName(HaEntitySnapshot snapshot, bool isLife360)
     {
         var name = Text(snapshot, "friendly_name");
         if (name is not null && name.StartsWith("Life360 ", StringComparison.OrdinalIgnoreCase))
         {
-            name = name["Life360 ".Length..];
+            name = name["Life360 ".Length..].Trim();
         }
 
-        var stem = ObjectId(trackerOrMemberId);
-        return FirstToken(name) ?? Capitalize(stem.StartsWith("life360_", StringComparison.Ordinal) ? stem["life360_".Length..] : stem);
+        if (!string.IsNullOrWhiteSpace(name))
+        {
+            return isLife360 ? FirstToken(name) ?? name : name;
+        }
+
+        var stem = ObjectId(snapshot.EntityId);
+        return Capitalize(stem.StartsWith("life360_", StringComparison.Ordinal) ? stem["life360_".Length..] : stem);
     }
 
     private static string? FirstToken(string? text) =>
@@ -449,16 +319,6 @@ public static partial class HaDiscovery
         return dot < 0 ? entityId : entityId[(dot + 1)..];
     }
 
-    private static IEnumerable<string> CompanionSensorIds(string companionTracker)
-    {
-        var stem = ObjectId(companionTracker);
-        yield return $"sensor.{stem}_battery_level";
-        yield return $"sensor.{stem}_battery_state";
-        yield return $"binary_sensor.{stem}_interactive";
-        yield return $"binary_sensor.{stem}_device_locked";
-        yield return $"binary_sensor.{stem}_android_auto";
-    }
-
     private static void AddIfPresent(HashSet<string> ids, string? id)
     {
         if (!string.IsNullOrWhiteSpace(id))
@@ -467,39 +327,7 @@ public static partial class HaDiscovery
         }
     }
 
-    [GeneratedRegex("user_images/([0-9a-fA-F][0-9a-fA-F-]{7,})", RegexOptions.CultureInvariant)]
-    private static partial Regex UserImages();
-
-    // ---- vehicles and the watch list -----------------------------------------------------------------------------
-
-    private static bool IsFordPass(VehicleOption vehicle) =>
-        string.Equals(vehicle.Integration, "fordpass", StringComparison.Ordinal) && !string.IsNullOrWhiteSpace(vehicle.EntityPrefix);
-
-    private static List<ResolvedVehicle> ResolveVehicles(RealmOptions options, Dictionary<string, HaEntitySnapshot> byId)
-    {
-        var vehicles = new List<ResolvedVehicle>();
-        for (var i = 0; i < options.Vehicles.Count; i++)
-        {
-            var option = options.Vehicles[i];
-            var fordPass = IsFordPass(option);
-            var trackerId = fordPass ? $"{TrackerPrefix}{option.EntityPrefix}_tracker" : null;
-            vehicles.Add(new ResolvedVehicle(
-                Id: option.Id,
-                Name: option.Name,
-                LoreTitle: option.LoreTitle,
-                Glyph: option.Glyph,
-                IsPlaceholder: !fordPass,
-                PlaceholderNote: fordPass ? null : option.PlaceholderNote,
-                SortOrder: option.SortOrder ?? i,
-                Prefix: fordPass ? option.EntityPrefix : null,
-                TrackerId: trackerId is not null && byId.ContainsKey(trackerId) ? trackerId : null,
-                SensorIds: fordPass
-                    ? VehicleSensors.Select(name => $"sensor.{option.EntityPrefix}_{name}").Where(byId.ContainsKey).ToArray()
-                    : []));
-        }
-
-        return vehicles;
-    }
+    // ---- the watch list ------------------------------------------------------------------------------------------
 
     private static List<string> WatchListOf(
         List<ResolvedMember> members,
@@ -532,10 +360,6 @@ public static partial class HaDiscovery
         foreach (var vehicle in vehicles)
         {
             AddIfPresent(ids, vehicle.TrackerId);
-            foreach (var id in vehicle.SensorIds)
-            {
-                ids.Add(id);
-            }
         }
 
         return ids.Where(byId.ContainsKey).Order(StringComparer.Ordinal).ToList();

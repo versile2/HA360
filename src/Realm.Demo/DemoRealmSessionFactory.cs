@@ -17,6 +17,6 @@ public sealed class DemoRealmSessionFactory : IRealmSessionFactory
     {
         var variants = DemoVariants.Parse(demo?.Variants);
         var start = demo?.Now ?? DemoDataSource.Anchor;
-        return new DemoRealmSession(new DemoDataSource(new DemoTimeProvider(start, variants.HaDown), variants));
+        return new DemoRealmSession(new DemoDataSource(new DemoTimeProvider(start, variants.HaDown), variants, variants.FullCast ? DemoRoster.EveryoneOnTheMap() : null));
     }
 }

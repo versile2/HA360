@@ -13,8 +13,8 @@ namespace Realm.Web.Tests;
 /// <summary>
 /// The three detail views of 01 sections 5.4 to 5.6 (<see cref="MemberDetail"/>, <see cref="VehicleDetail"/>, <see cref="PlaceDetail"/>), rendered from the Demo cast: Cass (header, status block,
 /// the low battery chip, the address, the week's tiles and the link to his report), the stale Dara, a member with no fix, the static Elio (no week, a distance row and the sentence), the accuracy
-/// chip, a week given by the parent, a week that cannot be read, a late answer and one that arrives after the detail has closed; the pickup (rows and their order, speed only while moving, red
-/// fuel, the stale warning, a dash for what is unknown), the hatchback placeholder; the place's Here-now list, the empty place and the person row that selects. Every string a test compares is read from
+/// chip, a week given by the parent, a week that cannot be read, a late answer and one that arrives after the detail has closed; the pickup (rows and their order, speed only while moving,
+/// the stale warning, a dash for what is unknown); the place's Here-now list, the empty place and the person row that selects. Every string a test compares is read from
 /// <see cref="DemoCast"/>, <see cref="DemoPlaces"/> or the Demo snapshot, or is one of the spec's own examples that the formatter's tests pin.
 /// </summary>
 public sealed class DetailComponentTests : ComponentTestBase
@@ -23,7 +23,7 @@ public sealed class DetailComponentTests : ComponentTestBase
 
     private const string BackSel = "[data-testid='detail-back']";
 
-    private static readonly IRealmSession Session = new DemoRealmSessionFactory().Create(null);
+    private static readonly IRealmSession Session = FullCast.Session(null);
 
     private static readonly RealmSnapshot Demo = Session.Current;
 
@@ -464,7 +464,7 @@ public sealed class DetailComponentTests : ComponentTestBase
 
     // ---- a vehicle ---------------------------------------------------------------------------------------------------------------------------
 
-    [Fact(DisplayName = "[AC-28d] The pickup's detail: Ford Pickup, THE KING'S WAGON, Updated 20 min ago, and the rows Location, Engine, Fuel, Odometer, Last update (no Speed while parked)")]
+    [Fact(DisplayName = "[AC-28d] The pickup's detail: Ford Pickup, THE KING'S WAGON, and the rows Location, Last update (no Speed while parked)")]
     public void TheWagon_ShowsItsHeader_AndItsRowsInOrder()
     {
         var cut = RenderVehicle(VehicleOf(DemoCast.Wagon.Id));
@@ -472,48 +472,21 @@ public sealed class DetailComponentTests : ComponentTestBase
         Assert.Equal(DemoCast.Wagon.Name, cut.Find("h2#realm-detail-title").TextContent);
         Assert.Equal(DemoCast.Wagon.Lore, cut.Find(".realm-detail-eyebrow").TextContent);
         Assert.Empty(cut.FindAll(".realm-detail-updated"));
-        Assert.DoesNotContain("Updated 20 min ago", cut.Markup, StringComparison.Ordinal);
         Assert.Empty(cut.FindAll(".realm-detail-warning"));
 
-        Assert.Equal(["Location", "Engine", "Fuel", "Odometer", "Last update"], cut.FindAll(".realm-detail-row dt").Select(label => label.TextContent));
+        Assert.Equal(["Location", "Last update"], cut.FindAll(".realm-detail-row dt").Select(label => label.TextContent));
         var values = Values(cut);
         Assert.Equal("At " + DemoPlaces.Home.Name, values["Location"]);
-        Assert.Equal("Off", values["Engine"]);
-        Assert.Equal("71%", cut.Find(".realm-detail-fuel-text").TextContent);
-        Assert.Equal("18,432 mi", values["Odometer"]);
         Assert.Equal("9:05 pm (20 min ago)", values["Last update"]);
+        Assert.Empty(cut.FindAll(".realm-detail-bar"));   // no fuel, no odometer, no engine: a vehicle is a device tracker (D107)
     }
 
     [Fact]
-    public void TheFuelRow_IsAnEightPixelBar_WithTheValueAndNoRedAbove15Percent()
-    {
-        var cut = RenderVehicle(VehicleOf(DemoCast.Wagon.Id));
-
-        var bar = cut.Find(".realm-detail-bar");
-        Assert.Equal("progressbar", bar.GetAttribute("role"));
-        Assert.Equal("71", bar.GetAttribute("aria-valuenow"));
-        Assert.Equal("0", bar.GetAttribute("aria-valuemin"));
-        Assert.Equal("100", bar.GetAttribute("aria-valuemax"));
-        Assert.Equal("width:71%", cut.Find(".realm-detail-bar-fill").GetAttribute("style"));
-        Assert.DoesNotContain("realm-detail-fuel--low", cut.Find("dd.realm-detail-fuel").ClassList);
-    }
-
-    [Fact]
-    public void LowFuel_IsRed()
-    {
-        var cut = RenderVehicle(VehicleOf(DemoCast.Wagon.Id) with { FuelPct = 10 });
-
-        Assert.Contains("realm-detail-fuel--low", cut.Find("dd.realm-detail-fuel").ClassList);
-        Assert.Equal("10%", cut.Find(".realm-detail-fuel-text").TextContent);
-        Assert.Equal("width:10%", cut.Find(".realm-detail-bar-fill").GetAttribute("style"));
-    }
-
-    [Fact]
-    public void AMovingWagon_AddsTheSpeedRow_AfterTheEngine()
+    public void AMovingWagon_AddsTheSpeedRow_AfterTheLocation()
     {
         var cut = RenderVehicle(VehicleOf(DemoCast.Wagon.Id) with { IsMoving = true, SpeedMps = 27.7 });
 
-        Assert.Equal(["Location", "Engine", "Speed", "Fuel", "Odometer", "Last update"], cut.FindAll(".realm-detail-row dt").Select(label => label.TextContent));
+        Assert.Equal(["Location", "Speed", "Last update"], cut.FindAll(".realm-detail-row dt").Select(label => label.TextContent));
         Assert.Equal("62 mph", Values(cut)["Speed"]);
         Assert.Equal("At " + DemoPlaces.Home.Name, Values(cut)["Location"]);
     }
@@ -544,31 +517,15 @@ public sealed class DetailComponentTests : ComponentTestBase
     [Fact]
     public void WhatIsUnknown_ReadsADash_AndTheLocationRowStays()
     {
-        var unknown = VehicleOf(DemoCast.Wagon.Id) with { Ignition = null, FuelPct = null, OdometerM = null, LastUpdateUtc = null };
+        var unknown = VehicleOf(DemoCast.Wagon.Id) with { LastUpdateUtc = null };
 
         var cut = RenderVehicle(unknown);
 
-        Assert.Equal(["Location", "Engine", "Fuel", "Odometer", "Last update"], cut.FindAll(".realm-detail-row dt").Select(label => label.TextContent));
+        Assert.Equal(["Location", "Last update"], cut.FindAll(".realm-detail-row dt").Select(label => label.TextContent));
         var values = Values(cut);
         Assert.Equal("At " + DemoPlaces.Home.Name, values["Location"]);
-        Assert.Equal(Dash, values["Engine"]);
-        Assert.Equal(Dash, values["Fuel"]);
-        Assert.Equal(Dash, values["Odometer"]);
         Assert.Equal(Dash, values["Last update"]);
-        Assert.Empty(cut.FindAll(".realm-detail-bar"));
         Assert.Empty(cut.FindAll(".realm-detail-updated"));
-    }
-
-    [Fact]
-    public void ThePlaceholder_ShowsItsNoteUnderLocation_AndNoOtherRow()
-    {
-        var cut = RenderVehicle(VehicleOf(DemoCast.Chariot.Id));
-
-        Assert.Equal(DemoCast.Chariot.Name, cut.Find("h2#realm-detail-title").TextContent);
-        Assert.Equal(["Location"], cut.FindAll(".realm-detail-row dt").Select(label => label.TextContent));
-        Assert.Equal(DemoCast.ChariotNote, Values(cut)["Location"]);
-        Assert.Empty(cut.FindAll(".realm-detail-warning"));
-        Assert.Empty(cut.FindAll(".realm-detail-bar"));
     }
 
     [Fact]
@@ -797,6 +754,8 @@ public sealed class DetailComponentTests : ComponentTestBase
             remove => inner.Changed -= value;
         }
 
+        public IRosterEditor Roster => inner.Roster;
+
         public TimeProvider Time => inner.Time;
 
         public TimeZoneInfo Zone => inner.Zone;
@@ -806,6 +765,10 @@ public sealed class DetailComponentTests : ComponentTestBase
             ReportCalls++;
             return OnReport is null ? inner.GetWeekReportAsync(weekOffset, weekStart, ct) : OnReport(weekOffset, weekStart, ct);
         }
+
+        public ValueTask<WeekReportVm> GetPeriodReportAsync(ReportWindow window, CancellationToken ct) => inner.GetPeriodReportAsync(window, ct);
+
+        public ValueTask<DriverWeek?> GetDriverPeriodAsync(string memberId, ReportWindow window, CancellationToken ct) => inner.GetDriverPeriodAsync(memberId, window, ct);
 
         public ValueTask<DriverWeek?> GetDriverWeekAsync(string memberId, int weekOffset, DayOfWeek weekStart, CancellationToken ct)
         {

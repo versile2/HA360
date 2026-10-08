@@ -5,14 +5,12 @@ namespace Realm.Domain.Tests;
 // The names that other slices share as constants (D52), and the MemberVm field added by D51.
 public class ConstantsTests
 {
-    // The four connection names of 02 section 1.8.
+    // The two connection names of 02 section 1.8 (0.2.0: Home Assistant and Life360 only).
     [Fact]
-    public void Connection_names_are_the_four_of_the_spec()
+    public void Connection_names_are_the_two_of_the_spec()
     {
         Assert.Equal("HomeAssistant", ConnectionNames.HomeAssistant);
         Assert.Equal("Life360Trackers", ConnectionNames.Life360Trackers);
-        Assert.Equal("FordPass", ConnectionNames.FordPass);
-        Assert.Equal("VehiclePlaceholder", ConnectionNames.VehiclePlaceholder);
     }
 
     // The keys of the four event kinds of 02 section 6.6.

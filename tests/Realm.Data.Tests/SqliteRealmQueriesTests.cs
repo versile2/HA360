@@ -46,7 +46,6 @@ public class SqliteRealmQueriesTests
         Assert.Equal(38.3, (await rig.Queries.GetLatestFixAsync("king", FixSource.Life360))?.Lat);
         Assert.Equal(At(60), (await rig.Queries.GetLatestFixAsync("king", FixSource.Companion))?.Ts);
         Assert.Null(await rig.Queries.GetLatestFixAsync("queen", FixSource.Life360));
-        Assert.Null(await rig.Queries.GetLatestFixAsync("king", FixSource.FordPass)); // vehicles have no fixes
     }
 
     [Fact]
@@ -65,7 +64,6 @@ public class SqliteRealmQueriesTests
 
         Assert.Equal(new[] { At(10), At(20), At(30) }, times.ToArray());
         Assert.Equal(new[] { At(15) }, (await rig.Queries.GetFixTimesAsync("king", FixSource.Companion, At(0), At(60))).ToArray());
-        Assert.Empty(await rig.Queries.GetFixTimesAsync("king", FixSource.FordPass, At(0), At(60))); // vehicles keep samples, not fixes
     }
 
     [Fact]
@@ -154,7 +152,9 @@ public class SqliteRealmQueriesTests
                 null,
                 "Example Rd",
                 null),
-            king[1]);
+            king[1] with { StartLat = null, StartLon = null, EndLat = null, EndLon = null });
+        Assert.NotNull(king[1].StartLat);
+        Assert.NotNull(king[1].EndLon);
         var coarseRow = king[0];
         Assert.Equal(TripQuality.Coarse, coarseRow.Quality);
         Assert.Null(coarseRow.TopSpeedMps);

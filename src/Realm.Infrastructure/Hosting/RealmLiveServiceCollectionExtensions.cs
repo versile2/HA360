@@ -15,6 +15,7 @@ using Realm.Infrastructure.Ha;
 using Realm.Infrastructure.Ingestion;
 using Realm.Infrastructure.Options;
 using Realm.Infrastructure.Retention;
+using Realm.Infrastructure.Roster;
 using Realm.Infrastructure.Stats;
 
 namespace Realm.Infrastructure.Hosting;
@@ -98,6 +99,7 @@ public static class RealmLiveServiceCollectionExtensions
         services.AddSingleton(settings.Options);
         services.AddSingleton(provider => RealmState.CreateInitial(settings.Options, provider.GetRequiredService<TimeProvider>(), refused));
         services.AddSingleton<DiscoveryState>();
+        services.AddSingleton<RosterService>();
         services.AddSingleton<ChangeNotifier>();
         services.AddSingleton<StatsService>();
         services.AddSingleton<HaDataSource>();
@@ -124,7 +126,7 @@ public static class RealmLiveServiceCollectionExtensions
         services.AddSingleton<IHaGateway>(provider => provider.GetRequiredService<HaGateway>());
         services.AddSingleton(provider => new HaDiscoveryRefresher(
             provider.GetRequiredService<IHaGateway>(),
-            settings.Options,
+            provider.GetRequiredService<RosterService>(),
             provider.GetRequiredService<DiscoveryState>(),
             (item, token) => provider.GetRequiredService<IngestionPipeline>().EnqueueAsync(item, token),
             provider.GetRequiredService<TimeProvider>(),

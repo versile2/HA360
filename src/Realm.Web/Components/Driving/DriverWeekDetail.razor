@@ -3,7 +3,7 @@
    footnote while the driver's basis is GPS or mixed. A driver who was not covered, or has no drives, gets the empty state of 01 section 8.7 in place of the list. The page
    decides nothing: every figure is the DriverSummary's or the DriveVm's and every string is built by DrivingFormatter. The Events tile carries the same text, asterisk
    and tooltip as the driver card's pill. *@
-<div class="realm-week-tiles">
+<div class="realm-week-tiles realm-screen-only">
     <div class="realm-week-tile">
         <span class="realm-week-tile__label">Drives</span>
         <span class="realm-week-tile__value">@DrivingFormatter.DrivesTile(Data.Summary)</span>
@@ -24,7 +24,31 @@
     </MudTooltip>
 </div>
 
-<div class="realm-week-events" role="list" aria-label="Events by type">
+<table class="realm-print-only realm-print-table" data-testid="print-summary">
+    <caption>Summary</caption>
+    <thead>
+        <tr>
+            <th scope="col">Drives</th>
+            <th scope="col">Miles</th>
+            <th scope="col">Top speed</th>
+            <th scope="col">Events</th>
+            <th scope="col">Speeding</th>
+            <th scope="col">Phone use</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>@DrivingFormatter.DrivesTile(Data.Summary)</td>
+            <td>@DrivingFormatter.MilesTile(Data.Summary)</td>
+            <td>@DrivingFormatter.TopSpeedTile(Data.Summary, TopSpeedMps)</td>
+            <td>@DrivingFormatter.EventsTile(Data.Summary)</td>
+            <td>@DrivingFormatter.EventCount(Data.Summary, EventKeys.Speeding)</td>
+            <td>@DrivingFormatter.EventCount(Data.Summary, EventKeys.Phone)</td>
+        </tr>
+    </tbody>
+</table>
+
+<div class="realm-week-events realm-screen-only" role="list" aria-label="Events by type">
     @foreach (var key in StatNameFormatter.ChipKeys)
     {
         <div class="realm-week-event" role="listitem" data-event="@key">
@@ -43,24 +67,60 @@
     }
 </div>
 
-@if (DrivingFormatter.EmptyWeekText(Data.Summary, Data.Trips.Count) is { } empty)
+@if (DrivingFormatter.EmptyWeekText(Data.Summary, Data.Trips.Count, LongPeriod) is { } empty)
 {
     <p class="realm-driving__quiet" role="status">@empty</p>
 }
 else
 {
-    @foreach (var day in DrivingFormatter.DriveDays(Data.Trips, Zone))
+    @if (PagerMath.ShowTop(Data.Trips.Count, _size))
     {
-        <section class="realm-drive-day">
-            <h2 class="realm-drive-day__header">@day.Label</h2>
-            <ul class="realm-drive-list">
-                @foreach (var line in day.Rows)
-                {
-                    <DriveRow @key="line.Index" Line="@line" />
-                }
-            </ul>
-        </section>
+        <EventsPager Position="top" Total="@Data.Trips.Count" Page="@_page" PageSize="@_size" PageChanged="OnPage" PageSizeChanged="OnSize" />
     }
+
+    <div class="realm-screen-only" data-testid="drive-list">
+        @foreach (var day in DrivingFormatter.DriveDays(Visible, Zone, PagerMath.Skip(_page, Data.Trips.Count, _size)))
+        {
+            <section class="realm-drive-day">
+                <h2 class="realm-drive-day__header">@day.Label</h2>
+                <ul class="realm-drive-list">
+                    @foreach (var line in day.Rows)
+                    {
+                        <DriveRow @key="line.Index" Line="@line" />
+                    }
+                </ul>
+            </section>
+        }
+    </div>
+
+    @if (PagerMath.ShowBottom(Data.Trips.Count))
+    {
+        <EventsPager Position="bottom" Total="@Data.Trips.Count" Page="@_page" PageSize="@_size" PageChanged="OnPage" PageSizeChanged="OnSize" />
+    }
+
+    @* Printing ignores the pager: every drive of the period is a row of this table (01 section 6.10). *@
+    <table class="realm-print-only realm-print-table realm-print-table--events" data-testid="print-events">
+        <caption>Drives</caption>
+        <thead>
+            <tr>
+                @foreach (var column in PrintFormatter.EventColumns)
+                {
+                    <th scope="col">@column</th>
+                }
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var row in PrintFormatter.Events(Data.Trips, Zone))
+            {
+                <tr data-testid="print-event-row">
+                    @foreach (var cell in row.Cells)
+                    {
+                        <td>@cell</td>
+                    }
+                </tr>
+            }
+        </tbody>
+    </table>
 }
 
 @if (DrivingFormatter.ShowDriverCaption(Data.Summary, Data.Trips.Count))
@@ -69,6 +129,10 @@ else
 }
 
 @code {
+    private DriverWeek? _seen;
+    private int _page;
+    private int _size = PagerMath.DefaultPageSize;
+
     /// <summary>The driver's week: the summary of the tiles and the event row, and the drives of the list.</summary>
     [Parameter, EditorRequired]
     public DriverWeek Data { get; set; } = default!;
@@ -80,4 +144,30 @@ else
     /// <summary>The session's zone, for the times and the day headers.</summary>
     [Parameter]
     public TimeZoneInfo Zone { get; set; } = TimeZoneInfo.Utc;
+
+    /// <summary>True for a month, a rolling window or a custom range: the empty states say "period" instead of "week".</summary>
+    [Parameter]
+    public bool LongPeriod { get; set; }
+
+    // The rows of the page: 25, 50 or 100 of the whole list, which stays in the order it came (newest first).
+    private IReadOnlyList<DriveVm> Visible =>
+        [.. Data.Trips.Skip(PagerMath.Skip(_page, Data.Trips.Count, _size)).Take(PagerMath.NormalizeSize(_size))];
+
+    // A new period or driver starts on its first page; the rows per page stay.
+    protected override void OnParametersSet()
+    {
+        if (!ReferenceEquals(_seen, Data))
+        {
+            _seen = Data;
+            _page = 0;
+        }
+    }
+
+    private void OnPage(int page) => _page = PagerMath.ClampPage(page, Data.Trips.Count, _size);
+
+    private void OnSize(int size)
+    {
+        _size = PagerMath.NormalizeSize(size);
+        _page = 0;
+    }
 }

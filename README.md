@@ -53,14 +53,14 @@ Status: experimental. [realm/CHANGELOG.md](realm/CHANGELOG.md) lists what each v
   </tr>
   <tr>
     <td align="center"><img src="assets/screenshots/phone-member-selected.png" width="230" alt="A selected member, Cass, shown in a compact card at the peek height"></td>
-    <td align="center"><img src="assets/screenshots/phone-sheet-vehicles.png" width="230" alt="The Vehicles tab listing a pickup and a second vehicle with engine and fuel status"></td>
+    <td align="center"><img src="assets/screenshots/phone-sheet-vehicles.png" width="230" alt="The Vehicles tab listing the vehicles that are on the map"></td>
   </tr>
   <tr>
     <td width="50%" valign="top">
       <h3>Weekly driving report</h3>
       Trips are recorded as they close and kept on your server, so reports reach back further than Home Assistant's
       recorder does. Six statistics (speeding, phone use, rapid acceleration, hard braking, top speed, drives and miles),
-      a card per driver and a week-by-week picker.
+      a card per driver and a week-by-week picker, plus last month, 3, 6 and 12 month periods and a custom date range. Every Driving screen can be printed or saved as PDF, and long drive lists are paged.
     </td>
     <td width="50%" valign="top">
       <h3>Every number explained</h3>
@@ -184,7 +184,7 @@ These are captures of the add-on installed on a real Home Assistant instance, ru
     <td align="center"><img src="assets/screenshots/live-phone-sheet-drivers.png" width="180" alt="The bottom sheet opened to 80 percent, listing five drivers with status and battery"><br><sub>Drivers, 80%</sub></td>
     <td align="center"><img src="assets/screenshots/live-phone-member-selected-edge-bubbles.png" width="180" alt="Alden selected: the map centred on him in a compact card, with the other members as edge bubbles"><br><sub>Selected member, edge bubbles</sub></td>
     <td align="center"><img src="assets/screenshots/live-phone-layers-popover.png" width="180" alt="The layers popover with Night, Day, Streets, Satellite and a Show places switch"><br><sub>Layers popover</sub></td>
-    <td align="center"><img src="assets/screenshots/live-phone-sheet-vehicles.png" width="180" alt="The Vehicles tab: a pickup with engine and fuel, and a second vehicle awaiting its maker's integration"><br><sub>Vehicles</sub></td>
+    <td align="center"><img src="assets/screenshots/live-phone-sheet-vehicles.png" width="180" alt="The Vehicles tab listing the vehicles that are on the map"><br><sub>Vehicles</sub></td>
   </tr>
   <tr>
     <td align="center"><img src="assets/screenshots/live-phone-sheet-places.png" width="180" alt="The Places tab listing fourteen places and who is at each"><br><sub>Places</sub></td>
@@ -209,7 +209,7 @@ These are captures of the add-on installed on a real Home Assistant instance, ru
 
 <table>
   <tr>
-    <td align="center"><img src="assets/screenshots/live-phone-vehicle-detail.png" width="180" alt="The pickup's detail: location, engine, fuel, odometer and last update"><br><sub>Vehicle detail</sub></td>
+    <td align="center"><img src="assets/screenshots/live-phone-vehicle-detail.png" width="180" alt="The pickup's detail: location and last update"><br><sub>Vehicle detail</sub></td>
     <td align="center"><img src="assets/screenshots/live-phone-place-detail.png" width="180" alt="Hearth Haven with its radius and the people and vehicles there now"><br><sub>Place detail</sub></td>
   </tr>
 </table>
@@ -268,7 +268,7 @@ The unfolded two-pane layout, one capture per view.
     <td align="center"><img src="assets/screenshots/live-desktop-panel-vehicles.png" width="330" alt="The Vehicles panel"><br><sub>Vehicles</sub></td>
   </tr>
   <tr>
-    <td align="center"><img src="assets/screenshots/live-desktop-vehicle-awaiting-integration.png" width="330" alt="The note explaining that the second vehicle awaits its maker's integration"><br><sub>Awaiting integration</sub></td>
+    <td align="center"><img src="assets/screenshots/live-desktop-vehicle-awaiting-integration.png" width="330" alt="The Vehicles panel on a wide screen"><br><sub>Vehicles</sub></td>
     <td align="center"><img src="assets/screenshots/live-desktop-panel-places.png" width="330" alt="The Places panel"><br><sub>Places</sub></td>
     <td align="center"><img src="assets/screenshots/live-desktop-place-detail.png" width="330" alt="Place detail in the side panel"><br><sub>Place detail</sub></td>
   </tr>
@@ -305,17 +305,19 @@ that has the Supervisor (Home Assistant OS or Supervised) on an amd64 machine.
 2. **Install.** Open **HA Cartographer** in the store and press **Install**. The Supervisor pulls the image
    `ghcr.io/versile2/ha-cartographer` (see the registry note below).
 3. **Choose Demo mode first.** Before the first start open the app's **Configuration** tab, switch on **Demo mode**
-   (`demo_mode: true` if you edit as YAML) and save. Nothing else needs to be filled in: the member, vehicle and place
-   lists ship empty.
+   (`demo_mode: true` if you edit as YAML) and save. Nothing else needs to be filled in.
 4. **Start and open it.** Press **Start**, switch on **Show in sidebar** (Home Assistant keeps this as a per-install
    setting, so the app cannot do it for you; **Watchdog** is optional) and open the sidebar entry called **The Realm** (the
    crown icon; the app is named HA Cartographer in the store). It also opens in the Home Assistant companion app. You should see the invented family on
    the map and a Driving report; that confirms the install works before any real data is involved.
-5. **Switch to your own household.** Turn **Demo mode** off. Then fill in the **Household members**, vehicles and places
-   lists of the Configuration tab (an example with an invented cast is in
-   [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#configuration)), and restart the app, because options are read when it
-   starts. Your names, entity ids and addresses stay in these options on your own Home Assistant. They are never part of
-   this repository or the image.
+5. **Switch to your own household.** Turn **Demo mode** off and restart the app. Everyone Home Assistant knows
+   (its `person` entities and its GPS `device_tracker`s that have reported in the last 30 days) is put on the map
+   at the first start, and you get one notification in Home Assistant saying so. Then open **Settings -> Who's on the
+   map** inside the app to sort them: drag a row (or use its menu) between **People**, **Vehicles** and **Not tracked**,
+   and tap a row to change its name, title and colour. Nothing is typed into the add-on options: they hold six switches
+   and thresholds only (Demo mode, the demo address parameter, the log level, how long positions are kept, the week
+   start and the speeding limit). Your names and entity ids stay in the app's database on your own Home Assistant.
+   They are never part of this repository or the image.
 
 The app's own **Documentation** tab ([realm/DOCS.md](realm/DOCS.md)) covers where the data comes from, what is stored
 and where, the phone-use statistic and troubleshooting.
@@ -328,11 +330,12 @@ name and a token that may read packages).
 
 ## Privacy
 
-- **Your data stays on your Home Assistant.** Positions, trips and vehicle samples live in a local SQLite file inside the
+- **Your data stays on your Home Assistant.** Positions, trips and the list of who is on the map live in a local SQLite file inside the
   add-on and are included in your backups. Positions are kept for 120 days by default.
 - **No cloud, no analytics, no telemetry, no update checks, no geocoding.** Ingress is the only door in; the app opens no port.
 - **No Life360 login.** It reads Home Assistant's entities and never calls Life360's API. The one exception is member
-  pictures served from `life360.com`, fetched without credentials; set a member's `avatar` to `none` to use initials.
+  pictures served from `life360.com`, fetched without credentials.
+- **It writes one thing to Home Assistant:** persistent notifications ("HA Cartographer: ...") when someone joins the map or is moved off it. Nothing else is changed there, and Demo mode sends none.
 - **Map tiles** are fetched by your browser from public servers (OpenFreeMap, and USGS for Satellite), which see your IP
   address and the area in view, not who is on the map. Demo mode uses an offline map and fetches nothing.
 

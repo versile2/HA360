@@ -1,7 +1,7 @@
 namespace Realm.Demo;
 
 /// <summary>
-/// The Demo variants of 02 section 9.5, parsed in one place. Each of the nine names is a pure transform that switches one
+/// The Demo variants of 02 section 9.5, parsed in one place. Each of the ten names is a pure transform that switches one
 /// aspect of the default fixture; they compose with commas and are applied left to right (see <see cref="Parse"/>). No
 /// variant undoes another, so the result does not depend on the order. Unknown names are ignored.
 /// </summary>
@@ -19,12 +19,13 @@ public sealed record DemoVariants
         ["all-near"] = current => current with { AllNear = true },
         ["empty-week"] = current => current with { EmptyWeek = true },
         ["fresh-install"] = current => current with { FreshInstall = true },
+        ["full-cast"] = current => current with { FullCast = true },
     };
 
     /// <summary>The default fixture: no variant.</summary>
     public static DemoVariants None { get; } = new();
 
-    /// <summary>The nine variant names of 02 section 9.5.</summary>
+    /// <summary>The ten variant names of 02 section 9.5.</summary>
     public static IReadOnlyList<string> Names { get; } = [.. Transforms.Keys];
 
     /// <summary>Every driver is phone-capable and every event type has a count in every week (the base data of 02 section 9.4).</summary>
@@ -55,8 +56,14 @@ public sealed record DemoVariants
     public bool FreshInstall { get; init; }
 
     /// <summary>
+    /// All seven roles of the cast are on the map: the prince under People and the hatchback under Vehicles, as the Demo of 0.1 showed them (the default roster
+    /// keeps them under Not tracked, D113). The acceptance suite opens the Demo with it; Settings, "Who's on the map" is checked without it.
+    /// </summary>
+    public bool FullCast { get; init; }
+
+    /// <summary>
     /// The variants named by <paramref name="names"/>, applied left to right. A name may itself hold a comma-separated list
-    /// (the caller normally splits it already). Surrounding spaces are ignored; a name that is not one of the nine is ignored.
+    /// (the caller normally splits it already). Surrounding spaces are ignored; a name that is not one of the ten is ignored.
     /// </summary>
     public static DemoVariants Parse(IEnumerable<string>? names)
     {

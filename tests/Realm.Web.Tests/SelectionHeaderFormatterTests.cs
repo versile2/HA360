@@ -9,13 +9,13 @@ namespace Realm.Web.Tests;
 
 /// <summary>
 /// The Peek selection header's strings (<see cref="SelectionHeaderFormatter"/>, 01 section 3.4.2 and the 8.4 row "Peek selection header, line 2", D45) and the strings of the detail views, from the Demo cast:
-/// Cass (name and lore, the status line and "Since", the low battery), the static Elio (no time part, no badge), the pickup ("At Hearth Haven · Engine off · Updated 20 min ago", "Last heard" when
-/// stale), the hatchback placeholder, a place with occupants (people plus vehicles) and an empty one, a null lore title and the accessible name. Every string a test compares is read from
+/// Cass (name and lore, the status line and "Since", the low battery), the static Elio (no time part, no badge), the pickup ("At Hearth Haven · Updated 20 min ago", "Last heard" when
+/// stale), the hatchback last heard long ago, a place with occupants (people plus vehicles) and an empty one, a null lore title and the accessible name. Every string a test compares is read from
 /// <see cref="DemoCast"/> and <see cref="DemoPlaces"/> or from the Demo snapshot, never retyped; the header and its row come from one source, which the tests check by comparing them.
 /// </summary>
 public sealed class SelectionHeaderFormatterTests
 {
-    private static readonly IRealmSession Session = new DemoRealmSessionFactory().Create(null);
+    private static readonly IRealmSession Session = FullCast.Session(null);
 
     private static readonly RealmSnapshot Demo = Session.Current;
 
@@ -214,17 +214,17 @@ public sealed class SelectionHeaderFormatterTests
 
     // ---- a vehicle ------------------------------------------------------------------------------------------------------------------------
 
-    [Fact(DisplayName = "[AC-28b] The pickup's header: Ford Pickup · The King's Wagon over At Hearth Haven · Engine off · Updated 20 min ago, no badge")]
-    public void TheWagon_ReadsLocationEngineAndUpdate_WithNoBadge()
+    [Fact(DisplayName = "[AC-28b] The pickup's header: Ford Pickup · The King's Wagon over At Hearth Haven · Updated 20 min ago, no badge")]
+    public void TheWagon_ReadsLocationAndUpdate_WithNoBadge()
     {
         var header = VehicleHeader(VehicleOf(DemoCast.Wagon.Id));
 
         Assert.Equal(new EntityRef(EntityKind.Vehicle, DemoCast.Wagon.Id), header.Entity);
         Assert.Equal(DemoCast.Wagon.Name, header.Line1);
         Assert.Equal(DemoCast.Wagon.Lore, header.Line1Lore);
-        Assert.Equal("At " + DemoPlaces.Home.Name + " · Engine off", header.Line2Lead);
+        Assert.Equal("At " + DemoPlaces.Home.Name, header.Line2Lead);
         Assert.Equal("Updated 20 min ago", header.Line2Tail);
-        Assert.Equal("At " + DemoPlaces.Home.Name + " · Engine off · Updated 20 min ago", header.Line2);
+        Assert.Equal("At " + DemoPlaces.Home.Name + " · Updated 20 min ago", header.Line2);
         Assert.Null(header.Battery);
         Assert.Equal(VehicleGlyph.Pickup, header.Glyph);
         Assert.Equal(string.Empty, header.Initial);
@@ -239,32 +239,23 @@ public sealed class SelectionHeaderFormatterTests
     }
 
     [Fact]
-    public void TheWagonWithNoIgnitionReading_HasNoEnginePart_AndOneWithNoUpdateHasNoTail()
+    public void AWagonWithNoUpdateTime_HasNoTail()
     {
         var wagon = VehicleOf(DemoCast.Wagon.Id);
 
-        var header = VehicleHeader(wagon with { Ignition = null, LastUpdateUtc = null });
+        var header = VehicleHeader(wagon with { LastUpdateUtc = null });
 
         Assert.Equal("At " + DemoPlaces.Home.Name, header.Line2);
         Assert.Null(header.Line2Tail);
     }
 
     [Fact]
-    public void ARemoteStartingWagon_ReadsTheMinutesLeft_InTheLead()
-    {
-        var remote = VehicleOf(DemoCast.Wagon.Id) with { Ignition = IgnitionState.RemoteStart, RemoteStartSecondsLeft = 480 };
-
-        Assert.Equal("At " + DemoPlaces.Home.Name + " · Remote start · 8 min left", VehicleHeader(remote).Line2Lead);
-    }
-
-    [Fact]
-    public void TheHatchbackPlaceholder_ReadsItsNote_AndTheCarGlyph()
+    public void TheHatchback_ReadsLastHeard_AndTheCarGlyph()
     {
         var header = VehicleHeader(VehicleOf(DemoCast.Chariot.Id));
 
         Assert.Equal(DemoCast.Chariot.Name, header.Line1);
-        Assert.Equal(DemoCast.ChariotNote, header.Line2);
-        Assert.Null(header.Line2Tail);
+        Assert.StartsWith("Last heard", header.Line2Tail, StringComparison.Ordinal);
         Assert.Equal(VehicleGlyph.Car, header.Glyph);
     }
 
@@ -494,28 +485,9 @@ public sealed class SelectionHeaderFormatterTests
 
         Assert.Equal("At " + DemoPlaces.Home.Name, SelectionHeaderFormatter.VehicleLocation(moving, Facts));
         Assert.StartsWith("Driving", VehicleTextFormatter.Location(moving, DemoPlaces.Home.Name), StringComparison.Ordinal);
-        Assert.Equal(DemoCast.ChariotNote, SelectionHeaderFormatter.VehicleLocation(VehicleOf(DemoCast.Chariot.Id), Facts));
         Assert.Equal(
             VehicleTextFormatter.LocationUnavailable,
             SelectionHeaderFormatter.VehicleLocation(VehicleOf(DemoCast.Wagon.Id) with { Freshness = Freshness.NoFix, Lat = null, Lon = null }, Facts));
-    }
-
-    [Theory]
-    [InlineData(IgnitionState.Off, "Off")]
-    [InlineData(IgnitionState.On, "On")]
-    [InlineData(IgnitionState.Accessory, "Accessory on")]
-    public void VehicleEngine_DropsTheWordEngine(IgnitionState ignition, string expected)
-    {
-        Assert.Equal(expected, SelectionHeaderFormatter.VehicleEngine(VehicleOf(DemoCast.Wagon.Id) with { Ignition = ignition }));
-    }
-
-    [Fact]
-    public void VehicleEngine_RemoteStartKeepsItsMinutes_AndAnUnknownIgnitionIsNull()
-    {
-        var wagon = VehicleOf(DemoCast.Wagon.Id);
-
-        Assert.Equal("Remote start · 8 min left", SelectionHeaderFormatter.VehicleEngine(wagon with { Ignition = IgnitionState.RemoteStart, RemoteStartSecondsLeft = 480 }));
-        Assert.Null(SelectionHeaderFormatter.VehicleEngine(wagon with { Ignition = null }));
     }
 
     [Fact]
@@ -529,13 +501,11 @@ public sealed class SelectionHeaderFormatterTests
         Assert.Null(SelectionHeaderFormatter.VehicleSpeed(wagon, Facts));
     }
 
-    [Fact(DisplayName = "[AC-28c] The pickup's odometer reads 18,432 mi and its last update 9:05 pm with the relative age in parentheses")]
-    public void VehicleOdometer_AndLastUpdate_ReadAsTheSpecWordsThem()
+    [Fact(DisplayName = "[AC-28c] The pickup's last update reads 9:05 pm with the relative age in parentheses")]
+    public void VehicleLastUpdate_ReadsAsTheSpecWordsIt()
     {
         var wagon = VehicleOf(DemoCast.Wagon.Id);
 
-        Assert.Equal("18,432 mi", SelectionHeaderFormatter.VehicleOdometer(wagon));
-        Assert.Null(SelectionHeaderFormatter.VehicleOdometer(wagon with { OdometerM = null }));
         Assert.Equal("9:05 pm (20 min ago)", SelectionHeaderFormatter.VehicleLastUpdate(wagon, Facts));
         Assert.Null(SelectionHeaderFormatter.VehicleLastUpdate(wagon with { LastUpdateUtc = null }, Facts));
     }

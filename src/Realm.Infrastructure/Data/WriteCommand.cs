@@ -16,8 +16,6 @@ internal abstract record WriteCommand
         public override bool IsDiagnostic => !InTrack;
     }
 
-    internal sealed record VehicleSampleRow(VehicleSample Value) : WriteCommand;
-
     internal sealed record Signal(string MemberId, PhoneSignal Value) : WriteCommand;
 
     /// <summary>A <c>meta</c> row: rare and tiny, so like a trip close it is never refused for lack of room.</summary>
@@ -32,6 +30,12 @@ internal abstract record WriteCommand
         int AlgoVersion,
         string DeriveHash,
         TaskCompletionSource<bool> Done) : WriteCommand
+    {
+        public override bool MustAccept => true;
+    }
+
+    /// <summary>A roster write (D113): rare, small and awaited by the caller, so like a trip close it is never refused for lack of room.</summary>
+    internal sealed record Roster(IReadOnlyList<RosterEntry> Entries, TaskCompletionSource Done) : WriteCommand
     {
         public override bool MustAccept => true;
     }

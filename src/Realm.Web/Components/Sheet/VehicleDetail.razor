@@ -1,4 +1,3 @@
-@using System.Globalization
 @using Microsoft.JSInterop
 @using Realm.Domain
 @using Realm.Web.Formatting
@@ -6,15 +5,12 @@
 
 @* The vehicle detail (01 section 5.5; 03 section 3.4): what the sheet shows at 80 percent with a vehicle selected, and in the Expanded panel whenever one is. A 48 px back button (the same
    step as the Android Back, BackStep.Detail), the 64 px glyph avatar with the name, the lore title as an eyebrow and the row's update line; then, for a stale vehicle, the warning line
-   at the top, and the rows (label left, value right): Location, Engine, Speed (only while the vehicle moves and its speed is known), Fuel (an 8 px bar and the percentage, red under
-   15 percent), Odometer and Last update. An unknown value reads "—". No trail in v1. The strings are the row's own (VmFactory) and SelectionHeaderFormatter's, so the detail and
-   its row agree. The placeholder (never selectable from its row) shows its note under Location and no other row. FocusOnOpen: as in MemberDetail. *@
+   at the top, and the rows (label left, value right): Location, Speed (only while the vehicle moves and its speed is known) and Last update. An unknown value reads "—". No trail in v1. The strings are the row's own (VmFactory) and SelectionHeaderFormatter's, so the detail and
+   its row agree. FocusOnOpen: as in MemberDetail. *@
 @{
     var row = VmFactory.Vehicle(Vehicle, Facts);
-    var engine = SelectionHeaderFormatter.VehicleEngine(Vehicle);
     var speed = SelectionHeaderFormatter.VehicleSpeed(Vehicle, Facts);
     var warning = SelectionHeaderFormatter.VehicleStaleWarning(Vehicle, Facts);
-    var odometer = SelectionHeaderFormatter.VehicleOdometer(Vehicle);
     var lastUpdate = SelectionHeaderFormatter.VehicleLastUpdate(Vehicle, Facts);
 }
 <section class="realm-detail realm-detail--vehicle" aria-labelledby="realm-detail-title" aria-describedby="realm-detail-rows">
@@ -51,49 +47,17 @@
                 <dt>Location</dt>
                 <dd>@SelectionHeaderFormatter.VehicleLocation(Vehicle, Facts)</dd>
             </div>
-            @if (!Vehicle.IsPlaceholder)
+            @if (speed is not null)
             {
                 <div class="realm-detail-row">
-                    <dt>Engine</dt>
-                    <dd>@(engine ?? DrivingFormatter.Dash)</dd>
-                </div>
-                @if (speed is not null)
-                {
-                    <div class="realm-detail-row">
-                        <dt>Speed</dt>
-                        <dd>@speed</dd>
-                    </div>
-                }
-                <div class="realm-detail-row">
-                    <dt>Fuel</dt>
-                    @if (Vehicle.FuelPct is { } fuel)
-                    {
-                        <dd class="@(row.LowFuel ? "realm-detail-fuel realm-detail-fuel--low" : "realm-detail-fuel")">
-                            <span class="realm-detail-bar"
-                                  role="progressbar"
-                                  aria-label="Fuel"
-                                  aria-valuemin="0"
-                                  aria-valuemax="100"
-                                  aria-valuenow="@fuel.ToString(CultureInfo.InvariantCulture)">
-                                <span class="realm-detail-bar-fill" style="width:@UnitFormatter.Percent(Math.Clamp(fuel, 0, 100))"></span>
-                            </span>
-                            <span class="realm-detail-fuel-text">@UnitFormatter.Percent(fuel)</span>
-                        </dd>
-                    }
-                    else
-                    {
-                        <dd>@DrivingFormatter.Dash</dd>
-                    }
-                </div>
-                <div class="realm-detail-row">
-                    <dt>Odometer</dt>
-                    <dd>@(odometer ?? DrivingFormatter.Dash)</dd>
-                </div>
-                <div class="realm-detail-row">
-                    <dt>Last update</dt>
-                    <dd>@(lastUpdate ?? DrivingFormatter.Dash)</dd>
+                    <dt>Speed</dt>
+                    <dd>@speed</dd>
                 </div>
             }
+            <div class="realm-detail-row">
+                <dt>Last update</dt>
+                <dd>@(lastUpdate ?? DrivingFormatter.Dash)</dd>
+            </div>
         </dl>
     </div>
 </section>

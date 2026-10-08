@@ -161,7 +161,7 @@ public sealed class ViewerResolverTests
     // A Demo session that has no members and no person links.
     private sealed class EmptySession : IRealmSession
     {
-        private readonly IRealmSession _inner = new DemoRealmSessionFactory().Create(null);
+        private readonly IRealmSession _inner = FullCast.Session(null);
 
         public bool Disposed { get; private set; }
 
@@ -173,12 +173,18 @@ public sealed class ViewerResolverTests
             remove => _inner.Changed -= value;
         }
 
+        public IRosterEditor Roster => _inner.Roster;
+
         public TimeProvider Time => _inner.Time;
 
         public TimeZoneInfo Zone => _inner.Zone;
 
         public ValueTask<WeekReportVm> GetWeekReportAsync(int weekOffset, DayOfWeek weekStart, CancellationToken ct) =>
             _inner.GetWeekReportAsync(weekOffset, weekStart, ct);
+
+        public ValueTask<WeekReportVm> GetPeriodReportAsync(ReportWindow window, CancellationToken ct) => _inner.GetPeriodReportAsync(window, ct);
+
+        public ValueTask<DriverWeek?> GetDriverPeriodAsync(string memberId, ReportWindow window, CancellationToken ct) => _inner.GetDriverPeriodAsync(memberId, window, ct);
 
         public ValueTask<DriverWeek?> GetDriverWeekAsync(string memberId, int weekOffset, DayOfWeek weekStart, CancellationToken ct) =>
             _inner.GetDriverWeekAsync(memberId, weekOffset, weekStart, ct);

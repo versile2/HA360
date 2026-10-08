@@ -43,9 +43,6 @@ const TARGET_MIN = 48;
 /** Half a pixel of rounding slack on a height read from a layout box. */
 const SLACK = 0.5;
 
-/** 01 section 8.5 and 5.2: what the placeholder's info button explains. It is the spec's sentence, not a Demo value. */
-const PLACEHOLDER_EXPLANATION = "This vehicle's maker has no official Home Assistant integration yet. When one exists, the Chariot will appear on the map.";
-
 // ---- small helpers -------------------------------------------------------------------------------------------------------------------------
 
 type Section = 'drivers' | 'vehicles' | 'places';
@@ -265,7 +262,7 @@ test.describe('Drivers list', () => {
 // ---- AC-28 (the list half): Vehicles -------------------------------------------------------------------------------------------------------
 
 test.describe('Vehicles list', () => {
-  test('[AC-28a] Vehicles lists the pickup on four lines and the hatchback placeholder with its note, no chevron and aria-disabled; the summary reads 2 vehicles · all parked', { tag: ['@phone', '@unfolded'] }, async ({ page }) => {
+  test('[AC-28a] Vehicles lists the pickup on three lines and the stale hatchback as an ordinary row with a chevron; the summary reads 2 vehicles · all parked', { tag: ['@phone', '@unfolded'] }, async ({ page }) => {
     const cast = loadDemoCast();
     await openList(page);
     await showSection(page, 'vehicles');
@@ -275,7 +272,7 @@ test.describe('Vehicles list', () => {
     expect(ids, 'the vehicles, in list order').toEqual(['row-vehicle-wagon', 'row-vehicle-chariot']);
     await expect(page.getByTestId('sheet-summary'), 'the Vehicles summary').toHaveText('2 vehicles · all parked');
 
-    // The pickup (live): L1 name and lore, L2 where it is, L3 the engine and the fuel, L4 how old that is.
+    // The pickup: L1 name and lore, L2 where it is, L3 how old that is. A vehicle is a device tracker (D107): no engine and no fuel line.
     const wagon = castVehicle(cast, 'wagon');
     const home = castPlace(cast, 'home');
     const pickup = row(page, 'vehicle', 'wagon');
@@ -285,59 +282,24 @@ test.describe('Vehicles list', () => {
     const separator = await pickup.locator('.realm-row-lore').evaluate((element) => getComputedStyle(element, '::before').content);
     expect(separator, 'the lore follows the name after a middle dot ("Ford Pickup · The King\'s Wagon")').toContain('·');
     await expect(pickup.locator('.realm-row-status'), 'pickup L2').toHaveText(`At ${home.name}`);
-    await expect(pickup.locator('.realm-row-part'), 'pickup L3: the engine and the fuel').toHaveText(['Engine off', 'Fuel 71%']);
-    await expect(pickup.locator('.realm-row-detail-text'), 'pickup L4').toHaveText('Updated 20 min ago');
-    await expect(pickup.locator('.realm-row-chevron'), 'a live row has its chevron').toHaveCount(1);
+    await expect(pickup.locator('.realm-row-part'), 'a vehicle row has no engine or fuel line').toHaveCount(0);
+    await expect(pickup.locator('.realm-row-detail-text'), 'pickup L3').toHaveText('Updated 20 min ago');
+    await expect(pickup.locator('.realm-row-chevron'), 'a row has its chevron').toHaveCount(1);
     await expect(pickup, 'the pickup is not disabled').not.toHaveAttribute('aria-disabled', 'true');
     await expect(pickup, 'the pickup is drawn at full opacity').toHaveCSS('opacity', '1');
     await expect(pickup.locator('.realm-row-glyph'), 'the pickup glyph is an svg').toHaveJSProperty('tagName', 'svg');
 
-    // The hatchback (placeholder): its note is the Demo's, word for word, and the row is a disabled button with no chevron.
+    // The hatchback has not reported for 20 days: an ordinary, tappable row that says when it was last heard from. There is no placeholder and no info button any more.
     const chariot = castVehicle(cast, 'chariot');
     const hatchback = row(page, 'vehicle', 'chariot');
     await expectTarget(hatchback, VEHICLE_ROW_MIN, 'row-vehicle-chariot');
-    await expect(hatchback.locator('.realm-row-name'), 'placeholder L1 name').toHaveText(chariot.name);
-    await expect(hatchback.locator('.realm-row-lore'), 'placeholder L1 lore title').toHaveText(chariot.lore);
-    await expect(hatchback.locator('.realm-row-note'), 'placeholder L2 is exactly the chariot note of the Demo cast').toHaveText(cast.chariotNote);
-    await expect(hatchback, 'the placeholder is aria-disabled').toHaveAttribute('aria-disabled', 'true');
-    await expect(hatchback.locator('.realm-row-chevron'), 'the placeholder has no chevron').toHaveCount(0);
-    await expect(hatchback.locator('.realm-row-part'), 'the placeholder has no engine or fuel line').toHaveCount(0);
-    await expect(hatchback, 'the placeholder is drawn at 0.7 opacity').toHaveCSS('opacity', '0.7');
-  });
-
-  test('[AC-28a] tapping the placeholder does nothing; its info button, a 48 px sibling of the row, opens the explanation and Esc closes it', { tag: ['@phone', '@unfolded'] }, async ({ page }) => {
-    await openList(page);
-    await showSection(page, 'vehicles');
-
-    const hatchback = row(page, 'vehicle', 'chariot');
-    const info = page.locator('.realm-row-info');
-    const popover = page.locator('.realm-row-popover');
-    await expect(info, 'one info button, for the one placeholder').toHaveCount(1);
-    await expect(info, 'the info button is named for what it opens').toHaveAttribute('aria-label', 'About this vehicle');
-    await expect(info, 'the popover is closed to begin with').toHaveAttribute('aria-expanded', 'false');
-    await expect(popover, 'no popover yet').toHaveCount(0);
-    expect(await info.evaluate((button) => button.parentElement?.closest('button') ?? null), 'the info button has no button around it (a button cannot hold one)').toBeNull();
-    await expect(hatchback.locator('.realm-row-info'), 'the info button is a sibling of the row, not a child').toHaveCount(0);
-    const target = await info.boundingBox();
-    expect(target, 'the info button has a box').not.toBeNull();
-    expect(Math.min(target?.width ?? 0, target?.height ?? 0), 'the info button is at least a 48 px target').toBeGreaterThanOrEqual(TARGET_MIN - SLACK);
-
-    // A tap on the row is a no-op. The row is aria-disabled, which Playwright treats as not enabled, so the tap is forced. Nothing can be waited for after a
-    // no-op, so the next step is the proof: events reach the circuit in order, and had the row tap opened the popover, the info tap below would close it again.
-    await hatchback.click({ force: true, position: { x: 40, y: 40 } });
-
-    // The info button opens the explanation, in the sheet and not in a layer of its own, and Esc on it closes it again.
-    await info.click();
-    await expect(info, 'aria-expanded after the tap on the info button (and after nothing from the row tap)').toHaveAttribute('aria-expanded', 'true');
-    await expect(popover, 'the explanation is shown').toHaveText(PLACEHOLDER_EXPLANATION);
-    await expect(popover, 'it is a note').toHaveAttribute('role', 'note');
-    await expect(popover, 'it is the element the info button controls').toHaveAttribute('id', (await info.getAttribute('aria-controls')) ?? 'missing');
-    await expect(hatchback, 'the placeholder is never the current row').not.toHaveAttribute('aria-current', 'true');
-    await expect(page.getByTestId('sheet-selection-header'), 'a tap on the placeholder selects nothing').toHaveCount(0);
-    await page.keyboard.press('Escape');
-    await expect(popover, 'Esc closes the explanation').toHaveCount(0);
-    await expect(info, 'aria-expanded after Esc').toHaveAttribute('aria-expanded', 'false');
-    await expect(page.getByTestId('sheet'), 'Esc never closes the sheet (01 section 3.4)').toBeVisible();
+    await expect(hatchback.locator('.realm-row-name'), 'hatchback L1 name').toHaveText(chariot.name);
+    await expect(hatchback.locator('.realm-row-lore'), 'hatchback L1 lore title').toHaveText(chariot.lore);
+    await expect(hatchback.locator('.realm-row-detail-text'), 'hatchback L3 says when it was last heard from').toHaveText(/^Last heard /);
+    await expect(hatchback, 'the hatchback is not disabled').not.toHaveAttribute('aria-disabled', 'true');
+    await expect(hatchback.locator('.realm-row-chevron'), 'the hatchback has a chevron').toHaveCount(1);
+    await expect(page.locator('.realm-row-info'), 'no vehicle has an info button').toHaveCount(0);
+    await expect(page.locator('.realm-row-note'), 'no vehicle has a placeholder note').toHaveCount(0);
   });
 });
 
@@ -448,7 +410,7 @@ async function openDetail(page: Page, label: string): Promise<void> {
 
 test.describe('S8c: selecting from the lists', () => {
   // [AC-28] The D45 half: the pickup row (sheet at 80 %) selects it. Peek, the header with no battery badge, the pin `pin-vehicle-wagon` centred as in AC-22 (the wagon is drawn beside the
-  // King's pin, the true point is what is centred), then the handle opens the vehicle detail (01 section 5.5: Location, Engine, Fuel, Odometer, Last update; no Speed while it is parked).
+  // King's pin, the true point is what is centred), then the handle opens the vehicle detail (01 section 5.5: Location, Last update; no Speed while it is parked).
   test('[AC-28] tapping the pickup row selects it at Peek with its header and no battery badge, the pin centred as in AC-22; the handle opens the vehicle detail', { tag: ['@phone'] }, async ({ page }) => {
     const cast = loadDemoCast();
     const wagon = castVehicle(cast, 'wagon');
@@ -459,16 +421,15 @@ test.describe('S8c: selecting from the lists', () => {
     await expectSelectedAtPeek(page, 'the pickup selected from its row', { kind: 'vehicle', id: 'wagon' });
     await expect(header(page).locator('.realm-row-name'), 'the header names the pickup').toHaveText(wagon.name);
     await expect(header(page).locator('.realm-row-lore'), 'the header gives its lore title').toHaveText(wagon.lore);
-    await expect(header(page).locator('.realm-sel-line'), 'the second line: where it is, the engine, how old that is').toHaveText(`At ${home.name} · Engine off · Updated 20 min ago`);
+    await expect(header(page).locator('.realm-sel-line'), 'the second line: where it is, how old that is').toHaveText(`At ${home.name} · Updated 20 min ago`);
     await expect(page.getByTestId('sheet-selection-battery'), 'a vehicle has no battery badge').toHaveCount(0);
 
     await openDetail(page, 'after the handle tap');
     await expect(page.locator('.realm-detail-name'), 'the vehicle detail is the pickup\'s').toHaveText(wagon.name);
     await expect(page.locator('.realm-detail-heading .realm-detail-eyebrow'), 'its lore title').toHaveText(wagon.lore);
-    await expect(page.locator('.realm-detail-rows dt'), 'the rows of a parked vehicle (no Speed)').toHaveText(['Location', 'Engine', 'Fuel', 'Odometer', 'Last update']);
+    await expect(page.locator('.realm-detail-rows dt'), 'the rows of a parked vehicle (no Speed)').toHaveText(['Location', 'Last update']);
     await expect(page.locator('.realm-detail-rows .realm-detail-row').nth(0).locator('dd'), 'Location').toHaveText(`At ${home.name}`);
-    await expect(page.locator('.realm-detail-rows .realm-detail-row').nth(1).locator('dd'), 'Engine').toHaveText('Off');
-    await expect(page.locator('.realm-detail-fuel-text'), 'Fuel').toHaveText('71%');
+    await expect(page.locator('.realm-detail-fuel-text'), 'no fuel row (D107)').toHaveCount(0);
   });
 
   // [AC-30] Cass's detail at v1 scope, reached by selecting at Peek and tapping the handle: back, the 64 px avatar, the name, the eyebrow, "Updated 3 min ago", the status, the since line with

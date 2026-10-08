@@ -6,7 +6,7 @@ namespace Realm.Domain;
 /// </summary>
 /// <param name="EntityId">The tracker entity the fix came from; the caller maps it to a member.</param>
 /// <param name="Ts">The time the position was taken (see 02 section 1.6 for what each source uses).</param>
-/// <param name="AccuracyM">Null when the source gives no usable accuracy (the Life360 placeholder, FordPass).</param>
+/// <param name="AccuracyM">Null when the source gives no usable accuracy (the Life360 placeholder).</param>
 /// <param name="SpeedMps">The reported speed only, never an implied one.</param>
 /// <param name="BatteryPct">Whole percent 0 to 100.</param>
 /// <param name="Charging">Null when the battery reading is unknown or does not say.</param>

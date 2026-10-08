@@ -7,6 +7,7 @@ namespace Realm.Domain;
 /// <param name="TopSpeedAtUtc">When the top speed was reached; null when TopSpeedMps is null.</param>
 /// <param name="SpeedingCount">Null for a coarse trip.</param>
 /// <param name="PhoneCount">Null when the trip predates the phone sensor or phone use could not be measured.</param>
+/// <param name="StartLat">The start and end points, to name an end by its nearest zone or address (<see cref="PlaceLabeler"/>); null when unknown.</param>
 public record StatsTrip(
     string MemberId,
     DateTimeOffset StartUtc,
@@ -22,4 +23,8 @@ public record StatsTrip(
     string? StartPlaceId,
     string? EndPlaceId,
     string? StartStreet,
-    string? EndStreet);
+    string? EndStreet,
+    double? StartLat = null,
+    double? StartLon = null,
+    double? EndLat = null,
+    double? EndLon = null);

@@ -61,7 +61,7 @@ public static class HandleSummaryFormatter
     }
 
     /// <summary>"{n} vehicles" (singular "1 vehicle") and " · {k} on the road" when k &gt; 0, else " · all parked".</summary>
-    /// <remarks>k counts <see cref="VehicleVm.IsMoving"/>; a vehicle with no data (the placeholder chariot) is parked.</remarks>
+    /// <remarks>k counts <see cref="VehicleVm.IsMoving"/>; a vehicle with no data is parked.</remarks>
     public static string Vehicles(IReadOnlyList<VehicleVm> vehicles)
     {
         var moving = vehicles.Count(vehicle => vehicle.IsMoving);

@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.2.0
+
+### Added
+
+- **Who's on the map.** A new section at the top of Settings lists every person and GPS tracker that Home Assistant
+  reports, in three groups: People, Vehicles and Not tracked. Drag a row to another group, or use its menu
+  (Move to...). Tap a row to change its name, title and colour.
+- On the first start every person, and every GPS tracker that reported a position in the last 30 days, is put under
+  People. Later, anything new is added to People. A tracker that has been unavailable, unknown or removed for 7 days
+  moves to Not tracked by itself. Each of these steps leaves one notification in Home Assistant
+  (HA Cartographer: ...) that points to Settings -> Who's on the map. Nothing is sent in Demo.
+- A vehicle is any tracker you put under Vehicles. It follows the tracker's position; there is no odometer or fuel.
+- **Longer periods in the Driving report.** A fifth control next to the week chips is a split button: the main part
+  re-applies your last long period (Last month by default), the arrow opens a menu with Last month, Last 3 months, Last
+  6 months, Last year and Custom range. Last 6 months and Last year appear only when `retention_fix_days` covers them
+  (185 and 366 days). The period is kept in the page address, so Back, printing and links work.
+- **Custom range** with a start and an end date picker, checked against today and the history that is kept.
+- **Print or save as PDF** from every Driving page: a clean Letter/A4 layout with the totals, drivers and every drive.
+- The drive list of a driver has a pager on top and at the bottom (25, 50 or 100 rows).
+
+### Changed
+
+- **The sources are Home Assistant and Life360 only.** FordPass, the second-vehicle placeholder and their Connections
+  rows are gone, and so is the stored vehicle history of the FordPass sensors (the table is dropped).
+- **The add-on has six options now:** demo_mode, allow_demo_param, log_level, driving_week_start,
+  driving_speeding_mph and retention_fix_days. The people, vehicles, places, ignore list and tuning options are gone;
+  their values are fixed defaults, and any old value in your configuration is ignored.
+- Ids of people and vehicles come from Home Assistant now (a person's id is the part of person.xxx after the dot, a
+  tracker's id is tracker_ plus the part after the dot). Positions stored under the old ids are no longer shown; they age out with
+  the history retention.
+- The add-on makes one call that writes to Home Assistant: creating the notifications above.
+
+- **Drives and top speeds now say where they happened**: the zone name, otherwise the city ("near Pinebrook", "I-65
+  near Pinebrook"), otherwise the nearest zone. "Unknown place" is gone.
+- `retention_fix_days` now ranges from 100 to 400 days and defaults to 100. Each 100 days uses roughly 6-20 MB per
+  tracked person (estimate).
+
 ## 0.1.2
 
 ### Fixed

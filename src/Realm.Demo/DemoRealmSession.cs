@@ -29,14 +29,18 @@ public sealed class DemoRealmSession : IRealmSession
         _source = source;
         _tick = tickInterval ?? DefaultTickInterval;
         _current = NewSnapshot();
+        source.Roster.Changed += OnRosterChanged;
     }
+
+    /// <inheritdoc />
+    public IRosterEditor Roster => _source.Roster;
 
     /// <inheritdoc />
     public RealmSnapshot Current => _current.Value;
 
     /// <inheritdoc />
     /// <remarks>
-    /// Raised only under the ha-down variant: on every tick, once the first subscriber arrives (a session nobody listens to
+    /// Raised on a roster change, and under the ha-down variant: on every tick, once the first subscriber arrives (a session nobody listens to
     /// starts no timer), and by <see cref="RestoreHomeAssistant"/>. The demo's statistics never change at run time.
     /// </remarks>
     public event Action? Changed
@@ -86,6 +90,25 @@ public sealed class DemoRealmSession : IRealmSession
     }
 
     /// <inheritdoc />
+    /// <remarks>A week chip is the frozen week of the fixture; any other period is computed over the fixture's drives.</remarks>
+    public ValueTask<WeekReportVm> GetPeriodReportAsync(ReportWindow window, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        return ValueTask.FromResult(window.Period.Kind == PeriodKind.Week
+            ? _source.WeekReport(window.Period.WeekOffset, window.Start.DayOfWeek) with { Period = window.Period }
+            : _source.PeriodReport(window));
+    }
+
+    /// <inheritdoc />
+    public ValueTask<DriverWeek?> GetDriverPeriodAsync(string memberId, ReportWindow window, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        return ValueTask.FromResult(window.Period.Kind == PeriodKind.Week
+            ? _source.GetDriverWeek(memberId, window.Period.WeekOffset)
+            : _source.GetDriverPeriod(memberId, window));
+    }
+
+    /// <inheritdoc />
     public string? ResolveMe(string? haUserId) => _source.ResolveMe(haUserId);
 
     /// <summary>
@@ -117,6 +140,7 @@ public sealed class DemoRealmSession : IRealmSession
         lock (_gate)
         {
             _disposed = true;
+            _source.Roster.Changed -= OnRosterChanged;
             _changed = null;
             timer = _timer;
             _timer = null;
@@ -131,6 +155,24 @@ public sealed class DemoRealmSession : IRealmSession
     {
         var restored = _restored;
         return new Lazy<RealmSnapshot>(() => _source.Snapshot(restored));
+    }
+
+    // A move or a rename in Settings: the snapshot is built again and listeners hear of it.
+    private void OnRosterChanged()
+    {
+        Action? handler;
+        lock (_gate)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _current = NewSnapshot();
+            handler = _changed;
+        }
+
+        handler?.Invoke();
     }
 
     private void Tick()

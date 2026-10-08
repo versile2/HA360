@@ -4,7 +4,7 @@ using Realm.Infrastructure.Options;
 
 namespace Realm.Infrastructure.Ingestion;
 
-/// <summary>A zone that is drawn, with the name and kind it has after the options overrides (02 section 1.9).</summary>
+/// <summary>A zone that is drawn, with the name and kind it has (02 section 1.9).</summary>
 internal sealed record PlaceDef(RawPlace Zone, string DisplayName, string Subtitle, PlaceKind Kind);
 
 /// <summary>Everything one snapshot is built from. The members and vehicles are the pipeline's live state; the builder only reads it.</summary>
@@ -85,11 +85,10 @@ internal static class SnapshotBuilder
             .OrderBy(m => m.SortOrder)
             .ThenBy(m => m.Id, StringComparer.Ordinal)
             .ToList();
-        var vehicleStates = input.Vehicles.ToDictionary(v => v.Plan.Id, v => StateOf(v, input.Entities), StringComparer.Ordinal);
         var vehicles = input.Vehicles
             .OrderBy(v => v.Plan.SortOrder)
             .ThenBy(v => v.Plan.Id, StringComparer.Ordinal)
-            .Select(v => VehicleOf(v, vehicleStates[v.Plan.Id], input, fused))
+            .Select(v => VehicleOf(v, input, fused))
             .ToList();
 
         return new RealmSnapshot(
@@ -103,11 +102,14 @@ internal static class SnapshotBuilder
             [
                 input.Connection.ToConnectionVm(input.Now),
                 Life360Connection(input),
-                FordPassConnection(input, vehicleStates),
-                new ConnectionVm(ConnectionNames.VehiclePlaceholder, ConnectionState.NotConnected, null),
             ],
             Zone: input.ZoneId,
-            UnitSystem: UnitSystem.Imperial);
+            UnitSystem: UnitSystem.Imperial,
+            RetentionFixDays: input.Options.RetentionFixDays,
+            Thresholds: new DrivingThresholds(
+                Math.Round(input.Options.DrivingSpeedingMps / FixParser.MphToMps, 1),
+                input.Options.DrivingSpeedingMinSeconds,
+                input.Options.DrivingPhoneMinSeconds));
     }
 
     // ---- members ------------------------------------------------------------------------------------------------
@@ -190,65 +192,24 @@ internal static class SnapshotBuilder
 
     // ---- vehicles -----------------------------------------------------------------------------------------------
 
-    internal static RawVehicleState StateOf(VehicleRuntime vehicle, IReadOnlyDictionary<string, HaEntitySnapshot> entities)
-    {
-        var sensors = vehicle.Plan.SensorIds.Select(id => entities.GetValueOrDefault(id)).OfType<HaEntitySnapshot>().ToList();
-        return vehicle.Plan.Prefix is { } prefix && sensors.Count > 0
-            ? FixParser.ParseVehicleState(prefix, sensors)
-            : new RawVehicleState(null, null, null, null, null, null);
-    }
-
-    private static VehicleVm VehicleOf(
-        VehicleRuntime runtime,
-        RawVehicleState state,
-        BuildInput input,
-        IReadOnlyDictionary<string, FusedPosition?> fused)
+    private static VehicleVm VehicleOf(VehicleRuntime runtime, BuildInput input, IReadOnlyDictionary<string, FusedPosition?> fused)
     {
         var plan = runtime.Plan;
-        if (plan.IsPlaceholder)
-        {
-            return new VehicleVm(
-                Id: plan.Id,
-                Name: plan.Name,
-                LoreTitle: plan.LoreTitle,
-                Glyph: plan.Glyph,
-                Lat: null,
-                Lon: null,
-                Street: null,
-                PlaceId: null,
-                Ignition: null,
-                RemoteStartSecondsLeft: null,
-                FuelPct: null,
-                OdometerM: null,
-                LastUpdateUtc: null,
-                SpeedMps: null,
-                IsMoving: false,
-                Freshness: Freshness.NoFix,
-                IsPlaceholder: true,
-                PlaceholderNote: plan.PlaceholderNote);
-        }
-
-        var lastUpdate = state.LastUpdateUtc;
-        var speed = VehicleRules.FreshSpeedMps(state.SpeedMps, lastUpdate, input.Now);
+        var fix = runtime.Fix;
+        var lastUpdate = fix?.Ts;
         return new VehicleVm(
             Id: plan.Id,
             Name: plan.Name,
             LoreTitle: plan.LoreTitle,
             Glyph: plan.Glyph,
-            Lat: runtime.Fix?.Lat,
-            Lon: runtime.Fix?.Lon,
+            Lat: fix?.Lat,
+            Lon: fix?.Lon,
             Street: BorrowedStreet(runtime, input, fused),
-            PlaceId: runtime.Fix is null ? null : runtime.PlaceId,
-            Ignition: state.Ignition,
-            RemoteStartSecondsLeft: state.RemoteStartSecondsLeft,
-            FuelPct: state.FuelPct,
-            OdometerM: state.OdometerM,
+            PlaceId: fix is null ? null : runtime.PlaceId,
             LastUpdateUtc: lastUpdate,
-            SpeedMps: speed,
-            IsMoving: VehicleRules.IsMoving(state.Ignition, state.SpeedMps, lastUpdate, input.Now),
-            Freshness: FreshnessRules.ForVehicle(input.Now, lastUpdate, input.Options.UiVehicleStaleAfterMinutes),
-            IsPlaceholder: false,
-            PlaceholderNote: null);
+            SpeedMps: VehicleRules.FreshSpeedMps(fix?.SpeedMps, lastUpdate, input.Now),
+            IsMoving: VehicleRules.IsMoving(fix?.SpeedMps, lastUpdate, input.Now),
+            Freshness: FreshnessRules.ForVehicle(input.Now, lastUpdate, input.Options.UiVehicleStaleAfterMinutes));
     }
 
     // 02 section 1.9: the street of a member whose fused fix is within 75 m of the vehicle and within 10 minutes of the vehicle's fix; else none (no geocoder).
@@ -316,25 +277,5 @@ internal static class SnapshotBuilder
         var since = seen.Max(m => m.Life360UnavailableSinceUtc!.Value);
         var state = input.Now - since >= Life360UnavailableAfter ? ConnectionState.Unavailable : ConnectionState.Reconnecting;
         return new ConnectionVm(ConnectionNames.Life360Trackers, state, lastSync);
-    }
-
-    private static ConnectionVm FordPassConnection(BuildInput input, Dictionary<string, RawVehicleState> states)
-    {
-        var fords = input.Vehicles.Where(v => !v.Plan.IsPlaceholder).ToList();
-        if (fords.Count == 0)
-        {
-            return new ConnectionVm(ConnectionNames.FordPass, ConnectionState.NotConnected, null);
-        }
-
-        DateTimeOffset? lastSync = fords.Select(v => states[v.Plan.Id].LastUpdateUtc).Max();
-        var limit = TimeSpan.FromMinutes(input.Options.UiVehicleStaleAfterMinutes);
-        if (fords.Any(v => states[v.Plan.Id].LastUpdateUtc is { } at && input.Now - at <= limit))
-        {
-            return new ConnectionVm(ConnectionNames.FordPass, ConnectionState.Connected, lastSync);
-        }
-
-        // Nothing fresh: Unavailable when Home Assistant has told us about the vehicle, Reconnecting while nothing has been heard yet.
-        var known = fords.Any(v => v.Plan.SensorIds.Concat(v.Plan.TrackerId is null ? [] : [v.Plan.TrackerId]).Any(input.Entities.ContainsKey));
-        return new ConnectionVm(ConnectionNames.FordPass, known ? ConnectionState.Unavailable : ConnectionState.Reconnecting, lastSync);
     }
 }

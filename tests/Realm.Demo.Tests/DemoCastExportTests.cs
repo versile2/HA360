@@ -18,11 +18,11 @@ public class DemoCastExportTests
         ("prince", "Elio", "Prince of the Peaks", "#7EE0A5", "static", 4, null, false, null, "Home · Highmeadow"),
     ];
 
-    // id, name, lore, glyph, sort order, placeholder, placeholder note.
-    private static readonly (string Id, string Name, string Lore, string Glyph, int SortOrder, bool IsPlaceholder, string? PlaceholderNote)[] ExpectedVehicles =
+    // id, name, lore, glyph, sort order.
+    private static readonly (string Id, string Name, string Lore, string Glyph, int SortOrder)[] ExpectedVehicles =
     [
-        ("wagon", "Ford Pickup", "The King's Wagon", "pickup", 0, false, null),
-        ("chariot", "Hatchback", "The Queen's Chariot", "car", 1, true, "Awaiting the royal scribes (the maker's app)"),
+        ("wagon", "Ford Pickup", "The King's Wagon", "pickup", 0),
+        ("chariot", "Hatchback", "The Queen's Chariot", "car", 1),
     ];
 
     // id, HA zone name, display name, subtitle, kind, lat, lon, radius in metres, drawn. The two "Work" zones and the two
@@ -46,8 +46,6 @@ public class DemoCastExportTests
         ("approach", "(arrival zone, never shown)", "(arrival zone, never shown)", "n/a", "other", 31.0990, -85.3410, 32187.0, false),
     ];
 
-    private const string ExpectedChariotNote = "Awaiting the royal scribes (the maker's app)";
-
     private static JsonElement Export() => JsonDocument.Parse(DemoCastExporter.ToJson()).RootElement;
 
     private static string? StringOrNull(JsonElement element, string property)
@@ -59,13 +57,14 @@ public class DemoCastExportTests
     // ---- DemoCast and DemoPlaces against the table of 02 section 9.2 ----------------------------------------
 
     [Fact]
-    public void The_cast_is_the_five_members_of_the_spec_in_order()
+    public void The_cast_is_the_five_members_of_the_spec_in_order_and_four_start_under_People()
     {
-        Assert.Equal("king,queen,jester,cryptid,prince", string.Join(",", DemoCast.Members.Select(m => m.Id)));
+        Assert.Equal("king,queen,jester,cryptid,prince", string.Join(",", DemoCast.AllMembers.Select(m => m.Id)));
+        Assert.Equal("king,queen,jester,cryptid", string.Join(",", DemoCast.Members.Select(m => m.Id)));
 
         foreach (var expected in ExpectedMembers)
         {
-            var member = DemoCast.Members.Single(m => m.Id == expected.Id);
+            var member = DemoCast.AllMembers.Single(m => m.Id == expected.Id);
 
             Assert.Equal(expected.Name, member.Name);
             Assert.Equal(expected.Lore, member.Lore);
@@ -98,29 +97,21 @@ public class DemoCastExportTests
     [Fact]
     public void The_vehicles_are_the_two_of_the_spec_and_the_wagon_lore_is_the_kings_wagon()
     {
-        Assert.Equal("wagon,chariot", string.Join(",", DemoCast.Vehicles.Select(v => v.Id)));
+        Assert.Equal("wagon,chariot", string.Join(",", DemoCast.AllVehicles.Select(v => v.Id)));
+        Assert.Equal("wagon", string.Join(",", DemoCast.Vehicles.Select(v => v.Id)));
 
         // O-1: "The King's Wagon", never "The Steward's Wagon".
         Assert.Equal("The King's Wagon", DemoCast.Wagon.Lore);
 
         foreach (var expected in ExpectedVehicles)
         {
-            var vehicle = DemoCast.Vehicles.Single(v => v.Id == expected.Id);
+            var vehicle = DemoCast.AllVehicles.Single(v => v.Id == expected.Id);
 
             Assert.Equal(expected.Name, vehicle.Name);
             Assert.Equal(expected.Lore, vehicle.Lore);
             Assert.Equal(expected.Glyph, vehicle.Glyph.ToString().ToLowerInvariant());
             Assert.Equal(expected.SortOrder, vehicle.SortOrder);
-            Assert.Equal(expected.IsPlaceholder, vehicle.IsPlaceholder);
-            Assert.Equal(expected.PlaceholderNote, vehicle.PlaceholderNote);
         }
-    }
-
-    [Fact]
-    public void The_chariot_note_is_the_string_of_the_spec()
-    {
-        Assert.Equal(ExpectedChariotNote, DemoCast.ChariotNote);
-        Assert.Equal(DemoCast.ChariotNote, DemoCast.Chariot.PlaceholderNote);
     }
 
     [Fact]
@@ -172,14 +163,15 @@ public class DemoCastExportTests
     // ---- the export -----------------------------------------------------------------------------------------
 
     [Fact]
-    public void The_export_has_five_members_two_vehicles_the_chariot_note_and_fifteen_places()
+    public void The_export_has_five_members_two_vehicles_the_roster_and_fifteen_places()
     {
         var root = Export();
 
         Assert.Equal(5, root.GetProperty("members").GetArrayLength());
         Assert.Equal(2, root.GetProperty("vehicles").GetArrayLength());
         Assert.Equal(15, root.GetProperty("places").GetArrayLength());
-        Assert.Equal(ExpectedChariotNote, root.GetProperty("chariotNote").GetString());
+        Assert.Equal(7, root.GetProperty("roster").GetArrayLength());
+        Assert.False(root.TryGetProperty("chariotNote", out _));
     }
 
     [Fact]
@@ -224,13 +216,11 @@ public class DemoCastExportTests
         {
             var vehicle = exported.Single(v => v.GetProperty("id").GetString() == expected.Id);
 
-            Assert.Equal("id,name,lore,glyph,sortOrder,isPlaceholder,placeholderNote", string.Join(",", vehicle.EnumerateObject().Select(p => p.Name)));
+            Assert.Equal("id,name,lore,glyph,sortOrder", string.Join(",", vehicle.EnumerateObject().Select(p => p.Name)));
             Assert.Equal(expected.Name, vehicle.GetProperty("name").GetString());
             Assert.Equal(expected.Lore, vehicle.GetProperty("lore").GetString());
             Assert.Equal(expected.Glyph, vehicle.GetProperty("glyph").GetString());
             Assert.Equal(expected.SortOrder, vehicle.GetProperty("sortOrder").GetInt32());
-            Assert.Equal(expected.IsPlaceholder, vehicle.GetProperty("isPlaceholder").GetBoolean());
-            Assert.Equal(expected.PlaceholderNote, StringOrNull(vehicle, "placeholderNote"));
         }
 
         Assert.Equal("The King's Wagon", StringOrNull(exported.Single(v => v.GetProperty("id").GetString() == "wagon"), "lore"));
@@ -243,9 +233,24 @@ public class DemoCastExportTests
         var json = DemoCastExporter.ToJson();
 
         Assert.Contains("\"The King's Wagon\"", json);
-        Assert.Contains("\"Awaiting the royal scribes (the maker's app)\"", json);
+        Assert.DoesNotContain("Awaiting the royal scribes", json);
         Assert.Contains("\"Home · Highmeadow\"", json);
         Assert.DoesNotContain("Steward", json);
+    }
+
+    // D113: four people and the wagon start on the map; the prince (moved automatically) and the hatchback (moved by hand) start under Not tracked.
+    [Fact]
+    public void The_export_carries_the_default_roster_in_its_three_groups()
+    {
+        var roster = Export().GetProperty("roster").EnumerateArray().ToList();
+
+        string Ids(string group) => string.Join(",", roster.Where(e => e.GetProperty("group").GetString() == group).Select(e => e.GetProperty("entityId").GetString()));
+
+        Assert.Equal("person.king,person.queen,person.jester,person.cryptid", Ids("people"));
+        Assert.Equal("device_tracker.wagon", Ids("vehicles"));
+        Assert.Equal("person.prince,device_tracker.hatchback", Ids("notTracked"));
+        Assert.True(roster.Single(e => e.GetProperty("entityId").GetString() == "person.prince").GetProperty("autoMoved").GetBoolean());
+        Assert.False(roster.Single(e => e.GetProperty("entityId").GetString() == "device_tracker.hatchback").GetProperty("autoMoved").GetBoolean());
     }
 
     [Fact]
@@ -277,7 +282,13 @@ public class DemoCastExportTests
     [Fact]
     public void Every_string_in_the_export_belongs_to_the_fictional_cast()
     {
-        var allowed = new HashSet<string>(StringComparer.Ordinal) { ExpectedChariotNote };
+        var allowed = new HashSet<string>(StringComparer.Ordinal)
+        {
+            // The roster: entity ids, the two kinds, the three groups and the three source words.
+            "person.king", "person.queen", "person.jester", "person.cryptid", "person.prince", "device_tracker.wagon", "device_tracker.hatchback",
+            "person", "tracker", "people", "vehicles", "notTracked",
+            "Home Assistant", "Life360", "Home Assistant + Life360",
+        };
         foreach (var m in ExpectedMembers)
         {
             allowed.UnionWith([m.Id, m.Name, m.Lore, m.Color, m.Kind]);
@@ -287,7 +298,6 @@ public class DemoCastExportTests
         foreach (var v in ExpectedVehicles)
         {
             allowed.UnionWith([v.Id, v.Name, v.Lore, v.Glyph]);
-            allowed.UnionWith(new[] { v.PlaceholderNote }.OfType<string>());
         }
 
         foreach (var p in ExpectedPlaces)

@@ -57,7 +57,7 @@ internal static class Plans
         var cars = vehicles ?? [];
         var ids = members
             .SelectMany(m => new[] { m.Life360TrackerId, m.CompanionTrackerId, m.Sensors?.BatteryLevel, m.Sensors?.BatteryState, m.Sensors?.Interactive, m.Sensors?.DeviceLocked, m.Sensors?.AndroidAuto })
-            .Concat(cars.SelectMany(v => v.SensorIds.Append(v.TrackerId)))
+            .Concat(cars.Select(v => v.TrackerId))
             .Concat(placed.Select(z => "zone." + z.Id))
             .OfType<string>()
             .Distinct(StringComparer.Ordinal)

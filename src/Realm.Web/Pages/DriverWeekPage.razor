@@ -1,12 +1,14 @@
 @page "/driving/{MemberId}"
 @implements IAsyncDisposable
+@using Microsoft.JSInterop
 @using Realm.Domain
 @using Realm.Web.Components.Driving
 @using Realm.Web.Formatting
 @inject NavigationManager Navigation
 @inject ILogger<DriverWeekPage> Logger
+@inject IJSRuntime JS
 
-@* The driver's week (01 section 6.6; 03 sections 3.3 and 3.4): a full page like Driving, with a Back link to driving?week=n (relative, like
+@* The driver's week or period (01 section 6.6; 03 sections 3.3 and 3.4): a full page like Driving, with a Back link to driving?week=n or ?period=... (relative, like
    every link), the driver's avatar, name and lore, and the week under them; the body is DriverWeekDetail. The member comes from the snapshot (the avatar and the name need no wait) and the figures from
    IRealmSession.GetDriverWeekAsync(memberId, week, snapshot.WeekStart); the driver's top speed is the report's per-driver speed (01 section 6.8), so the week report is read too and a
    failure of that second read only leaves the tile "—". ?week= is read on every navigation (D69), in every mode. An id that names no report driver (the static prince, an
@@ -16,10 +18,15 @@
     <div class="realm-driving__column">
         <header class="realm-driving__header">
             <span class="realm-driving__wordmark">@DrivingFormatter.Wordmark</span>
+            <button type="button" class="realm-print-btn realm-no-print" data-testid="btn-print" aria-label="Print this driver's report, or save it as PDF" @onclick="PrintAsync">
+                <MudIcon Icon="@Icons.Material.Filled.Print" />
+            </button>
         </header>
 
+        <p class="realm-print-only realm-print-header" data-testid="print-header">@PrintHeader</p>
+
         <div class="realm-driver-week__bar">
-            <a class="realm-driver-week__back" href="@DrivingFormatter.BackHref(_week)" data-testid="detail-back" aria-label="@DrivingFormatter.BackLabel">
+            <a class="realm-driver-week__back" href="@DrivingFormatter.BackHref(_period)" data-testid="detail-back" aria-label="@DrivingFormatter.BackLabel">
                 <MudIcon Icon="@Icons.Material.Filled.ArrowBack" />
             </a>
             <DriverAvatar Name="@Name" MemberColor="@_member?.Color" AvatarUrl="@_member?.AvatarUrl" Diameter="48" Ring="true" />
@@ -40,7 +47,8 @@
 
         @if (_data is { } data)
         {
-            <DriverWeekDetail Data="@data" TopSpeedMps="@_topSpeedMps" Zone="@Session.Zone" />
+            <DriverWeekDetail Data="@data" TopSpeedMps="@_topSpeedMps" Zone="@Session.Zone" LongPeriod="@_period.IsLong" />
+            <p class="realm-print-only realm-print-footer" data-testid="print-footer">@PeriodFormatter.PrintFooter(Session.Current.Thresholds)</p>
         }
         else if (_loading)
         {
@@ -59,13 +67,13 @@
 @code {
     private readonly CancellationTokenSource _lifetime = new();
     private CancellationTokenSource? _load;
-    private IReadOnlyList<WeekRef> _weeks = [];
+    private ReportWindow? _window;
     private MemberVm? _member;
     private DriverWeek? _data;
     private double? _topSpeedMps;
     private string? _loadedMember;
-    private int _loadedWeek = -1;
-    private int _week;
+    private ReportPeriod? _loadedPeriod;
+    private ReportPeriod _period = ReportPeriod.ThisWeek;
     private bool _loading = true;
     private bool _failed;
     private bool _disposed;
@@ -82,34 +90,74 @@
     [SupplyParameterFromQuery(Name = "week")]
     public string? WeekQuery { get; set; }
 
+    /// <summary><c>?period=last-month|3m|6m|1y|custom</c>, with <c>from</c> and <c>to</c> for a custom range (01 section 6.2, D113).</summary>
+    [SupplyParameterFromQuery(Name = "period")]
+    public string? PeriodQuery { get; set; }
+
+    /// <summary><c>?from=YYYY-MM-DD</c>, with <c>period=custom</c>.</summary>
+    [SupplyParameterFromQuery(Name = "from")]
+    public string? FromQuery { get; set; }
+
+    /// <summary><c>?to=YYYY-MM-DD</c>, with <c>period=custom</c>.</summary>
+    [SupplyParameterFromQuery(Name = "to")]
+    public string? ToQuery { get; set; }
+
     private string Name => _member?.DisplayName ?? MemberId;
 
-    // The week under the name: "This week · Sep 28 – Oct 4". The chips of the snapshot's week start give the range.
-    private string WeekLabel => _week < _weeks.Count ? DrivingFormatter.WeekHeading(_weeks[_week]) : string.Empty;
+    // The period under the name: "This week · Sep 28 – Oct 4", "Last month · Aug 1 – Aug 31".
+    private string WeekLabel => _window is null ? string.Empty : PeriodFormatter.Heading(_window);
+
+    // The header of the printed page: "Driving Report · Alden · Last month · Aug 1 – Aug 31 · printed Oct 8, 2026".
+    private string PrintHeader =>
+        _window is null
+            ? DrivingFormatter.PeriodTitle
+            : PeriodFormatter.PrintHeader(_window, PeriodMath.Today(Session.Time.GetUtcNow(), Session.Zone), Name);
 
     // Prerendering runs this twice (the prerender scope, then the circuit); both only read the session and the query.
     protected override async Task OnParametersSetAsync()
     {
         var snapshot = Session.Current;
-        _weeks = WeekMath.Chips(Session.Time.GetUtcNow(), snapshot.WeekStart, Session.Zone);
+        var now = Session.Time.GetUtcNow();
         _member = snapshot.Members.FirstOrDefault(member => string.Equals(member.Id, MemberId, StringComparison.Ordinal));
-        _week = DrivingFormatter.ParseWeek(WeekQuery);
-        if (_week == _loadedWeek && string.Equals(MemberId, _loadedMember, StringComparison.Ordinal))
+        _period = Allowed(ReportPeriod.Parse(PeriodQuery, FromQuery, ToQuery, WeekQuery), now, snapshot.RetentionFixDays);
+        _window = PeriodMath.Resolve(_period, now, snapshot.WeekStart, Session.Zone);
+        if (_period == _loadedPeriod && string.Equals(MemberId, _loadedMember, StringComparison.Ordinal))
         {
             return;
         }
 
         _loadedMember = MemberId;
-        _loadedWeek = _week;
+        _loadedPeriod = _period;
         _data = null;
         _topSpeedMps = null;
         _loading = true;
         _failed = false;
-        await LoadAsync(MemberId, _week, snapshot.WeekStart);
+        await LoadAsync(MemberId, _window);
+    }
+
+    // The same rules as the report page: a period this install does not offer reads as This week.
+    private ReportPeriod Allowed(ReportPeriod period, DateTimeOffset now, int retentionDays) =>
+        period.Kind switch
+        {
+            PeriodKind.Week or PeriodKind.LastMonth => period,
+            PeriodKind.Custom => PeriodMath.ValidateCustom(period.From, period.To, now, Session.Zone, retentionDays).IsValid ? period : ReportPeriod.ThisWeek,
+            _ => PeriodMath.IsAvailable(period.Kind, retentionDays) ? period : ReportPeriod.ThisWeek,
+        };
+
+    private async Task PrintAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("print");
+        }
+        catch (Exception exception) when (exception is JSException or JSDisconnectedException or TaskCanceledException)
+        {
+            Logger.LogWarning(exception, "The driver page could not open the print dialog.");
+        }
     }
 
     // One load at a time: a newer one (another member or week) cancels the one in flight, whose result is then dropped.
-    private async Task LoadAsync(string memberId, int week, DayOfWeek weekStart)
+    private async Task LoadAsync(string memberId, ReportWindow window)
     {
         _load?.Cancel();
         _load?.Dispose();
@@ -121,10 +169,13 @@
         var loaded = false;
         try
         {
-            data = await Session.GetDriverWeekAsync(memberId, week, weekStart, token);
+            var weekStart = Session.Current.WeekStart;
+            data = window.Period.Kind == PeriodKind.Week
+                ? await Session.GetDriverWeekAsync(memberId, window.Period.WeekOffset, weekStart, token)
+                : await Session.GetDriverPeriodAsync(memberId, window, token);
             if (data is not null)
             {
-                topSpeed = await TopSpeedAsync(memberId, week, weekStart, token);
+                topSpeed = await TopSpeedAsync(memberId, window, weekStart, token);
             }
 
             loaded = true;
@@ -136,7 +187,7 @@
         catch (Exception exception)
         {
             // The week cannot be read: the banner says so and the page stays on its header; the Back link still works.
-            Logger.LogError(exception, "The driver week of {MemberId} could not be loaded for week {Week}.", memberId, week);
+            Logger.LogError(exception, "The driver report of {MemberId} could not be loaded for {Period}.", memberId, window.Period.Query());
         }
 
         if (token.IsCancellationRequested || _disposed)
@@ -158,16 +209,18 @@
     }
 
     // The driver's top speed is the report's per-driver speed. The tile reads "—" when the report cannot be read; only the week itself is worth a banner.
-    private async Task<double?> TopSpeedAsync(string memberId, int week, DayOfWeek weekStart, CancellationToken token)
+    private async Task<double?> TopSpeedAsync(string memberId, ReportWindow window, DayOfWeek weekStart, CancellationToken token)
     {
         try
         {
-            var report = await Session.GetWeekReportAsync(week, weekStart, token);
+            var report = window.Period.Kind == PeriodKind.Week
+                ? await Session.GetWeekReportAsync(window.Period.WeekOffset, weekStart, token)
+                : await Session.GetPeriodReportAsync(window, token);
             return DrivingFormatter.TopSpeedOf(report, memberId);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            Logger.LogWarning(exception, "The week report could not be read for the top speed of {MemberId} in week {Week}.", memberId, week);
+            Logger.LogWarning(exception, "The report could not be read for the top speed of {MemberId} in {Period}.", memberId, window.Period.Query());
             return null;
         }
     }

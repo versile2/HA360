@@ -53,15 +53,15 @@ public sealed class DiagnosticsEndpointTests
     }
 
     [Fact]
-    public async Task TheConnections_AreTheFourEntriesOfTheSettingsChips_WithTheirStateAsAWord()
+    public async Task TheConnections_AreTheTwoEntriesOfTheSettingsChips_WithTheirStateAsAWord()
     {
         using var document = await GetAsync();
         var connections = document.RootElement.GetProperty("connections").EnumerateArray().ToArray();
 
         Assert.Equal(
-            [ConnectionNames.HomeAssistant, ConnectionNames.Life360Trackers, ConnectionNames.FordPass, ConnectionNames.VehiclePlaceholder],
+            [ConnectionNames.HomeAssistant, ConnectionNames.Life360Trackers],
             connections.Select(connection => connection.GetProperty("name").GetString()));
-        Assert.Equal(["connected", "connected", "connected", "notConnected"], connections.Select(connection => connection.GetProperty("state").GetString()));
+        Assert.Equal(["connected", "connected"], connections.Select(connection => connection.GetProperty("state").GetString()));
         Assert.All(connections, connection => Assert.Equal(["name", "state", "lastSyncUtc"], connection.EnumerateObject().Select(property => property.Name)));
     }
 
@@ -73,7 +73,7 @@ public sealed class DiagnosticsEndpointTests
 
         Assert.Equal(DemoCast.Members.Select(member => member.Id), members.Select(member => member.GetProperty("id").GetString()));
         Assert.All(members, member => Assert.Equal(["id", "freshness", "staleAfterMinutes"], member.EnumerateObject().Select(property => property.Name)));
-        Assert.Equal("static", members.Single(member => member.GetProperty("id").GetString() == DemoCast.Prince.Id).GetProperty("freshness").GetString());
+        Assert.All(members, member => Assert.Equal("fresh", member.GetProperty("freshness").GetString()));
     }
 
     [Fact]

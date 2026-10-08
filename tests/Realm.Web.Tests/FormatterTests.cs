@@ -12,7 +12,7 @@ namespace Realm.Web.Tests;
 /// The handle-summary line of 01 section 8.2 (<see cref="HandleSummaryFormatter"/>): the rows of the spec built from the Demo cast, then the rules one at a time on
 /// small hand-built view models (the 24 hour window, "driving" needing a fresh fix, the singular forms). S7b adds the row formatters: <see cref="TimeFormatter"/>,
 /// <see cref="UnitFormatter"/>, <see cref="MemberTextFormatter"/> and the vehicle and place strings, with the rows of 01 section 8 built from <see cref="DemoCast"/> and
-/// <see cref="DemoPlaces"/> through <see cref="VmFactory"/> (the names, lore titles, streets and the chariot's note are read from the cast, never retyped; only the clock
+/// <see cref="DemoPlaces"/> through <see cref="VmFactory"/> (the names, lore titles and streets are read from the cast, never retyped; only the clock
 /// times and distances, which the spec states and the cast does not carry as text, are written out).
 /// </summary>
 public sealed class FormatterTests
@@ -169,9 +169,9 @@ public sealed class FormatterTests
     }
 
     [Fact]
-    public void Vehicles_APlaceholderWithNoData_IsParked()
+    public void Vehicles_AVehicleWithNoData_IsParked()
     {
-        var vehicles = new[] { Vehicle("wagon"), Vehicle("chariot", isPlaceholder: true) };
+        var vehicles = new[] { Vehicle("wagon"), Vehicle("chariot", noFix: true) };
 
         Assert.Equal("2 vehicles · all parked", HandleSummaryFormatter.Vehicles(vehicles));
     }
@@ -207,7 +207,7 @@ public sealed class FormatterTests
         var place = Place(
             "p",
             memberIds: [.. DemoCast.Members.Take(people).Select(member => member.Id)],
-            vehicleIds: [.. DemoCast.Vehicles.Take(vehicles).Select(vehicle => vehicle.Id)]);
+            vehicleIds: [.. DemoCast.AllVehicles.Take(vehicles).Select(vehicle => vehicle.Id)]);
 
         Assert.Equal(expected, HandleSummaryFormatter.Places([place]));
     }
@@ -398,7 +398,7 @@ public sealed class FormatterTests
     {
         var rows = DemoRows();
 
-        Assert.Equal(DemoCast.Members.Select(member => member.Id), rows.Select(row => row.Id));
+        Assert.Equal(DemoCast.AllMembers.Select(member => member.Id), rows.Select(row => row.Id));
         var alden = rows[0];
         Assert.Equal(DemoCast.King.Name, alden.Name);
         Assert.Equal(DemoCast.King.Lore, alden.Lore);
@@ -648,33 +648,27 @@ public sealed class FormatterTests
 
     // ---- vehicles: 01 section 5.2 ------------------------------------------------------------------------------------------------------------
 
-    [Fact(DisplayName = "[AC-28a] the pickup's row reads the spec and the chariot's placeholder reads DemoCast.ChariotNote")]
-    public void VehicleRows_ThePickupAndThePlaceholder_AreTheSpecs()
+    [Fact(DisplayName = "[AC-28a] the pickup's row reads the spec and the hatchback, last heard 20 days ago, reads in the warning tone")]
+    public void VehicleRows_ThePickupAndTheStaleHatchback_AreTheSpecs()
     {
         var rows = VmFactory.VehicleRows(Demo.Vehicles, Facts());
 
-        Assert.Equal(DemoCast.Vehicles.Select(vehicle => vehicle.Id), rows.Select(row => row.Id));
+        Assert.Equal(DemoCast.AllVehicles.Select(vehicle => vehicle.Id), rows.Select(row => row.Id));
         var wagon = rows[0];
         Assert.Equal(DemoCast.Wagon.Name, wagon.Name);
         Assert.Equal(DemoCast.Wagon.Lore, wagon.Lore);
         Assert.Equal("At " + DemoPlaces.Home.Name, wagon.LocationLine);
-        Assert.Equal("Engine off", wagon.Engine);
-        Assert.Equal("Fuel 71%", wagon.Fuel);
-        Assert.False(wagon.LowFuel);
         Assert.Equal("Updated 20 min ago", wagon.Updated);
+        Assert.Equal(LineTone.Normal, wagon.UpdatedTone);
         Assert.Equal(VehicleGlyph.Pickup, wagon.Glyph);
-        Assert.False(wagon.IsPlaceholder);
         Assert.Equal("row-vehicle-wagon", wagon.TestId);
-        Assert.Equal($"{DemoCast.Wagon.Name}, {DemoCast.Wagon.Lore}. At {DemoPlaces.Home.Name}. Engine off. Fuel 71 percent. Updated 20 min ago.", wagon.AccessibleName);
+        Assert.Equal($"{DemoCast.Wagon.Name}, {DemoCast.Wagon.Lore}. At {DemoPlaces.Home.Name}. Updated 20 min ago.", wagon.AccessibleName);
 
         var chariot = rows[1];
-        Assert.Equal(DemoCast.ChariotNote, chariot.LocationLine);
-        Assert.True(chariot.IsPlaceholder);
-        Assert.Null(chariot.Engine);
-        Assert.Null(chariot.Fuel);
-        Assert.Equal(string.Empty, chariot.Updated);
+        Assert.StartsWith("Last heard", chariot.Updated, StringComparison.Ordinal);
+        Assert.Equal(LineTone.Warning, chariot.UpdatedTone);
         Assert.Equal(VehicleGlyph.Car, chariot.Glyph);
-        Assert.Contains(DemoCast.ChariotNote, chariot.AccessibleName, StringComparison.Ordinal);
+        Assert.StartsWith($"{DemoCast.Chariot.Name}, {DemoCast.Chariot.Lore}.", chariot.AccessibleName, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -691,34 +685,13 @@ public sealed class FormatterTests
         Assert.Equal("Driving", VehicleRow(parked with { IsMoving = true, SpeedMps = null }, zone).LocationLine);
     }
 
-    [Theory]
-    [InlineData(IgnitionState.Off, null, "Engine off")]
-    [InlineData(IgnitionState.On, null, "Engine on")]
-    [InlineData(IgnitionState.Accessory, null, "Accessory on")]
-    [InlineData(IgnitionState.RemoteStart, 480, "Remote start · 8 min left")]
-    [InlineData(IgnitionState.RemoteStart, 421, "Remote start · 8 min left")]
-    [InlineData(IgnitionState.RemoteStart, null, "Remote start")]
-    public void Vehicle_Engine_IsTheFourStrings_RemoteStartRoundsTheMinutesUp(IgnitionState ignition, int? secondsLeft, string expected)
-    {
-        var row = VehicleRow(Vehicle("v") with { Ignition = ignition, RemoteStartSecondsLeft = secondsLeft });
-
-        Assert.Equal(expected, row.Engine);
-        Assert.Equal(ignition == IgnitionState.RemoteStart, row.RemoteStart);
-    }
-
     [Fact]
-    public void Vehicle_UnknownIgnitionFuelAndUpdate_AreLeftOut_AndLowFuelIsMarked()
+    public void Vehicle_UnknownUpdate_IsLeftOut()
     {
         var unknown = VehicleRow(Vehicle("v"));
-        Assert.Null(unknown.Engine);
-        Assert.Null(unknown.Fuel);
-        Assert.Equal(string.Empty, unknown.Updated);
 
-        var low = VehicleRow(Vehicle("v") with { FuelPct = 12 });
-        Assert.Equal("Low fuel 12%", low.Fuel);
-        Assert.True(low.LowFuel);
-        Assert.Contains("Fuel 12 percent, low.", low.AccessibleName, StringComparison.Ordinal);
-        Assert.Equal("Fuel 15%", VehicleRow(Vehicle("v") with { FuelPct = 15 }).Fuel);
+        Assert.Equal(string.Empty, unknown.Updated);
+        Assert.DoesNotContain("Updated", unknown.AccessibleName, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -734,18 +707,12 @@ public sealed class FormatterTests
     }
 
     [Fact]
-    public void Vehicle_ThePlaceholderWithoutANote_ReadsLocationUnavailable()
+    public void Vehicle_WithoutAFix_ReadsLocationUnavailable()
     {
-        var row = VehicleRow(Vehicle("v", isPlaceholder: true));
+        var row = VehicleRow(Vehicle("v", noFix: true));
 
         Assert.Equal("Location unavailable", row.LocationLine);
     }
-
-    [Fact]
-    public void Vehicle_ThePlaceholderPopover_IsTheSpecsExplanation() =>
-        Assert.Equal(
-            "This vehicle's maker has no official Home Assistant integration yet. When one exists, the Chariot will appear on the map.",
-            VehicleTextFormatter.PlaceholderExplanation);
 
     // ---- places: 01 section 5.3 --------------------------------------------------------------------------------------------------------------
 
@@ -914,7 +881,7 @@ public sealed class FormatterTests
 
     // The Demo session owns a clock and the line is computed at its instant (the frozen Demo anchor), never at the wall clock; the session is never started,
     // so there is nothing to dispose (the same snapshot is read by MapPayloadFactoryTests).
-    private static readonly IRealmSession Session = new DemoRealmSessionFactory().Create(null);
+    private static readonly IRealmSession Session = FullCast.Session(null);
 
     private static RealmSnapshot Demo => Session.Current;
 
@@ -952,26 +919,20 @@ public sealed class FormatterTests
             Freshness: freshness,
             StaticLabel: null);
 
-    private static VehicleVm Vehicle(string id, bool isMoving = false, bool isPlaceholder = false) =>
+    private static VehicleVm Vehicle(string id, bool isMoving = false, bool noFix = false) =>
         new(
             Id: id,
             Name: "Cart " + id,
             LoreTitle: null,
             Glyph: VehicleGlyph.Car,
-            Lat: isPlaceholder ? null : 31.0990,
-            Lon: isPlaceholder ? null : -85.3410,
+            Lat: noFix ? null : 31.0990,
+            Lon: noFix ? null : -85.3410,
             Street: null,
             PlaceId: null,
-            Ignition: null,
-            RemoteStartSecondsLeft: null,
-            FuelPct: null,
-            OdometerM: null,
             LastUpdateUtc: null,
             SpeedMps: null,
             IsMoving: isMoving,
-            Freshness: isPlaceholder ? Freshness.NoFix : Freshness.Fresh,
-            IsPlaceholder: isPlaceholder,
-            PlaceholderNote: null);
+            Freshness: noFix ? Freshness.NoFix : Freshness.Fresh);
 
     private static PlaceVm Place(string id, IReadOnlyList<string> memberIds, IReadOnlyList<string> vehicleIds) =>
         new(id, "Place " + id, string.Empty, PlaceKind.Other, 31.0990, -85.3410, 100, memberIds, vehicleIds);

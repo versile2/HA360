@@ -9,9 +9,6 @@ namespace Realm.Demo;
 /// </summary>
 public static class DemoCast
 {
-    /// <summary>The placeholder note of the second vehicle (01 Appendix A.2).</summary>
-    public const string ChariotNote = "Awaiting the royal scribes (the maker's app)";
-
     public static readonly DemoMember King = new(
         Id: "king",
         Name: "Alden",
@@ -77,22 +74,24 @@ public static class DemoCast
         Name: "Ford Pickup",
         Lore: "The King's Wagon",
         Glyph: VehicleGlyph.Pickup,
-        SortOrder: 0,
-        IsPlaceholder: false,
-        PlaceholderNote: null);
+        SortOrder: 0);
 
     public static readonly DemoVehicle Chariot = new(
         Id: "chariot",
         Name: "Hatchback",
         Lore: "The Queen's Chariot",
         Glyph: VehicleGlyph.Car,
-        SortOrder: 1,
-        IsPlaceholder: true,
-        PlaceholderNote: ChariotNote);
+        SortOrder: 1);
 
-    /// <summary>The five people in sort order.</summary>
-    public static readonly IReadOnlyList<DemoMember> Members = [King, Queen, Jester, Cryptid, Prince];
+    /// <summary>The four people the demo roster starts with, in sort order. The prince starts under Not tracked.</summary>
+    public static readonly IReadOnlyList<DemoMember> Members = [King, Queen, Jester, Cryptid];
 
-    /// <summary>The two vehicles in sort order.</summary>
-    public static readonly IReadOnlyList<DemoVehicle> Vehicles = [Wagon, Chariot];
+    /// <summary>The vehicle the demo roster starts with. The chariot starts under Not tracked.</summary>
+    public static readonly IReadOnlyList<DemoVehicle> Vehicles = [Wagon];
+
+    /// <summary>All five people of the fixture in sort order, the prince included (he starts under Not tracked).</summary>
+    public static readonly IReadOnlyList<DemoMember> AllMembers = [King, Queen, Jester, Cryptid, Prince];
+
+    /// <summary>Both vehicles of the fixture in sort order, the chariot included (it starts under Not tracked).</summary>
+    public static readonly IReadOnlyList<DemoVehicle> AllVehicles = [Wagon, Chariot];
 }

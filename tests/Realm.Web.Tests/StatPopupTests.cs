@@ -415,9 +415,9 @@ public sealed class StatPopupTests : ComponentTestBase
     {
         var cut = await OpenAsync(StatNameFormatter.DrivesKey, await DrivingFormatterTests.Report(0));
 
-        // The Tab order inside the dialog's focus trap is Close, the toggle, Got it.
+        // The Tab order inside the dialog's focus trap is Close, the toggle, Got it, then (0.2.0) the print button of the report behind the popup.
         var controls = cut.FindAll(".mud-dialog-content button").Select(button => button.GetAttribute("data-testid")).ToList();
-        Assert.Equal(["popup-close", "popup-toggle-drives", "popup-toggle-miles", "popup-gotit"], controls);
+        Assert.Equal(["popup-close", "popup-toggle-drives", "popup-toggle-miles", "popup-gotit", "popup-print"], controls);
         var close = cut.Find("button[data-testid='popup-close']");
         Assert.Equal("Close", close.GetAttribute("aria-label"));
 

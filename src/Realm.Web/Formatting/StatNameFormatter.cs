@@ -116,17 +116,24 @@ public static class StatNameFormatter
             _ => count == 1 ? "event" : "events",
         };
 
-    /// <summary>"this week" for the current week, "last week" for the one before, "that week" for the two date-range weeks (01 section 6.7).</summary>
+    /// <summary>
+    /// The week offset the period words are given for a long period (a month, a rolling window, a custom range): <see cref="Period"/> reads "in this period" and
+    /// <see cref="Previous"/> "the period before".
+    /// </summary>
+    public const int LongPeriod = -1;
+
+    /// <summary>"this week" for the current week, "last week" for the one before, "that week" for the two date-range weeks, "in this period" for a long period (01 section 6.7).</summary>
     public static string Period(int weekOffset) =>
         weekOffset switch
         {
+            < 0 => "in this period",
             0 => "this week",
             1 => "last week",
             _ => "that week",
         };
 
-    /// <summary>The comparator's name (01 section 6.7): "last week" for This week, otherwise "the week before".</summary>
-    public static string Previous(int weekOffset) => weekOffset == 0 ? "last week" : "the week before";
+    /// <summary>The comparator's name (01 section 6.7): "last week" for This week, "the week before" for an older week, "the period before" for a long period.</summary>
+    public static string Previous(int weekOffset) => weekOffset < 0 ? "the period before" : weekOffset == 0 ? "last week" : "the week before";
 
     // ---- the chip (01 section 6.3) -----------------------------------------------------------------------------------------------------------
 

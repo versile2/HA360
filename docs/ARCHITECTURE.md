@@ -8,11 +8,12 @@ from its own stored history. It appears as a sidebar panel through Ingress, so H
 and it works in the companion app. It publishes no port.
 
 Live positions come from Home Assistant's own entities (the Life360 trackers, the companion apps and zones). The
-add-on holds no Life360 login or token and never calls Life360's API. The one exception is member pictures: with the
-`avatar` option of a member set to `life360` (and in the default `auto` mode when the person has no picture of their own
-in Home Assistant), the add-on downloads the picture, without credentials, from the `life360.com` address Home Assistant
-reports for the member's tracker, and caches it under `/data/cache/avatars`. All personal configuration (names, entity
-ids, addresses) lives in the add-on's options on the user's own Home Assistant, never in this repository.
+add-on holds no Life360 login or token and never calls Life360's API. The one exception is member pictures: when the person has no
+picture of their own in Home Assistant, the add-on downloads the picture, without credentials, from the `life360.com`
+address Home Assistant reports for the member's tracker, and caches it under `/data/cache/avatars`. Its one write to Home
+Assistant is the persistent notification it creates when someone joins the map or is moved off it (D113). All personal
+configuration (names, titles, colours, who is on the map) lives in the add-on's database on the user's own Home Assistant,
+never in this repository.
 
 ## Stack
 
@@ -50,39 +51,12 @@ to; the repository guards (see How CI works) compare that list with `config.yaml
 
 ## Configuration
 
-The Configuration tab (the `options` and `schema` blocks of `realm/config.yaml`) holds thresholds, switches and three
-lists: `members`, `vehicles` and `places`. They ship empty; with no options set the app discovers people from Home
-Assistant and shows plain names. A small example with an invented cast (patterns in angle brackets stand for your own
-entity ids):
-
-```yaml
-members:
-  - id: king
-    display_name: "Alden"
-    lore_title: "The King"
-    color: "#E8BC4E"
-    person: "person.<slug>"
-    life360_tracker: "device_tracker.<slug>"
-    companion_tracker: "device_tracker.<slug>"
-  - id: queen
-    display_name: "Briar"
-    lore_title: "The Queen"
-vehicles:
-  - id: wagon
-    name: "Pickup"
-    lore_title: "The King's Wagon"
-    glyph: pickup
-    integration: fordpass
-    entity_prefix: "fordpass_<vin>"
-places:
-  - zone: "zone.<slug>"
-    display_name: "Hearth Haven"
-    subtitle: "Home"
-    kind: home
-```
-
-A member with `kind: static` is a fixed pin for someone who does not share location (`static_label`, `static_latitude`,
-`static_longitude`). `lore_title` is only a secondary label; plain names stay the primary text.
+The Configuration tab (the `options` and `schema` blocks of `realm/config.yaml`) holds six options only: `demo_mode`,
+`allow_demo_param`, `log_level`, `retention_fix_days`, `driving_week_start` and `driving_speeding_mph`. Who is on the map is
+not an option: the roster (every person and GPS tracker Home Assistant reports, with its group, name, title and colour) lives
+in the `roster` table of the app database and is edited in the app, under Settings -> Who's on the map (D113, D114). Saved
+places are the Home Assistant zones. Every other threshold is a constant of the code; an option an earlier version wrote into
+the configuration is ignored.
 
 ## How CI works
 

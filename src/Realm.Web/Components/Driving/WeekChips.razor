@@ -19,7 +19,7 @@
                 data-testid="@("week-chip-" + week.Offset.ToString(CultureInfo.InvariantCulture))"
                 aria-checked="@(selected ? "true" : "false")"
                 aria-label="@DrivingFormatter.ChipAccessibleName(week)"
-                tabindex="@(selected ? 0 : -1)"
+                tabindex="@(selected || (Selected < 0 && week.Offset == 0) ? 0 : -1)"
                 @onclick="() => SelectAsync(week.Offset)"
                 @onkeydown="args => KeyDownAsync(args, week.Offset)">@DrivingFormatter.ChipLabel(week)</button>
     }
@@ -34,7 +34,7 @@
     [Parameter]
     public IReadOnlyList<WeekRef> Weeks { get; set; } = [];
 
-    /// <summary>The selected offset, 0 to 3.</summary>
+    /// <summary>The selected offset, 0 to 3; -1 while a long period is shown (no chip is selected and the first stays the tab stop).</summary>
     [Parameter]
     public int Selected { get; set; }
 

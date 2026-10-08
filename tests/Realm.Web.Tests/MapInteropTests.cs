@@ -61,7 +61,7 @@ public sealed class MapInteropTests
     {
         var js = new FakeJs();
         await using var interop = await MapInterop.CreateAsync(js, new MapCallbacks(new RecordingHandler()));
-        await using var session = new DemoRealmSessionFactory().Create(null);
+        await using var session = FullCast.Session(null);
         var snapshot = session.Current;
         var options = MapPayloadOptions.Default;
         var members = MapPayloadFactory.Members(snapshot.Members, snapshot.Places, null, session.Time.GetUtcNow(), options, 1);

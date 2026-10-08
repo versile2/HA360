@@ -164,7 +164,7 @@ public sealed class DrivingFormatterTests
                 "14 drives • 366.0 miles",
                 "10 drives • 118.2 miles",
             ],
-            report.Drivers.Select(DrivingFormatter.DriverLine));
+            report.Drivers.Select(d => DrivingFormatter.DriverLine(d)));
         Assert.Contains('•', DrivingFormatter.DriverLine(report.Drivers[0]));
         Assert.DoesNotContain('·', DrivingFormatter.DriverLine(report.Drivers[0]));
         Assert.Equal(["king", "jester", "cryptid", "queen"], report.Drivers.Select(d => d.MemberId));
@@ -852,7 +852,7 @@ public sealed class DrivingFormatterTests
     }
 
     [Fact]
-    public void DriveDays_NameAnUnknownPlace_AFarAwaySpeed_AndAMissingSpeed()
+    public void DriveDays_NameAnUnnamedPlace_AFarAwaySpeed_AndAMissingSpeed()
     {
         var start = new DateTimeOffset(2026, 9, 30, 15, 0, 0, TimeSpan.Zero);
         var events = new Dictionary<string, int?> { ["speeding"] = 1, ["phone"] = 0, ["accel"] = null, ["braking"] = 2 };
@@ -861,7 +861,7 @@ public sealed class DrivingFormatterTests
 
         var rows = DrivingFormatter.DriveDays([unknown, fast], Chicago).SelectMany(day => day.Rows).ToList();
 
-        Assert.Equal("Unknown place → Work", rows[0].Route);
+        Assert.Equal("Somewhere in the Realm → Work", rows[0].Route);
         Assert.Equal("5.0 mi · Top —", rows[0].Detail);
         Assert.Equal(["1 speeding event", "2 hard-braking events"], rows[0].Events.Select(chip => chip.Text));
         Assert.Equal("Work → Home", rows[1].Route);
@@ -888,7 +888,7 @@ public sealed class DrivingFormatterTests
     ];
 
     internal static IRealmSession Demo(params string[] variants) =>
-        new DemoRealmSessionFactory().Create(new DemoUrlParams(null, variants));
+        FullCast.Session(new DemoUrlParams(null, variants));
 
     private static IReadOnlyDictionary<string, MemberVm> DemoMembers() =>
         Demo().Current.Members.ToDictionary(member => member.Id, StringComparer.Ordinal);
