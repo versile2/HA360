@@ -130,3 +130,7 @@ node --test "tests/js/**/*.test.mjs"
 
 The tests build temporary git repositories and need `git`, `bash` and Node 22. They run locally only until the `js` job
 of slice S5 exists; its quoted glob then picks them up.
+
+## Releases
+
+`release.yml` is not part of the CI summary. Merging a PR that bumps `version` in `realm/config.yaml` to main runs it: it builds and pushes `ghcr.io/versile2/ha-cartographer:<version>`, and only after that creates the tag `v<version>` and a GitHub release with notes generated from the merged PRs (`.github/release.yml`). A version that already has a tag is skipped; `workflow_dispatch` on main re-runs a failed release.

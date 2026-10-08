@@ -106,7 +106,8 @@ app) and `publish-ci`, which waits for all of them. `SUMMARY.md` has a section f
 ## Releasing
 
 The add-on version in `realm/config.yaml` equals the image tag, and every version has a section in
-`realm/CHANGELOG.md`. A release is image first, store second: push a tag `vX.Y.Z` (a workflow, added with the
-Dockerfile, builds and pushes the image), then edit `version` in `realm/config.yaml` once the image exists, so nobody is
-offered an update they cannot pull. Install in Home Assistant by adding `https://github.com/Versile2/ha-cartographer` as an app
+`realm/CHANGELOG.md`. A release is made by merging a PR that bumps `version` in `realm/config.yaml` to main: the
+release workflow builds and pushes the image, then creates the tag `vX.Y.Z` and the GitHub release (notes generated from the
+merged PRs). The store sees the new version as soon as the merge lands, a few minutes before the image is pushed; an update
+attempted in that window fails to pull and succeeds on retry. Install in Home Assistant by adding `https://github.com/Versile2/ha-cartographer` as an app
 repository.
