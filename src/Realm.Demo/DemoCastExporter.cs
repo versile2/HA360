@@ -19,24 +19,12 @@ public static class DemoCastExporter
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
 
-    /// <summary>The cast as indented JSON: members, vehicles, the chariot note and all 15 places (the drawn flag marks the 14 that are shown).</summary>
+    /// <summary>The cast as indented JSON: members, vehicles, the two Not tracked examples and all 15 places (the drawn flag marks the 14 that are shown).</summary>
     public static string ToJson()
     {
         var export = new
         {
-            Members = DemoCast.Members.Select(member => new
-            {
-                member.Id,
-                member.Name,
-                member.Lore,
-                member.Color,
-                Kind = member.Kind.ToString().ToLowerInvariant(),
-                member.SortOrder,
-                member.PersonUserId,
-                member.PhoneCapable,
-                member.Address,
-                member.StaticLabel,
-            }),
+            Members = DemoCast.Members.Select(Describe),
             Vehicles = DemoCast.Vehicles.Select(vehicle => new
             {
                 vehicle.Id,
@@ -44,10 +32,9 @@ public static class DemoCastExporter
                 vehicle.Lore,
                 Glyph = vehicle.Glyph.ToString().ToLowerInvariant(),
                 vehicle.SortOrder,
-                vehicle.IsPlaceholder,
-                vehicle.PlaceholderNote,
             }),
-            DemoCast.ChariotNote,
+            Prince = Describe(DemoCast.Prince),
+            Chariot = new { DemoCast.Chariot.Id, DemoCast.Chariot.Name, DemoCast.Chariot.Lore },
             Places = DemoPlaces.All.Select(place => new
             {
                 place.Id,
@@ -64,6 +51,20 @@ public static class DemoCastExporter
 
         return JsonSerializer.Serialize(export, Options);
     }
+
+    private static object Describe(DemoMember member) => new
+    {
+        member.Id,
+        member.Name,
+        member.Lore,
+        member.Color,
+        Kind = member.Kind.ToString().ToLowerInvariant(),
+        member.SortOrder,
+        member.PersonUserId,
+        member.PhoneCapable,
+        member.Address,
+        member.StaticLabel,
+    };
 
     /// <summary>Writes <see cref="ToJson"/> to <paramref name="path"/> (UTF-8, no byte-order mark), creating the folder if needed.</summary>
     public static void WriteTo(string path)

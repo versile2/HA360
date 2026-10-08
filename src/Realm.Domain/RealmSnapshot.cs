@@ -4,7 +4,7 @@ namespace Realm.Domain;
 /// <param name="Zone">HA's IANA time zone id; every time is shown in it.</param>
 /// <param name="StatsVersion">Bumped whenever a trip is closed and written, so the Driving page knows when to refetch.</param>
 /// <param name="WeekStart">The add-on option driving_week_start.</param>
-/// <param name="Connections">Exactly four entries: HomeAssistant, Life360Trackers, FordPass, VehiclePlaceholder.</param>
+/// <param name="Connections">Exactly two entries: HomeAssistant, Life360Trackers.</param>
 public record RealmSnapshot(
     DateTimeOffset ServerNowUtc,
     int StatsVersion,

@@ -1,7 +1,7 @@
 namespace Realm.Infrastructure.Diagnostics;
 
 /// <summary>
-/// The nine fixed warning codes of <c>diagnostics.json</c> (03 section 2.11), in the order the specification lists them. A code is a word for the operator, never
+/// The eight fixed warning codes of <c>diagnostics.json</c> (03 section 2.11), in the order the specification lists them. A code is a word for the operator, never
 /// prose, and carries no value: the file says that something is wrong, the log says what.
 /// </summary>
 public static class WarningCodes
@@ -29,7 +29,4 @@ public static class WarningCodes
 
     /// <summary>The map script and the server disagree on the payload schema (a stale cached script).</summary>
     public const string PayloadSchemaMismatch = "payload_schema_mismatch";
-
-    /// <summary>A vehicle's last refresh is older than <c>ui_vehicle_stale_after_minutes</c>.</summary>
-    public const string VehicleSensorStale = "vehicle_sensor_stale";
 }

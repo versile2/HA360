@@ -12,9 +12,9 @@ namespace Realm.Infrastructure.Data;
 /// <summary>
 /// The single database writer (02 section 7.3, 03 sections 2.4, 2.12 and 2.13). Producers queue rows through <see cref="IRealmWriter"/>; one consumer commits
 /// the queue in one transaction whenever 100 rows are waiting or 2 s have passed, so a crash loses at most 2 s of fixes (the HA history gap-fill restores
-/// them). Fixes and signals are <c>INSERT OR IGNORE</c>, vehicle samples merge with <c>ON CONFLICT DO UPDATE ... COALESCE</c>, meta rows replace. The queue holds
-/// <see cref="QueueCapacity"/> rows and drops <c>track = 0</c> diagnostic rows first when it is full. A trip close is written on its own, after the flush
-/// that holds everything queued before it. On a graceful stop the queue is drained, <c>meta.clean_shutdown</c> is set to <c>'1'</c> and the WAL is
+/// them). Fixes and signals are <c>INSERT OR IGNORE</c>, meta rows replace. The queue holds
+/// <see cref="QueueCapacity"/> rows and drops <c>track = 0</c> diagnostic rows first when it is full. A trip close and a roster write are each written on their own, after the flush
+/// that holds everything queued before them. On a graceful stop the queue is drained, <c>meta.clean_shutdown</c> is set to <c>'1'</c> and the WAL is
 /// checkpointed. This is the only code that writes the database after <see cref="SchemaBootstrap"/>.
 /// </summary>
 public sealed class DbWriter : BackgroundService, IRealmWriter
@@ -38,24 +38,19 @@ public sealed class DbWriter : BackgroundService, IRealmWriter
         "INSERT OR IGNORE INTO fixes(member_id, ts, source, lat, lon, acc_m, speed_mps, heading_deg, alt_m, battery_pct, charging, driving, address, track, reason) "
         + "VALUES (@member, @ts, @source, @lat, @lon, @acc, @speed, @heading, @alt, @battery, @charging, @driving, @address, @track, @reason)";
 
-    // "COALESCE(excluded.col, col)": a later sample of the same vehicle and time fills what is empty and never erases a value.
-    private const string VehicleSampleSql =
-        "INSERT INTO vehicle_samples(vehicle_id, ts, odo_m, fuel_pct, ignition, gear, speed_mps, remote_start_s, lat, lon) "
-        + "VALUES (@vehicle, @ts, @odo, @fuel, @ignition, @gear, @speed, @remote, @lat, @lon) "
-        + "ON CONFLICT(vehicle_id, ts) DO UPDATE SET "
-        + "odo_m = COALESCE(excluded.odo_m, odo_m), fuel_pct = COALESCE(excluded.fuel_pct, fuel_pct), "
-        + "ignition = COALESCE(excluded.ignition, ignition), gear = COALESCE(excluded.gear, gear), "
-        + "speed_mps = COALESCE(excluded.speed_mps, speed_mps), remote_start_s = COALESCE(excluded.remote_start_s, remote_start_s), "
-        + "lat = COALESCE(excluded.lat, lat), lon = COALESCE(excluded.lon, lon)";
-
     private const string SignalSql =
         "INSERT OR IGNORE INTO signals(member_id, ts, kind, value) VALUES (@member, @ts, @kind, @value)";
 
     private const string PruneFixesSql = "DELETE FROM fixes WHERE id IN (SELECT id FROM fixes WHERE ts < @cutoff ORDER BY id LIMIT @limit)";
 
-    private const string PruneVehicleSamplesSql = "DELETE FROM vehicle_samples WHERE id IN (SELECT id FROM vehicle_samples WHERE ts < @cutoff ORDER BY id LIMIT @limit)";
-
     private const string PruneSignalsSql = "DELETE FROM signals WHERE id IN (SELECT id FROM signals WHERE ts < @cutoff ORDER BY id LIMIT @limit)";
+
+    private const string RosterSql =
+        "INSERT INTO roster(entity_id, kind, grp, display_name, lore_title, color, sort_order, source, first_seen, last_active, auto_moved_at) "
+        + "VALUES (@id, @kind, @grp, @name, @lore, @color, @sort, @source, @first, @active, @moved) "
+        + "ON CONFLICT(entity_id) DO UPDATE SET kind = excluded.kind, grp = excluded.grp, display_name = excluded.display_name, lore_title = excluded.lore_title, "
+        + "color = excluded.color, sort_order = excluded.sort_order, source = excluded.source, first_seen = excluded.first_seen, "
+        + "last_active = excluded.last_active, auto_moved_at = excluded.auto_moved_at";
 
     private const string MetaSql = "INSERT OR REPLACE INTO meta(key, value) VALUES (@key, @value)";
 
@@ -74,7 +69,7 @@ public sealed class DbWriter : BackgroundService, IRealmWriter
         "INSERT INTO trip_events(trip_id, kind, start_ts, end_ts, peak, lat, lon) VALUES (@trip, @kind, @start, @end, @peak, @lat, @lon)";
 
     /// <summary>The tables of 02 section 7.6 that age out after <c>retention_fix_days</c>, in the order they are pruned.</summary>
-    internal static readonly string[] PrunedTables = ["fixes", "vehicle_samples", "signals"];
+    internal static readonly string[] PrunedTables = ["fixes", "signals"];
 
     private readonly IDbContextFactory<RealmDb> _factory;
     private readonly TimeProvider _time;
@@ -131,11 +126,6 @@ public sealed class DbWriter : BackgroundService, IRealmWriter
 
     public bool EnqueueFix(string memberId, RawFix fix, bool inTrack = true, TrackReason? reason = null)
     {
-        if (fix.Source is not (FixSource.Life360 or FixSource.Companion))
-        {
-            throw new ArgumentException("Only life360 and companion fixes are stored as fixes; FordPass readings are vehicle samples", nameof(fix));
-        }
-
         // lat and lon are NOT NULL columns and SQLite stores NaN as NULL: one such row would fail every flush after it, so it is refused here.
         if (!double.IsFinite(fix.Lat) || !double.IsFinite(fix.Lon))
         {
@@ -143,11 +133,6 @@ public sealed class DbWriter : BackgroundService, IRealmWriter
         }
 
         return Accept(new WriteCommand.Fix(memberId, fix, inTrack, inTrack ? null : reason));
-    }
-
-    public bool EnqueueVehicleSample(VehicleSample sample)
-    {
-        return Accept(new WriteCommand.VehicleSampleRow(sample));
     }
 
     public bool EnqueueSignal(string memberId, PhoneSignal signal)
@@ -179,13 +164,33 @@ public sealed class DbWriter : BackgroundService, IRealmWriter
         return await done.Task.WaitAsync(cancellationToken);
     }
 
+    public async Task WriteRosterAsync(IReadOnlyList<RosterEntry> entries, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(entries);
+        if (entries.Count == 0)
+        {
+            return;
+        }
+
+        var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var accepted = _queue.TryAdd(new WriteCommand.Roster(entries, done));
+        PublishQueue();
+        if (!accepted)
+        {
+            throw new InvalidOperationException("The database writer has stopped");
+        }
+
+        _bell.Writer.TryWrite(true);
+        await done.Task.WaitAsync(cancellationToken);
+    }
+
     public Task FlushAsync(CancellationToken cancellationToken = default)
     {
         return FlushQueuedAsync(cancellationToken);
     }
 
     /// <summary>
-    /// Deletes up to <paramref name="limit"/> of the oldest rows of one of the raw tables (<c>fixes</c>, <c>signals</c>, <c>vehicle_samples</c>) with a time before
+    /// Deletes up to <paramref name="limit"/> of the oldest rows of one of the raw tables (<c>fixes</c>, <c>signals</c>) with a time before
     /// <paramref name="cutoff"/> and returns how many went (02 section 7.6, the <c>prune</c> job). It runs between flushes, never inside one, so the writer stays the
     /// only code that changes the database. Any other table is refused: trips are kept for ever.
     /// </summary>
@@ -194,7 +199,6 @@ public sealed class DbWriter : BackgroundService, IRealmWriter
         var sql = table switch
         {
             "fixes" => PruneFixesSql,
-            "vehicle_samples" => PruneVehicleSamplesSql,
             "signals" => PruneSignalsSql,
             _ => throw new ArgumentException("Only the raw tables are pruned", nameof(table)),
         };
@@ -355,8 +359,25 @@ public sealed class DbWriter : BackgroundService, IRealmWriter
                         continue;
                     }
 
+                    if (commands[done] is WriteCommand.Roster roster)
+                    {
+                        try
+                        {
+                            await CommitRosterAsync(roster);
+                        }
+                        catch (Exception ex)
+                        {
+                            roster.Done.TrySetException(ex);
+                            done++;
+                            throw;
+                        }
+
+                        done++;
+                        continue;
+                    }
+
                     var end = done;
-                    while (end < commands.Count && commands[end] is not WriteCommand.Trip)
+                    while (end < commands.Count && commands[end] is not (WriteCommand.Trip or WriteCommand.Roster))
                     {
                         end++;
                     }
@@ -420,9 +441,6 @@ public sealed class DbWriter : BackgroundService, IRealmWriter
             using var fixInsert = new SqlStatement(
                 connection, transaction, FixSql,
                 "@member", "@ts", "@source", "@lat", "@lon", "@acc", "@speed", "@heading", "@alt", "@battery", "@charging", "@driving", "@address", "@track", "@reason");
-            using var sampleUpsert = new SqlStatement(
-                connection, transaction, VehicleSampleSql,
-                "@vehicle", "@ts", "@odo", "@fuel", "@ignition", "@gear", "@speed", "@remote", "@lat", "@lon");
             using var signalInsert = new SqlStatement(connection, transaction, SignalSql, "@member", "@ts", "@kind", "@value");
             using var metaUpsert = new SqlStatement(connection, transaction, MetaSql, "@key", "@value");
             for (var i = start; i < end; i++)
@@ -436,12 +454,6 @@ public sealed class DbWriter : BackgroundService, IRealmWriter
                             SqlValues.Real(f.AccuracyM), SqlValues.Real(f.SpeedMps), SqlValues.Real(f.HeadingDeg), SqlValues.Real(f.AltitudeM),
                             SqlValues.Integer(f.BatteryPct), SqlValues.Flag(f.Charging), SqlValues.Flag(f.Driving), SqlValues.Text(f.Address),
                             fix.InTrack ? 1L : 0L, SqlValues.Text(ReasonText(fix.Reason)));
-                        break;
-                    case WriteCommand.VehicleSampleRow row:
-                        var s = row.Value;
-                        sampleUpsert.Run(
-                            s.VehicleId, SqlValues.Millis(s.Ts), SqlValues.Real(s.OdometerM), SqlValues.Integer(s.FuelPct), SqlValues.Text(s.Ignition),
-                            SqlValues.Text(s.Gear), SqlValues.Real(s.SpeedMps), SqlValues.Integer(s.RemoteStartSeconds), SqlValues.Real(s.Lat), SqlValues.Real(s.Lon));
                         break;
                     case WriteCommand.Signal signal:
                         signalInsert.Run(signal.MemberId, SqlValues.Millis(signal.Value.Ts), SignalKindText(signal.Value.Kind), SignalValueText(signal.Value.IsOn));
@@ -494,6 +506,32 @@ public sealed class DbWriter : BackgroundService, IRealmWriter
                 }
             }
         }
+    }
+
+    // The roster rows replace the row of their entity id; times are Unix milliseconds like every other table, the group and kind are lower-case words.
+    private async Task CommitRosterAsync(WriteCommand.Roster command)
+    {
+        await using (var session = await DbSession.OpenAsync(_factory, CancellationToken.None))
+        {
+            var connection = session.Connection;
+            using var transaction = connection.BeginTransaction();
+            using (var upsert = new SqlStatement(
+                connection, transaction, RosterSql,
+                "@id", "@kind", "@grp", "@name", "@lore", "@color", "@sort", "@source", "@first", "@active", "@moved"))
+            {
+                foreach (var entry in command.Entries)
+                {
+                    upsert.Run(
+                        entry.EntityId, RosterText.Kind(entry.Kind), RosterText.Group(entry.Group), entry.DisplayName, SqlValues.Text(entry.LoreTitle),
+                        entry.Color, (long)entry.SortOrder, entry.Source, SqlValues.Millis(entry.FirstSeenUtc), SqlValues.Millis(entry.LastActiveUtc),
+                        SqlValues.Millis(entry.AutoMovedUtc));
+                }
+            }
+
+            transaction.Commit();
+        }
+
+        command.Done.TrySetResult();
     }
 
     private async Task CommitTripAsync(WriteCommand.Trip command)
@@ -597,6 +635,10 @@ public sealed class DbWriter : BackgroundService, IRealmWriter
             if (command is WriteCommand.Trip trip)
             {
                 trip.Done.TrySetException(error);
+            }
+            else if (command is WriteCommand.Roster roster)
+            {
+                roster.Done.TrySetException(error);
             }
         }
 

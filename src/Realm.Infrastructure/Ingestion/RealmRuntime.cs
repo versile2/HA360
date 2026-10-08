@@ -59,7 +59,7 @@ internal sealed class MemberRuntime
     public Dictionary<PhoneSignalKind, (bool? IsOn, DateTimeOffset Ts)> LastSignals { get; } = [];
 }
 
-/// <summary>The mutable state of one vehicle: its tracker's last accepted fix and the last sample that was queued.</summary>
+/// <summary>The mutable state of one vehicle: its tracker's last accepted fix and the zones it is in.</summary>
 internal sealed class VehicleRuntime
 {
     public VehicleRuntime(ResolvedVehicle plan)
@@ -74,6 +74,4 @@ internal sealed class VehicleRuntime
     public IReadOnlyList<string> ZoneIds { get; set; } = [];
 
     public string? PlaceId { get; set; }
-
-    public VehicleSample? LastSample { get; set; }
 }

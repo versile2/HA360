@@ -10,7 +10,7 @@ namespace Realm.Infrastructure.Diagnostics;
 
 /// <summary>
 /// The Live <see cref="IDiagnostics"/> (03 section 2.11, 02 section 10.4): it copies what the services already keep into a <see cref="DiagnosticsSnapshot"/>
-/// with <c>mode</c> "live", and raises the nine fixed warning codes of <see cref="WarningCodes"/> from it. It reads the current <see cref="RealmSnapshot"/> (the
+/// with <c>mode</c> "live", and raises the eight fixed warning codes of <see cref="WarningCodes"/> from it. It reads the current <see cref="RealmSnapshot"/> (the
 /// zone, the counts, the four connection entries, each member's freshness and each vehicle's last refresh), <see cref="ServiceCounters"/> and the websocket's
 /// status, and it has no other input, so there is no coordinate, address, name, battery value, entity id, user id, token or log text for it to copy. Members
 /// appear by their option slug only. Reading is cheap and never blocks a service; the web host fills in the circuit counts when it serves the file.
@@ -111,10 +111,10 @@ public sealed class DiagnosticsSnapshotBuilder : IDiagnostics
             Warnings: WarningsOf(snapshot, status, now, dropped, writerDepth, zoneDataOk));
     }
 
-    // The nine codes of 03 section 2.11, in the order it lists them. Each one has exactly the condition the section gives.
+    // The eight codes of 03 section 2.11, in the order it lists them. Each one has exactly the condition the section gives.
     private List<string> WarningsOf(RealmSnapshot snapshot, HaConnectionStatus? status, DateTimeOffset now, long dropped, int writerDepth, bool zoneDataOk)
     {
-        var warnings = new List<string>(9);
+        var warnings = new List<string>(8);
 
         // The HomeAssistant entry the Settings chips and the banner show.
         var homeAssistant = snapshot.Connections.FirstOrDefault(connection => connection.Name == ConnectionNames.HomeAssistant);
@@ -157,13 +157,6 @@ public sealed class DiagnosticsSnapshotBuilder : IDiagnostics
         if (_counters.PayloadSchemaMismatch)
         {
             warnings.Add(WarningCodes.PayloadSchemaMismatch);
-        }
-
-        // A vehicle that Home Assistant reports on, whose last refresh is older than the threshold; a vehicle never heard of has no refresh to be old.
-        var vehicleLimit = TimeSpan.FromMinutes(_options.UiVehicleStaleAfterMinutes);
-        if (snapshot.Vehicles.Any(vehicle => !vehicle.IsPlaceholder && vehicle.LastUpdateUtc is { } refreshed && now - refreshed > vehicleLimit))
-        {
-            warnings.Add(WarningCodes.VehicleSensorStale);
         }
 
         return warnings;

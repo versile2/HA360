@@ -43,6 +43,10 @@ public sealed class HaGateway : IHaGateway, IDisposable
         _rest.GetHistoryAsync(entityId, start, end, withAttributes, cancellationToken);
 
     /// <inheritdoc />
+    public Task NotifyAsync(string notificationId, string title, string message, CancellationToken cancellationToken) =>
+        _rest.NotifyAsync(notificationId, title, message, cancellationToken);
+
+    /// <inheritdoc />
     public Task<AvatarImage?> GetImageAsync(string pathAndQuery, int maxBytes, CancellationToken cancellationToken) =>
         _rest.GetImageAsync(pathAndQuery, maxBytes, cancellationToken);
 

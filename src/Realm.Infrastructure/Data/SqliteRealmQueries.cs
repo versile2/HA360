@@ -57,11 +57,6 @@ public sealed class SqliteRealmQueries : IRealmQueries
 
     public async Task<RawFix?> GetLatestFixAsync(string memberId, FixSource source, CancellationToken cancellationToken = default)
     {
-        if (source == FixSource.FordPass)
-        {
-            return null; // vehicles keep samples, not fixes
-        }
-
         var rows = await QueryAsync(
             $"SELECT {FixColumns} FROM fixes WHERE member_id = @member AND source = @source ORDER BY ts DESC LIMIT 1",
             ReadFix,
@@ -73,11 +68,6 @@ public sealed class SqliteRealmQueries : IRealmQueries
 
     public Task<IReadOnlyList<DateTimeOffset>> GetFixTimesAsync(string memberId, FixSource source, DateTimeOffset fromUtc, DateTimeOffset toUtc, CancellationToken cancellationToken = default)
     {
-        if (source == FixSource.FordPass)
-        {
-            return Task.FromResult<IReadOnlyList<DateTimeOffset>>([]); // vehicles keep samples, not fixes
-        }
-
         return QueryAsync(
             "SELECT ts FROM fixes WHERE member_id = @member AND source = @source AND ts >= @from AND ts < @to ORDER BY ts",
             reader => SqlValues.FromMillis(reader.GetInt64(0)),
@@ -108,6 +98,31 @@ public sealed class SqliteRealmQueries : IRealmQueries
             ("@member", memberId),
             ("@from", SqlValues.Millis(fromUtc)),
             ("@to", SqlValues.Millis(toUtc)));
+    }
+
+    public Task<IReadOnlyList<RosterEntry>> GetRosterAsync(CancellationToken cancellationToken = default)
+    {
+        return QueryAsync(
+            "SELECT entity_id, kind, grp, display_name, lore_title, color, sort_order, source, first_seen, last_active, auto_moved_at "
+            + "FROM roster ORDER BY CASE grp WHEN 'people' THEN 0 WHEN 'vehicles' THEN 1 ELSE 2 END, sort_order, entity_id",
+            ReadRoster,
+            cancellationToken);
+    }
+
+    private static RosterEntry ReadRoster(DbDataReader reader)
+    {
+        return new RosterEntry(
+            EntityId: reader.GetString(0),
+            Kind: RosterText.ParseKind(reader.GetString(1)),
+            Group: RosterText.ParseGroup(reader.GetString(2)),
+            DisplayName: reader.GetString(3),
+            LoreTitle: SqlValues.NullableText(reader, 4),
+            Color: reader.GetString(5),
+            SortOrder: reader.GetInt32(6),
+            Source: reader.GetString(7),
+            FirstSeenUtc: SqlValues.FromMillis(reader.GetInt64(8)),
+            LastActiveUtc: SqlValues.FromMillis(reader.GetInt64(9)),
+            AutoMovedUtc: SqlValues.NullableMillis(reader, 10));
     }
 
     private static StatsTrip ReadTrip(DbDataReader reader)

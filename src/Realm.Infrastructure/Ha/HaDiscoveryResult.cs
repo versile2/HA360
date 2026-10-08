@@ -3,13 +3,13 @@ using Realm.Domain;
 namespace Realm.Infrastructure.Ha;
 
 /// <summary>
-/// The outcome of one discovery run (02 section 1.2): who the members and vehicles are, which entities feed each of them, the zones, and the entity ids the
-/// websocket must watch. It holds entity ids and options only, no state values, so it is safe to log by count.
+/// The outcome of one discovery run (02 section 1.2): who the members and vehicles are (the roster entries that are on the map), which entities feed each of
+/// them, the zones, and the entity ids the websocket must watch. It holds entity ids and roster settings only, no state values, so it is safe to log by count.
 /// </summary>
 /// <param name="TimeZone">HA's IANA time zone id.</param>
 /// <param name="HaVersion">HA's version text; null when HA did not say.</param>
 /// <param name="WatchList">Sorted, distinct; zones are in it or they never update live (R-096).</param>
-/// <param name="Warnings">Fixed sentences that name a member id or an option key, never a position; the refresher logs each one once.</param>
+/// <param name="Warnings">Fixed sentences that name an entity or a member id, never a position; the refresher logs each one once.</param>
 public sealed record HaDiscoveryResult(
     string TimeZone,
     string? HaVersion,
@@ -27,11 +27,11 @@ public sealed record HaDiscoveryResult(
 public sealed record CompanionSensors(string? BatteryLevel, string? BatteryState, string? Interactive, string? DeviceLocked, string? AndroidAuto);
 
 /// <summary>One member with every entity that feeds it (02 section 2.3). A null entity id means that source does not exist for this member.</summary>
-/// <param name="Id">The options id, or <c>l360_xxxxxxxx</c> / <c>ha_xxxxxxxx</c> for a member discovered without an options entry (02 section 2.2).</param>
-/// <param name="Color">Option colour, else the next colour of the member palette (01 section 7.5).</param>
+/// <param name="Id">The roster entry's id: its entity id with the dot made an underscore (<c>person_alden</c>).</param>
+/// <param name="Color">The roster colour (01 section 7.5).</param>
 /// <param name="UserId">The HA user id of the person; only ever compared, never shown or logged.</param>
 /// <param name="PhoneCapable">The phone's screen sensor exists, so a missing phone-use count means "not recorded yet" (02 section 6.3).</param>
-/// <param name="AvatarUpstream">The servable picture of the member (an HA <c>image/serve</c> path or a Life360 HTTPS URL), chosen by the member's avatar option; null for none.</param>
+/// <param name="AvatarUpstream">The servable picture of the member (an HA <c>image/serve</c> path or a Life360 HTTPS URL); null for none.</param>
 public sealed record ResolvedMember(
     string Id,
     string DisplayName,
@@ -53,16 +53,14 @@ public sealed record ResolvedMember(
     double? StaticLon,
     bool StaticShowAddress);
 
-/// <summary>One vehicle of the options. A placeholder (<c>integration: none</c>) has no entities.</summary>
-/// <param name="SensorIds">The <c>sensor.{prefix}_*</c> entities of 02 section 1.2 step 6 that exist in HA.</param>
+/// <summary>One vehicle: a roster entry in Vehicles, followed by the position of its device tracker.</summary>
+/// <param name="TrackerId">The device tracker whose position the vehicle shows; null when the entry has none.</param>
+/// <param name="Source">How the tracker is read: <see cref="FixSource.Life360"/> for a Life360 tracker, else <see cref="FixSource.Companion"/>.</param>
 public sealed record ResolvedVehicle(
     string Id,
     string Name,
     string? LoreTitle,
     VehicleGlyph Glyph,
-    bool IsPlaceholder,
-    string? PlaceholderNote,
     int SortOrder,
-    string? Prefix,
     string? TrackerId,
-    IReadOnlyList<string> SensorIds);
+    FixSource Source = FixSource.Companion);

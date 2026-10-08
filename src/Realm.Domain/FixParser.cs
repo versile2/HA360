@@ -10,23 +10,14 @@ namespace Realm.Domain;
 /// </summary>
 public static class FixParser
 {
-    /// <summary>Home Assistant's Life360 and FordPass speeds are mph; this converts them to m/s, the only factor used.</summary>
+    /// <summary>Home Assistant's Life360 speeds are mph; this converts them to m/s, the only factor used.</summary>
     public const double MphToMps = 0.44704;
-
-    private const double MilesToMetres = 1609.344;
-    private const double KilometresToMetres = 1000;
-    private const double KilometresPerHourToMps = 1 / 3.6;
 
     // Life360 reports a constant 15.2 m (50 ft) accuracy on every fix: a placeholder, not a measurement.
     private const double Life360AccuracyPlaceholderM = 15.2;
     private const double Life360AccuracyPlaceholderToleranceM = 0.05;
 
-    // FordPass sends 0,0 bursts: a position within half a degree of the origin is not a fix.
-    private const double NullIslandDegrees = 0.5;
-    private const double VehicleMaxPlausibleSpeedMps = 60;
     private const double RestartEchoMinDistanceM = 1;
-
-    private static readonly TimeSpan DuplicateWindow = TimeSpan.FromSeconds(2);
 
     /// <summary>
     /// Parses one tracker state into a fix, or null when the state is not a new, valid fix.
@@ -55,11 +46,6 @@ public static class FixParser
         }
 
         if (lat is < -90 or > 90 || lon is < -180 or > 180)
-        {
-            return null;
-        }
-
-        if (source == FixSource.FordPass && Math.Abs(lat) < NullIslandDegrees && Math.Abs(lon) < NullIslandDegrees)
         {
             return null;
         }
@@ -99,45 +85,6 @@ public static class FixParser
             Address: source == FixSource.Life360 ? Text(attributes, "address") : null);
     }
 
-    /// <summary>
-    /// Parses the sensors of one FordPass vehicle (entity ids sensor.{prefix}_odometer, _fuel, _ignitionstatus,
-    /// _speed, _remotestartcountdown and _lastrefresh). A missing or unavailable sensor gives null for its field.
-    /// </summary>
-    /// <param name="entityPrefix">The vehicle's entity_prefix option, for example fordpass_xxxx.</param>
-    /// <param name="sensors">Any entity states; those that are not this vehicle's sensors are ignored.</param>
-    public static RawVehicleState ParseVehicleState(string entityPrefix, IEnumerable<HaEntitySnapshot> sensors)
-    {
-        var byId = new Dictionary<string, HaEntitySnapshot>(StringComparer.Ordinal);
-        foreach (var sensor in sensors)
-        {
-            byId[sensor.EntityId] = sensor;
-        }
-
-        HaEntitySnapshot? Find(string name) => byId.GetValueOrDefault($"sensor.{entityPrefix}_{name}");
-
-        var odometer = Find("odometer");
-        var speed = Find("speed");
-        var countdownMinutes = NumericState(Find("remotestartcountdown"));
-        int? remoteStartSeconds = countdownMinutes is { } minutes
-            ? (int)Math.Round(minutes * 60, MidpointRounding.AwayFromZero)
-            : null;
-
-        // The vehicle's sample clock is its lastrefresh sensor; without it, the newest update among its sensors.
-        var ownSensors = new[] { "odometer", "fuel", "ignitionstatus", "speed", "remotestartcountdown", "lastrefresh" }
-            .Select(Find)
-            .OfType<HaEntitySnapshot>()
-            .ToList();
-        var lastRefresh = Find("lastrefresh") is { } refresh ? IsoInstant(refresh.State) : null;
-
-        return new RawVehicleState(
-            LastUpdateUtc: lastRefresh ?? ownSensors.Max(s => s.LastUpdatedUtc)?.ToUniversalTime(),
-            OdometerM: NumericState(odometer) is { } odometerReading ? odometerReading * (UnitIs(odometer, "km") ? KilometresToMetres : MilesToMetres) : null,
-            FuelPct: Percent(NumericState(Find("fuel"))),
-            Ignition: Ignition(Find("ignitionstatus")?.State, countdownRunning: countdownMinutes > 0),
-            RemoteStartSecondsLeft: remoteStartSeconds > 0 ? remoteStartSeconds : null,
-            SpeedMps: NumericState(speed) is { } speedReading ? speedReading * (UnitIs(speed, "km/h") ? KilometresPerHourToMps : MphToMps) : null);
-    }
-
     /// <summary>Parses a zone state, or returns null when it is not a zone with a position and a radius.</summary>
     public static RawPlace? ParseZone(HaEntitySnapshot snapshot)
     {
@@ -173,72 +120,39 @@ public static class FixParser
     private static bool IsRepeat(RawFix previous, FixSource source, double lat, double lon, DateTimeOffset ts, bool firstSnapshot)
     {
         var samePosition = previous.Lat == lat && previous.Lon == lon;
-        var apart = (ts - previous.Ts).Duration();
-        switch (source)
+        if (source == FixSource.Life360)
         {
-            case FixSource.Life360:
-                // Attributes with the same last_seen are a battery or wifi change, not a new fix.
-                return ts == previous.Ts;
-            case FixSource.Companion:
-                // A companion fix is the state's update time "when coordinates changed" (02 section 1.6): the same coordinates, however long after, are an
-                // attribute-only update (accuracy, altitude, battery) and not a new fix. Counting them would make a stationary phone look fresher than its
-                // last position report and bias the heartbeat estimate (02 section 4.7) low.
-                // Rule F0: on the first snapshot after a restart, a state within 1 m of the last stored fix is an echo.
-                return samePosition
-                    || (firstSnapshot && Geo.DistanceM(previous.Lat, previous.Lon, lat, lon) < RestartEchoMinDistanceM);
-            default:
-                if (samePosition && apart <= DuplicateWindow)
-                {
-                    return true;
-                }
-
-                // Implied speed above 60 m/s from the last accepted fix: a spike, not movement.
-                var distance = Geo.DistanceM(previous.Lat, previous.Lon, lat, lon);
-                return apart == TimeSpan.Zero
-                    ? distance > 0
-                    : distance / apart.TotalSeconds > VehicleMaxPlausibleSpeedMps;
+            // Attributes with the same last_seen are a battery or wifi change, not a new fix.
+            return ts == previous.Ts;
         }
+
+        // A companion fix is the state's update time "when coordinates changed" (02 section 1.6): the same coordinates, however long after, are an
+        // attribute-only update (accuracy, altitude, battery) and not a new fix. Counting them would make a stationary phone look fresher than its
+        // last position report and bias the heartbeat estimate (02 section 4.7) low.
+        // Rule F0: on the first snapshot after a restart, a state within 1 m of the last stored fix is an echo.
+        return samePosition
+            || (firstSnapshot && Geo.DistanceM(previous.Lat, previous.Lon, lat, lon) < RestartEchoMinDistanceM);
     }
 
     private static double? Accuracy(FixSource source, double? metres) => source switch
     {
         FixSource.Life360 => metres is { } m && Math.Abs(m - Life360AccuracyPlaceholderM) < Life360AccuracyPlaceholderToleranceM ? null : metres,
-        FixSource.Companion => metres,
-        _ => null,
+        _ => metres,
     };
 
     private static double? Speed(FixSource source, double? raw) => source switch
     {
         FixSource.Life360 => raw * MphToMps,
-        FixSource.Companion => raw,
-        _ => null,
-    };
-
-    private static IgnitionState? Ignition(string? text, bool countdownRunning) => text?.Trim().ToUpperInvariant() switch
-    {
-        "OFF" => IgnitionState.Off,
-        "ACCESSORY" => IgnitionState.Accessory,
-        "ON" or "RUN" or "START" => countdownRunning ? IgnitionState.RemoteStart : IgnitionState.On,
-        _ => null,
+        _ => raw,
     };
 
     private static bool IsUnavailable(string state) =>
         string.Equals(state, "unavailable", StringComparison.OrdinalIgnoreCase)
         || string.Equals(state, "unknown", StringComparison.OrdinalIgnoreCase);
 
-    private static bool UnitIs(HaEntitySnapshot? snapshot, string unit) =>
-        snapshot is not null && string.Equals(Text(snapshot.Attributes, "unit_of_measurement"), unit, StringComparison.OrdinalIgnoreCase);
-
     // A whole percent from 0 to 100; anything else is unknown.
     private static int? Percent(double? value) =>
         value is >= 0 and <= 100 ? (int)Math.Round(value.Value, MidpointRounding.AwayFromZero) : null;
-
-    private static double? NumericState(HaEntitySnapshot? snapshot) =>
-        snapshot is not null
-        && double.TryParse(snapshot.State, NumberStyles.Float, CultureInfo.InvariantCulture, out var value)
-        && double.IsFinite(value)
-            ? value
-            : null;
 
     private static double? Number(IReadOnlyDictionary<string, JsonElement> attributes, string key) =>
         attributes.TryGetValue(key, out var element)

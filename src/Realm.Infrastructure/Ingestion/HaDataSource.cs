@@ -1,13 +1,14 @@
 using Realm.Domain;
 using Realm.Infrastructure.Ha;
+using Realm.Infrastructure.Roster;
 using Realm.Infrastructure.Stats;
 
 namespace Realm.Infrastructure.Ingestion;
 
 /// <summary>
 /// The singleton behind every circuit's <see cref="LiveRealmSession"/> (02 section 1.10, 03 section 2.2): a facade over <see cref="RealmState"/> (the
-/// current snapshot), <see cref="ChangeNotifier"/> (its change events), <see cref="DiscoveryState"/> (who "me" is) and <see cref="StatsService"/> (the zone
-/// and the weekly report built from the stored trips). It holds no state of its own, so it is cheap to share and never blocks.
+/// current snapshot), <see cref="ChangeNotifier"/> (its change events), <see cref="DiscoveryState"/> (who "me" is), <see cref="RosterService"/> (who is on the map)
+/// and <see cref="StatsService"/> (the zone and the weekly report built from the stored trips). It holds no state of its own, so it is cheap to share and never blocks.
 /// </summary>
 public sealed class HaDataSource
 {
@@ -15,16 +16,21 @@ public sealed class HaDataSource
     private readonly DiscoveryState _discovery;
     private readonly ChangeNotifier _notifier;
     private readonly StatsService _stats;
+    private readonly RosterService _roster;
     private readonly TimeProvider _time;
 
-    public HaDataSource(RealmState state, DiscoveryState discovery, ChangeNotifier notifier, StatsService stats, TimeProvider time)
+    public HaDataSource(RealmState state, DiscoveryState discovery, ChangeNotifier notifier, StatsService stats, RosterService roster, TimeProvider time)
     {
         _state = state;
         _discovery = discovery;
         _notifier = notifier;
         _stats = stats;
+        _roster = roster;
         _time = time;
     }
+
+    /// <summary>The add-on's stored roster: who is on the map (shared by every circuit).</summary>
+    public IRosterEditor Roster => _roster;
 
     /// <summary>The current immutable snapshot.</summary>
     public RealmSnapshot Current => _state.Current;

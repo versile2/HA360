@@ -416,16 +416,11 @@ public sealed class IngestionPipeline : BackgroundService
             }
         }
 
-        foreach (var vehicle in _vehicles.Values.Where(v => !v.Plan.IsPlaceholder))
+        foreach (var vehicle in _vehicles.Values)
         {
             if (vehicle.Plan.TrackerId is { } tracker)
             {
                 _vehicleOwners[tracker] = vehicle;
-            }
-
-            foreach (var sensor in vehicle.Plan.SensorIds)
-            {
-                _vehicleOwners[sensor] = vehicle;
             }
         }
 
@@ -706,50 +701,17 @@ public sealed class IngestionPipeline : BackgroundService
         _writes.Add(writer => writer.EnqueueSignal(memberId, signal));
     }
 
+    // A vehicle is a device tracker the owner moved to Vehicles: its position is shown, nothing of it is stored (D113). The tracker is read like a phone's.
     private void ApplyVehicle(VehicleRuntime vehicle, HaEntitySnapshot entity, bool first, DateTimeOffset now)
     {
-        if (entity.EntityId == vehicle.Plan.TrackerId)
+        var fix = FixParser.ParseTracker(entity, vehicle.Plan.Source, now, vehicle.Fix, first);
+        if (fix is not null && (vehicle.Fix is null || fix.Ts >= vehicle.Fix.Ts))
         {
-            var fix = FixParser.ParseTracker(entity, FixSource.FordPass, now, vehicle.Fix, first);
-            if (fix is not null && (vehicle.Fix is null || fix.Ts >= vehicle.Fix.Ts))
-            {
-                vehicle.Fix = fix;
-            }
-        }
-
-        // Vehicles keep samples, not fixes (02 section 5.7): one row per (vehicle, sample clock), merged by the writer without erasing a value.
-        var state = SnapshotBuilder.StateOf(vehicle, _entities);
-        if (state.LastUpdateUtc is { } ts)
-        {
-            var prefix = vehicle.Plan.Prefix;
-            var sample = new VehicleSample(
-                VehicleId: vehicle.Plan.Id,
-                Ts: ts,
-                OdometerM: state.OdometerM,
-                FuelPct: state.FuelPct,
-                Ignition: RawText($"sensor.{prefix}_ignitionstatus")?.ToLowerInvariant(),
-                Gear: RawText($"sensor.{prefix}_gearleverposition"),
-                SpeedMps: state.SpeedMps,
-                RemoteStartSeconds: state.RemoteStartSecondsLeft,
-                Lat: vehicle.Fix is { } fixAt && (ts - fixAt.Ts).Duration() <= TimeSpan.FromMinutes(10) ? fixAt.Lat : null,
-                Lon: vehicle.Fix is { } fixAtLon && (ts - fixAtLon.Ts).Duration() <= TimeSpan.FromMinutes(10) ? fixAtLon.Lon : null);
-            if (sample != vehicle.LastSample)
-            {
-                vehicle.LastSample = sample;
-                _writes.Add(writer => writer.EnqueueVehicleSample(sample));
-            }
+            vehicle.Fix = fix;
         }
 
         _dirty = true;
     }
-
-    private string? RawText(string entityId) =>
-        _entities.TryGetValue(entityId, out var entity)
-        && !string.IsNullOrWhiteSpace(entity.State)
-        && !string.Equals(entity.State, "unavailable", StringComparison.OrdinalIgnoreCase)
-        && !string.Equals(entity.State, "unknown", StringComparison.OrdinalIgnoreCase)
-            ? entity.State.Trim()
-            : null;
 
     private static DateTimeOffset? InstantAttribute(HaEntitySnapshot entity, string key)
     {
@@ -799,39 +761,29 @@ public sealed class IngestionPipeline : BackgroundService
         member.Heartbeat = FreshnessRules.Heartbeat(member.FixTimes.Values.Select(times => (IReadOnlyList<DateTimeOffset>)times), _options.UiStaleAfterMinutes);
     }
 
-    // The zones as drawn (02 section 1.9): the options' hidden and display overrides applied, the oversized and hidden ones left out, duplicate names told apart.
+    // The zones as drawn (02 section 1.9): the oversized ones left out, duplicate names told apart.
     private void RebuildPlaces()
     {
         _zonesDirty = false;
         var zones = _zones.Values.OrderBy(z => z.Id, StringComparer.Ordinal).ToList();
-        var optionOf = new Dictionary<string, PlaceOption>(StringComparer.Ordinal);
-        foreach (var option in _options.Places)
-        {
-            if (HaDiscovery.MatchZone(option.Zone, zones) is { } matched)
-            {
-                optionOf.TryAdd(matched.Id, option);
-            }
-        }
-
         var maxRadiusM = _options.UiMaxZoneRadiusKm * 1000;
         var seen = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         var places = new List<PlaceDef>();
         foreach (var zone in zones)
         {
-            optionOf.TryGetValue(zone.Id, out var option);
-            if (option?.Hidden == true || zone.RadiusM > maxRadiusM)
+            if (zone.RadiusM > maxRadiusM)
             {
                 continue;
             }
 
-            var name = string.IsNullOrWhiteSpace(option?.DisplayName) ? zone.Name.Trim() : option.DisplayName.Trim();
+            var name = zone.Name.Trim();
             seen[name] = seen.GetValueOrDefault(name) + 1;
             var count = seen[name];
             places.Add(new PlaceDef(
                 zone,
                 count == 1 ? name : $"{name} ({count.ToString(CultureInfo.InvariantCulture)})",
-                option?.Subtitle ?? string.Empty,
-                zone.Id == "home" ? PlaceKind.Home : option?.Kind ?? PlaceKind.Other));
+                string.Empty,
+                zone.Id == "home" ? PlaceKind.Home : PlaceKind.Other));
         }
 
         _places = places
