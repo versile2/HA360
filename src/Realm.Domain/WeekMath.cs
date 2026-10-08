@@ -60,9 +60,11 @@ public static class WeekMath
         return local.Date.AddDays(-daysSinceStart);
     }
 
-    // Local midnight of a calendar day as a UTC instant. If midnight does not exist (a DST gap) the day
-    // starts at the next valid instant; if it happens twice the day starts at the first occurrence.
-    private static DateTimeOffset LocalMidnightToUtc(DateTime day, TimeZoneInfo zone)
+    /// <summary>
+    /// Local midnight of a calendar day as a UTC instant. If midnight does not exist (a DST gap) the day
+    /// starts at the next valid instant; if it happens twice the day starts at the first occurrence.
+    /// </summary>
+    public static DateTimeOffset LocalMidnightToUtc(DateTime day, TimeZoneInfo zone)
     {
         var local = DateTime.SpecifyKind(day, DateTimeKind.Unspecified);
         while (zone.IsInvalidTime(local))

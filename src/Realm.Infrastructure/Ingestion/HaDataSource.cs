@@ -52,6 +52,14 @@ public sealed class HaDataSource
     public ValueTask<DriverWeek?> GetDriverWeekAsync(string memberId, int weekOffset, DayOfWeek weekStart, CancellationToken cancellationToken) =>
         _stats.GetDriverWeekAsync(memberId, weekOffset, weekStart, cancellationToken);
 
+    /// <summary>The report of any period from the stored trips.</summary>
+    public ValueTask<WeekReportVm> GetPeriodReportAsync(ReportWindow window, CancellationToken cancellationToken) =>
+        _stats.GetPeriodReportAsync(window, cancellationToken);
+
+    /// <summary>One driver's period; null for an id that is not a driver of the report.</summary>
+    public ValueTask<DriverWeek?> GetDriverPeriodAsync(string memberId, ReportWindow window, CancellationToken cancellationToken) =>
+        _stats.GetDriverPeriodAsync(memberId, window, cancellationToken);
+
     /// <summary>The member whose person is the HA user <paramref name="haUserId"/>; null when there is none. A lookup over the members in memory.</summary>
     public string? ResolveMe(string? haUserId)
     {

@@ -17,6 +17,9 @@ public sealed class DemoDataSource
     /// <summary>The zone of the fixture; the clock's local time is always shown in it.</summary>
     public const string ZoneId = "America/Chicago";
 
+    /// <summary>The Demo keeps its (synthetic) history for the longest retention the add-on allows, so every period of the split button is offered.</summary>
+    public const int DemoRetentionFixDays = 400;
+
     // The add-on option defaults the fixture runs under (02 section 3.1).
     private const int StaleAfterMinutes = 30;
     private const int OfflineAfterHours = 24;
@@ -86,6 +89,12 @@ public sealed class DemoDataSource
 
     /// <summary>One driver's week: the summary of the report and the generated drives, newest first; null for the prince, an unknown id or any member that is not a report driver.</summary>
     public DriverWeek? GetDriverWeek(string memberId, int weekOffset) => _driving.GetDriverWeek(memberId, weekOffset);
+
+    /// <summary>The report of any period (a month, a rolling window, a custom range) over the fixture's drives.</summary>
+    public WeekReportVm PeriodReport(ReportWindow window) => _driving.PeriodReport(window);
+
+    /// <summary>One driver's period over the fixture's drives; null for an unknown or non-report member.</summary>
+    public DriverWeek? GetDriverPeriod(string memberId, ReportWindow window) => _driving.DriverPeriod(memberId, window);
 
     /// <summary>
     /// The snapshot at the clock's current instant, with the snapshot variants applied. <paramref name="homeAssistantRestored"/>
@@ -259,7 +268,8 @@ public sealed class DemoDataSource
             Places: places,
             Connections: connections,
             Zone: ZoneId,
-            UnitSystem: UnitSystem.Imperial);
+            UnitSystem: UnitSystem.Imperial,
+            RetentionFixDays: DemoRetentionFixDays);
     }
 
     // The member variants of 02 section 9.5, each a pure transform of one member. no-fix comes after all-near, so a member

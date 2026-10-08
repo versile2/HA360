@@ -86,6 +86,25 @@ public sealed class DemoRealmSession : IRealmSession
     }
 
     /// <inheritdoc />
+    /// <remarks>A week chip is the frozen week of the fixture; any other period is computed over the fixture's drives.</remarks>
+    public ValueTask<WeekReportVm> GetPeriodReportAsync(ReportWindow window, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        return ValueTask.FromResult(window.Period.Kind == PeriodKind.Week
+            ? _source.WeekReport(window.Period.WeekOffset, window.Start.DayOfWeek) with { Period = window.Period }
+            : _source.PeriodReport(window));
+    }
+
+    /// <inheritdoc />
+    public ValueTask<DriverWeek?> GetDriverPeriodAsync(string memberId, ReportWindow window, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        return ValueTask.FromResult(window.Period.Kind == PeriodKind.Week
+            ? _source.GetDriverWeek(memberId, window.Period.WeekOffset)
+            : _source.GetDriverPeriod(memberId, window));
+    }
+
+    /// <inheritdoc />
     public string? ResolveMe(string? haUserId) => _source.ResolveMe(haUserId);
 
     /// <summary>

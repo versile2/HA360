@@ -830,7 +830,7 @@ public class StatsRulesTests
 
         var newest = week.Trips[0];
         Assert.Equal("Eastgate Avenue", newest.FromLabel);   // the zone id no longer exists: the street is the fallback
-        Assert.Null(newest.ToLabel);                          // no zone, no street
+        Assert.Equal(PlaceLabeler.Fallback, newest.ToLabel);  // no zone, no street, no coordinates: never null or "Unknown place"
         Assert.Equal(2222.25, newest.Meters);
         Assert.Equal(27.7, newest.TopSpeedMps);
         Assert.Equal(2, newest.Events["speeding"]);

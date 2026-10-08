@@ -25,7 +25,7 @@ public sealed class SqliteRealmQueries : IRealmQueries
     {
         return QueryAsync(
             "SELECT member_id, start_ts, end_ts, distance_m, quality, distance_source, top_speed_mps, top_speed_ts, top_speed_street, "
-            + "speeding_count, phone_count, start_place_id, end_place_id, start_street, end_street "
+            + "speeding_count, phone_count, start_place_id, end_place_id, start_street, end_street, start_lat, start_lon, end_lat, end_lon "
             + "FROM trips WHERE start_ts >= @from AND start_ts < @to AND (@member IS NULL OR member_id = @member) "
             + "ORDER BY start_ts DESC, id DESC",
             ReadTrip,
@@ -127,7 +127,11 @@ public sealed class SqliteRealmQueries : IRealmQueries
             StartPlaceId: SqlValues.NullableText(reader, 11),
             EndPlaceId: SqlValues.NullableText(reader, 12),
             StartStreet: SqlValues.NullableText(reader, 13),
-            EndStreet: SqlValues.NullableText(reader, 14));
+            EndStreet: SqlValues.NullableText(reader, 14),
+            StartLat: SqlValues.NullableReal(reader, 15),
+            StartLon: SqlValues.NullableReal(reader, 16),
+            EndLat: SqlValues.NullableReal(reader, 17),
+            EndLon: SqlValues.NullableReal(reader, 18));
     }
 
     // The table keeps no entity id and no battery reading time (02 section 7.2), so those two stay empty.

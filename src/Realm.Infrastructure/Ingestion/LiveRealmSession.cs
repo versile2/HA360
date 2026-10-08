@@ -73,6 +73,14 @@ public sealed class LiveRealmSession : IRealmSession
         _source.GetDriverWeekAsync(memberId, weekOffset, weekStart, ct);
 
     /// <inheritdoc />
+    public ValueTask<WeekReportVm> GetPeriodReportAsync(ReportWindow window, CancellationToken ct) =>
+        _source.GetPeriodReportAsync(window, ct);
+
+    /// <inheritdoc />
+    public ValueTask<DriverWeek?> GetDriverPeriodAsync(string memberId, ReportWindow window, CancellationToken ct) =>
+        _source.GetDriverPeriodAsync(memberId, window, ct);
+
+    /// <inheritdoc />
     public string? ResolveMe(string? haUserId) => _source.ResolveMe(haUserId);
 
     /// <inheritdoc />

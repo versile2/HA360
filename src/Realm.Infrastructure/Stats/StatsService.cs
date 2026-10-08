@@ -15,7 +15,11 @@ namespace Realm.Infrastructure.Stats;
 public sealed class StatsService
 {
     private const int WeeksKept = 4;
-    private const int MaxCachedWeeks = 16;
+    private const int MaxCachedWeeks = 24;
+    private const int MaxAddressLookups = 3000;
+    private const int MaxMemoAddresses = 20_000;
+    private const double AddressMaxDistanceM = 1000;
+    private static readonly TimeSpan AddressMaxAge = TimeSpan.FromMinutes(30);
     private static readonly TimeSpan PhoneSignalLookback = TimeSpan.FromDays(7);
 
     private readonly RealmState _state;
@@ -27,6 +31,7 @@ public sealed class StatsService
     private readonly DetectionSettings _detection;
     private readonly object _cacheGate = new();
     private readonly Dictionary<TripsKey, IReadOnlyList<StatsTrip>> _cache = [];
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<(string MemberId, long AtMs), string?> _addressMemo = new();
     private int _cacheVersion = -1;
     private volatile ZoneEntry? _zone;
     private int _reads;
@@ -80,19 +85,38 @@ public sealed class StatsService
 
     /// <summary>The report of week <paramref name="weekOffset"/> (0 to 3) from the stored trips.</summary>
     /// <exception cref="ArgumentOutOfRangeException">The week offset is not 0 to 3.</exception>
-    public async ValueTask<WeekReportVm> GetWeekReportAsync(int weekOffset, DayOfWeek weekStart, CancellationToken cancellationToken)
+    public ValueTask<WeekReportVm> GetWeekReportAsync(int weekOffset, DayOfWeek weekStart, CancellationToken cancellationToken)
     {
-        var (now, zone, members, trips) = await ReadAsync(weekOffset, weekStart, cancellationToken);
-        return StatsRules.WeekReport(now, weekStart, zone, weekOffset, members, trips);
+        CheckWeek(weekOffset);
+        return GetPeriodReportAsync(PeriodMath.Resolve(ReportPeriod.OfWeek(weekOffset), _time.GetUtcNow(), weekStart, Zone), cancellationToken);
     }
 
     /// <summary>One driver's week; null for an id that is not a driver of the report.</summary>
     /// <exception cref="ArgumentOutOfRangeException">The week offset is not 0 to 3.</exception>
-    public async ValueTask<DriverWeek?> GetDriverWeekAsync(string memberId, int weekOffset, DayOfWeek weekStart, CancellationToken cancellationToken)
+    public ValueTask<DriverWeek?> GetDriverWeekAsync(string memberId, int weekOffset, DayOfWeek weekStart, CancellationToken cancellationToken)
     {
-        var (now, zone, members, trips) = await ReadAsync(weekOffset, weekStart, cancellationToken);
-        var placeNames = _state.Current.Places.ToDictionary(p => p.Id, p => p.DisplayName, StringComparer.Ordinal);
-        return StatsRules.DriverWeekOf(now, weekStart, zone, weekOffset, memberId, members, trips, placeNames);
+        CheckWeek(weekOffset);
+        return GetDriverPeriodAsync(memberId, PeriodMath.Resolve(ReportPeriod.OfWeek(weekOffset), _time.GetUtcNow(), weekStart, Zone), cancellationToken);
+    }
+
+    /// <summary>The report of any period (a week, a calendar month, a rolling window or a custom range) from the stored trips.</summary>
+    public async ValueTask<WeekReportVm> GetPeriodReportAsync(ReportWindow window, CancellationToken cancellationToken)
+    {
+        var (members, trips) = await ReadAsync(window, cancellationToken);
+        return StatsRules.PeriodReport(window, members, trips);
+    }
+
+    /// <summary>
+    /// One driver's period; null for an id that is not a driver of the report. The ends of every drive are named (<see cref="PlaceLabeler"/>): the zone, else the city of the
+    /// address stored near the end, else the nearest zone.
+    /// </summary>
+    public async ValueTask<DriverWeek?> GetDriverPeriodAsync(string memberId, ReportWindow window, CancellationToken cancellationToken)
+    {
+        var (members, trips) = await ReadAsync(window, cancellationToken);
+        var zones = _state.Current.Places.Select(p => new LabelZone(p.Id, p.DisplayName, p.Lat, p.Lon)).ToList();
+        var addresses = await AddressesAsync(memberId, window, trips, zones, cancellationToken);
+        var labels = new PlaceLabeler(zones, (trip, end) => addresses.TryGetValue((trip.StartUtc, end), out var address) ? address : null);
+        return StatsRules.DriverPeriodOf(window, memberId, members, trips, labels);
     }
 
     /// <summary>
@@ -123,28 +147,89 @@ public sealed class StatsService
         return written;
     }
 
-    // The report drivers (live members that count in the Driving report) with their recording starts, and the trips of the week and of its comparator.
-    private async Task<(DateTimeOffset Now, TimeZoneInfo Zone, IReadOnlyList<StatsMember> Members, IReadOnlyList<StatsTrip> Trips)> ReadAsync(
-        int weekOffset,
-        DayOfWeek weekStart,
-        CancellationToken cancellationToken)
+    private static void CheckWeek(int weekOffset)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(weekOffset);
         ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(weekOffset, WeeksKept);
+    }
+
+    // The report drivers (live members that count in the Driving report) with their recording starts, and the trips of the window and of its comparator.
+    private async Task<(IReadOnlyList<StatsMember> Members, IReadOnlyList<StatsTrip> Trips)> ReadAsync(ReportWindow window, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(window);
         var version = _state.Current.StatsVersion;
-        var now = _time.GetUtcNow();
-        var zone = Zone;
-        var current = WeekMath.StartUtc(now, weekStart, zone, weekOffset);
-        var comparator = StatsRules.ComparatorWindow(now, weekStart, zone, weekOffset);
-        var end = WeekMath.EndUtc(now, weekStart, zone, weekOffset);
+        var from = window.StartUtc < window.Comparator.StartUtc ? window.StartUtc : window.Comparator.StartUtc;
 
         var starts = await _queries.GetRecordingStartsAsync(cancellationToken);
         var members = _discovery.Current.Members
             .Where(m => m.Kind == MemberKind.Live && m.InDrivingReport)
             .Select(m => new StatsMember(m.Id, m.DisplayName, m.PhoneCapable, starts.TryGetValue(m.Id, out var start) ? start : null))
             .ToList();
-        var trips = await TripsAsync(new TripsKey(weekOffset, weekStart, zone.Id, current < comparator.StartUtc ? current : comparator.StartUtc, end), version, cancellationToken);
-        return (now, zone, members, trips);
+        var trips = await TripsAsync(new TripsKey(Zone.Id, from, window.EndUtc), version, cancellationToken);
+        return (members, trips);
+    }
+
+    // The stored address near the start and the end of each of the member's drives that lies in no zone that still exists: the latest address fix at or before the point,
+    // at most 30 minutes old and 1 km away. Memoized by (member, instant); at most MaxAddressLookups reads per call, the rest are named by the nearest zone.
+    private async Task<Dictionary<(DateTimeOffset Start, bool End), string?>> AddressesAsync(
+        string memberId,
+        ReportWindow window,
+        IReadOnlyList<StatsTrip> trips,
+        IReadOnlyList<LabelZone> zones,
+        CancellationToken cancellationToken)
+    {
+        var known = zones.Select(z => z.Id).ToHashSet(StringComparer.Ordinal);
+        var result = new Dictionary<(DateTimeOffset Start, bool End), string?>();
+        var lookups = 0;
+        foreach (var trip in trips)
+        {
+            if (!string.Equals(trip.MemberId, memberId, StringComparison.Ordinal) || trip.StartUtc < window.StartUtc || trip.StartUtc >= window.EndUtc)
+            {
+                continue;
+            }
+
+            foreach (var end in new[] { false, true })
+            {
+                var placeId = end ? trip.EndPlaceId : trip.StartPlaceId;
+                if (placeId is not null && known.Contains(placeId))
+                {
+                    continue;
+                }
+
+                if (lookups >= MaxAddressLookups)
+                {
+                    return result;
+                }
+
+                lookups++;
+                var at = end ? trip.EndUtc : trip.StartUtc;
+                result[(trip.StartUtc, end)] = await AddressNearAsync(memberId, at, end ? trip.EndLat : trip.StartLat, end ? trip.EndLon : trip.StartLon, cancellationToken);
+            }
+        }
+
+        return result;
+    }
+
+    private async Task<string?> AddressNearAsync(string memberId, DateTimeOffset at, double? lat, double? lon, CancellationToken cancellationToken)
+    {
+        var key = (memberId, at.ToUnixTimeMilliseconds());
+        if (_addressMemo.TryGetValue(key, out var hit))
+        {
+            return hit;
+        }
+
+        var fix = await _queries.GetLatestAddressFixAsync(memberId, at, cancellationToken);
+        var near = fix is { Address: not null }
+            && at - fix.Ts <= AddressMaxAge
+            && (lat is null || lon is null || Geo.DistanceM(fix.Lat, fix.Lon, lat.Value, lon.Value) <= AddressMaxDistanceM);
+        var address = near ? fix!.Address : null;
+        if (_addressMemo.Count >= MaxMemoAddresses)
+        {
+            _addressMemo.Clear();
+        }
+
+        _addressMemo[key] = address;
+        return address;
     }
 
     private async Task<IReadOnlyList<StatsTrip>> TripsAsync(TripsKey key, int version, CancellationToken cancellationToken)
@@ -181,7 +266,7 @@ public sealed class StatsService
         return trips;
     }
 
-    private sealed record TripsKey(int WeekOffset, DayOfWeek WeekStart, string ZoneId, DateTimeOffset From, DateTimeOffset To);
+    private sealed record TripsKey(string ZoneId, DateTimeOffset From, DateTimeOffset To);
 
     private sealed record ZoneEntry(string Id, TimeZoneInfo Zone);
 }

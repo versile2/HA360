@@ -9,6 +9,7 @@ namespace Realm.Domain;
 /// <param name="Events">Keyed speeding, phone, accel, braking.</param>
 /// <param name="TopSpeed">Null when no driver has a speed record that week.</param>
 /// <param name="Drivers">In card order: Drives descending, Meters descending, name.</param>
+/// <param name="Period">What was asked for (a week chip or a long period); null in reports built before 0.2.0 callers pass it.</param>
 public record WeekReportVm(
     DateTimeOffset Start,
     DateTimeOffset End,
@@ -18,4 +19,5 @@ public record WeekReportVm(
     IReadOnlyDictionary<string, EventStat> Events,
     TopSpeedStat? TopSpeed,
     WeekTotals Totals,
-    IReadOnlyList<DriverSummary> Drivers);
+    IReadOnlyList<DriverSummary> Drivers,
+    ReportPeriod? Period = null);

@@ -154,7 +154,9 @@ public class SqliteRealmQueriesTests
                 null,
                 "Example Rd",
                 null),
-            king[1]);
+            king[1] with { StartLat = null, StartLon = null, EndLat = null, EndLon = null });
+        Assert.NotNull(king[1].StartLat);
+        Assert.NotNull(king[1].EndLon);
         var coarseRow = king[0];
         Assert.Equal(TripQuality.Coarse, coarseRow.Quality);
         Assert.Null(coarseRow.TopSpeedMps);

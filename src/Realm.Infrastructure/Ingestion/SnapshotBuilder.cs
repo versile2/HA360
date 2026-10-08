@@ -107,7 +107,8 @@ internal static class SnapshotBuilder
                 new ConnectionVm(ConnectionNames.VehiclePlaceholder, ConnectionState.NotConnected, null),
             ],
             Zone: input.ZoneId,
-            UnitSystem: UnitSystem.Imperial);
+            UnitSystem: UnitSystem.Imperial,
+            RetentionFixDays: input.Options.RetentionFixDays);
     }
 
     // ---- members ------------------------------------------------------------------------------------------------

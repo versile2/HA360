@@ -63,6 +63,76 @@ internal sealed class DemoDrivingData
         return driver is null ? null : new DriverWeek(Summary(Row(weekOffset, driver)), Trips(weekOffset, driver));
     }
 
+    /// <summary>
+    /// The report of any period (a month, a rolling window, a custom range) by the production rules (<see cref="StatsRules"/>) over the fixture's drives. The fixture holds the
+    /// four frozen weeks and, before them, the same three full weeks repeated back in time with their own dates (so a year has data); the base data has no gap.
+    /// </summary>
+    public WeekReportVm PeriodReport(ReportWindow window)
+    {
+        var (members, trips, _) = PeriodInputs(window);
+        return StatsRules.PeriodReport(window, members, trips);
+    }
+
+    /// <summary>One driver's period; null for the static member, an unknown id or any member that is not in the report.</summary>
+    public DriverWeek? DriverPeriod(string memberId, ReportWindow window)
+    {
+        var (members, trips, names) = PeriodInputs(window);
+        return StatsRules.DriverPeriodOf(window, memberId, members, trips, PlaceLabeler.FromNames(names));
+    }
+
+    // The longest history the fixture builds (a year and a comparator year are never asked for; the comparator of a long window may reach further back and is then simply unknown).
+    private const int MaxHistoryWeeks = 120;
+
+    private (List<StatsMember> Members, List<StatsTrip> Trips, Dictionary<string, string> Names) PeriodInputs(ReportWindow window)
+    {
+        var from = window.StartUtc < window.Comparator.StartUtc ? window.StartUtc : window.Comparator.StartUtc;
+        var newest = Math.Max(0, WeekMath.WeekOffsetOf(window.EndUtc.AddSeconds(-1), DemoDataSource.Anchor, DayOfWeek.Monday, _zone));
+        var oldest = Math.Min(MaxHistoryWeeks, WeekMath.WeekOffsetOf(from, DemoDataSource.Anchor, DayOfWeek.Monday, _zone));
+        var recordingStart = _variants.FreshInstall ? RecordingStartUtc : DemoDataSource.Anchor.AddDays(-MaxHistoryWeeks * 7);
+
+        var members = DemoDrivingTables.ReportDrivers
+            .Select(driver => new StatsMember(driver.Id, driver.Name, (_variants.AllSources || driver.PhoneCapable) && !_variants.PhoneUnavailable, recordingStart))
+            .ToList();
+        var trips = new List<StatsTrip>();
+        var names = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var driver in DemoDrivingTables.ReportDrivers)
+        {
+            for (var week = newest; week <= oldest; week++)
+            {
+                foreach (var drive in Trips(week, driver))
+                {
+                    trips.Add(new StatsTrip(
+                        driver.Id,
+                        drive.StartUtc,
+                        drive.EndUtc,
+                        drive.Meters,
+                        TripQuality.Dense,
+                        DistanceBasis.Gps,
+                        drive.TopSpeedMps,
+                        drive.StartUtc,
+                        null,
+                        CountOf(drive, EventKeys.Speeding),
+                        CountOf(drive, EventKeys.Phone),
+                        drive.FromLabel,
+                        drive.ToLabel,
+                        null,
+                        null));
+                    foreach (var label in new[] { drive.FromLabel, drive.ToLabel })
+                    {
+                        if (label is not null)
+                        {
+                            names[label] = label;
+                        }
+                    }
+                }
+            }
+        }
+
+        return (members, trips, names);
+    }
+
+    private static int? CountOf(DriveVm drive, string key) => drive.Events.TryGetValue(key, out var count) ? count : null;
+
     private static void EnsureWeek(int weekOffset)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(weekOffset, 0);
@@ -210,7 +280,15 @@ internal sealed class DemoDrivingData
     // through the same variants as the report, so its sums are the report's figures.
     private List<DriveVm> Trips(int week, DemoMember driver)
     {
-        var totals = Totals(week, driver);
+        // The four frozen weeks are the dataset's own; older weeks repeat its three full weeks in turn, with their own dates (and so their own drives), and exist only
+        // when the recording is not the fresh install.
+        if (week >= WeekMath.ChipCount && _variants.FreshInstall)
+        {
+            return [];
+        }
+
+        var table = week < WeekMath.ChipCount ? week : 1 + ((week - 1) % (WeekMath.ChipCount - 1));
+        var totals = Totals(table, driver);
         if (!totals.Covered || (_variants.EmptyWeek && week == 0))
         {
             return [];
@@ -228,9 +306,9 @@ internal sealed class DemoDrivingData
             TopMph: totals.TopMph.GetValueOrDefault(),
             Counts: totals.Counts,
             WindowStartMin: windowStart,
-            WindowEndMin: DemoDrivingTables.LatestEndMin(week, driver),
+            WindowEndMin: DemoDrivingTables.LatestEndMin(table, driver),
             HomeLabel: driver.Id == DemoCast.Jester.Id ? DemoPlaces.JesterHall.Name : DemoPlaces.Home.Name,
-            Fixed: DemoDrivingTables.FixedDrives(week, driver));
+            Fixed: DemoDrivingTables.FixedDrives(table, driver));
 
         return [.. DemoDriveGenerator.Generate(spec).Select(drive => new DriveVm(
             StartUtc: Instant(monday, drive.StartMin),
