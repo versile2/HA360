@@ -39,16 +39,20 @@ public static class PeriodMath
     public static DateOnly OldestKept(DateTimeOffset now, TimeZoneInfo zone, int retentionDays) => Today(now, zone).AddDays(-retentionDays);
 
     /// <summary>Checks a custom range: both dates present, start not after end, end not in the future, start not before the oldest kept day.</summary>
-    public static RangeCheck ValidateCustom(DateOnly? from, DateOnly? to, DateTimeOffset now, TimeZoneInfo zone, int retentionDays)
+    public static RangeCheck ValidateCustom(DateOnly? from, DateOnly? to, DateTimeOffset now, TimeZoneInfo zone, int retentionDays) =>
+        ValidateCustom(from, to, Today(now, zone), retentionDays);
+
+    /// <summary>The same check against a given local <paramref name="today"/>.</summary>
+    public static RangeCheck ValidateCustom(DateOnly? from, DateOnly? to, DateOnly today, int retentionDays)
     {
-        var oldest = OldestKept(now, zone, retentionDays);
+        var oldest = today.AddDays(-retentionDays);
         if (from is not { } start || to is not { } end)
         {
             return new RangeCheck(RangeError.Missing, oldest);
         }
 
         var error = start > end ? RangeError.EndBeforeStart
-            : end > Today(now, zone) ? RangeError.InFuture
+            : end > today ? RangeError.InFuture
             : start < oldest ? RangeError.BeforeHistory
             : RangeError.None;
         return new RangeCheck(error, oldest);

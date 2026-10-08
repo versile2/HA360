@@ -87,6 +87,197 @@
   box-shadow: 0 1px 4px var(--realm-driving-shadow);
 }
 
+/* ---- the period control (0.2.0): the week chips and, as the fifth control, a split button (MudButtonGroup + MudMenu); the chips scroll inside their share of the row ---- */
+
+.realm-period-row {
+  display: flex;
+  align-items: center;
+  margin: 8px 0 0;
+}
+
+.realm-period-row .realm-week-chips {
+  flex: 1 1 0;
+  min-width: 0;
+  margin: 0 0 0 -16px;
+}
+
+.realm-period-split.mud-button-group-root {
+  flex: none;
+  height: 48px;
+  margin-left: 8px;
+  border-radius: 24px;
+  box-shadow: none;
+}
+
+.realm-period-split .mud-button-root,
+.realm-period-split .realm-period-split__menu button {
+  box-sizing: border-box;
+  height: 48px;
+  min-width: 0;
+  margin: 0;
+  border: 1px solid var(--realm-line);
+  background: var(--realm-surface-2);
+  color: var(--realm-text);
+  box-shadow: none;
+  font: inherit;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  line-height: 20px;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+.realm-period-split .realm-period-split__main {
+  padding: 0 12px 0 16px;
+  border-radius: 24px 0 0 24px;
+}
+
+.realm-period-split .realm-period-split__menu button {
+  width: 44px;
+  padding: 0;
+  border-left-width: 0;
+  border-radius: 0 24px 24px 0;
+}
+
+.realm-period-split--selected .mud-button-root,
+.realm-period-split--selected .realm-period-split__menu button {
+  border-color: var(--realm-primary);
+  background: var(--realm-primary);
+  color: var(--realm-on-primary);
+}
+
+.realm-period-menu .mud-menu-item {
+  min-height: 48px;
+}
+
+/* ---- the custom range: two date pickers and Apply, under the chips ---- */
+
+.realm-custom-range {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px 12px;
+  margin: 8px 0 0;
+  padding: 12px 16px;
+  border: 1px solid var(--realm-line);
+  border-radius: 16px;
+  background: var(--realm-surface-2);
+}
+
+.realm-custom-range__field {
+  flex: 1 1 140px;
+  min-width: 0;
+}
+
+.realm-custom-range__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.realm-custom-range__message {
+  flex: 1 1 100%;
+  margin: 0;
+  color: var(--realm-warning);
+  font-size: 0.875rem;
+  line-height: 20px;
+}
+
+/* ---- the print button: a 48 px target at the right of the header row (print.css hides it) ---- */
+
+.realm-driving__header {
+  position: relative;
+}
+
+.realm-print-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-sizing: border-box;
+  min-width: 48px;
+  min-height: 48px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 24px;
+  background: transparent;
+  color: var(--realm-text-2);
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.realm-driving__header > .realm-print-btn {
+  position: absolute;
+  top: 4px;
+  right: 8px;
+}
+
+.realm-popup__print {
+  width: 100%;
+  margin-top: 8px;
+  padding: 0 16px;
+  font-size: 0.875rem;
+}
+
+/* ---- the drive list's pager: rows per page, the range and the previous and next buttons ---- */
+
+.realm-pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px 12px;
+  margin: 12px 0;
+  color: var(--realm-text-2);
+  font-size: 0.875rem;
+  line-height: 20px;
+}
+
+.realm-pager__size {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.realm-pager__select {
+  box-sizing: border-box;
+  min-height: 48px;
+  padding: 0 8px;
+  border: 1px solid var(--realm-line);
+  border-radius: 12px;
+  background: var(--realm-surface-2);
+  color: var(--realm-text);
+  font: inherit;
+}
+
+.realm-pager__button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 24px;
+  background: transparent;
+  color: var(--realm-text);
+  cursor: pointer;
+}
+
+.realm-pager__button:disabled {
+  color: var(--realm-text-disabled);
+  cursor: default;
+}
+
+/* ---- print-only content is not drawn on the screen (css/realm-print.css draws it) ---- */
+
+.realm-print-only {
+  display: none;
+}
+
 /* ---- the title block ---- */
 
 .realm-driving__title {

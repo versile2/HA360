@@ -101,6 +101,20 @@ public sealed class RealmUiState
         }
     }
 
+    /// <summary>
+    /// The long period the split button of the Driving report applies from its main part: Last month until the person chooses another (a month, a rolling window or a custom
+    /// range). Kept for the circuit, not across a reload.
+    /// </summary>
+    public ReportPeriod LastLongPeriod
+    {
+        get;
+        set
+        {
+            ArgumentNullException.ThrowIfNull(value);
+            Set(ref field, value);
+        }
+    } = new(ReportPeriod.DefaultLong);
+
     /// <summary>The layout; changing it never changes the selection (AC-12), only what <see cref="Body"/> and <see cref="Depth"/> derive.</summary>
     public LayoutSnapshot Layout
     {

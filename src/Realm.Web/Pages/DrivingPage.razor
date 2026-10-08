@@ -12,9 +12,10 @@
 @inject RealmUiState Ui
 @inject HistorySync History
 
-@* The Weekly Driving Report (01 section 6; 03 section 3.4): a full page, no map and no sheet. The session is RealmShell's cascading value. The selected week is the
-   ?week= query (D69), read on every navigation through SupplyParameterFromQuery and written back with NavigationManager (a chip is a replace, so Back from Driving still
-   leaves for Location), never taken from the Demo overrides. The report comes from IRealmSession.GetWeekReportAsync(week, snapshot.WeekStart); the page renders it and
+@* The Weekly Driving Report (01 section 6; 03 section 3.4): a full page, no map and no sheet. The session is RealmShell's cascading value. The selected period is the
+   address query (D69, D113): ?week=0..3 for a week chip, ?period=last-month|3m|6m|1y for a long period and ?period=custom&from=YYYY-MM-DD&to=YYYY-MM-DD for a custom range,
+   read on every navigation through SupplyParameterFromQuery (ReportPeriod.Parse; a long period the retention does not cover, or a custom range that fails the checks, reads as
+   This week) and written back with NavigationManager (a choice is a replace, so Back from Driving still leaves for Location), never taken from the Demo overrides. The report comes from IRealmSession.GetWeekReportAsync(week, snapshot.WeekStart) for a week chip and from GetPeriodReportAsync(window) for a long period; the page renders it and
    decides nothing: every figure, arrow, asterisk of 01 section 6.3 is the data layer's, built into strings by the formatters. The report is fetched again, in place, when
    the snapshot's StatsVersion moves (never polled). The six openers raise OnOpen and the page opens StatPopup with IDialogService (01 section 6.7).
 
@@ -24,11 +25,21 @@
     <div class="realm-driving__column">
         <header class="realm-driving__header">
             <span class="realm-driving__wordmark">@DrivingFormatter.Wordmark</span>
+            <button type="button" class="realm-print-btn realm-no-print" data-testid="btn-print" aria-label="Print the report, or save it as PDF" @onclick="PrintAsync">
+                <MudIcon Icon="@Icons.Material.Filled.Print" />
+            </button>
         </header>
 
-        <WeekChips Weeks="@_weeks" Selected="@_week" SelectedChanged="OnWeekAsync" />
+        <p class="realm-print-only realm-print-header" data-testid="print-header">@PrintHeader</p>
 
-        <h1 class="realm-h1 realm-driving__title">@DrivingFormatter.Title</h1>
+        <PeriodBar Weeks="@_weeks"
+                   Period="@_period"
+                   LastLong="@Ui.LastLongPeriod"
+                   RetentionFixDays="@RetentionDays"
+                   Today="@Today"
+                   PeriodChanged="OnPeriodAsync" />
+
+        <h1 class="realm-h1 realm-driving__title">@PeriodFormatter.Title(_period)</h1>
         <p class="realm-driving__subtitle">@DrivingFormatter.Subtitle</p>
         <p class="realm-driving__range" role="status">@RangeLine</p>
 
@@ -54,14 +65,14 @@
         }
         else
         {
-            <div class="realm-stat-grid">
+            <div class="realm-stat-grid realm-screen-only">
                 @foreach (var key in StatNameFormatter.ChipKeys)
                 {
-                    <StatChip Key="@key" Stat="@StatOf(key)" WeekOffset="@_week" OnOpen="OpenAsync" />
+                    <StatChip Key="@key" Stat="@StatOf(key)" WeekOffset="@WordsOffset" OnOpen="OpenAsync" />
                 }
             </div>
 
-            <div class="realm-card-row">
+            <div class="realm-card-row realm-screen-only">
                 <TopSpeedCard TopSpeed="@_report?.TopSpeed" Driver="@MemberOf(_report?.TopSpeed?.MemberId)" OnOpen="@(() => OpenAsync(StatNameFormatter.TopSpeedKey))" />
                 <DrivesCard Totals="@Totals" OnOpen="@(() => OpenAsync(StatNameFormatter.DrivesKey))" />
             </div>
@@ -72,20 +83,73 @@
                 {
                     <p class="realm-driving__quiet">@DrivingFormatter.NoDrivesCurrentWeek</p>
                 }
+                else if (_period.IsLong && report.Coverage != WeekCoverage.NoRecord && report.Totals.Drives == 0)
+                {
+                    <p class="realm-driving__quiet">@DrivingFormatter.NoDrivesPeriod</p>
+                }
 
-                <div class="realm-driver-list">
+                <div class="realm-driver-list realm-screen-only">
                     @foreach (var driver in report.Drivers)
                     {
-                        <DriverCard @key="driver.MemberId" Driver="@driver" Member="@MemberOf(driver.MemberId)" Week="@_week" />
+                        <DriverCard @key="driver.MemberId" Driver="@driver" Member="@MemberOf(driver.MemberId)" Period="@_period" />
                     }
                 </div>
 
+                @* The printed report: tables of the totals and the drivers (01 section 6.10); the cards, chips and map are drawn for the screen only. *@
+                <table class="realm-print-only realm-print-table" data-testid="print-totals">
+                    <caption>Totals</caption>
+                    <thead>
+                        <tr>
+                            @foreach (var column in PrintFormatter.TotalsColumns)
+                            {
+                                <th scope="col">@column</th>
+                            }
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in PrintFormatter.Totals(report, NameOf, Session.Zone))
+                        {
+                            <tr>
+                                @foreach (var cell in row.Cells)
+                                {
+                                    <td>@cell</td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+
+                <table class="realm-print-only realm-print-table" data-testid="print-drivers">
+                    <caption>Drivers</caption>
+                    <thead>
+                        <tr>
+                            @foreach (var column in PrintFormatter.DriverColumns)
+                            {
+                                <th scope="col">@column</th>
+                            }
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in PrintFormatter.Drivers(report, NameOf))
+                        {
+                            <tr>
+                                @foreach (var cell in row.Cells)
+                                {
+                                    <td>@cell</td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+
                 @if (ShowDistanceCaption(report))
                 {
-                    <p class="realm-driving__caption">@(StatNameFormatter.DistanceCaption + ".")</p>
+                    <p class="realm-driving__caption realm-screen-only">@(StatNameFormatter.DistanceCaption + ".")</p>
                 }
             }
         }
+
+        <p class="realm-print-only realm-print-footer" data-testid="print-footer">@PeriodFormatter.PrintFooter(Session.Current.Thresholds)</p>
     </div>
 </section>
 
@@ -104,8 +168,9 @@
     private IReadOnlyList<WeekRef> _weeks = [];
     private Dictionary<string, MemberVm> _members = new(StringComparer.Ordinal);
     private WeekReportVm? _report;
-    private int _week;
-    private int _loadedWeek = -1;
+    private ReportPeriod _period = ReportPeriod.ThisWeek;
+    private ReportPeriod? _loadedPeriod;
+    private ReportWindow? _window;
     private int _statsVersion = -1;
     private bool _loading = true;
     private bool _failed;
@@ -121,14 +186,38 @@
     [SupplyParameterFromQuery(Name = "week")]
     public string? WeekQuery { get; set; }
 
+    /// <summary><c>?period=last-month|3m|6m|1y|custom</c>: a long period; it wins over <c>week</c> (01 section 6.2, D113).</summary>
+    [SupplyParameterFromQuery(Name = "period")]
+    public string? PeriodQuery { get; set; }
+
+    /// <summary><c>?from=YYYY-MM-DD</c>, with <c>period=custom</c>.</summary>
+    [SupplyParameterFromQuery(Name = "from")]
+    public string? FromQuery { get; set; }
+
+    /// <summary><c>?to=YYYY-MM-DD</c>, with <c>period=custom</c>.</summary>
+    [SupplyParameterFromQuery(Name = "to")]
+    public string? ToQuery { get; set; }
+
     // The Drives card reads "—" for a week nobody was recorded in: nothing was counted, which is not the same as no drives.
     private WeekTotals? Totals => _report is null || _report.Coverage == WeekCoverage.NoRecord ? null : _report.Totals;
 
     // While the report loads the line is empty; when it cannot be read the plain range of the chip stands in for it.
     private string RangeLine =>
         _report is not null ? DrivingFormatter.RangeLine(_report, Session.Zone)
-        : _loading || _week >= _weeks.Count ? string.Empty
-        : DrivingFormatter.RangeText(_weeks[_week].Start, _weeks[_week].End);
+        : _loading || _window is null ? string.Empty
+        : DrivingFormatter.RangeText(_window.Start, _window.End);
+
+    // The period words of the sentences: the week chip's offset, or "in this period" for a long period.
+    private int WordsOffset => _period.IsLong ? StatNameFormatter.LongPeriod : _period.WeekOffset;
+
+    private int RetentionDays => Session.Current.RetentionFixDays;
+
+    private DateOnly Today => PeriodMath.Today(Session.Time.GetUtcNow(), Session.Zone);
+
+    // The header of the printed page: "Driving Report · Last month · Aug 1 – Aug 31 · printed Oct 8, 2026".
+    private string PrintHeader => _window is null ? DrivingFormatter.PeriodTitle : PeriodFormatter.PrintHeader(_window, Today);
+
+    private string NameOf(string memberId) => MemberOf(memberId)?.DisplayName ?? memberId;
 
     private EventStat? StatOf(string key) => _report is not null && _report.Events.TryGetValue(key, out var stat) ? stat : null;
 
@@ -145,20 +234,38 @@
     protected override async Task OnParametersSetAsync()
     {
         RefreshChips();
-        var week = DrivingFormatter.ParseWeek(WeekQuery);
-        _week = week;
-        Ui.SelectedWeek = week;
-        if (week == _loadedWeek)
+        var snapshot = Session.Current;
+        var now = Session.Time.GetUtcNow();
+        var period = Allowed(ReportPeriod.Parse(PeriodQuery, FromQuery, ToQuery, WeekQuery), now, snapshot.RetentionFixDays);
+        _period = period;
+        _window = PeriodMath.Resolve(period, now, snapshot.WeekStart, Session.Zone);
+        Ui.SelectedWeek = period.IsLong ? 0 : period.WeekOffset;
+        if (period.IsLong)
+        {
+            Ui.LastLongPeriod = period;
+        }
+
+        if (period == _loadedPeriod)
         {
             return;
         }
 
-        _loadedWeek = week;
+        _loadedPeriod = period;
         _report = null;
         _loading = true;
         _failed = false;
-        await LoadAsync(week, blank: true);
+        await LoadAsync(period, blank: true);
     }
+
+    // A deep link may name a period this install does not offer: 3, 6 and 12 months need the retention to cover them (PeriodMath.IsAvailable) and a custom range must pass the
+    // checks of the pickers. Anything else reads as This week.
+    private ReportPeriod Allowed(ReportPeriod period, DateTimeOffset now, int retentionDays) =>
+        period.Kind switch
+        {
+            PeriodKind.Week or PeriodKind.LastMonth => period,
+            PeriodKind.Custom => PeriodMath.ValidateCustom(period.From, period.To, now, Session.Zone, retentionDays).IsValid ? period : ReportPeriod.ThisWeek,
+            _ => PeriodMath.IsAvailable(period.Kind, retentionDays) ? period : ReportPeriod.ThisWeek,
+        };
 
     // The circuit exists from the first render on: only now can the page listen for the snapshot's StatsVersion and attach the browser history.
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -207,8 +314,8 @@
         _members = snapshot.Members.ToDictionary(member => member.Id, StringComparer.Ordinal);
     }
 
-    // One load at a time: a newer one (another week, or a new StatsVersion) cancels the one in flight, whose result is then dropped.
-    private async Task LoadAsync(int week, bool blank)
+    // One load at a time: a newer one (another period, or a new StatsVersion) cancels the one in flight, whose result is then dropped.
+    private async Task LoadAsync(ReportPeriod period, bool blank)
     {
         _load?.Cancel();
         _load?.Dispose();
@@ -218,7 +325,9 @@
         var snapshot = Session.Current;
         try
         {
-            var report = await Session.GetWeekReportAsync(week, snapshot.WeekStart, token);
+            var report = period.Kind == PeriodKind.Week
+                ? await Session.GetWeekReportAsync(period.WeekOffset, snapshot.WeekStart, token)
+                : await Session.GetPeriodReportAsync(PeriodMath.Resolve(period, Session.Time.GetUtcNow(), snapshot.WeekStart, Session.Zone), token);
             if (token.IsCancellationRequested || _disposed)
             {
                 return;
@@ -235,7 +344,7 @@
         catch (Exception exception)
         {
             // 01 section 6.9: the report cannot be read. The banner says so and every chip reads "—"; the page keeps what it had unless it was blanked for a new week.
-            Logger.LogError(exception, "The weekly driving report could not be loaded for week {Week}.", week);
+            Logger.LogError(exception, "The driving report could not be loaded for {Period}.", period.Query());
             if (token.IsCancellationRequested || _disposed)
             {
                 return;
@@ -253,16 +362,41 @@
         _loading = false;
     }
 
-    // A chip: write the choice back to the query (replace, so Back from Driving still leaves for Location). This week is the default and leaves no parameter.
-    private Task OnWeekAsync(int week)
+    // A choice (a chip, the split button or an applied custom range): write it back to the query (replace, so Back from Driving still leaves for Location). This week is the
+    // default and leaves no parameter; a week leaves no period, from or to, and a long period leaves no week.
+    private Task OnPeriodAsync(ReportPeriod period)
     {
-        if (week != _week)
+        if (period != _period)
         {
-            var value = week == 0 ? null : week.ToString(System.Globalization.CultureInfo.InvariantCulture);
-            Navigation.NavigateTo(Navigation.GetUriWithQueryParameter("week", value), replace: true);
+            if (period.IsLong)
+            {
+                Ui.LastLongPeriod = period;
+            }
+
+            var query = new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["week"] = period.Kind == PeriodKind.Week && period.WeekOffset != 0 ? period.WeekOffset.ToString(System.Globalization.CultureInfo.InvariantCulture) : null,
+                ["period"] = ReportPeriod.QueryValueOf(period.Kind),
+                ["from"] = period.Kind == PeriodKind.Custom && period.From is { } from ? ReportPeriod.Iso(from) : null,
+                ["to"] = period.Kind == PeriodKind.Custom && period.To is { } to ? ReportPeriod.Iso(to) : null,
+            };
+            Navigation.NavigateTo(Navigation.GetUriWithQueryParameters(query), replace: true);
         }
 
         return Task.CompletedTask;
+    }
+
+    // The browser's print dialog: the print stylesheet (css/realm-print.css) draws the report as tables on a light page. Every Driving page has the button (01 section 6.10).
+    private async Task PrintAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("print");
+        }
+        catch (Exception exception) when (exception is JSException or JSDisconnectedException or TaskCanceledException)
+        {
+            Logger.LogWarning(exception, "The Driving page could not open the print dialog.");
+        }
     }
 
     // The popup of one of the six openers (01 section 6.7): a MudBlazor dialog with the week report the page shows. Esc and the scrim close it; MudBlazor returns the focus to the
@@ -275,7 +409,7 @@
             { popup => popup.Key, key },
             { popup => popup.Report, _report },
             { popup => popup.Members, members },
-            { popup => popup.WeekOffset, _week },
+            { popup => popup.WeekOffset, WordsOffset },
             { popup => popup.Zone, Session.Zone },
         };
         await Dialogs.ShowAsync<StatPopup>(null, parameters, PopupOptions);
@@ -284,7 +418,8 @@
     // Raised off the UI thread (IRealmSession.Changed): marshal back before touching state. The report is fetched again, in place, only when StatsVersion moved.
     private void OnSessionChanged()
     {
-        if (_disposed || _loadedWeek < 0 || Session.Current.StatsVersion == _statsVersion)
+        var period = _loadedPeriod;
+        if (_disposed || period is null || Session.Current.StatsVersion == _statsVersion)
         {
             return;
         }
@@ -296,7 +431,7 @@
                 return;
             }
 
-            await LoadAsync(_loadedWeek, blank: false);
+            await LoadAsync(period, blank: false);
             StateHasChanged();
         }).ContinueWith(
             static task => _ = task.Exception, // R3-14: observe a dispatcher fault of a closed circuit

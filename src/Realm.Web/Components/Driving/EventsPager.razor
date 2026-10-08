@@ -1,0 +1,63 @@
+@* The pager of a driver's drive list (01 section 6.6): "Rows per page" (25, 50 or 100), the range "26–50 of 120" and the previous and next buttons. It is drawn above the list
+   (only when the rows do not fit on one page, PagerMath.ShowTop) and always below it. It reports the new page or page size; the list owns both. Printing ignores it. *@
+<div class="realm-pager realm-no-print" data-testid="@("events-pager-" + Position)" role="navigation" aria-label="@("Drives pager, " + Position)">
+    <label class="realm-pager__size">
+        <span class="realm-pager__size-label">Rows per page</span>
+        <select class="realm-pager__select" data-testid="@("events-pager-size-" + Position)" @onchange="OnSizeAsync">
+            @foreach (var size in PagerMath.PageSizes)
+            {
+                <option value="@size.ToString(CultureInfo.InvariantCulture)" selected="@(size == PageSize)">@size.ToString(CultureInfo.InvariantCulture)</option>
+            }
+        </select>
+    </label>
+    <span class="realm-pager__range" data-testid="@("events-pager-range-" + Position)" aria-live="polite">@PagerMath.Summary(Total, Page, PageSize)</span>
+    <button type="button"
+            class="realm-pager__button"
+            aria-label="Previous page"
+            data-testid="@("events-pager-prev-" + Position)"
+            disabled="@(Page <= 0)"
+            @onclick="PreviousAsync">
+        <MudIcon Icon="@Icons.Material.Filled.ChevronLeft" />
+    </button>
+    <button type="button"
+            class="realm-pager__button"
+            aria-label="Next page"
+            data-testid="@("events-pager-next-" + Position)"
+            disabled="@(Page >= PagerMath.PageCount(Total, PageSize) - 1)"
+            @onclick="NextAsync">
+        <MudIcon Icon="@Icons.Material.Filled.ChevronRight" />
+    </button>
+</div>
+
+@code {
+    /// <summary>"top" or "bottom": the two pagers of one list.</summary>
+    [Parameter, EditorRequired]
+    public string Position { get; set; } = "bottom";
+
+    /// <summary>The number of rows in the whole list.</summary>
+    [Parameter]
+    public int Total { get; set; }
+
+    /// <summary>The page shown, from 0.</summary>
+    [Parameter]
+    public int Page { get; set; }
+
+    /// <summary>Rows per page: 25, 50 or 100.</summary>
+    [Parameter]
+    public int PageSize { get; set; } = PagerMath.DefaultPageSize;
+
+    /// <summary>The person moved to another page.</summary>
+    [Parameter]
+    public EventCallback<int> PageChanged { get; set; }
+
+    /// <summary>The person chose another rows-per-page value (the list goes back to its first page).</summary>
+    [Parameter]
+    public EventCallback<int> PageSizeChanged { get; set; }
+
+    private Task PreviousAsync() => PageChanged.InvokeAsync(Math.Max(0, Page - 1));
+
+    private Task NextAsync() => PageChanged.InvokeAsync(Math.Min(PagerMath.PageCount(Total, PageSize) - 1, Page + 1));
+
+    private Task OnSizeAsync(ChangeEventArgs args) =>
+        PageSizeChanged.InvokeAsync(int.TryParse(args.Value?.ToString(), NumberStyles.None, CultureInfo.InvariantCulture, out var size) ? PagerMath.NormalizeSize(size) : PagerMath.DefaultPageSize);
+}

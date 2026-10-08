@@ -2,13 +2,13 @@
    driver's week (driving/{memberId}?week=n, relative like every link here; the target is DriverWeekPage). Everything is built from the DriverSummary by the
    formatter: the pill lists the tracked types only and carries its asterisk only when CoarseTrips > 0, never for a null count of one kind. *@
 <a class="realm-driver-card"
-   href="@DrivingFormatter.DriverHref(Driver.MemberId, Week)"
+   href="@DrivingFormatter.DriverHref(Driver.MemberId, Shown)"
    data-testid="@("driver-card-" + Driver.MemberId)"
    aria-label="@DrivingFormatter.DriverAccessibleName(Name, Driver)">
     <DriverAvatar Name="@Name" MemberColor="@Member?.Color" AvatarUrl="@Member?.AvatarUrl" Diameter="56" Ring="true" />
     <div class="realm-driver-card__text">
         <span class="realm-driver-card__name">@Name</span>
-        <span class="realm-driver-card__line">@DrivingFormatter.DriverLine(Driver)</span>
+        <span class="realm-driver-card__line">@DrivingFormatter.DriverLine(Driver, Shown.IsLong)</span>
         @if (Pill is { } pill)
         {
             <MudTooltip Text="@pill.Tooltip" Placement="Placement.Bottom" Inline="true" RootClass="realm-pill-root">
@@ -33,9 +33,15 @@
     [Parameter]
     public MemberVm? Member { get; set; }
 
-    /// <summary>The week offset the card was shown for; the link carries it as <c>?week=</c>.</summary>
+    /// <summary>The week offset the card was shown for; the link carries it as <c>?week=</c>. Ignored when <see cref="Period"/> is given.</summary>
     [Parameter]
     public int Week { get; set; }
+
+    /// <summary>The period the card was shown for (a long period carries <c>?period=</c> and its dates); null means the week chip <see cref="Week"/>.</summary>
+    [Parameter]
+    public ReportPeriod? Period { get; set; }
+
+    private ReportPeriod Shown => Period ?? ReportPeriod.OfWeek(Week);
 
     private string Name => Member?.DisplayName ?? Driver.MemberId;
 

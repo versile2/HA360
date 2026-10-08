@@ -269,7 +269,8 @@ public sealed class DemoDataSource
             Connections: connections,
             Zone: ZoneId,
             UnitSystem: UnitSystem.Imperial,
-            RetentionFixDays: DemoRetentionFixDays);
+            RetentionFixDays: DemoRetentionFixDays,
+            Thresholds: DrivingThresholds.Default);
     }
 
     // The member variants of 02 section 9.5, each a pure transform of one member. no-fix comes after all-near, so a member

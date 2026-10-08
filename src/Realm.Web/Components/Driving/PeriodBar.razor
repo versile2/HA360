@@ -1,0 +1,160 @@
+@using Realm.Web.Formatting
+
+@* The period control of the Driving report (01 section 6.2): the four week chips and, as the fifth control, a split button. The main part re-applies the last chosen long
+   period (Last month until another is chosen); the arrow opens a menu with Last month (the previous calendar month), Last 3 months, Last 6 months and Last year (rolling windows
+   that end today) and, below a divider, Custom range…. The 3, 6 and 12 month entries appear only when retention_fix_days covers them (PeriodMath.IsAvailable). Custom range opens
+   a panel with a start and an end date picker and Apply; the range is checked by PeriodMath.ValidateCustom (start not after end, not after today, not before the oldest day kept)
+   and the message says which rule failed. The component only reports a choice; the page owns the selection (it is the address query, so Back, printing and links work). *@
+<div class="realm-period-row realm-no-print" data-testid="period-bar">
+    <WeekChips Weeks="@Weeks" Selected="@(Period.IsLong ? -1 : Period.WeekOffset)" SelectedChanged="OnWeekAsync" />
+
+    <MudButtonGroup Variant="@(Period.IsLong ? Variant.Filled : Variant.Outlined)" Color="Color.Default" Class="@("realm-period-split" + (Period.IsLong ? " realm-period-split--selected" : string.Empty))" data-testid="period-split">
+        <MudButton Class="realm-period-split__main"
+                   OnClick="ApplyLastAsync"
+                   aria-pressed="@(Period.IsLong ? "true" : "false")"
+                   data-testid="period-main">@PeriodFormatter.SplitText(LastLong)</MudButton>
+        <MudMenu Icon="@Icons.Material.Filled.ArrowDropDown"
+                 AriaLabel="@PeriodFormatter.MenuLabel"
+                 Class="realm-period-split__menu"
+                 Style="align-self: auto;"
+                 ListClass="realm-period-menu"
+                 data-testid="period-menu">
+            @foreach (var kind in Kinds)
+            {
+                <MudMenuItem OnClick="@(() => ChooseAsync(kind))" data-testid="@("period-item-" + ReportPeriod.QueryValueOf(kind))">@PeriodFormatter.MenuText(kind)</MudMenuItem>
+            }
+            <MudDivider />
+            <MudMenuItem OnClick="OpenCustom" data-testid="period-item-custom">@PeriodFormatter.CustomLabel</MudMenuItem>
+        </MudMenu>
+    </MudButtonGroup>
+</div>
+
+@if (_customOpen)
+{
+    <div class="realm-custom-range realm-no-print" data-testid="custom-range" role="group" aria-label="Custom range">
+        <MudDatePicker Label="From"
+                       Date="_from"
+                       DateChanged="OnFrom"
+                       Editable="true"
+                       DateFormat="yyyy-MM-dd"
+                       Placeholder="YYYY-MM-DD"
+                       MinDate="@OldestKept.ToDateTime(TimeOnly.MinValue)"
+                       MaxDate="@Today.ToDateTime(TimeOnly.MinValue)"
+                       Variant="Variant.Outlined"
+                       Margin="Margin.Dense"
+                       Class="realm-custom-range__field"
+                       data-testid="custom-from" />
+        <MudDatePicker Label="To"
+                       Date="_to"
+                       DateChanged="OnTo"
+                       Editable="true"
+                       DateFormat="yyyy-MM-dd"
+                       Placeholder="YYYY-MM-DD"
+                       MinDate="@OldestKept.ToDateTime(TimeOnly.MinValue)"
+                       MaxDate="@Today.ToDateTime(TimeOnly.MinValue)"
+                       Variant="Variant.Outlined"
+                       Margin="Margin.Dense"
+                       Class="realm-custom-range__field"
+                       data-testid="custom-to" />
+        <div class="realm-custom-range__actions">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ApplyCustomAsync" data-testid="custom-apply">Apply</MudButton>
+            <MudButton Variant="Variant.Text" OnClick="CloseCustom" data-testid="custom-cancel">Cancel</MudButton>
+        </div>
+        @if (_message.Length > 0)
+        {
+            <p class="realm-custom-range__message" role="alert" data-testid="custom-message">@_message</p>
+        }
+    </div>
+}
+
+@code {
+    private bool _customOpen;
+    private DateTime? _from;
+    private DateTime? _to;
+    private string _message = string.Empty;
+
+    /// <summary>The four week chips, this week first.</summary>
+    [Parameter]
+    public IReadOnlyList<WeekRef> Weeks { get; set; } = [];
+
+    /// <summary>The period shown; a week chip is selected only when this is a week.</summary>
+    [Parameter]
+    public ReportPeriod Period { get; set; } = ReportPeriod.ThisWeek;
+
+    /// <summary>The long period the main part of the split button applies; Last month until the person chooses another.</summary>
+    [Parameter]
+    public ReportPeriod LastLong { get; set; } = new(ReportPeriod.DefaultLong);
+
+    /// <summary>retention_fix_days: decides which menu entries are offered and how far back a custom range may reach.</summary>
+    [Parameter]
+    public int RetentionFixDays { get; set; } = 100;
+
+    /// <summary>Today in HA's zone (the latest day a custom range may end on).</summary>
+    [Parameter]
+    public DateOnly Today { get; set; }
+
+    /// <summary>A period was chosen: a week chip, the main part, a menu entry or an applied custom range.</summary>
+    [Parameter]
+    public EventCallback<ReportPeriod> PeriodChanged { get; set; }
+
+    private IReadOnlyList<PeriodKind> Kinds => PeriodMath.MenuKinds(RetentionFixDays);
+
+    private DateOnly OldestKept => Today.AddDays(-RetentionFixDays);
+
+    private Task OnWeekAsync(int week) => PeriodChanged.InvokeAsync(ReportPeriod.OfWeek(week));
+
+    private Task ApplyLastAsync() => PeriodChanged.InvokeAsync(LastLong);
+
+    private Task ChooseAsync(PeriodKind kind)
+    {
+        _customOpen = false;
+        return PeriodChanged.InvokeAsync(new ReportPeriod(kind));
+    }
+
+    private void OpenCustom()
+    {
+        _customOpen = true;
+        _message = string.Empty;
+        var custom = LastLong.Kind == PeriodKind.Custom ? LastLong : Period.Kind == PeriodKind.Custom ? Period : null;
+        if (custom is { From: { } from, To: { } to })
+        {
+            _from = from.ToDateTime(TimeOnly.MinValue);
+            _to = to.ToDateTime(TimeOnly.MinValue);
+        }
+    }
+
+    private void CloseCustom()
+    {
+        _customOpen = false;
+        _message = string.Empty;
+    }
+
+    private void OnFrom(DateTime? value)
+    {
+        _from = value;
+        _message = string.Empty;
+    }
+
+    private void OnTo(DateTime? value)
+    {
+        _to = value;
+        _message = string.Empty;
+    }
+
+    // The checks are PeriodMath's; the clock is the page's Today (HA's zone), so the message and the pickers' limits agree.
+    private async Task ApplyCustomAsync()
+    {
+        DateOnly? from = _from is { } f ? DateOnly.FromDateTime(f) : null;
+        DateOnly? to = _to is { } t ? DateOnly.FromDateTime(t) : null;
+        var check = PeriodMath.ValidateCustom(from, to, Today, RetentionFixDays);
+        if (!check.IsValid)
+        {
+            _message = PeriodFormatter.RangeMessage(check, RetentionFixDays);
+            return;
+        }
+
+        _message = string.Empty;
+        _customOpen = false;
+        await PeriodChanged.InvokeAsync(ReportPeriod.OfRange(from!.Value, to!.Value));
+    }
+}

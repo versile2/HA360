@@ -86,8 +86,14 @@
             // The circuit dropped; there is no page left to scroll.
         }
 
-        // This week is the default and leaves no ?week= parameter (the chips write it the same way); a replace, so Back from Driving still leaves for Location.
-        var thisWeek = Navigation.GetUriWithQueryParameter("week", (string?)null);
+        // This week is the default and leaves no ?week= parameter (the chips write it the same way), nor a ?period= with its dates (a long period); a replace, so Back from Driving still leaves for Location.
+        var thisWeek = Navigation.GetUriWithQueryParameters(new Dictionary<string, object?>(StringComparer.Ordinal)
+        {
+            ["week"] = null,
+            ["period"] = null,
+            ["from"] = null,
+            ["to"] = null,
+        });
         if (!string.Equals(thisWeek, Navigation.Uri, StringComparison.Ordinal))
         {
             Navigation.NavigateTo(thisWeek, replace: true);

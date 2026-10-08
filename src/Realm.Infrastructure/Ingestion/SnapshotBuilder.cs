@@ -108,7 +108,11 @@ internal static class SnapshotBuilder
             ],
             Zone: input.ZoneId,
             UnitSystem: UnitSystem.Imperial,
-            RetentionFixDays: input.Options.RetentionFixDays);
+            RetentionFixDays: input.Options.RetentionFixDays,
+            Thresholds: new DrivingThresholds(
+                Math.Round(input.Options.DrivingSpeedingMps / FixParser.MphToMps, 1),
+                input.Options.DrivingSpeedingMinSeconds,
+                input.Options.DrivingPhoneMinSeconds));
     }
 
     // ---- members ------------------------------------------------------------------------------------------------

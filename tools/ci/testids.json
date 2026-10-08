@@ -41,6 +41,27 @@
     "settings-report-issue",
     "settings-star",
     "banner-{ha|life360|reconnect}",
-    "skeleton-row"
+    "skeleton-row",
+    "period-bar",
+    "period-split",
+    "period-main",
+    "period-menu",
+    "period-item-{last-month|3m|6m|1y|custom}",
+    "custom-range",
+    "custom-from",
+    "custom-to",
+    "custom-apply",
+    "custom-cancel",
+    "custom-message",
+    "btn-print",
+    "popup-print",
+    "print-header",
+    "print-footer",
+    "print-totals",
+    "print-drivers",
+    "print-events",
+    "print-event-row",
+    "drive-list",
+    "events-pager-{top|bottom}"
   ]
 }

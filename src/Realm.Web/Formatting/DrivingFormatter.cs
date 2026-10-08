@@ -72,8 +72,23 @@ public static class DrivingFormatter
     /// <summary>The empty state of a driver's week with no drives (01 section 8.7).</summary>
     public const string NoDrivesWeek = "No drives this week. The roads are quiet.";
 
-    /// <summary>The place of a drive end that has neither a place name nor a street (01 section 6.6).</summary>
-    public const string UnknownPlace = "Unknown place";
+    /// <summary>The place of a drive end the data layer sent without a label (01 section 6.6, D113): never "Unknown place". The data layer names every end itself (<see cref="PlaceLabeler"/>).</summary>
+    public const string UnnamedPlace = PlaceLabeler.Fallback;
+
+    /// <summary>The page title, the H1, of a long period (a month, a rolling window, a custom range; 01 section 6.1).</summary>
+    public const string PeriodTitle = "Driving Report";
+
+    /// <summary>The range line, and the empty state, of a long period in which no driver was recorded.</summary>
+    public const string NoRecordPeriod = "The scribes have no record of this period.";
+
+    /// <summary>The empty state of a driver's long period with no drives.</summary>
+    public const string NoDrivesPeriod = "No drives in this period. The roads are quiet.";
+
+    /// <summary>The second line of a driver card for a covered driver with no drives in a long period.</summary>
+    public const string NoDrivesDriverPeriod = "No drives in this period · resting in the castle";
+
+    /// <summary>The second line of a driver card for a driver who was not recorded in a long period.</summary>
+    public const string NoRecordDriverPeriod = "No record of this period";
 
     /// <summary>The accessible name of the Back link of the driver week (01 section 6.6).</summary>
     public const string BackLabel = "Back to the driving report";
@@ -138,9 +153,10 @@ public static class DrivingFormatter
     /// </summary>
     public static string RangeLine(WeekReportVm report, TimeZoneInfo zone)
     {
+        var isLong = report.Period?.IsLong == true;
         if (report.Coverage == WeekCoverage.NoRecord)
         {
-            return NoRecordWeek;
+            return isLong ? NoRecordPeriod : NoRecordWeek;
         }
 
         var line = RangeText(report.Start, report.End);
@@ -149,7 +165,7 @@ public static class DrivingFormatter
             line += Middle + "so far";
         }
 
-        if (report.Coverage == WeekCoverage.Partial && RecordedFrom(report, zone) is { } weekday)
+        if (report.Coverage == WeekCoverage.Partial && RecordedFrom(report, zone, isLong ? "MMM d" : "ddd") is { } weekday)
         {
             line += Middle + "recorded from " + weekday;
         }
@@ -158,7 +174,7 @@ public static class DrivingFormatter
     }
 
     // The weekday ("Wed") on which recording began, taking the latest start among the covered drivers; null when none of them has a start.
-    private static string? RecordedFrom(WeekReportVm report, TimeZoneInfo zone)
+    private static string? RecordedFrom(WeekReportVm report, TimeZoneInfo zone, string format)
     {
         DateTimeOffset? latest = null;
         foreach (var driver in report.Drivers)
@@ -169,7 +185,7 @@ public static class DrivingFormatter
             }
         }
 
-        return latest is { } instant ? TimeZoneInfo.ConvertTime(instant, zone).ToString("ddd", CultureInfo.InvariantCulture) : null;
+        return latest is { } instant ? TimeZoneInfo.ConvertTime(instant, zone).ToString(format, CultureInfo.InvariantCulture) : null;
     }
 
     /// <summary>"Tue, Sep 29": a day in the session's zone (01 section 8.3).</summary>
@@ -229,15 +245,15 @@ public static class DrivingFormatter
     /// The second line of a driver card (01 section 6.5): "18 drives • 202.6 miles" (the bullet is U+2022, miles to one decimal), "No drives this week · resting
     /// in the castle" for a covered driver with no drives, "No record of this week" for a driver who was not covered.
     /// </summary>
-    public static string DriverLine(DriverSummary driver)
+    public static string DriverLine(DriverSummary driver, bool longPeriod = false)
     {
         if (!driver.Covered || driver.Drives is not { } drives)
         {
-            return NoRecordDriver;
+            return longPeriod ? NoRecordDriverPeriod : NoRecordDriver;
         }
 
         return drives == 0
-            ? NoDrivesDriver
+            ? (longPeriod ? NoDrivesDriverPeriod : NoDrivesDriver)
             : Count(drives) + " " + Drives(drives) + Bullet + DriverMiles(driver.Meters ?? 0) + " miles";
     }
 
@@ -317,6 +333,12 @@ public static class DrivingFormatter
     public static string DriverHref(string memberId, int week) =>
         "driving/" + Uri.EscapeDataString(memberId) + "?week=" + week.ToString(CultureInfo.InvariantCulture);
 
+    /// <summary>The link of a driver card for any period: <c>driving/jester?week=0</c> for a week chip (as before), <c>driving/jester?period=3m</c> for a long period.</summary>
+    public static string DriverHref(string memberId, ReportPeriod period) =>
+        period.Kind == PeriodKind.Week
+            ? DriverHref(memberId, period.WeekOffset)
+            : "driving/" + Uri.EscapeDataString(memberId) + "?" + period.Query();
+
     // ---- the driver week (01 section 6.6) ----------------------------------------------------------------------------------------------------
 
     /// <summary>
@@ -328,6 +350,10 @@ public static class DrivingFormatter
 
     /// <summary>The link of the Back button of the driver week (01 section 6.6, relative as every link): <c>driving?week=1</c>.</summary>
     public static string BackHref(int week) => "driving?week=" + week.ToString(CultureInfo.InvariantCulture);
+
+    /// <summary>The Back link for any period: <c>driving?week=1</c> for a week chip, <c>driving?period=custom&amp;from=..&amp;to=..</c> for a long period.</summary>
+    public static string BackHref(ReportPeriod period) =>
+        period.Kind == PeriodKind.Week ? BackHref(period.WeekOffset) : "driving?" + period.Query();
 
     /// <summary>A driver's top speed of the week in metres per second, from the report's per-driver speeds (01 section 6.8); null when the driver has none.</summary>
     public static double? TopSpeedOf(WeekReportVm? report, string memberId)
@@ -382,8 +408,8 @@ public static class DrivingFormatter
     /// The empty state of a driver's week (01 sections 6.6 and 8.7): the no-record sentence for a driver who was not covered, "No drives this week. The roads are
     /// quiet." for a covered one with no drives; null when there are drives to list.
     /// </summary>
-    public static string? EmptyWeekText(DriverSummary driver, int driveCount) =>
-        !driver.Covered ? NoRecordWeek : driveCount == 0 ? NoDrivesWeek : null;
+    public static string? EmptyWeekText(DriverSummary driver, int driveCount, bool longPeriod = false) =>
+        !driver.Covered ? (longPeriod ? NoRecordPeriod : NoRecordWeek) : driveCount == 0 ? (longPeriod ? NoDrivesPeriod : NoDrivesWeek) : null;
 
     /// <summary>True while the driver's distances are GPS-estimated and there are some to caption (01 section 6.6, item 4): the basis is <c>Gps</c> or <c>Mixed</c>.</summary>
     public static bool ShowDriverCaption(DriverSummary driver, int driveCount) =>
@@ -391,15 +417,15 @@ public static class DrivingFormatter
 
     /// <summary>
     /// The drives of a driver's week grouped by day, in the order they come (newest first, 02 section 6.7). Each row has the time range ("9:01 – 9:06 pm"), "From → To"
-    /// ("Unknown place" for an end without a label), "1.1 mi · Top 38 mph" ("Top —" without a speed) and a chip for each type whose count is above zero: a zero or a
+    /// ("Somewhere in the Realm" for an end the data layer sent without a label), "1.1 mi · Top 38 mph" ("Top —" without a speed) and a chip for each type whose count is above zero: a zero or a
     /// <c>null</c> count draws nothing.
     /// </summary>
-    public static IReadOnlyList<DriveDay> DriveDays(IReadOnlyList<DriveVm> trips, TimeZoneInfo zone)
+    public static IReadOnlyList<DriveDay> DriveDays(IReadOnlyList<DriveVm> trips, TimeZoneInfo zone, int firstIndex = 0)
     {
         var days = new List<DriveDay>();
         List<DriveLine>? rows = null;
         DateTime? current = null;
-        var index = 0;
+        var index = firstIndex;
         foreach (var trip in trips)
         {
             var date = TimeZoneInfo.ConvertTime(trip.StartUtc, zone).Date;
@@ -417,7 +443,7 @@ public static class DrivingFormatter
         return days;
     }
 
-    private static string Route(DriveVm trip) => (trip.FromLabel ?? UnknownPlace) + " → " + (trip.ToLabel ?? UnknownPlace);
+    private static string Route(DriveVm trip) => (trip.FromLabel ?? UnnamedPlace) + " → " + (trip.ToLabel ?? UnnamedPlace);
 
     private static string Detail(DriveVm trip) => UnitFormatter.Distance(trip.Meters) + Middle + "Top " + SpeedText(trip.TopSpeedMps);
 

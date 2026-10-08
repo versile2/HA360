@@ -1,0 +1,157 @@
+/*
+ * The printable Driving report (01 section 6.10, D113): every Driving screen prints as a clean Letter/A4 page with a light background and dark text. The map-free page has
+ * no navigation, chips, cards, pager or dialogs on paper: the totals, drivers and events are the tables drawn for print (.realm-print-only), the header line reads
+ * "Driving Report · {period} · printed {date}" and the footer holds the thresholds. The events table lists ALL drives (the pager is a screen control). Rows never split
+ * across pages and the table header repeats on each page.
+ * Tokens and the named colours white and black only: the no-colour-literals guard fails the build on a hex or rgb() literal here. It loads last, so it wins by order.
+ */
+
+@media print {
+  @page {
+    size: auto;
+    margin: 14mm 12mm;
+  }
+
+  :root {
+    color-scheme: light;
+    --realm-bg: white;
+    --realm-surface: white;
+    --realm-surface-2: white;
+    --realm-text: black;
+    --realm-text-2: color-mix(in srgb, black 70%, white);
+    --realm-line: color-mix(in srgb, black 35%, white);
+  }
+
+  html,
+  body {
+    height: auto !important;
+    overflow: visible !important;
+    background: white !important;
+    color: black !important;
+    font-size: 10pt;
+    line-height: 1.35;
+  }
+
+  /* No chrome on paper: the bottom navigation, the controls, the cards, the banners, every dialog and popover and the skeleton. */
+  .realm-nav,
+  .realm-no-print,
+  .realm-screen-only,
+  .realm-driving__header,
+  .realm-driving__skeleton,
+  .realm-driving__banner,
+  .realm-reconnect,
+  .mud-overlay,
+  .mud-dialog-container,
+  .mud-popover-provider,
+  .mud-snackbar-provider,
+  .realm-popup-scrim,
+  #blazor-error-ui {
+    display: none !important;
+  }
+
+  .realm-print-only {
+    display: block !important;
+  }
+
+  table.realm-print-only {
+    display: table !important;
+  }
+
+  .realm-driving {
+    padding: 0 !important;
+  }
+
+  .realm-driving__column {
+    max-width: none;
+  }
+
+  .realm-driving__title,
+  .realm-driver-week__name {
+    margin: 0 0 4px;
+    color: black;
+    font-size: 16pt;
+    text-align: left;
+  }
+
+  .realm-driving__subtitle,
+  .realm-driving__range,
+  .realm-driving__quiet,
+  .realm-driving__caption,
+  .realm-driver-week__lore,
+  .realm-driver-week__week {
+    margin: 0 0 6px;
+    color: var(--realm-text-2);
+    font-size: 10pt;
+    text-align: left;
+  }
+
+  .realm-driver-week__bar {
+    display: block;
+    margin: 0 0 6px;
+  }
+
+  .realm-driver-week__back {
+    display: none !important;
+  }
+
+  .realm-print-header {
+    margin: 0 0 8px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid black;
+    color: black;
+    font-size: 11pt;
+    font-weight: 700;
+  }
+
+  .realm-print-footer {
+    margin: 12px 0 0;
+    padding-top: 4px;
+    border-top: 1px solid var(--realm-line);
+    color: var(--realm-text-2);
+    font-size: 8pt;
+  }
+
+  .realm-print-table {
+    width: 100%;
+    margin: 0 0 12px;
+    border-collapse: collapse;
+    color: black;
+    font-size: 9pt;
+  }
+
+  .realm-print-table caption {
+    padding: 4px 0;
+    color: black;
+    font-size: 11pt;
+    font-weight: 700;
+    text-align: left;
+  }
+
+  .realm-print-table th,
+  .realm-print-table td {
+    padding: 3px 6px;
+    border: 1px solid var(--realm-line);
+    color: black;
+    text-align: left;
+    vertical-align: top;
+  }
+
+  .realm-print-table th {
+    background: color-mix(in srgb, black 8%, white);
+    font-weight: 700;
+  }
+
+  .realm-print-table thead {
+    display: table-header-group;
+  }
+
+  .realm-print-table tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .realm-print-table caption,
+  .realm-print-table th {
+    break-after: avoid;
+  }
+}
