@@ -17,7 +17,11 @@ async function openRoster(page: Page): Promise<void> {
   await expect(dialog(page), 'the Settings dialog is open').toBeVisible();
 }
 
-const pinIds = async (page: Page): Promise<string[]> => (await readHook(page, 'pins')).map((pin) => pin.id).sort();
+// What the map draws for people and vehicles: the pins on screen and the edge bubbles of those that are far away (the prince is far from the default view).
+const pinIds = async (page: Page): Promise<string[]> => [
+  ...(await readHook(page, 'pins')).map((pin) => pin.id),
+  ...(await readHook(page, 'bubbles')).flatMap((bubble) => bubble.ids),
+].sort();
 
 test.describe("Settings, Who's on the map", () => {
   test('[ROSTER] the section is first, with PEOPLE 4, VEHICLES 1 and NOT TRACKED 2, and every row reads kind · source', { tag: ['@phone', '@unfolded'] }, async ({ page }) => {
@@ -25,7 +29,7 @@ test.describe("Settings, Who's on the map", () => {
     await openRoster(page);
 
     await expect(dialog(page).locator('.realm-settings__section h3').first(), 'the roster is the first section').toHaveText("Who's on the map");
-    await expect(section(page).locator('.realm-roster__heading'), 'the three groups and their counts').toHaveText(['PEOPLE4', 'VEHICLES1', 'NOT TRACKED2']);
+    await expect(section(page).locator('.realm-roster__heading'), 'the three groups and their counts').toHaveText(['PEOPLE 4', 'VEHICLES 1', 'NOT TRACKED 2']);
     for (const entry of cast.roster) {
       const slug = entry.entityId.replace(/[._]/g, '-');
       const row = page.getByTestId(`roster-row-${slug}`);

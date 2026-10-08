@@ -1090,13 +1090,14 @@
 }
 
 .realm-roster__item {
+  padding: 4px 0;
   border-bottom: 1px solid var(--realm-line);
 }
 
 .realm-roster__row {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
   min-height: 56px;
 }
 

@@ -188,12 +188,11 @@ public sealed class LiveDiagnosticsEndpointTests
 
     private static Dictionary<string, string?> LiveSettings() => new() { ["SUPERVISOR_TOKEN"] = FictionalToken };
 
-    // The refusal of the existing composition tests: an offline limit that is not above the stale limit (02 section 3.3).
+    // The refusal of the existing composition tests: an option that cannot be read (02 section 3.3).
     private static Dictionary<string, string?> RefusedSettings()
     {
         var settings = LiveSettings();
-        settings["Ui:StaleAfterMinutes"] = "120";
-        settings["Ui:OfflineAfterHours"] = "1";
+        settings["Retention:FixDays"] = "not-a-number";
         return settings;
     }
 

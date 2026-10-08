@@ -25,7 +25,7 @@ public sealed class RosterSectionTests : ComponentTestBase
 
         var cut = Open(session);
 
-        Assert.Equal(["PEOPLE4", "VEHICLES1", "NOT TRACKED2"], cut.FindAll(".realm-roster__heading").Select(heading => heading.TextContent.Trim()));
+        Assert.Equal(["PEOPLE4", "VEHICLES1", "NOTTRACKED2"], cut.FindAll(".realm-roster__heading").Select(heading => System.Text.RegularExpressions.Regex.Replace(heading.TextContent, "\\s+", string.Empty)));
         Assert.Equal("4", cut.Find("[data-testid='roster-count-people']").TextContent);
         Assert.Equal("1", cut.Find("[data-testid='roster-count-vehicles']").TextContent);
         Assert.Equal("2", cut.Find("[data-testid='roster-count-not-tracked']").TextContent);

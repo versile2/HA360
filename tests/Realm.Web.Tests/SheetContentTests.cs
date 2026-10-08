@@ -52,8 +52,8 @@ public sealed class SheetContentTests : ComponentTestBase
         var cut = Content(Section.Drivers);
 
         var rows = cut.FindAll("[data-testid='sheet-list'] > li > button");
-        Assert.Equal(DemoCast.Members.Select(member => $"row-member-{member.Id}"), rows.Select(row => row.GetAttribute("data-testid")));
-        Assert.Equal(DemoCast.Members.Select(member => member.Name), rows.Select(row => row.QuerySelector(".realm-row-name")!.TextContent));
+        Assert.Equal(DemoCast.AllMembers.Select(member => $"row-member-{member.Id}"), rows.Select(row => row.GetAttribute("data-testid")));
+        Assert.Equal(DemoCast.AllMembers.Select(member => member.Name), rows.Select(row => row.QuerySelector(".realm-row-name")!.TextContent));
         Assert.Equal(5, cut.FindAll("[data-testid='sheet-list'] > li").Count);
         Assert.Equal("Since 5:52 pm", cut.Find("[data-testid='row-member-king'] .realm-row-detail-text").TextContent);
     }

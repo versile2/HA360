@@ -396,7 +396,7 @@ test.describe('[GAL] screenshot gallery: the Layers popover and the Settings dia
     await expect(dialog, 'the Settings dialog is open').toBeVisible();
     await expect(frame.locator('.realm-popup__title'), 'the title').toHaveText('Settings');
     await expect(dialog.locator('.realm-settings__section h3'), 'the five sections, in order').toHaveText(["Who's on the map", 'Map', 'Appearance', 'Connections', 'About']);
-    await expect(dialog.locator('.realm-roster__heading'), 'the roster groups with their counts (the Demo starts with 4, 1 and 2)').toHaveText(['PEOPLE4', 'VEHICLES1', 'NOT TRACKED2']);
+    await expect(dialog.locator('.realm-roster__heading'), 'the roster groups with their counts (the Demo starts with 4, 1 and 2)').toHaveText(['PEOPLE 4', 'VEHICLES 1', 'NOT TRACKED 2']);
 
     // Its size: the whole window below 600 px, a 480 px column in the middle from there up.
     const viewport = viewportOf(page);

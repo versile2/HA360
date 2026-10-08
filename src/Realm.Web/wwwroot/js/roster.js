@@ -30,6 +30,37 @@
     }
   });
 
+  // Esc inside the ⋮ menu or the editor closes that and nothing else. MudBlazor's dialog listens for Escape natively on its own element, below any handler Blazor could run, so the
+  // key is taken here, before it travels: the button that closes the menu (or Cancel) is clicked, the way the keyboard user would, and the event goes no further.
+  document.addEventListener('keydown', (event) => {
+    const target = event.target;
+    if (event.key !== 'Escape' || !(target instanceof Element)) {
+      return;
+    }
+
+    const menu = target.closest('.realm-roster__menu');
+    const edit = menu ? null : target.closest('.realm-roster__edit');
+    const item = (menu ?? edit)?.closest('.realm-roster__item');
+    if (!item) {
+      return;
+    }
+
+    event.stopPropagation();
+    event.preventDefault();
+    if (menu) {
+      const more = item.querySelector('.realm-roster__more');
+      if (more instanceof HTMLElement) {
+        more.click();
+        more.focus();
+      }
+    } else {
+      const cancel = item.querySelector('[data-testid="roster-cancel"]');
+      if (cancel instanceof HTMLElement) {
+        cancel.click();
+      }
+    }
+  }, true);
+
   /** @type {any} */ (window).realmRoster = {
     /** @param {string} id */
     focus(id) {

@@ -304,7 +304,7 @@ public sealed class MapViewTests : ComponentTestBase
         cut.Render(parameters => parameters.Add(map => map.Selection, Wagon));
 
         Assert.Empty(ChipOwners(LastMembers()));   // the king is not selected, so his chip is gone as well
-        Assert.Equal("Parked · Engine off", LastVehicles().Vehicles.Single(vehicle => vehicle.Id == DemoCast.Wagon.Id).Chip);
+        Assert.Equal("Parked", LastVehicles().Vehicles.Single(vehicle => vehicle.Id == DemoCast.Wagon.Id).Chip);
 
         cut.Render(parameters => parameters.Add(map => map.Selection, null));
 

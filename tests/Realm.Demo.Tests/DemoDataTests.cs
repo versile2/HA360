@@ -1555,8 +1555,9 @@ public class DemoDataTests
 
         Assert.Equal(5, snapshot.Members.Count);
         Assert.Equal(2, snapshot.Vehicles.Count);
-        Assert.Equal(4, Snapshot().Members.Count);
-        Assert.Single(Snapshot().Vehicles);
+        var normal = new DemoRealmSessionFactory().Create(null).Current;
+        Assert.Equal(4, normal.Members.Count);
+        Assert.Single(normal.Vehicles);
     }
 
     [Fact]

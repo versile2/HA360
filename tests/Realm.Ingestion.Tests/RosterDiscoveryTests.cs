@@ -32,7 +32,7 @@ public sealed class RosterDiscoveryTests
 
         await PassAsync(rig);
 
-        Assert.Equal([King, Pickup], Ids(rig, RosterGroup.People));
+        Assert.Equal([Pickup, King], Ids(rig, RosterGroup.People));
         Assert.Equal([OldVan], Ids(rig, RosterGroup.NotTracked));
         Assert.Equal("Alden", rig.Roster.Entries.Single(e => e.EntityId == King).DisplayName);
         Assert.Equal(["king", "tracker_pickup"], rig.Discovery.Current.Members.Select(m => m.Id).Order(StringComparer.Ordinal));
@@ -83,7 +83,7 @@ public sealed class RosterDiscoveryTests
 
         await PassAsync(rig);
 
-        Assert.Equal([King, Scooter], Ids(rig, RosterGroup.People));
+        Assert.Equal([Scooter, King], Ids(rig, RosterGroup.People));
         Assert.Equal(["ha_cartographer_summary", "ha_cartographer_device_tracker.scooter"], rig.Gateway.Notifications.Select(n => n.Id));
         Assert.Equal(historyCalls, rig.Gateway.HistoryCalls.Count);
         Assert.Contains("Who's on the map", rig.Gateway.Notifications[1].Message, StringComparison.Ordinal);

@@ -33,8 +33,6 @@ public sealed class DemoDataSource
     // The pickup: 7.78 m from the king, inside home, standing still, last update 21:05. The hatchback is parked near it, last seen 20 days ago.
     private const double WagonLat = 31.09907;
     private const double WagonLon = -85.34100;
-    private const double ChariotLat = 31.09950;
-    private const double ChariotLon = -85.34050;
 
     // The all-near variant (02 section 9.5): the cryptid 3.07 km and the prince 3.48 km from the king.
     private const double NearCryptidLat = 31.1250;
@@ -175,10 +173,10 @@ public sealed class DemoDataSource
             Name: entry.DisplayName,
             LoreTitle: entry.LoreTitle,
             Glyph: spot.Glyph,
-            Lat: spot.Lat,
-            Lon: spot.Lon,
+            Lat: double.IsNaN(spot.Lat) ? null : spot.Lat,
+            Lon: double.IsNaN(spot.Lon) ? null : spot.Lon,
             Street: null,
-            PlaceId: PlaceResolver.Resolve(spot.Lat, spot.Lon, null, zones, []).PlaceId,
+            PlaceId: double.IsNaN(spot.Lat) ? null : PlaceResolver.Resolve(spot.Lat, spot.Lon, null, zones, []).PlaceId,
             LastUpdateUtc: spot.Fix?.Ts,
             SpeedMps: spot.Fix?.SpeedMps,
             IsMoving: VehicleRules.IsMoving(spot.Fix?.SpeedMps, spot.Fix?.Ts, now),
@@ -299,6 +297,10 @@ public sealed class DemoDataSource
         Spot Parked(string id, string key, VehicleGlyph glyph, int ageSeconds, double lat, double lon) =>
             new(id, key, Fix(key, ageSeconds, lat, lon, null, null, null, 0), lat, lon, null, false, null, null, glyph);
 
+        // The hatchback last reported 20 days ago and has no position now: it is listed ("Last heard 20 days ago") but has no pin (as in 0.1, where its row had none).
+        Spot Silent(string id, string key, VehicleGlyph glyph, int ageSeconds) =>
+            new(id, key, Fix(key, ageSeconds, 0, 0, null, null, null, 0), double.NaN, double.NaN, null, false, null, null, glyph);
+
         return new Dictionary<string, Spot>(StringComparer.Ordinal)
         {
             [DemoCast.King.Id] = Located(DemoCast.King, 0, 31.0990, -85.3410, 18, 19, true, Local(17, 52), driving: false),
@@ -307,7 +309,7 @@ public sealed class DemoDataSource
             [DemoCast.Cryptid.Id] = Located(DemoCast.Cryptid, 42 * 60, 31.3382, -82.7291, 35, 10, false, Local(20, 10), driving: false),
             [DemoCast.Prince.Id] = new(DemoCast.Prince.Id, "prince", null, PrinceLat, PrinceLon, null, false, null, DemoCast.Prince.StaticLabel, VehicleGlyph.Car),
             [DemoCast.Wagon.Id] = Parked(DemoCast.Wagon.Id, "wagon", DemoCast.Wagon.Glyph, (int)(Anchor - Local(21, 5)).TotalSeconds, WagonLat, WagonLon),
-            [DemoCast.Chariot.Id] = Parked(DemoCast.Chariot.Id, "hatchback", DemoCast.Chariot.Glyph, 20 * 24 * 3600, ChariotLat, ChariotLon),
+            [DemoCast.Chariot.Id] = Silent(DemoCast.Chariot.Id, "hatchback", DemoCast.Chariot.Glyph, 20 * 24 * 3600),
         };
     }
 
