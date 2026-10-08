@@ -62,6 +62,9 @@ public sealed class LiveRealmSession : IRealmSession
     public IRosterEditor Roster => _source.Roster;
 
     /// <inheritdoc />
+    public IPlaceEditor PlaceEditor => _source.PlaceEditor;
+
+    /// <inheritdoc />
     public TimeProvider Time => _source.Time;
 
     /// <inheritdoc />

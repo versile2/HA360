@@ -7,7 +7,7 @@ using Xunit;
 
 namespace Realm.Data.Tests;
 
-// The options loader (02 sections 3.1 to 3.5): the binding table of the six add-on options (D114), the defaults, the old options that are ignored, and the cross-field validation.
+// The options loader (02 sections 3.1 to 3.5): the binding table of the seven add-on options (D114, and allow_add of 0.2.2, D120), the defaults, the old options that are ignored, and the cross-field validation.
 public class OptionsBindingTests
 {
     // The /data/options.json of 0.2.0.
@@ -18,7 +18,8 @@ public class OptionsBindingTests
           "log_level": "information",
           "driving_week_start": "monday",
           "driving_speeding_mph": 80,
-          "retention_fix_days": 120
+          "retention_fix_days": 120,
+          "allow_add": true
         }
         """;
 
@@ -63,10 +64,10 @@ public class OptionsBindingTests
     }
 
     [Fact]
-    public void There_are_exactly_six_options()
+    public void There_are_exactly_seven_options()
     {
         Assert.Equal(
-            new[] { "log_level", "driving_week_start", "driving_speeding_mph", "retention_fix_days", "demo_mode", "allow_demo_param" },
+            new[] { "log_level", "driving_week_start", "driving_speeding_mph", "retention_fix_days", "demo_mode", "allow_demo_param", "allow_add" },
             OptionsBinding.Table.Select(row => row.Key).ToArray());
     }
 
@@ -126,6 +127,7 @@ public class OptionsBindingTests
         Assert.Equal(100, options.RetentionFixDays);
         Assert.False(options.DemoMode);
         Assert.False(options.AllowDemoParam);
+        Assert.True(options.AllowAdd);   // 0.2.2: the Add rows are on unless the owner switches them off
 
         var defaults = OptionsBinding.Defaults;
         Assert.Equal(options.DrivingWeekStart, defaults.DrivingWeekStart);
@@ -163,7 +165,7 @@ public class OptionsBindingTests
     {
         var options = OptionsBinding.Parse(
             """
-            { "log_level": "debug", "driving_week_start": "sunday", "driving_speeding_mph": 70, "retention_fix_days": 121, "demo_mode": true, "allow_demo_param": true }
+            { "log_level": "debug", "driving_week_start": "sunday", "driving_speeding_mph": 70, "retention_fix_days": 121, "demo_mode": true, "allow_demo_param": true, "allow_add": false }
             """);
 
         Assert.Equal(LogLevel.Debug, options.LogLevel);
@@ -172,6 +174,7 @@ public class OptionsBindingTests
         Assert.Equal(121, options.RetentionFixDays);
         Assert.True(options.DemoMode);
         Assert.True(options.AllowDemoParam);
+        Assert.False(options.AllowAdd);
     }
 
     [Fact]
@@ -187,7 +190,7 @@ public class OptionsBindingTests
     }
 
     [Fact]
-    public void The_options_of_an_older_version_are_ignored_but_the_six_still_apply()
+    public void The_options_of_an_older_version_are_ignored_but_the_current_ones_still_apply()
     {
         using var document = JsonDocument.Parse(OldOptions);
 

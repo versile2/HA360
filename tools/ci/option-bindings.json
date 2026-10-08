@@ -5,7 +5,8 @@
     "driving_speeding_mph",
     "retention_fix_days",
     "demo_mode",
-    "allow_demo_param"
+    "allow_demo_param",
+    "allow_add"
   ],
   "bindings": {
     "log_level": { "path": "Logging:LogLevel:Default", "default": "Information" },
@@ -13,6 +14,7 @@
     "driving_speeding_mph": { "path": "Driving:SpeedingMps", "default": 80, "factor": 0.44704 },
     "retention_fix_days": { "path": "Retention:FixDays", "default": 100 },
     "demo_mode": { "path": "Demo:Mode", "default": false },
-    "allow_demo_param": { "path": "Demo:AllowParam", "default": false }
+    "allow_demo_param": { "path": "Demo:AllowParam", "default": false },
+    "allow_add": { "path": "Ui:AllowAdd", "default": true }
   }
 }

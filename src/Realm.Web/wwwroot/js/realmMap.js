@@ -54,6 +54,7 @@ import {
 import {
   FALLBACK_ZONE_APPEARANCE,
   HALO_SOURCE,
+  PLACEMENT_SOURCE,
   STYLES,
   ZONE_SOURCE,
   appearanceOf,
@@ -948,6 +949,7 @@ function failPending(r, pending, error) {
 function onStyleLoad(r) {
   ensureOverlay(r);
   r.styleReady = true;
+  drawPlacement(r); // D120: the preview circle survives a style switch
   r.dirty.zones = true;
   r.dirty.halos = true;
   const pending = r.pending;
@@ -1465,6 +1467,7 @@ function bindMap(r) {
   map.on('click', (event) => {
     const target = event.originalEvent?.target;
     if (target instanceof Element && target.closest('.realm-ui')) return;
+    if (placementTap(r, event.lngLat)) return; // D120: while a place is being placed a tap moves the pin
     if (r.styleReady && map.getLayer('realm-zones-fill')) {
       // A circle wider than the view (a huge zone) is outline only: a tap inside it is a map tap, so it never blocks deselecting.
       const hits = map.queryRenderedFeatures(event.point, { layers: ['realm-zones-fill'] }).filter((hit) => !hit.properties?.huge);
@@ -1506,6 +1509,7 @@ function teardown() {
   releaseStyleBlob(r);
   releaseSelection(r); // S8a
   releaseBubbles(r); // S9b
+  releasePlacement(r); // D120
   r.resizeObserver?.disconnect();
   document.removeEventListener('visibilitychange', r.onVisibility);
   for (const pin of r.pins.values()) pin.marker.remove();
@@ -2693,3 +2697,161 @@ extraHooks.bubbles = () => {
   return describeBubbles(bubbleState(r).bubbles);
 };
 extraHooks.layoutBubbles = layoutBubbles;
+
+// ---- placing a new place (D120, 01 section 5.8) -----------------------------------------------------------------------------
+// A draggable centre pin and a radius circle, drawn into PLACEMENT_SOURCE. .NET owns the name, the icon and the Save; this region only
+// owns the geometry: it reports the pin position (OnPlacementMoved) and draws the radius .NET sets. The state lives in a WeakMap like the
+// regions above; the hooks are marked `D120:`.
+
+/** @typedef {{ marker: import('maplibre-gl').Marker, el: HTMLElement, radiusM: number, onKey: (event: KeyboardEvent) => void, onZoom: () => void }} PlacementRuntime */
+/** @type {WeakMap<Runtime, PlacementRuntime>} */
+const placementRuntimes = new WeakMap();
+
+/** How far the pin moves per arrow key, and per shift+arrow key, in CSS pixels. */
+const PLACEMENT_STEP_PX = 8;
+const PLACEMENT_STEP_BIG_PX = 48;
+/** The room the bottom panel takes below the pin at start, in CSS pixels. */
+const PLACEMENT_PANEL_ROOM_PX = 280;
+const PLACEMENT_MIN_ZOOM = 15;
+const PLACEMENT_MIN_PX = 14;
+
+/** @param {Runtime} r */
+function reportPlacement(r) {
+  const state = placementRuntimes.get(r);
+  if (!state) return;
+  const at = state.marker.getLngLat();
+  notify('OnPlacementMoved', at.lat, at.lng);
+}
+
+/** Draws (or clears) the radius circle; never smaller than 14 px on screen. @param {Runtime} r */
+function drawPlacement(r) {
+  const state = placementRuntimes.get(r);
+  if (!r.styleReady || !r.map.getSource(PLACEMENT_SOURCE)) return;
+  if (!state) {
+    pushFeatures(r, PLACEMENT_SOURCE, []);
+    return;
+  }
+  const at = state.marker.getLngLat();
+  const mpp = metersPerPixel(r.map.getZoom(), at.lat);
+  const drawn = Math.max(state.radiusM, PLACEMENT_MIN_PX * mpp);
+  const appearance = r.zones?.appearances?.[r.appearance] ?? FALLBACK_ZONE_APPEARANCE;
+  pushFeatures(r, PLACEMENT_SOURCE, [circlePolygon([at.lng, at.lat], drawn, 64, { lineColor: appearance.lineColor })]);
+}
+
+/**
+ * Called by the map click: moves the pin to the tap while placing.
+ * @param {Runtime} r
+ * @param {{ lng: number, lat: number }} lngLat
+ * @returns {boolean} true when the tap was consumed
+ */
+function placementTap(r, lngLat) {
+  const state = placementRuntimes.get(r);
+  if (!state) return false;
+  state.marker.setLngLat([lngLat.lng, lngLat.lat]);
+  drawPlacement(r);
+  reportPlacement(r);
+  return true;
+}
+
+/** @param {Runtime} r */
+function releasePlacement(r) {
+  const state = placementRuntimes.get(r);
+  if (!state) return;
+  placementRuntimes.delete(r);
+  r.map.off('zoom', state.onZoom);
+  state.el.removeEventListener('keydown', state.onKey);
+  state.marker.remove();
+  document.documentElement.removeAttribute('data-placing');
+  try {
+    drawPlacement(r);
+  } catch {
+    // the map is going away
+  }
+}
+
+/**
+ * Starts placement: the pin appears at the centre of the part of the map the bottom panel leaves free, and the camera zooms in to at least 15.
+ * @param {{ radiusM: number, label?: string }} opts
+ */
+export function beginPlacement(opts) {
+  call('beginPlacement', () => {
+    const r = rt;
+    if (!r) return;
+    releasePlacement(r);
+    const el = document.createElement('div');
+    el.className = 'realm-placement-pin realm-ui';
+    el.setAttribute('data-testid', 'placement-pin');
+    el.setAttribute('role', 'application');
+    el.setAttribute('tabindex', '0');
+    el.setAttribute('aria-label', opts.label ?? 'New place position. Drag the pin, or use the arrow keys to move it.');
+    el.innerHTML = icon('place');
+    const size = r.map.getContainer();
+    const x = size.clientWidth / 2;
+    const y = Math.max(size.clientHeight - PLACEMENT_PANEL_ROOM_PX, size.clientHeight * 0.3) / 2;
+    const start = r.map.unproject([x, y]);
+    const marker = new (lib().Marker)({ element: el, draggable: true, anchor: 'bottom', offset: [0, 4] }).setLngLat(start).addTo(r.map);
+    /** @param {KeyboardEvent} event */
+    const onKey = (event) => {
+      const step = event.shiftKey ? PLACEMENT_STEP_BIG_PX : PLACEMENT_STEP_PX;
+      let dx = 0;
+      let dy = 0;
+      switch (event.key) {
+        case 'ArrowLeft': dx = -step; break;
+        case 'ArrowRight': dx = step; break;
+        case 'ArrowUp': dy = -step; break;
+        case 'ArrowDown': dy = step; break;
+        default: return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      const at = r.map.project(marker.getLngLat());
+      marker.setLngLat(r.map.unproject([at.x + dx, at.y + dy]));
+      drawPlacement(r);
+      reportPlacement(r);
+    };
+    const state = { marker, el, radiusM: opts.radiusM, onKey, onZoom: () => drawPlacement(r) };
+    placementRuntimes.set(r, state);
+    el.addEventListener('keydown', state.onKey);
+    marker.on('drag', () => drawPlacement(r));
+    marker.on('dragend', () => {
+      drawPlacement(r);
+      reportPlacement(r);
+    });
+    r.map.on('zoom', state.onZoom);
+    document.documentElement.setAttribute('data-placing', '');
+    if (r.map.getZoom() < PLACEMENT_MIN_ZOOM) {
+      r.map.easeTo({ center: start, zoom: PLACEMENT_MIN_ZOOM, duration: r.reducedMotion ? 0 : 600, essential: true });
+    }
+    drawPlacement(r);
+    reportPlacement(r);
+  }, true);
+}
+
+/** @param {number} radiusM */
+export function setPlacementRadius(radiusM) {
+  call('setPlacementRadius', () => {
+    const r = rt;
+    const state = r ? placementRuntimes.get(r) : undefined;
+    if (!r || !state) return;
+    state.radiusM = Number(radiusM);
+    drawPlacement(r);
+  }, true);
+}
+
+/** Moves the pin to a position (the tests and the keyboard-free path use it). @param {number} lat @param {number} lon */
+export function setPlacementPosition(lat, lon) {
+  call('setPlacementPosition', () => {
+    const r = rt;
+    const state = r ? placementRuntimes.get(r) : undefined;
+    if (!r || !state) return;
+    state.marker.setLngLat([lon, lat]);
+    drawPlacement(r);
+    reportPlacement(r);
+  }, true);
+}
+
+export function endPlacement() {
+  call('endPlacement', () => {
+    if (rt) releasePlacement(rt);
+  }, true);
+}

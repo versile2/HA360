@@ -1,0 +1,19 @@
+@using Realm.Web.Sheet
+
+@* The last row of a sheet list (0.2.2, D119): "+ Add driver", "+ Add tracker" or "+ Add place". It sits after the list, not in it (the list holds only the rows of the section), looks like a
+   row (a 48 px target, the primary colour) and is an ordinary button with one text node, so its accessible name is its text. Hidden by the page when the add-on option allow_add is off. *@
+<div class="realm-add-wrap">
+    <button type="button" class="realm-add-row" data-testid="@AddKinds.TestId(Kind)" @onclick="OnClick">@AddKinds.Label(Kind)</button>
+</div>
+
+@code {
+    /// <summary>What the row adds.</summary>
+    [Parameter, EditorRequired]
+    public AddKind Kind { get; set; }
+
+    /// <summary>The row was tapped.</summary>
+    [Parameter]
+    public EventCallback<AddKind> OnAdd { get; set; }
+
+    private Task OnClick() => OnAdd.InvokeAsync(Kind);
+}

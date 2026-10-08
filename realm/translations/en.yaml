@@ -5,6 +5,9 @@ configuration:
   allow_demo_param:
     name: "Allow demo link"
     description: "Allow adding ?demo=1 to the address to open a demo session while the app runs on real data."
+  allow_add:
+    name: "Allow adding drivers, trackers and places"
+    description: "Show + Add driver, + Add tracker and + Add place at the end of the lists. Adding a place creates a zone in Home Assistant, which needs an administrator account. Switch off to keep the lists read-only."
   log_level:
     name: "Log level"
     description: "Minimum level written to the app log."

@@ -8,6 +8,9 @@ namespace Realm.Infrastructure.Ha;
 /// </summary>
 public sealed class HaGateway : IHaGateway, IDisposable
 {
+    /// <summary>How long a websocket command (<c>zone/create</c>) may take to be answered.</summary>
+    public static readonly TimeSpan CommandTimeout = TimeSpan.FromSeconds(15);
+
     private readonly HaWebSocketConnection _connection;
     private readonly HaRestClient _rest;
     private HaConnectionState _lastState = HaConnectionState.Connecting;
@@ -45,6 +48,17 @@ public sealed class HaGateway : IHaGateway, IDisposable
     /// <inheritdoc />
     public Task NotifyAsync(string notificationId, string title, string message, CancellationToken cancellationToken) =>
         _rest.NotifyAsync(notificationId, title, message, cancellationToken);
+
+    /// <inheritdoc />
+    public async Task CreateZoneAsync(NewZone zone, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(zone);
+        var result = await _connection.CallAsync(HaZoneCommand.Type, writer => HaZoneCommand.WriteFields(writer, zone), CommandTimeout, cancellationToken);
+        if (!result.Success)
+        {
+            throw new HaCommandException(result.ErrorCode ?? "failed", result.ErrorMessage);
+        }
+    }
 
     /// <inheritdoc />
     public Task<AvatarImage?> GetImageAsync(string pathAndQuery, int maxBytes, CancellationToken cancellationToken) =>

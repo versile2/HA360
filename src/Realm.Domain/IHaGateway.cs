@@ -43,6 +43,13 @@ public interface IHaGateway
     Task NotifyAsync(string notificationId, string title, string message, CancellationToken cancellationToken);
 
     /// <summary>
+    /// The websocket command <c>zone/create</c> (0.2.2, D119; the second call of the add-on that changes anything in Home Assistant, 02 section 10.3): creates a zone
+    /// from <paramref name="zone"/>, not passive. Throws <see cref="HaCommandException"/> when Home Assistant answers with an error (not an administrator, an old
+    /// version without the command) or the websocket is not connected or does not answer in time. Never called in Demo.
+    /// </summary>
+    Task CreateZoneAsync(NewZone zone, CancellationToken cancellationToken) => throw new NotSupportedException("This gateway cannot create zones");
+
+    /// <summary>
     /// <c>GET</c> of an <c>image/serve/...</c> path (a leading <c>/api/</c> is accepted): the bytes and content type, or null when HA does not answer 200.
     /// Any other path is refused with an <see cref="ArgumentException"/>; a body above <paramref name="maxBytes"/> throws an <see cref="InvalidDataException"/>.
     /// </summary>

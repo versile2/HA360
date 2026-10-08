@@ -29,18 +29,28 @@ been unavailable, unknown or removed for 7 days moves to **Not tracked** by itse
 off the map, the lists and the reports, and no new history is stored for it; what was stored before stays until it ages out.
 Moving something by hand is never undone by the app.
 
+## Adding from the lists
+
+The last row of each list adds something. **+ Add driver** and **+ Add tracker** list everything the app found: choose one
+that is Not tracked and it moves onto the map (what is already there is greyed out). **+ Add place** lets you drop a pin,
+set a radius between 25 m and 2 km, name it and choose an icon; **Save** creates a zone in Home Assistant, which then shows
+up here like any other zone. Creating a zone needs a Home Assistant administrator account; if yours is not one, the app says
+so and adds nothing. The place's icon is stored in Home Assistant, but Home Assistant's zone list does not hand icons to the
+app, so a place you add shows with the plain pin icon in the Places list. Switch the three rows off with the `allow_add` option.
+
 The names, titles and colours live in the app's own database on your Home Assistant. They are never part of the
 repository or the image.
 
 ## Add-on options
 
-The **Configuration** tab has six options. Everything else is a fixed default, and an option from an older version that is
+The **Configuration** tab has seven options. Everything else is a fixed default, and an option from an older version that is
 still in your configuration is ignored.
 
 | Option | Meaning |
 |---|---|
 | `demo_mode` | Show the fictional family instead of your data. |
 | `allow_demo_param` | Let `?demo=1` open a demo session while the app runs on real data. |
+| `allow_add` | Show the **+ Add driver**, **+ Add tracker** and **+ Add place** rows at the end of the lists (default on). Demo mode always shows them. |
 | `log_level` | How much the app writes to its log. |
 | `retention_fix_days` | How long positions are kept (default 120). |
 | `driving_week_start` | The first day of the driving report's week (`monday` or `sunday`). |
@@ -54,7 +64,7 @@ It holds no Life360 login or token and does not log in to or call Life360's API.
 the picture Home Assistant reports for a member is an HTTPS address on `life360.com`, the app downloads it without
 credentials and caches it under `/data/cache/avatars`. That happens when the person has no picture of their own in Home Assistant; without any picture the app shows
 initials. The app has no access to Home Assistant's configuration files: it talks to Home Assistant only through
-the Supervisor. It changes nothing in Home Assistant except to create the persistent notifications described under Setup.
+the Supervisor. It changes nothing in Home Assistant except to create the persistent notifications described under Setup and, when you use **+ Add place**, the zone you ask for (Home Assistant's `zone/create` command, which needs an administrator; switch the rows off with `allow_add`).
 
 ## What is stored and where
 

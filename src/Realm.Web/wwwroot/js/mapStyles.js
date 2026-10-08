@@ -232,6 +232,7 @@ export function styleDocumentUrl(style, env) {
 
 export const HALO_SOURCE = 'realm-halos';
 export const ZONE_SOURCE = 'realm-zones';
+export const PLACEMENT_SOURCE = 'realm-placement';
 export const HALO_LAYERS = Object.freeze(['realm-halos-fill', 'realm-halos-line']);
 export const ZONE_LAYERS = Object.freeze(['realm-zones-fill', 'realm-zones-casing', 'realm-zones-line-empty', 'realm-zones-line-occupied']);
 
@@ -259,6 +260,7 @@ export function overlaySpec() {
     sources: {
       [HALO_SOURCE]: { type: 'geojson', data: { ...empty } },
       [ZONE_SOURCE]: { type: 'geojson', data: { ...empty } },
+      [PLACEMENT_SOURCE]: { type: 'geojson', data: { ...empty } },
     },
     layers: [
       { id: 'realm-halos-fill', type: 'fill', source: HALO_SOURCE, paint: { 'fill-color': featureColor('color'), 'fill-opacity': 0.12 } },
@@ -287,6 +289,8 @@ export function overlaySpec() {
         layout: { 'line-join': 'round' },
         paint: { 'line-color': featureColor('lineColor'), 'line-width': 2 },
       },
+      { id: 'realm-placement-fill', type: 'fill', source: PLACEMENT_SOURCE, paint: { 'fill-color': featureColor('lineColor'), 'fill-opacity': 0.2 } },
+      { id: 'realm-placement-line', type: 'line', source: PLACEMENT_SOURCE, paint: { 'line-color': featureColor('lineColor'), 'line-width': 2.5 } },
     ],
   };
 }

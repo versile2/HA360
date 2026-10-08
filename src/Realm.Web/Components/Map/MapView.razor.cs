@@ -150,6 +150,23 @@ public sealed partial class MapView : IMapEventHandler, IAsyncDisposable
     [Parameter]
     public EventCallback<string> OnStyleFailed { get; set; }
 
+    /// <summary>
+    /// The radius in metres of the place being placed (D120), or null when no place is being placed. A change from null starts placement (the pin appears at the centre of the free map),
+    /// a change to null ends it, a change of value redraws the circle.
+    /// </summary>
+    [Parameter]
+    public double? PlacementRadiusM { get; set; }
+
+    /// <summary>The accessible name of the placement pin.</summary>
+    [Parameter]
+    public string PlacementLabel { get; set; } = "New place position. Drag the pin, or use the arrow keys to move it.";
+
+    /// <summary>The pin of the place being placed moved or appeared: latitude and longitude.</summary>
+    [Parameter]
+    public EventCallback<(double Latitude, double Longitude)> OnPlacementMoved { get; set; }
+
+    private double? _placementRadius;
+
     [Inject]
     private IJSRuntime JS { get; set; } = default!;
 
@@ -204,6 +221,9 @@ public sealed partial class MapView : IMapEventHandler, IAsyncDisposable
 
     Task IMapEventHandler.PinTapAsync(string kind, string id) =>
         EntityOf(kind, id) is { } entity ? InvokeAsync(() => TapAsync(entity)) : Task.CompletedTask;
+
+    Task IMapEventHandler.PlacementMovedAsync(double latitude, double longitude) =>
+        InvokeAsync(() => OnPlacementMoved.InvokeAsync((latitude, longitude)));
 
     Task IMapEventHandler.MapTapAsync() => InvokeAsync(() => OnMapTap.InvokeAsync());
 
@@ -424,6 +444,25 @@ public sealed partial class MapView : IMapEventHandler, IAsyncDisposable
             if (MapPayloadFactory.Targets(Members, Vehicles, Places, MeId, Options, ++_targetsVersion) is { } payload)
             {
                 await interop.SetDefaultTargetsAsync(payload);
+            }
+        }
+
+        if (_placementRadius != PlacementRadiusM)
+        {
+            var before = _placementRadius;
+            var radius = PlacementRadiusM;
+            _placementRadius = radius;
+            if (radius is null)
+            {
+                await interop.EndPlacementAsync();
+            }
+            else if (before is null)
+            {
+                await interop.BeginPlacementAsync(radius.Value, PlacementLabel);
+            }
+            else
+            {
+                await interop.SetPlacementRadiusAsync(radius.Value);
             }
         }
 

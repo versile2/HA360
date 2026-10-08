@@ -45,6 +45,21 @@ public sealed class FakeHaServer : IAsyncDisposable
     /// <summary>True sends the result of <c>subscribe_entities</c> and the snapshot together in one array frame.</summary>
     public bool CoalesceInitialReply { get; set; }
 
+    /// <summary>
+    /// What the server answers to a command it has no built-in answer for, by the command's <c>type</c>: a success carrying a result, or a failure with an error code and message.
+    /// A command with no entry keeps the answer of a Home Assistant that does not know it, <c>unknown_command</c>.
+    /// </summary>
+    public Dictionary<string, (bool Success, string? Code, string? Message, string? ResultJson)> CommandReplies { get; } = [];
+
+    /// <summary>Commands of these types are received and never answered (a Home Assistant that hangs).</summary>
+    public HashSet<string> SilentCommands { get; } = [];
+
+    /// <summary>Answers the command <paramref name="type"/> with a success.</summary>
+    public void ReplyOk(string type, string? resultJson = null) => CommandReplies[type] = (true, null, null, resultJson);
+
+    /// <summary>Answers the command <paramref name="type"/> with an error.</summary>
+    public void ReplyError(string type, string code, string message = "Refused.") => CommandReplies[type] = (false, code, message, null);
+
     /// <summary>When set, the snapshot is sent as one websocket message split into fragments of this many bytes.</summary>
     public int? SnapshotFragmentBytes { get; set; }
 

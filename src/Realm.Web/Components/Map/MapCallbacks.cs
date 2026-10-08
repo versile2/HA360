@@ -39,5 +39,8 @@ public sealed class MapCallbacks
     public Task OnWebGlUnavailable() => _handler.WebGlUnavailableAsync();
 
     [JSInvokable]
+    public Task OnPlacementMoved(double latitude, double longitude) => _handler.PlacementMovedAsync(latitude, longitude);
+
+    [JSInvokable]
     public Task OnError(string area, string message) => _handler.ErrorAsync(area, message);
 }

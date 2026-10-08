@@ -189,7 +189,9 @@ test.describe('navigation, right stack, sheet and layout', () => {
     expectNear(layers.y + layers.height, height - peekHeight(height) - 12, TOL, 'btn-layers bottom edge (y = 729 at 915): 12 px above the sheet top');
     expectNear(layers.y + layers.height, sheet.topPx - 12, TOL, 'btn-layers bottom edge against window.__realm.sheet().topPx - 12');
 
-    // The "+" slot is reserved and renders nothing, and nothing in the app adds a person, a vehicle or a place (01 section 1 and 5.8).
+    // The "+" slot is reserved and renders nothing, and nothing in the app adds a person, a vehicle or a place (01 section 1 and 5.8). Since 0.2.2 (D119, D120) the sheet lists end with
+    // "+ Add driver", "+ Add tracker" and "+ Add place" rows (specs/add.spec.ts); they are one text node that starts with a plus sign, have their own test ids and sit in the list, which
+    // is hidden at Peek, so none of the four assertions below can match them.
     await expect(page.getByTestId('slot-add'), 'slot-add is never rendered in v1').toHaveCount(0);
     await expect(page.getByText('+', { exact: true }), 'no element whose text is "+"').toHaveCount(0);
     await expect(page.getByText(/Add a (person|vehicle|place)/i), 'no "Add a ..." element').toHaveCount(0);

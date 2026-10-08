@@ -18,9 +18,11 @@ public sealed class HaDataSource
     private readonly StatsService _stats;
     private readonly RosterService _roster;
     private readonly TimeProvider _time;
+    private readonly IPlaceEditor? _places;
 
-    public HaDataSource(RealmState state, DiscoveryState discovery, ChangeNotifier notifier, StatsService stats, RosterService roster, TimeProvider time)
+    public HaDataSource(RealmState state, DiscoveryState discovery, ChangeNotifier notifier, StatsService stats, RosterService roster, TimeProvider time, IPlaceEditor? places = null)
     {
+        _places = places;
         _state = state;
         _discovery = discovery;
         _notifier = notifier;
@@ -31,6 +33,9 @@ public sealed class HaDataSource
 
     /// <summary>The add-on's stored roster: who is on the map (shared by every circuit).</summary>
     public IRosterEditor Roster => _roster;
+
+    /// <summary>Adds places by asking Home Assistant to create a zone (0.2.2, D119); a host without one refuses every attempt.</summary>
+    public IPlaceEditor PlaceEditor => _places ?? UnavailablePlaceEditor.Instance;
 
     /// <summary>The current immutable snapshot.</summary>
     public RealmSnapshot Current => _state.Current;

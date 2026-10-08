@@ -1,5 +1,5 @@
 name: "HA Cartographer"
-version: "0.2.1"                  # equals the image tag; merging a PR to main with a new version releases it automatically (image, tag v<version>, GitHub release; Actions -> release -> Run workflow re-runs it by hand); a CHANGELOG.md section of the same name must exist
+version: "0.2.2"                  # equals the image tag; merging a PR to main with a new version releases it automatically (image, tag v<version>, GitHub release; Actions -> release -> Run workflow re-runs it by hand); a CHANGELOG.md section of the same name must exist
 slug: realm
 description: "Map-first family map and weekly driving reports, inside Home Assistant."
 url: "https://github.com/Versile2/ha-cartographer"
@@ -31,9 +31,10 @@ backup_exclude:
 
 watchdog: "http://[HOST]:[PORT:8099]/healthz"   # liveness only; used if the owner switches Watchdog on
 
-options:                          # the only add-on options (0.2.0, D114): who is on the map is chosen in the app, in Settings
+options:                          # the only add-on options (0.2.0, D114; allow_add joined in 0.2.2, D120): who is on the map is chosen in the app, in Settings
   demo_mode: false                # first on purpose: Home Assistant renders options in this order
   allow_demo_param: false
+  allow_add: true
   log_level: information
   driving_week_start: monday
   driving_speeding_mph: 80
@@ -41,6 +42,7 @@ options:                          # the only add-on options (0.2.0, D114): who i
 schema:                           # enumerated values are lower-case
   demo_mode: bool
   allow_demo_param: bool
+  allow_add: bool
   log_level: "list(trace|debug|information|warning|error)"
   driving_week_start: "list(monday|sunday)"
   driving_speeding_mph: "int(50,150)"
