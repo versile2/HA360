@@ -164,7 +164,7 @@ public sealed class DrivingFormatterTests
                 "14 drives • 366.0 miles",
                 "10 drives • 118.2 miles",
             ],
-            report.Drivers.Select(DrivingFormatter.DriverLine));
+            report.Drivers.Select(d => DrivingFormatter.DriverLine(d)));
         Assert.Contains('•', DrivingFormatter.DriverLine(report.Drivers[0]));
         Assert.DoesNotContain('·', DrivingFormatter.DriverLine(report.Drivers[0]));
         Assert.Equal(["king", "jester", "cryptid", "queen"], report.Drivers.Select(d => d.MemberId));
