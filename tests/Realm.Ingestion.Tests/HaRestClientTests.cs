@@ -70,7 +70,7 @@ public sealed class HaRestClientTests : IDisposable
         await rig.Client.GetStatesAsync(null, CancellationToken.None);
         await rig.Client.GetIntegrationEntitiesAsync(CancellationToken.None);
         await rig.Client.GetZonesAsync(CancellationToken.None);
-        await rig.Client.GetHistoryAsync("sensor.fordpass_demo_odometer", Start, Start.AddHours(1), withAttributes: false, CancellationToken.None);
+        await rig.Client.GetHistoryAsync("device_tracker.king_pixel", Start, Start.AddHours(1), withAttributes: false, CancellationToken.None);
         await rig.Client.GetImageAsync("/api/image/serve/abc123/512x512", 1024, CancellationToken.None);
 
         Assert.Equal(6, rig.Handler.Requests.Count);
@@ -82,16 +82,16 @@ public sealed class HaRestClientTests : IDisposable
     }
 
     [Fact]
-    public void TheClosedList_IsConfigStatesTemplateHistoryAndImage()
+    public void TheClosedList_IsConfigStatesTemplateHistoryImageAndTheNotification()
     {
-        // 02 section 10.3: the data layer never calls a service, writes a state or issues an admin command. A new public call is a decision, so it fails here.
+        // 02 section 10.3: the data layer calls no service but persistent_notification.create, writes no state and issues no admin command. A new public call is a decision, so it fails here.
         var calls = typeof(HaRestClient).GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
             .Select(method => method.Name)
             .Order(StringComparer.Ordinal)
             .ToArray();
 
         Assert.Equal(
-            new[] { "GetConfigAsync", "GetHistoryAsync", "GetImageAsync", "GetIntegrationEntitiesAsync", "GetStatesAsync", "GetZonesAsync", "RenderTemplateAsync" },
+            new[] { "GetConfigAsync", "GetHistoryAsync", "GetImageAsync", "GetIntegrationEntitiesAsync", "GetStatesAsync", "GetZonesAsync", "NotifyAsync", "RenderTemplateAsync" },
             calls);
     }
 
@@ -321,20 +321,44 @@ public sealed class HaRestClientTests : IDisposable
     }
 
     [Fact]
+    public async Task Notify_PostsOnePersistentNotification_WithItsStableId()
+    {
+        var rig = NewRig(handler => handler.Respond(HttpStatusCode.OK, "[]"));
+
+        await rig.Client.NotifyAsync("ha_cartographer_device_tracker.pixel_8", "HA Cartographer: New tracker found", "Pixel 8 was added to People.", CancellationToken.None);
+
+        var request = Assert.Single(rig.Handler.Requests);
+        Assert.Equal(HttpMethod.Post, request.Method);
+        Assert.Equal("/core/api/services/persistent_notification/create", request.Uri?.AbsolutePath);
+        Assert.Equal("Bearer " + Token, request.Headers["Authorization"]);
+        using var body = System.Text.Json.JsonDocument.Parse(request.Body!);
+        Assert.Equal("ha_cartographer_device_tracker.pixel_8", body.RootElement.GetProperty("notification_id").GetString());
+        Assert.Equal("HA Cartographer: New tracker found", body.RootElement.GetProperty("title").GetString());
+        Assert.Equal("Pixel 8 was added to People.", body.RootElement.GetProperty("message").GetString());
+    }
+
+    [Fact]
+    public async Task Notify_AnErrorStatus_Throws()
+    {
+        var rig = NewRig(handler => handler.Respond(HttpStatusCode.Unauthorized));
+
+        await Assert.ThrowsAsync<HttpRequestException>(() => rig.Client.NotifyAsync("ha_cartographer_x", "HA Cartographer: x", "x", CancellationToken.None));
+    }
+
+    [Fact]
     public async Task IntegrationEntities_AreReadFromTheDiscoveryTemplate()
     {
-        const string answer = """{"life360":["device_tracker.life360_king"],"mobile_app":["device_tracker.king_pixel","sensor.king_pixel_battery_level"],"fordpass":[]}""";
+        const string answer = """{"life360":["device_tracker.life360_king"],"mobile_app":["device_tracker.king_pixel","sensor.king_pixel_battery_level"]}""";
         var rig = NewRig(handler => handler.Respond(HttpStatusCode.OK, answer, "text/plain"));
 
         var entities = await rig.Client.GetIntegrationEntitiesAsync(CancellationToken.None);
 
         Assert.Equal(new[] { "device_tracker.life360_king" }, entities.Life360.ToArray());
         Assert.Equal(new[] { "device_tracker.king_pixel", "sensor.king_pixel_battery_level" }, entities.MobileApp.ToArray());
-        Assert.Empty(entities.FordPass);
         var template = TemplateOf(rig.Handler.Requests[0]);
         Assert.Contains("integration_entities('life360')", template);
         Assert.Contains("integration_entities('mobile_app')", template);
-        Assert.Contains("integration_entities('fordpass')", template);
+        Assert.DoesNotContain("fordpass", template);
     }
 
     [Fact]

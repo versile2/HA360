@@ -1,7 +1,8 @@
 namespace Realm.Domain;
 
 /// <summary>
-/// The only data surface the UI sees, one per circuit. The surface is these nine members (0.2.0 added the two period reads).
+/// The only data surface the UI sees, one per circuit. The surface is these ten members (0.2.0 added the two period reads): the snapshot, its change event, the clock, the zone, the two
+/// weekly Driving reports, the two period reads, "me", and the roster that Settings edits.
 /// </summary>
 public interface IRealmSession : IAsyncDisposable
 {
@@ -36,6 +37,12 @@ public interface IRealmSession : IAsyncDisposable
     /// One driver's week. Null for the static member, an unknown id or any member that is not in the report.
     /// </summary>
     ValueTask<DriverWeek?> GetDriverWeekAsync(string memberId, int weekOffset, DayOfWeek weekStart, CancellationToken ct);
+
+    /// <summary>
+    /// Who is on the map: every roster entry in its group (People, Vehicles, Not tracked), with the two edits Settings offers. A Live session shares the add-on's
+    /// stored roster; a Demo session has a roster of its own, in memory, that dies with the circuit.
+    /// </summary>
+    IRosterEditor Roster { get; }
 
     /// <summary>The member whose person link matches the HA user id; null if none. Synchronous: a lookup over in-memory members.</summary>
     string? ResolveMe(string? haUserId);

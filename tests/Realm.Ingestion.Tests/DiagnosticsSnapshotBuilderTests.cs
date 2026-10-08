@@ -13,7 +13,7 @@ namespace Realm.Ingestion.Tests;
 
 /// <summary>
 /// The Live <c>diagnostics.json</c> (03 sections 2.11 and 9.3): the file has the fields of 2.11 in their order with <c>mode</c> "live"; every value is something a
-/// service keeps (a counter, a depth, an instant, a state word) or something the current snapshot already shows; each of the nine fixed warning codes is raised by
+/// service keeps (a counter, a depth, an instant, a state word) or something the current snapshot already shows; each of the eight fixed warning codes is raised by
 /// exactly its condition, at the boundary the specification draws, and by nothing else; and the file holds states, counts and codes only, never a location, an
 /// address, a name, a token or the path of the database. Time is manual and every id and name is fictional.
 /// </summary>
@@ -32,8 +32,8 @@ public sealed class DiagnosticsSnapshotBuilderTests : IDisposable
         "schema", "version", "mode", "uptimeSeconds", "zone", "zoneDataOk", "circuits", "connections", "counts", "ha", "ingestion", "db", "members", "warnings",
     ];
 
-    // The nine codes of 03 section 2.11, in the order it lists them.
-    private static readonly string[] NineCodes =
+    // The eight codes of 03 section 2.11, in the order it lists them.
+    private static readonly string[] EightCodes =
     [
         "ha_unavailable",
         "ha_auth_failed",
@@ -43,7 +43,6 @@ public sealed class DiagnosticsSnapshotBuilderTests : IDisposable
         "unclean_shutdown",
         "zone_data_missing",
         "payload_schema_mismatch",
-        "vehicle_sensor_stale",
     ];
 
     private readonly string _folder = Path.Combine(Path.GetTempPath(), "realm-diagnostics-tests-" + Guid.NewGuid().ToString("N"));
@@ -90,7 +89,7 @@ public sealed class DiagnosticsSnapshotBuilderTests : IDisposable
     }
 
     [Fact]
-    public void TheConnections_AreTheSnapshotsFourEntries()
+    public void TheConnections_AreTheSnapshotsTwoEntries()
     {
         var rig = new Rig();
 
@@ -98,7 +97,7 @@ public sealed class DiagnosticsSnapshotBuilderTests : IDisposable
 
         Assert.Equal(rig.State.Current.Connections, snapshot.Connections);
         Assert.Equal(
-            [ConnectionNames.HomeAssistant, ConnectionNames.Life360Trackers, ConnectionNames.FordPass, ConnectionNames.VehiclePlaceholder],
+            [ConnectionNames.HomeAssistant, ConnectionNames.Life360Trackers],
             snapshot.Connections.Select(connection => connection.Name));
     }
 
@@ -271,14 +270,14 @@ public sealed class DiagnosticsSnapshotBuilderTests : IDisposable
     }
 
     [Fact]
-    public void TheNineCodes_AreExactlyTheOnesOfTheSpecification_AndNothingElseIsDeclared()
+    public void TheEightCodes_AreExactlyTheOnesOfTheSpecification_AndNothingElseIsDeclared()
     {
         var declared = typeof(WarningCodes).GetFields(BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly)
             .Where(field => field.IsLiteral)
             .Select(field => (string)field.GetRawConstantValue()!)
             .ToArray();
 
-        Assert.Equal(NineCodes.Order(StringComparer.Ordinal).ToArray(), declared.Order(StringComparer.Ordinal).ToArray());
+        Assert.Equal(EightCodes.Order(StringComparer.Ordinal).ToArray(), declared.Order(StringComparer.Ordinal).ToArray());
         Assert.All(declared, code => Assert.Matches("^[a-z0-9_]+$", code));   // a code is a word for the operator, never prose
     }
 
@@ -531,57 +530,10 @@ public sealed class DiagnosticsSnapshotBuilderTests : IDisposable
         Assert.Equal(["payload_schema_mismatch"], rig.Get().Warnings);
     }
 
-    // ---- vehicle_sensor_stale --------------------------------------------------------------------------------------
+    // ---- all eight together -----------------------------------------------------------------------------------------
 
     [Fact]
-    public void VehicleSensorStale_IsRaisedWhenAVehiclesLastRefreshIsOlderThanTheThreshold()
-    {
-        var rig = new Rig();
-        var limit = TimeSpan.FromMinutes(rig.Options.UiVehicleStaleAfterMinutes);
-        rig.Publish(NewSnapshot(Start, ConnectionState.Connected, vehicles: [Vehicle("wagon", Start - limit - TimeSpan.FromSeconds(1), Freshness.Stale)]));
-
-        Assert.Equal(["vehicle_sensor_stale"], rig.Get().Warnings);
-    }
-
-    [Fact]
-    public void VehicleSensorStale_IsAbsentAtTheThresholdItself_AndForARecentRefresh()
-    {
-        var rig = new Rig();
-        var limit = TimeSpan.FromMinutes(rig.Options.UiVehicleStaleAfterMinutes);
-        rig.Publish(NewSnapshot(Start, ConnectionState.Connected, vehicles: [Vehicle("wagon", Start - limit), Vehicle("car", Start.AddMinutes(-1))]));
-
-        Assert.DoesNotContain("vehicle_sensor_stale", rig.Get().Warnings);
-    }
-
-    [Fact]
-    public void VehicleSensorStale_IsAbsentForAVehicleHomeAssistantNeverReportedOnAndForAPlaceholder()
-    {
-        var rig = new Rig();
-        rig.Publish(NewSnapshot(
-            Start,
-            ConnectionState.Connected,
-            vehicles: [Vehicle("wagon", null, Freshness.NoFix), Vehicle("spare", Start.AddDays(-30), Freshness.Stale, placeholder: true)]));
-
-        Assert.DoesNotContain("vehicle_sensor_stale", rig.Get().Warnings);
-    }
-
-    [Fact]
-    public void VehicleSensorStale_FollowsTheOptionsThreshold()
-    {
-        var rig = new Rig(OptionsBinding.Defaults with { UiVehicleStaleAfterMinutes = 10 });
-        rig.Publish(NewSnapshot(Start, ConnectionState.Connected, vehicles: [Vehicle("wagon", Start.AddMinutes(-11), Freshness.Stale)]));
-
-        Assert.Contains("vehicle_sensor_stale", rig.Get().Warnings);
-
-        rig.Publish(NewSnapshot(Start, ConnectionState.Connected, vehicles: [Vehicle("wagon", Start.AddMinutes(-9))]));
-
-        Assert.DoesNotContain("vehicle_sensor_stale", rig.Get().Warnings);
-    }
-
-    // ---- all nine together -----------------------------------------------------------------------------------------
-
-    [Fact]
-    public void AllNineCodes_AreRaisedTogether_InTheOrderOfTheSpecification()
+    public void AllEightCodes_AreRaisedTogether_InTheOrderOfTheSpecification()
     {
         var rig = new Rig { Status = new HaConnectionStatus(HaConnectionState.AuthFailed, Start.AddMinutes(-5), null, 5, null) };
         rig.Counters.RecordIngestSkipped();
@@ -589,9 +541,9 @@ public sealed class DiagnosticsSnapshotBuilderTests : IDisposable
         rig.Counters.RecordStartup(1, uncleanShutdown: true);
         rig.Counters.RecordZoneData(ok: false);
         rig.Counters.MarkPayloadSchemaMismatch();
-        rig.Publish(NewSnapshot(Start, ConnectionState.Unavailable, vehicles: [Vehicle("wagon", Start.AddHours(-3), Freshness.Stale)]));
+        rig.Publish(NewSnapshot(Start, ConnectionState.Unavailable));
 
-        Assert.Equal(NineCodes, rig.Get().Warnings);
+        Assert.Equal(EightCodes, rig.Get().Warnings);
     }
 
     [Fact]
@@ -697,8 +649,6 @@ public sealed class DiagnosticsSnapshotBuilderTests : IDisposable
             [
                 new ConnectionVm(ConnectionNames.HomeAssistant, homeAssistant, now),
                 new ConnectionVm(ConnectionNames.Life360Trackers, ConnectionState.Connected, now),
-                new ConnectionVm(ConnectionNames.FordPass, ConnectionState.NotConnected, null),
-                new ConnectionVm(ConnectionNames.VehiclePlaceholder, ConnectionState.NotConnected, null),
             ],
             Zone: zone,
             UnitSystem: UnitSystem.Imperial);
@@ -729,7 +679,7 @@ public sealed class DiagnosticsSnapshotBuilderTests : IDisposable
             SortOrder: 0,
             Freshness: freshness);
 
-    private static VehicleVm Vehicle(string id, DateTimeOffset? lastUpdate, Freshness freshness = Freshness.Fresh, bool placeholder = false, double? lat = null, double? lon = null) =>
+    private static VehicleVm Vehicle(string id, DateTimeOffset? lastUpdate, Freshness freshness = Freshness.Fresh, double? lat = null, double? lon = null) =>
         new(
             Id: id,
             Name: "Wagon",
@@ -739,16 +689,10 @@ public sealed class DiagnosticsSnapshotBuilderTests : IDisposable
             Lon: lon,
             Street: null,
             PlaceId: null,
-            Ignition: null,
-            RemoteStartSecondsLeft: null,
-            FuelPct: null,
-            OdometerM: null,
             LastUpdateUtc: lastUpdate,
             SpeedMps: null,
             IsMoving: false,
-            Freshness: freshness,
-            IsPlaceholder: placeholder,
-            PlaceholderNote: null);
+            Freshness: freshness);
 
     // A builder over a manual clock, counters of its own and a state that reads healthy: Home Assistant connected, nobody and nothing yet.
     private sealed class Rig

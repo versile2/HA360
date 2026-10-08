@@ -21,8 +21,6 @@ public sealed class DemoDiagnostics : IDiagnostics
         {
             new ConnectionVm(ConnectionNames.HomeAssistant, ConnectionState.Connected, DemoDataSource.Anchor),
             new ConnectionVm(ConnectionNames.Life360Trackers, ConnectionState.Connected, DemoDataSource.Anchor),
-            new ConnectionVm(ConnectionNames.FordPass, ConnectionState.Connected, DemoDataSource.Anchor),
-            new ConnectionVm(ConnectionNames.VehiclePlaceholder, ConnectionState.NotConnected, null),
         };
 
         return new DiagnosticsSnapshot(
@@ -37,7 +35,7 @@ public sealed class DemoDiagnostics : IDiagnostics
             Counts: new DiagnosticsSnapshot.EntityCounts(DemoCast.Members.Count, DemoCast.Vehicles.Count, DemoPlaces.Drawn.Count),
             Ha: new DiagnosticsSnapshot.HaCounters("connected", Reconnects: 0, LastMessageUtc: DemoDataSource.Anchor, WatchedEntities: 24, MessagesPerMinute: 12),
             Ingestion: new DiagnosticsSnapshot.IngestionCounters(EventsPerMinute: 12, QueueDepth: 0, Dropped: 0),
-            Db: new DiagnosticsSnapshot.DbCounters(SchemaVersion: 1, UncleanShutdownAtStart: false, SizeBytes: 0, WriterQueueDepth: 0, LastCommitUtc: DemoDataSource.Anchor),
+            Db: new DiagnosticsSnapshot.DbCounters(SchemaVersion: 2, UncleanShutdownAtStart: false, SizeBytes: 0, WriterQueueDepth: 0, LastCommitUtc: DemoDataSource.Anchor),
             Members: members,
             Warnings: []);
     }

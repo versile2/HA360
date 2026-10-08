@@ -9,13 +9,9 @@ public interface IRealmWriter
 {
     /// <summary>
     /// Queues one stored fix of a person (<c>fixes</c> table, <c>INSERT OR IGNORE</c> on member, time and source). <paramref name="inTrack"/> false stores it
-    /// with <c>track = 0</c> and <paramref name="reason"/>: those diagnostic rows are the first to be dropped when the queue is full. A fix whose source is
-    /// <see cref="FixSource.FordPass"/> belongs in <see cref="EnqueueVehicleSample"/> and is refused with an <see cref="ArgumentException"/>.
+    /// with <c>track = 0</c> and <paramref name="reason"/>: those diagnostic rows are the first to be dropped when the queue is full.
     /// </summary>
     bool EnqueueFix(string memberId, RawFix fix, bool inTrack = true, TrackReason? reason = null);
-
-    /// <summary>Queues one vehicle sample (<c>vehicle_samples</c> table): inserted, or merged into the row of the same vehicle and time without erasing a value.</summary>
-    bool EnqueueVehicleSample(VehicleSample sample);
 
     /// <summary>Queues one phone sensor transition (<c>signals</c> table, <c>INSERT OR IGNORE</c> on member, time and kind).</summary>
     bool EnqueueSignal(string memberId, PhoneSignal signal);
@@ -34,6 +30,12 @@ public interface IRealmWriter
     /// <param name="algoVersion">The detector's algorithm version, stamped on the row (02 section 7.7).</param>
     /// <param name="deriveHash">The hash of the options that influence the derived counts, stamped on the row (02 section 7.7).</param>
     Task<bool> WriteTripAsync(string memberId, DetectedTrip trip, int algoVersion, string deriveHash, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Writes roster rows (<c>roster</c> table, 02 section 7.2): each entry is inserted, or replaces the row of its entity id, in one transaction after everything
+    /// queued before it has been committed. Completes when they are committed. Nobody else writes that table. The writer must be running.
+    /// </summary>
+    Task WriteRosterAsync(IReadOnlyList<RosterEntry> entries, CancellationToken cancellationToken = default);
 
     /// <summary>Commits everything queued so far and returns when it is on disk. A failure is thrown and the rows stay queued for the next attempt.</summary>
     Task FlushAsync(CancellationToken cancellationToken = default);

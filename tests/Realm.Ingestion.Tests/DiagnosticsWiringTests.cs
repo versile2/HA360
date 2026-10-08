@@ -470,17 +470,17 @@ public sealed class DiagnosticsWiringTests : IDisposable
     [Fact]
     public async Task TheDiscoveryRefresher_ReportsTheSizeOfTheWatchList()
     {
-        var counters = new ServiceCounters(new ManualTimeProvider(Start));
-        var time = new ManualTimeProvider(Start);
+        await using var rig = await StoreRig.StartAsync();
         var gateway = new FakeHaGateway { States = [new HaEntitySnapshot(Home, "0", new Dictionary<string, JsonElement>(), Start, Start)] };
         using var refresher = new HaDiscoveryRefresher(
             gateway,
-            OptionsBinding.Defaults,
+            rig.Roster,
             new DiscoveryState(),
             (_, _) => ValueTask.CompletedTask,
-            time,
+            rig.Time,
             new RecordingLogger<HaDiscoveryRefresher>(),
-            counters);
+            rig.Counters);
+        var counters = rig.Counters;
 
         await refresher.StartAsync(CancellationToken.None);
         Assert.True(SpinWait.SpinUntil(() => refresher.LastRefreshUtc is not null, TimeSpan.FromSeconds(10)), "The first discovery did not finish");

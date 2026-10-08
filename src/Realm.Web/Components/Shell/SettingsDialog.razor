@@ -8,7 +8,7 @@
 @inject RealmUiState Ui
 
 @* The Settings dialog (01 sections 7.9 and 8.9; 03 section 3.4), opened from the Settings tab of the bottom nav with IDialogService.ShowAsync (BottomNav). A full-screen dialog below 600 px with a top bar (the back
-   arrow, "Settings", "Royal decrees") and a centred 480 px dialog from 600 px up (realm-map.css). Four sections: Map (the style as a list, which is the popover's list shown for
+   arrow, "Settings", "Royal decrees") and a centred 480 px dialog from 600 px up (realm-map.css). Five sections: Who's on the map (the roster, RosterSection, D113), Map (the style as a list, which is the popover's list shown for
    discoverability, Show places, Default view), Appearance (Layout), Connections (read-only chips, one row per entry the session lists) and About (the version, the map credits and the
    48 px Diagnostics row that opens diagnostics.json in a new tab, then, v0.1.1 (D105), Report an issue and Star this project, which open the GitHub issue chooser and the repository page in new tabs). There is no Save button: every choice applies at once through DevicePrefs, which stores it per device. And there
    are no Theme, Units, 12/24 h, Week starts on or Reset rows: dark and imperial are the only values in v1 (D35). Esc, the scrim and the back arrow close it. The title takes the
@@ -29,6 +29,8 @@
         </span>
     </TitleContent>
     <DialogContent>
+        <RosterSection />
+
         <section class="realm-settings__section" aria-labelledby="realm-settings-map">
             <h3 id="realm-settings-map" class="realm-settings__heading">Map</h3>
 
@@ -260,8 +262,6 @@
             {
                 Realm.Domain.ConnectionNames.HomeAssistant => "Home Assistant",
                 Realm.Domain.ConnectionNames.Life360Trackers => "Life360",
-                Realm.Domain.ConnectionNames.FordPass => "FordPass",
-                Realm.Domain.ConnectionNames.VehiclePlaceholder => "Second vehicle (maker's app)",
                 _ => null,
             };
             if (name is null)

@@ -34,7 +34,7 @@ public sealed class RealmUiStateCircuitTests
     // A camera made of numbers the Demo cast already has (the default view's bounds and the viewer's point), never invented ones.
     private static async Task<CameraState> CameraAsync(double zoom)
     {
-        await using var session = new DemoRealmSessionFactory().Create(null);
+        await using var session = FullCast.Session(null);
         var snapshot = session.Current;
         var targets = MapPayloadFactory.Targets(snapshot.Members, snapshot.Vehicles, snapshot.Places, null, MapPayloadOptions.Default, 1)
             ?? throw new InvalidOperationException("The Demo cast has default targets.");

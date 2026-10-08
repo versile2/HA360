@@ -99,8 +99,7 @@ public static class SelectionHeaderFormatter
     }
 
     /// <summary>
-    /// A vehicle's header: "{name} · {lore}", then "{location} · {engine} · {Updated 20 min ago | Last heard 1 hr ago}", all three parts the row's (no battery). A vehicle with no ignition reading
-    /// has no engine part and one with no update time has no tail.
+    /// A vehicle's header: "{name} · {lore}", then "{location} · {Updated 20 min ago | Last heard 1 hr ago}", both parts the row's (no battery). A vehicle with no update time has no tail.
     /// </summary>
     public static SelectionHeaderVm Vehicle(VehicleVm vehicle, RowFacts facts)
     {
@@ -111,7 +110,7 @@ public static class SelectionHeaderFormatter
             Entity: new EntityRef(EntityKind.Vehicle, vehicle.Id),
             Line1: row.Name,
             Line1Lore: row.Lore,
-            Line2Lead: row.Engine is { } engine ? row.LocationLine + Separator + engine : row.LocationLine,
+            Line2Lead: row.LocationLine,
             Line2Tail: row.Updated.Length > 0 ? row.Updated : null,
             Initial: string.Empty,
             Color: null,
@@ -294,26 +293,13 @@ public static class SelectionHeaderFormatter
 
     /// <summary>
     /// The vehicle detail's Location row (01 section 5.5): "At Hearth Haven", the street, "Somewhere in the Realm", "Location unavailable". Unlike the row's line it never reads "Driving": the speed
-    /// has a row of its own, and the place or street shows while the vehicle moves. A placeholder reads its note.
+    /// has a row of its own, and the place or street shows while the vehicle moves.
     /// </summary>
     public static string VehicleLocation(VehicleVm vehicle, RowFacts facts)
     {
         ArgumentNullException.ThrowIfNull(vehicle);
         ArgumentNullException.ThrowIfNull(facts);
-        return vehicle.IsPlaceholder
-            ? VmFactory.Vehicle(vehicle, facts).LocationLine
-            : VehicleTextFormatter.Location(vehicle with { IsMoving = false }, facts.PlaceOf(vehicle.PlaceId)?.DisplayName, facts.Units);
-    }
-
-    /// <summary>The vehicle detail's Engine row (01 section 5.5): "Off", "On", "Accessory on", "Remote start · 8 min left"; null when the ignition is unknown.</summary>
-    public static string? VehicleEngine(VehicleVm vehicle)
-    {
-        ArgumentNullException.ThrowIfNull(vehicle);
-        const string prefix = "Engine ";
-        var engine = VehicleTextFormatter.Engine(vehicle);
-        return engine is not null && engine.StartsWith(prefix, StringComparison.Ordinal)
-            ? char.ToUpperInvariant(engine[prefix.Length]) + engine[(prefix.Length + 1)..]
-            : engine;
+        return VehicleTextFormatter.Location(vehicle with { IsMoving = false }, facts.PlaceOf(vehicle.PlaceId)?.DisplayName, facts.Units);
     }
 
     /// <summary>The vehicle detail's Speed row (01 section 5.5, "62 mph"): only while the vehicle is moving and its speed is known; null omits the row.</summary>
@@ -322,13 +308,6 @@ public static class SelectionHeaderFormatter
         ArgumentNullException.ThrowIfNull(vehicle);
         ArgumentNullException.ThrowIfNull(facts);
         return vehicle.IsMoving && vehicle.SpeedMps is { } speed ? UnitFormatter.Speed(speed, facts.Units) : null;
-    }
-
-    /// <summary>The vehicle detail's Odometer row (01 section 5.5, "18,432 mi"); null when the reading is unknown.</summary>
-    public static string? VehicleOdometer(VehicleVm vehicle)
-    {
-        ArgumentNullException.ThrowIfNull(vehicle);
-        return vehicle.OdometerM is { } meters ? DrivingFormatter.TotalMiles(meters) + " mi" : null;
     }
 
     /// <summary>

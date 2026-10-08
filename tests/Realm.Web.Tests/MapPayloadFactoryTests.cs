@@ -383,32 +383,27 @@ public sealed class MapPayloadFactoryTests
     // ---- the chip of a vehicle ---------------------------------------------------------------------------------------------------------------
 
     [Fact]
-    public void Demo_TheSelectedWagon_ReadsParkedEngineOff_AndOnlyTheSelectedVehicleHasAChip()
+    public void Demo_TheSelectedWagon_ReadsParked_AndOnlyTheSelectedVehicleHasAChip()
     {
         var wagon = new EntityRef(EntityKind.Vehicle, DemoCast.Wagon.Id);
 
         var selected = MapPayloadFactory.Vehicles(Demo.Vehicles, Demo.Places, 1, wagon, Now, TimeZoneInfo.Utc).Vehicles;
         var none = MapPayloadFactory.Vehicles(Demo.Vehicles, Demo.Places, 1, selection: null, Now, TimeZoneInfo.Utc).Vehicles;
-        var chariot = MapPayloadFactory.Vehicles(Demo.Vehicles, Demo.Places, 1, new EntityRef(EntityKind.Vehicle, DemoCast.Chariot.Id), Now, TimeZoneInfo.Utc).Vehicles;
 
-        Assert.Equal("Parked · Engine off", selected.Single(vehicle => vehicle.Id == DemoCast.Wagon.Id).Chip);
+        Assert.Equal("Parked", selected.Single(vehicle => vehicle.Id == DemoCast.Wagon.Id).Chip);
         Assert.Equal([DemoCast.Wagon.Id], selected.Where(vehicle => vehicle.Chip is not null).Select(vehicle => vehicle.Id));
         Assert.All(none, vehicle => Assert.Null(vehicle.Chip));
-        Assert.All(chariot, vehicle => Assert.Null(vehicle.Chip));   // the placeholder has no pin, so no chip
     }
 
     [Theory]
-    [InlineData(Freshness.Stale, true, IgnitionState.On, 27.7, 60, "Last heard 1 hr ago")]    // "never Driving, whatever the engine says"
-    [InlineData(Freshness.Stale, false, IgnitionState.Off, null, 45, "Last heard 45 min ago")]
-    [InlineData(Freshness.Fresh, true, IgnitionState.On, 27.7165, 0, "Driving · 62 mph")]
-    [InlineData(Freshness.Fresh, true, IgnitionState.On, null, 0, "Driving")]
-    [InlineData(Freshness.Fresh, false, IgnitionState.Off, null, 0, "Parked · Engine off")]
-    [InlineData(Freshness.Fresh, false, IgnitionState.Accessory, null, 0, "Parked · Accessory on")]
-    [InlineData(Freshness.Fresh, false, IgnitionState.On, 0.0, 0, "Engine on")]
-    [InlineData(Freshness.Fresh, false, null, null, 0, "Parked")]
-    public void ASelectedVehicle_HasTheChipOfTheTable(Freshness freshness, bool isMoving, IgnitionState? ignition, double? speedMps, int minutesAgo, string expected)
+    [InlineData(Freshness.Stale, true, 27.7, 60, "Last heard 1 hr ago")]    // "never Driving, whatever the speed says"
+    [InlineData(Freshness.Stale, false, null, 45, "Last heard 45 min ago")]
+    [InlineData(Freshness.Fresh, true, 27.7165, 0, "Driving · 62 mph")]
+    [InlineData(Freshness.Fresh, true, null, 0, "Driving")]
+    [InlineData(Freshness.Fresh, false, null, 0, "Parked")]
+    public void ASelectedVehicle_HasTheChipOfTheTable(Freshness freshness, bool isMoving, double? speedMps, int minutesAgo, string expected)
     {
-        var vehicle = Vehicle("v", freshness: freshness, isMoving: isMoving, ignition: ignition, speedMps: speedMps, lastUpdate: Now.AddMinutes(-minutesAgo));
+        var vehicle = Vehicle("v", freshness: freshness, isMoving: isMoving, speedMps: speedMps, lastUpdate: Now.AddMinutes(-minutesAgo));
 
         var item = Assert.Single(MapPayloadFactory.Vehicles([vehicle], [], 1, new EntityRef(EntityKind.Vehicle, "v"), Now, TimeZoneInfo.Utc).Vehicles);
 
@@ -416,22 +411,12 @@ public sealed class MapPayloadFactoryTests
     }
 
     [Fact]
-    public void ARemoteStartedVehicle_ThatIsNotMoving_ReadsItsMinutesLeft_NotParked()
-    {
-        var vehicle = Vehicle("v", ignition: IgnitionState.RemoteStart, remoteStartSecondsLeft: 480);
-
-        Assert.Equal("Remote start · 8 min left", MapPayloadFactory.VehicleChip(vehicle, Now, TimeZoneInfo.Utc));
-    }
-
-    [Fact]
     public void AVehicleWithoutAPin_OrAStaleOneNeverHeardFrom_HasNoChip()
     {
         var noFix = Vehicle("n", freshness: Freshness.NoFix, lat: null, lon: null);
-        var placeholder = Vehicle("w", isPlaceholder: true);
         var stale = Vehicle("s", freshness: Freshness.Stale, lastUpdate: null);
 
         Assert.Null(MapPayloadFactory.VehicleChip(noFix, Now, TimeZoneInfo.Utc));
-        Assert.Null(MapPayloadFactory.VehicleChip(placeholder, Now, TimeZoneInfo.Utc));
         Assert.Null(MapPayloadFactory.VehicleChip(stale, Now, TimeZoneInfo.Utc));
     }
 
@@ -595,11 +580,10 @@ public sealed class MapPayloadFactoryTests
     // ---- vehicles -----------------------------------------------------------------------------------------------------------------------
 
     [Fact]
-    public void Demo_TheWagonIsAParkedPickupAndTheChariotHasNoPin()
+    public void Demo_TheWagonIsAParkedPickup()
     {
         var payload = MapPayloadFactory.Vehicles(Demo.Vehicles, Demo.Places, 1);
         var wagon = payload.Vehicles.Single(vehicle => vehicle.Id == DemoCast.Wagon.Id);
-        var chariot = payload.Vehicles.Single(vehicle => vehicle.Id == DemoCast.Chariot.Id);
 
         Assert.Equal(MapGlyph.Pickup, wagon.Glyph);
         Assert.Equal(DemoCast.Wagon.Name, wagon.Name);
@@ -608,12 +592,7 @@ public sealed class MapPayloadFactoryTests
         Assert.Equal(new Ring(MapPalette.RingParked, Dashed: false, 3), wagon.Ring);
         Assert.False(wagon.Stale);
         Assert.Null(wagon.Chip);
-        Assert.Equal($"{DemoCast.Wagon.Name}, {DemoCast.Wagon.Lore}. At {Demo.Places.Single(p => p.Id == DemoPlaces.Home.Id).DisplayName}. Engine off. Fuel 71 percent.", wagon.AriaLabel);
-
-        Assert.Equal(MapGlyph.Car, chariot.Glyph);
-        Assert.Null(chariot.Lat);
-        Assert.Null(chariot.Lon);
-        Assert.Contains(DemoCast.ChariotNote, chariot.AriaLabel);
+        Assert.Equal($"{DemoCast.Wagon.Name}, {DemoCast.Wagon.Lore}. At {Demo.Places.Single(p => p.Id == DemoPlaces.Home.Id).DisplayName}.", wagon.AriaLabel);
     }
 
     [Theory]
@@ -633,34 +612,14 @@ public sealed class MapPayloadFactoryTests
     }
 
     [Fact]
-    public void AVehicleWithoutAFix_AndThePlaceholder_HaveNoCoordinates()
+    public void AVehicleWithoutAFix_HasNoCoordinates()
     {
         var noFix = Vehicle("v", freshness: Freshness.NoFix, lat: null, lon: null);
-        var placeholder = Vehicle("w", isPlaceholder: true, lat: 31.0, lon: -85.0);
 
-        var items = MapPayloadFactory.Vehicles([noFix, placeholder], [], 1).Vehicles;
+        var item = Assert.Single(MapPayloadFactory.Vehicles([noFix], [], 1).Vehicles);
 
-        Assert.All(items, item =>
-        {
-            Assert.Null(item.Lat);
-            Assert.Null(item.Lon);
-        });
-    }
-
-    [Theory]
-    [InlineData(IgnitionState.Off, null, "Engine off.")]
-    [InlineData(IgnitionState.Accessory, null, "Accessory on.")]
-    [InlineData(IgnitionState.On, null, "Engine on.")]
-    [InlineData(IgnitionState.RemoteStart, 480, "Remote start · 8 min left.")]
-    [InlineData(IgnitionState.RemoteStart, 481, "Remote start · 9 min left.")]
-    [InlineData(IgnitionState.RemoteStart, null, "Remote start.")]
-    public void VehicleName_SaysWhatTheEngineIsDoing(IgnitionState ignition, int? secondsLeft, string expected)
-    {
-        var vehicle = Vehicle("v", ignition: ignition, remoteStartSecondsLeft: secondsLeft);
-
-        var item = Assert.Single(MapPayloadFactory.Vehicles([vehicle], [], 1).Vehicles);
-
-        Assert.Contains(" " + expected, item.AriaLabel);
+        Assert.Null(item.Lat);
+        Assert.Null(item.Lon);
     }
 
     // ---- zones ----------------------------------------------------------------------------------------------------------------------------
@@ -716,8 +675,8 @@ public sealed class MapPayloadFactoryTests
     {
         var place = Demo.Places.Single(candidate => candidate.Id == DemoPlaces.Work.Id) with
         {
-            MemberIdsInside = [.. DemoCast.Members.Take(people).Select(member => member.Id)],
-            VehicleIdsInside = [.. DemoCast.Vehicles.Take(vehicles).Select(vehicle => vehicle.Id)],
+            MemberIdsInside = [.. DemoCast.AllMembers.Take(people).Select(member => member.Id)],
+            VehicleIdsInside = [.. DemoCast.AllVehicles.Take(vehicles).Select(vehicle => vehicle.Id)],
         };
 
         var zone = Assert.Single(MapPayloadFactory.Zones([place], show: true, Options, 1).Zones);
@@ -845,14 +804,13 @@ public sealed class MapPayloadFactoryTests
     }
 
     [Fact]
-    public void DefaultView_CountsVehiclesWithAPosition_NotThePlaceholder()
+    public void DefaultView_CountsVehiclesWithAPosition_NotOneWithoutAFix()
     {
         var me = Member("a", lat: MeLat, lon: MeLon);
         var stale = Vehicle("v", freshness: Freshness.Stale, lat: MeLat + 0.05, lon: MeLon);
-        var placeholder = Vehicle("w", isPlaceholder: true, lat: MeLat - 0.05, lon: MeLon);
         var noFix = Vehicle("x", freshness: Freshness.NoFix, lat: MeLat - 0.06, lon: MeLon);
 
-        var targets = Targets([me], [stale, placeholder, noFix], [], "a");
+        var targets = Targets([me], [stale, noFix], [], "a");
 
         Assert.Equal(MeLat, targets.Default.Bounds[0][1]);
         Assert.Equal(MeLat + 0.05, targets.Default.Bounds[1][1]);
@@ -936,7 +894,7 @@ public sealed class MapPayloadFactoryTests
 
     // ---- helpers ---------------------------------------------------------------------------------------------------------------------------------
 
-    private static RealmSnapshot LoadDemo() => new DemoRealmSessionFactory().Create(null).Current;
+    private static RealmSnapshot LoadDemo() => FullCast.Session(null).Current;
 
     private static MembersPayload Members(IReadOnlyList<MemberVm> members, IReadOnlyList<PlaceVm> places, string? meId) =>
         MapPayloadFactory.Members(members, places, meId, Now, Options, 1);
@@ -1021,11 +979,8 @@ public sealed class MapPayloadFactoryTests
         string id,
         Freshness freshness = Freshness.Fresh,
         bool isMoving = false,
-        bool isPlaceholder = false,
         double? lat = MeLat,
         double? lon = MeLon,
-        IgnitionState? ignition = null,
-        int? remoteStartSecondsLeft = null,
         double? speedMps = null,
         DateTimeOffset? lastUpdate = null) =>
         new(
@@ -1037,14 +992,8 @@ public sealed class MapPayloadFactoryTests
             Lon: lon,
             Street: null,
             PlaceId: null,
-            Ignition: ignition,
-            RemoteStartSecondsLeft: remoteStartSecondsLeft,
-            FuelPct: null,
-            OdometerM: null,
             LastUpdateUtc: lastUpdate,
             SpeedMps: speedMps,
             IsMoving: isMoving,
-            Freshness: freshness,
-            IsPlaceholder: isPlaceholder,
-            PlaceholderNote: null);
+            Freshness: freshness);
 }

@@ -40,11 +40,11 @@ public sealed class OptionsFileTests : IDisposable
     [Fact]
     public void AValidFile_IsMappedOntoTheConfigurationPaths_AndTheDefaultsFillWhatItLeavesOut()
     {
-        var configuration = Configure("""{ "ui_stale_after_minutes": 45, "allow_demo_param": true }""");
+        var configuration = Configure("""{ "retention_fix_days": 45, "allow_demo_param": true }""");
 
-        Assert.Equal("45", configuration["Ui:StaleAfterMinutes"]);
+        Assert.Equal("45", configuration["Retention:FixDays"]);
         Assert.Equal("true", configuration["Demo:AllowParam"]);
-        Assert.Equal("24", configuration["Ui:OfflineAfterHours"]);
+        Assert.Equal("false", configuration["Demo:Mode"]);
         Assert.Null(configuration[RealmLiveServiceCollectionExtensions.OptionsFileErrorKey]);
     }
 
@@ -52,41 +52,41 @@ public sealed class OptionsFileTests : IDisposable
     public void TheFile_SitsJustBelowTheEnvironmentVariables_SoTheEnvironmentWins()
     {
         var configuration = new ConfigurationManager();
-        configuration.AddInMemoryCollection(new Dictionary<string, string?> { ["Realm:OptionsPath"] = WriteOptions("""{ "ui_stale_after_minutes": 45 }""") });
+        configuration.AddInMemoryCollection(new Dictionary<string, string?> { ["Realm:OptionsPath"] = WriteOptions("""{ "retention_fix_days": 45 }""") });
         configuration.AddEnvironmentVariables();
-        configuration.AddInMemoryCollection(new Dictionary<string, string?> { ["Ui:StaleAfterMinutes"] = "99" });   // stands for the command line, above the environment
+        configuration.AddInMemoryCollection(new Dictionary<string, string?> { ["Retention:FixDays"] = "99" });   // stands for the command line, above the environment
 
         configuration.AddRealmOptionsFile();
 
         var sources = configuration.Sources;
         var environment = IndexOf<EnvironmentVariablesConfigurationSource>(sources);
         var file = Assert.IsType<MemoryConfigurationSource>(sources[environment - 1]);
-        Assert.Equal("45", file.InitialData?.Single(pair => pair.Key == "Ui:StaleAfterMinutes").Value);
-        Assert.Equal("99", configuration["Ui:StaleAfterMinutes"]);
+        Assert.Equal("45", file.InitialData?.Single(pair => pair.Key == "Retention:FixDays").Value);
+        Assert.Equal("99", configuration["Retention:FixDays"]);
     }
 
     [Fact]
     public void TheEnvironmentNamesAnotherFile_AndItBeatsTheConfiguredPath()
     {
-        var configured = WriteOptions("""{ "ui_stale_after_minutes": 45 }""", "configured.json");
-        var named = WriteOptions("""{ "ui_stale_after_minutes": 50 }""", "named.json");
+        var configured = WriteOptions("""{ "retention_fix_days": 45 }""", "configured.json");
+        var named = WriteOptions("""{ "retention_fix_days": 50 }""", "named.json");
         var configuration = new ConfigurationManager();
         configuration.AddInMemoryCollection(new Dictionary<string, string?> { ["Realm:OptionsPath"] = configured, ["REALM_OPTIONS"] = named });
 
         configuration.AddRealmOptionsFile();
 
-        Assert.Equal("50", configuration["Ui:StaleAfterMinutes"]);
+        Assert.Equal("50", configuration["Retention:FixDays"]);
     }
 
     [Fact]
     public void AValueOfTheWrongType_IsReportedByKeyName_AndNeverByValue()
     {
-        var configuration = Configure("""{ "ui_stale_after_minutes": "a-value-that-must-not-be-echoed" }""");
+        var configuration = Configure("""{ "retention_fix_days": "a-value-that-must-not-be-echoed" }""");
 
         var error = configuration[RealmLiveServiceCollectionExtensions.OptionsFileErrorKey];
 
         Assert.NotNull(error);
-        Assert.Contains("ui_stale_after_minutes", error, StringComparison.Ordinal);
+        Assert.Contains("retention_fix_days", error, StringComparison.Ordinal);
         Assert.DoesNotContain("a-value-that-must-not-be-echoed", error, StringComparison.Ordinal);
     }
 

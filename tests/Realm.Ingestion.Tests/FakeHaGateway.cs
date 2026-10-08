@@ -16,6 +16,7 @@ internal sealed class FakeHaGateway : IHaGateway
     private int _stateCalls;
     private int _zoneCalls;
     private int _integrationCalls;
+    private readonly List<Notification> _notifications = [];
 
     public event Action? Connected;
 
@@ -25,7 +26,7 @@ internal sealed class FakeHaGateway : IHaGateway
 
     public IReadOnlyList<HaEntitySnapshot> States { get; set; } = [];
 
-    public HaIntegrationEntities Integration { get; set; } = new([], [], []);
+    public HaIntegrationEntities Integration { get; set; } = new([], []);
 
     public IReadOnlyList<RawPlace> Zones { get; set; } = [];
 
@@ -44,6 +45,21 @@ internal sealed class FakeHaGateway : IHaGateway
     public int ZoneCalls => Volatile.Read(ref _zoneCalls);
 
     public int IntegrationCalls => Volatile.Read(ref _integrationCalls);
+
+    /// <summary>When set, <see cref="NotifyAsync"/> throws it (the notification could not be created).</summary>
+    public Exception? NotifyFailure { get; set; }
+
+    /// <summary>Every notification that was created, in order (a failed one is not in the list).</summary>
+    public IReadOnlyList<Notification> Notifications
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _notifications.ToArray();
+            }
+        }
+    }
 
     /// <summary>Every watch list that was set, in order (null for a cleared one).</summary>
     public IReadOnlyList<IReadOnlyCollection<string>?> WatchLists
@@ -116,11 +132,29 @@ internal sealed class FakeHaGateway : IHaGateway
             : throw new InvalidOperationException("No history call is expected");
     }
 
+    public Task NotifyAsync(string notificationId, string title, string message, CancellationToken cancellationToken)
+    {
+        if (NotifyFailure is { } failure)
+        {
+            return Task.FromException(failure);
+        }
+
+        lock (_gate)
+        {
+            _notifications.Add(new Notification(notificationId, title, message));
+        }
+
+        return Task.CompletedTask;
+    }
+
     public Task<AvatarImage?> GetImageAsync(string pathAndQuery, int maxBytes, CancellationToken cancellationToken)
     {
         Interlocked.Increment(ref _imageCalls);
         return Image is { } image ? image(pathAndQuery, maxBytes, cancellationToken) : throw new InvalidOperationException("No image call is expected");
     }
+
+    /// <summary>One persistent notification as it was created.</summary>
+    internal sealed record Notification(string Id, string Title, string Message);
 
     /// <summary>One history request as the backfill made it.</summary>
     internal sealed record HistoryCall(string EntityId, DateTimeOffset Start, DateTimeOffset End, bool WithAttributes);

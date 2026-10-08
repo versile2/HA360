@@ -12,8 +12,8 @@ namespace Realm.Infrastructure.Ha;
 
 /// <summary>
 /// The REST side of Home Assistant (03 section 2.6): <c>config</c>, <c>states</c>, <c>template</c> (a read-only POST), <c>history/period</c> and
-/// <c>image/serve</c>. That is the complete list of HA calls of the data layer (02 section 10.3): it never calls a service, writes a state or issues an
-/// admin command. Every request URI is relative to <see cref="HaRestOptions.BaseAddress"/> and has no leading slash. A 502, 503 or 504 (Core is
+/// <c>image/serve</c>, and since 0.2.0 one call that writes, <c>services/persistent_notification/create</c> (<see cref="NotifyAsync"/>). That is the complete
+/// list of HA calls of the data layer (02 section 10.3): it calls no other service, writes no state and issues no admin command. Every request URI is relative to <see cref="HaRestOptions.BaseAddress"/> and has no leading slash. A 502, 503 or 504 (Core is
 /// restarting), a timeout or a refused connection is retried after 1, 2, 5, 10 and 30 s; history requests are sequential, 250 ms apart. The bearer
 /// token goes only into the request header and is never logged.
 /// </summary>
@@ -21,7 +21,7 @@ public sealed partial class HaRestClient
 {
     // 02 section 1.2 step 2 and step 7, word for word.
     private const string IntegrationTemplate =
-        "{{ {'life360': integration_entities('life360'), 'mobile_app': integration_entities('mobile_app'), 'fordpass': integration_entities('fordpass')} | tojson }}";
+        "{{ {'life360': integration_entities('life360'), 'mobile_app': integration_entities('mobile_app')} | tojson }}";
 
     private const string ZonesTemplate =
         "{% set o = namespace(l=[]) %}{% for z in states.zone %}"
@@ -128,7 +128,36 @@ public sealed partial class HaRestClient
         var text = await RenderTemplateAsync(IntegrationTemplate, cancellationToken);
         using var document = ParseJson(text, "integration entities");
         var root = document.RootElement;
-        return new HaIntegrationEntities(Strings(root, "life360"), Strings(root, "mobile_app"), Strings(root, "fordpass"));
+        return new HaIntegrationEntities(Strings(root, "life360"), Strings(root, "mobile_app"));
+    }
+
+    /// <summary>
+    /// <c>POST services/persistent_notification/create</c>: shows (or replaces, when the id exists) one notification in Home Assistant's notification list. The
+    /// id, title and message are the caller's fixed sentences, which name an entity and never a position. Retried like the other calls: creating a notification
+    /// with an id is idempotent.
+    /// </summary>
+    public Task NotifyAsync(string notificationId, string title, string message, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(notificationId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(title);
+        ArgumentNullException.ThrowIfNull(message);
+        return CallAsync(
+            "notify",
+            () => new HttpRequestMessage(HttpMethod.Post, "services/persistent_notification/create")
+            {
+                Content = new StringContent(
+                    JsonSerializer.Serialize(new Dictionary<string, string> { ["notification_id"] = notificationId, ["title"] = title, ["message"] = message }),
+                    Encoding.UTF8,
+                    "application/json"),
+            },
+            allowRetry: true,
+            async (response, token) =>
+            {
+                response.EnsureSuccessStatusCode();
+                await response.Content.ReadAsStringAsync(token);
+                return true;
+            },
+            cancellationToken);
     }
 
     /// <summary>The zone template of 02 section 1.2 step 7. A zone without a usable position or radius is left out.</summary>

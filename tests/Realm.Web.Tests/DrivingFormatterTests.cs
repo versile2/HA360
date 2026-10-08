@@ -888,7 +888,7 @@ public sealed class DrivingFormatterTests
     ];
 
     internal static IRealmSession Demo(params string[] variants) =>
-        new DemoRealmSessionFactory().Create(new DemoUrlParams(null, variants));
+        FullCast.Session(new DemoUrlParams(null, variants));
 
     private static IReadOnlyDictionary<string, MemberVm> DemoMembers() =>
         Demo().Current.Members.ToDictionary(member => member.Id, StringComparer.Ordinal);

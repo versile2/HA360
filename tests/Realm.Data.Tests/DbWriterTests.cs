@@ -4,7 +4,7 @@ using Xunit;
 
 namespace Realm.Data.Tests;
 
-// The single writer (02 section 7.3, 03 sections 2.4, 2.12 and 2.13): flush at 100 rows or 2 s, INSERT OR IGNORE, the vehicle-sample UPSERT, back-pressure
+// The single writer (02 section 7.3, 03 sections 2.4, 2.12 and 2.13): flush at 100 rows or 2 s, INSERT OR IGNORE, the roster UPSERT, back-pressure
 // that drops track = 0 rows first, the shutdown drain and the clean_shutdown flag. The clock is fake; only the writer's own thread runs on real time.
 public class DbWriterTests
 {
@@ -112,52 +112,50 @@ public class DbWriterTests
     }
 
     [Fact]
-    public async Task A_vehicle_reading_is_not_a_fix_and_a_bad_coordinate_is_refused()
+    public async Task A_bad_coordinate_is_refused()
     {
         await using var rig = await WriterRig.StartAsync();
         var writer = rig.Writer;
 
-        Assert.Throws<ArgumentException>(() => { writer.EnqueueFix("wagon", TestData.Fix(0, FixSource.FordPass)); });
         Assert.False(writer.EnqueueFix("king", TestData.Fix(0, lat: double.NaN)));
         Assert.False(writer.EnqueueFix("king", TestData.Fix(0) with { Lon = double.PositiveInfinity }));
         Assert.Equal(0, writer.QueueDepth);
     }
 
+    private static RosterEntry RosterRow(string entityId, RosterGroup group, int order, string? lore = null, DateTimeOffset? autoMoved = null) =>
+        new(entityId, entityId.StartsWith("person.", StringComparison.Ordinal) ? RosterKind.Person : RosterKind.Tracker, group, "Name " + entityId, lore, "#E8BC4E", order, "Home Assistant + Life360", TestData.Start, TestData.Start.AddHours(1), autoMoved);
+
     [Fact]
-    public async Task Vehicle_samples_merge_by_vehicle_and_time_and_a_missing_value_never_erases_one()
+    public async Task The_roster_is_stored_by_entity_id_and_a_second_write_replaces_the_row()
     {
         await using var rig = await WriterRig.StartAsync();
-        var at = TestData.Start;
-        var timeMs = at.ToUnixTimeMilliseconds();
 
-        Assert.True(rig.Writer.EnqueueVehicleSample(new VehicleSample("wagon", at, OdometerM: 100_000.5, Ignition: "off")));
-        Assert.True(rig.Writer.EnqueueVehicleSample(new VehicleSample("wagon", at, FuelPct: 55, Lat: 38.5, Lon: -86.5)));
-        await rig.Writer.FlushAsync();
+        await rig.Writer.WriteRosterAsync([RosterRow("person.alden", RosterGroup.People, 0, "The King"), RosterRow("device_tracker.pickup", RosterGroup.NotTracked, 0, autoMoved: TestData.Start.AddDays(1))], CancellationToken.None);
 
-        Assert.Equal(1, rig.RowCount("vehicle_samples"));
-        Assert.Equal("100000.5", SampleColumn(rig, "odo_m", timeMs));
-        Assert.Equal("55", SampleColumn(rig, "fuel_pct", timeMs));
-        Assert.Equal("off", SampleColumn(rig, "ignition", timeMs));
-        Assert.Equal("38.5", SampleColumn(rig, "lat", timeMs));
-        Assert.Null(SampleColumn(rig, "gear", timeMs));
+        Assert.Equal(2, rig.RowCount("roster"));
+        var stored = await rig.Queries.GetRosterAsync(CancellationToken.None);
+        var alden = Assert.Single(stored, e => e.EntityId == "person.alden");
+        Assert.Equal(RosterGroup.People, alden.Group);
+        Assert.Equal(RosterKind.Person, alden.Kind);
+        Assert.Equal("The King", alden.LoreTitle);
+        Assert.Equal("#E8BC4E", alden.Color);
+        Assert.Equal("Home Assistant + Life360", alden.Source);
+        Assert.Equal(TestData.Start, alden.FirstSeenUtc);
+        Assert.Equal(TestData.Start.AddHours(1), alden.LastActiveUtc);
+        Assert.Null(alden.AutoMovedUtc);
+        var pickup = Assert.Single(stored, e => e.EntityId == "device_tracker.pickup");
+        Assert.Equal(RosterGroup.NotTracked, pickup.Group);
+        Assert.Equal(RosterKind.Tracker, pickup.Kind);
+        Assert.Null(pickup.LoreTitle);
+        Assert.Equal(TestData.Start.AddDays(1), pickup.AutoMovedUtc);
 
-        // A later reading of the same instant replaces what it carries and keeps what it does not.
-        Assert.True(rig.Writer.EnqueueVehicleSample(new VehicleSample("wagon", at, OdometerM: 100_010, Gear: "park")));
-        await rig.Writer.FlushAsync();
+        await rig.Writer.WriteRosterAsync([RosterRow("person.alden", RosterGroup.Vehicles, 3, "Renamed")], CancellationToken.None);
 
-        Assert.Equal(1, rig.RowCount("vehicle_samples"));
-        Assert.Equal("100010", SampleColumn(rig, "odo_m", timeMs));
-        Assert.Equal("55", SampleColumn(rig, "fuel_pct", timeMs));
-        Assert.Equal("off", SampleColumn(rig, "ignition", timeMs));
-        Assert.Equal("park", SampleColumn(rig, "gear", timeMs));
-
-        // Another time, or another vehicle, is another row.
-        Assert.True(rig.Writer.EnqueueVehicleSample(new VehicleSample("wagon", at.AddMinutes(1), FuelPct: 54, SpeedMps: 12.5, RemoteStartSeconds: 300)));
-        Assert.True(rig.Writer.EnqueueVehicleSample(new VehicleSample("chariot", at, FuelPct: 80)));
-        await rig.Writer.FlushAsync();
-
-        Assert.Equal(3, rig.RowCount("vehicle_samples"));
-        Assert.Equal("300", SampleColumn(rig, "remote_start_s", at.AddMinutes(1).ToUnixTimeMilliseconds()));
+        Assert.Equal(2, rig.RowCount("roster"));
+        var again = Assert.Single(await rig.Queries.GetRosterAsync(CancellationToken.None), e => e.EntityId == "person.alden");
+        Assert.Equal(RosterGroup.Vehicles, again.Group);
+        Assert.Equal(3, again.SortOrder);
+        Assert.Equal("Renamed", again.LoreTitle);
     }
 
     [Fact]
@@ -235,10 +233,9 @@ public class DbWriterTests
 
         // No diagnostic row is left: now a row that matters is refused too, whatever its kind.
         Assert.False(writer.EnqueueFix("king", TestData.Fix(20_000)));
-        Assert.False(writer.EnqueueVehicleSample(new VehicleSample("wagon", TestData.Start, FuelPct: 50)));
         Assert.False(writer.EnqueueSignal("king", new PhoneSignal(TestData.Start, PhoneSignalKind.Screen, true)));
         Assert.Equal(DbWriter.QueueCapacity, writer.QueueDepth);
-        Assert.Equal(14, writer.DroppedRows);
+        Assert.Equal(13, writer.DroppedRows);
         Assert.Contains(rig.Log.Messages, message => message.Contains("rows dropped so far", StringComparison.Ordinal));
 
         // What is left is written, and none of it is a diagnostic row.
@@ -326,14 +323,12 @@ public class DbWriterTests
             Assert.True(rig.Writer.EnqueueFix("king", TestData.Fix(i)));
         }
 
-        Assert.True(rig.Writer.EnqueueVehicleSample(new VehicleSample("wagon", TestData.Start, FuelPct: 60)));
         Assert.True(rig.Writer.EnqueueSignal("king", new PhoneSignal(TestData.Start, PhoneSignalKind.Locked, true)));
 
         await rig.StopAsync(); // no clock tick: the drain, not the timer, writes them
 
         Assert.Equal(0, LogBytes(rig.FilePath));   // wal_checkpoint(TRUNCATE) left the log empty (or SQLite already removed the file)
         Assert.Equal(5, rig.RowCount("fixes"));
-        Assert.Equal(1, rig.RowCount("vehicle_samples"));
         Assert.Equal(1, rig.RowCount("signals"));
         Assert.Equal(0, rig.Writer.QueueDepth);
         Assert.Equal("1", TestSql.Text(rig.FilePath, "SELECT value FROM meta WHERE key = 'clean_shutdown'"));
@@ -346,9 +341,8 @@ public class DbWriterTests
         await rig.StopAsync();
 
         Assert.False(rig.Writer.EnqueueFix("king", TestData.Fix(0)));
-        Assert.False(rig.Writer.EnqueueVehicleSample(new VehicleSample("wagon", TestData.Start, FuelPct: 60)));
         Assert.False(rig.Writer.EnqueueSignal("king", new PhoneSignal(TestData.Start, PhoneSignalKind.Locked, true)));
-        Assert.Equal(3, rig.Writer.DroppedRows);
+        Assert.Equal(2, rig.Writer.DroppedRows);
         await Assert.ThrowsAsync<InvalidOperationException>(() => rig.Writer.WriteTripAsync("king", TestData.Trip(0), 1, "h"));
         Assert.Equal(0, rig.RowCount("fixes"));
     }
@@ -478,11 +472,6 @@ public class DbWriterTests
     {
         var ts = TestData.Start.AddSeconds(second).ToUnixTimeMilliseconds();
         return TestSql.Text(rig.FilePath, $"SELECT reason FROM fixes WHERE ts = {ts}");
-    }
-
-    private static string? SampleColumn(WriterRig rig, string column, long timeMs)
-    {
-        return TestSql.Text(rig.FilePath, $"SELECT {column} FROM vehicle_samples WHERE vehicle_id = 'wagon' AND ts = {timeMs}");
     }
 
     private static string? TripColumn(WriterRig rig, string column)

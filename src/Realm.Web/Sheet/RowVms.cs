@@ -53,31 +53,21 @@ public sealed record MemberRowVm(
     public string TestId => "row-member-" + Id;
 }
 
-/// <summary>One vehicle's row (01 section 5.2); the placeholder has only the location line (its note) and no engine, fuel or update.</summary>
+/// <summary>One vehicle's row (01 section 5.2); a location line and an update line.</summary>
 /// <param name="Id">The role id (<c>wagon</c>): the test id is <c>row-vehicle-{Id}</c>.</param>
 /// <param name="Name">L1, bold.</param>
 /// <param name="Lore">L1, secondary.</param>
 /// <param name="Glyph">The avatar's glyph: the pickup silhouette or the car icon.</param>
-/// <param name="IsPlaceholder">A vehicle with no integration yet: <c>aria-disabled</c>, dashed avatar, info button.</param>
-/// <param name="LocationLine">L2 (the placeholder's note, in secondary colour).</param>
-/// <param name="Engine">L3, first part ("Engine off"); null when unknown.</param>
-/// <param name="RemoteStart">True while the ignition is on remote start: the engine part carries a timer icon, not a key.</param>
-/// <param name="Fuel">L3, second part ("Fuel 71%", "Low fuel 12%"); null when unknown.</param>
-/// <param name="LowFuel">True when <paramref name="Fuel"/> is the low form (drawn in the error colour).</param>
+/// <param name="LocationLine">L2.</param>
 /// <param name="Updated">L4 ("Updated 20 min ago", "Last heard 1 hr ago"); empty when unknown.</param>
 /// <param name="UpdatedTone">Warning when the vehicle is stale.</param>
-/// <param name="AccessibleName">The accessible name, without "Double tap to show on map." (the placeholder has none).</param>
+/// <param name="AccessibleName">The accessible name, without "Double tap to show on map.".</param>
 public sealed record VehicleRowVm(
     string Id,
     string Name,
     string? Lore,
     VehicleGlyph Glyph,
-    bool IsPlaceholder,
     string LocationLine,
-    string? Engine,
-    bool RemoteStart,
-    string? Fuel,
-    bool LowFuel,
     string Updated,
     LineTone UpdatedTone,
     string AccessibleName)

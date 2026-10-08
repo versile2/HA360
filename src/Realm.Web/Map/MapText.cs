@@ -48,31 +48,16 @@ internal static class MapText
         return name.ToString();
     }
 
-    /// <summary>The accessible name of a vehicle pin: "Ford Pickup, The King's Wagon. At Hearth Haven. Engine off. Fuel 71 percent." (01 section 10.3 without the update time).</summary>
+    /// <summary>The accessible name of a vehicle pin: "Ford Pickup, The King's Wagon. At Hearth Haven." (01 section 10.3 without the update time).</summary>
     public static string VehiclePinName(VehicleVm vehicle, PlaceVm? place)
     {
         var name = new StringBuilder(string.IsNullOrWhiteSpace(vehicle.LoreTitle) ? vehicle.Name : vehicle.Name + ", " + vehicle.LoreTitle);
-        if (vehicle.IsPlaceholder)
-        {
-            return name.Append(". ").Append(vehicle.PlaceholderNote ?? "Location unavailable").Append('.').ToString();
-        }
-
         var location = vehicle.Lat is null || vehicle.Lon is null
             ? "Location unavailable"
             : place is not null ? "At " + place.DisplayName
             : !string.IsNullOrWhiteSpace(vehicle.Street) ? vehicle.Street
             : SomewhereInTheRealm;
         name.Append(". ").Append(location).Append('.');
-        if (EngineText(vehicle) is { } engine)
-        {
-            name.Append(' ').Append(engine).Append('.');
-        }
-
-        if (vehicle.FuelPct is { } fuel)
-        {
-            name.Append(" Fuel ").Append(fuel.ToString(CultureInfo.InvariantCulture)).Append(" percent.");
-        }
-
         return name.ToString();
     }
 
@@ -99,16 +84,5 @@ internal static class MapText
         _ => string.IsNullOrWhiteSpace(member.Street)
             ? SomewhereInTheRealm
             : poorAccuracy ? "Near " + member.Street : member.Street,
-    };
-
-    private static string? EngineText(VehicleVm vehicle) => vehicle.Ignition switch
-    {
-        IgnitionState.Off => "Engine off",
-        IgnitionState.Accessory => "Accessory on",
-        IgnitionState.On => "Engine on",
-        IgnitionState.RemoteStart when vehicle.RemoteStartSecondsLeft is { } seconds =>
-            "Remote start · " + ((seconds + 59) / 60).ToString(CultureInfo.InvariantCulture) + " min left",
-        IgnitionState.RemoteStart => "Remote start",
-        _ => null,
     };
 }

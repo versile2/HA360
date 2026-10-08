@@ -14,10 +14,4 @@ public enum OptionKind
 
     /// <summary>A JSON true or false.</summary>
     Flag,
-
-    /// <summary>A JSON array of strings; bound as <c>Path:0</c>, <c>Path:1</c> and so on.</summary>
-    TextList,
-
-    /// <summary>A JSON array of flat objects; bound as <c>Path:0:PascalCasedKey</c> (02 section 3.4).</summary>
-    ObjectList,
 }

@@ -122,17 +122,15 @@ test.describe('[GAL] screenshot gallery', () => {
     expectViewportPng(file, page, testInfo.project.name);
   });
 
-  // SC04-vehicles-list: the Vehicles list with the pickup on four lines and the hatchback placeholder, dimmed, with its note and the info button (03 section 8.5, row SC04).
+  // SC04-vehicles-list: the Vehicles list with the pickup and the stale hatchback, both ordinary rows (03 section 8.5, row SC04).
   test('[GAL] SC04-vehicles-list', { tag: ['@phone', '@unfolded'] }, async ({ page }, testInfo) => {
-    const cast = loadDemoCast();
     await openListScene(page, 'vehicles');
 
     await expect(page.locator('[data-testid^="row-vehicle-"]'), 'two vehicles are listed').toHaveCount(2);
     await expect(page.getByTestId('row-vehicle-wagon'), 'the pickup is on screen').toBeVisible();
-    await expect(page.getByTestId('row-vehicle-chariot'), 'the placeholder is on screen').toBeVisible();
-    await expect(page.getByTestId('row-vehicle-chariot').locator('.realm-row-note'), 'the placeholder note of the Demo cast').toHaveText(cast.chariotNote);
-    await expect(page.getByTestId('row-vehicle-chariot'), 'the placeholder is disabled').toHaveAttribute('aria-disabled', 'true');
-    await expect(page.locator('.realm-row-info'), 'the placeholder has its info button').toBeVisible();
+    await expect(page.getByTestId('row-vehicle-chariot'), 'the hatchback is on screen').toBeVisible();
+    await expect(page.getByTestId('row-vehicle-chariot'), 'the hatchback is an ordinary row').not.toHaveAttribute('aria-disabled', 'true');
+    await expect(page.locator('.realm-row-info'), 'no vehicle has an info button').toHaveCount(0);
     await expect(page.getByTestId('sheet-summary'), 'the Vehicles summary').toHaveText('2 vehicles · all parked');
 
     const file = await saveShot(page, testInfo, 'SC04-vehicles-list');
@@ -385,10 +383,10 @@ test.describe('[GAL] screenshot gallery: the Layers popover and the Settings dia
   });
 
   // SC09-settings (S10a): the Settings dialog opened from the Settings tab of the nav: full-screen below 600 px, 480 px wide and centred from there up (03 section 8.5, row SC09; 01 section 7.9).
-  // Map, Appearance, Connections and About, with the 48 px Diagnostics row and no Theme, Units, Week starts on or Reset rows (D35). The scene is taken twice: the top of the
+  // Who's on the map (the roster, D113), Map, Appearance, Connections and About, with the 48 px Diagnostics row and no Theme, Units, Week starts on or Reset rows (D35). The scene is taken twice: the top of the
   // dialog (SC09-settings) and the bottom, scrolled to the About section (SC09-settings-about).
   test('[GAL] SC09-settings', { tag: ['@phone', '@unfolded'] }, async ({ page }, testInfo) => {
-    await demo(page);
+    await demo(page, { defaultRoster: true });
     await mapReady(page);
     await page.getByTestId('btn-settings').click();
 
@@ -397,7 +395,8 @@ test.describe('[GAL] screenshot gallery: the Layers popover and the Settings dia
     const frame = page.locator('.mud-dialog.realm-settings');
     await expect(dialog, 'the Settings dialog is open').toBeVisible();
     await expect(frame.locator('.realm-popup__title'), 'the title').toHaveText('Settings');
-    await expect(dialog.locator('.realm-settings__section h3'), 'the four sections, in order').toHaveText(['Map', 'Appearance', 'Connections', 'About']);
+    await expect(dialog.locator('.realm-settings__section h3'), 'the five sections, in order').toHaveText(["Who's on the map", 'Map', 'Appearance', 'Connections', 'About']);
+    await expect(dialog.locator('.realm-roster__heading'), 'the roster groups with their counts (the Demo starts with 4, 1 and 2)').toHaveText(['PEOPLE 4', 'VEHICLES 1', 'NOT TRACKED 2']);
 
     // Its size: the whole window below 600 px, a 480 px column in the middle from there up.
     const viewport = viewportOf(page);
@@ -414,12 +413,12 @@ test.describe('[GAL] screenshot gallery: the Layers popover and the Settings dia
       }
     }
 
-    // What it holds: the Map section's controls, the one Appearance row, the four connections of the Demo, and nothing of 01 section 7.9's dropped rows.
+    // What it holds: the Map section's controls, the one Appearance row, the two connections of the Demo, and nothing of 01 section 7.9's dropped rows.
     await expect(dialog.getByRole('radio', { name: 'Night' }), 'Night is the style when none was ever chosen').toHaveAttribute('aria-checked', 'true');
     await expect(dialog.getByRole('switch', { name: /Show places/ }), 'Show places is on by default').toHaveAttribute('aria-checked', 'true');
     await expect(dialog.getByRole('radio', { name: 'Auto' }), 'the layout is Auto by default').toHaveAttribute('aria-checked', 'true');
-    await expect(dialog.locator('.realm-settings__connection-name'), 'the four connections, by their names in Settings').toHaveText(['Home Assistant', 'Life360', 'FordPass', "Second vehicle (maker's app)"]);
-    await expect(dialog.locator('.realm-settings__chip'), 'their states in the Demo').toHaveText(['Connected', 'Connected', 'Connected', 'Not connected']);
+    await expect(dialog.locator('.realm-settings__connection-name'), 'the two connections, by their names in Settings').toHaveText(['Home Assistant', 'Life360']);
+    await expect(dialog.locator('.realm-settings__chip'), 'their states in the Demo').toHaveText(['Connected', 'Connected']);
     for (const dropped of ['Theme', 'Units', 'Week starts', 'Reset']) {
       await expect(dialog.getByText(dropped), `no "${dropped}" row in v1`).toHaveCount(0);
     }

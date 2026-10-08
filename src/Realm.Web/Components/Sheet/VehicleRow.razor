@@ -2,14 +2,11 @@
 @using Realm.Web.Formatting
 @using Realm.Web.Sheet
 
-@* One vehicle's row (01 section 5.2; 03 section 3.4): 96 px at the least, four lines. A live vehicle is one button like a person's row. The placeholder (a vehicle with no integration yet) is
-   aria-disabled, drawn at 70 percent with a dashed avatar and no chevron, and a tap on it does nothing; its info button is a sibling of the row, because a button cannot hold a button, and
-   opens a small note over the row (a plain element, no MudX popover inside the sheet's own popover). The row is positioned by its list item. *@
+@* One vehicle's row (01 section 5.2; 03 section 3.4): 96 px at the least, three lines (name, location, update). One button like a person's row. The row is positioned by its list item. *@
 <button type="button"
         class="@RowClass"
         data-testid="@Row.TestId"
         aria-label="@AriaLabel"
-        aria-disabled="@(Row.IsPlaceholder ? "true" : null)"
         aria-current="@(Selected ? "true" : null)"
         @onclick="Click">
     <span class="realm-row-avatar-wrap">
@@ -25,55 +22,17 @@
                 <span class="realm-row-lore">@lore</span>
             }
         </span>
-        <span class="@(Row.IsPlaceholder ? "realm-row-line realm-row-note" : "realm-row-line realm-row-status")">@Row.LocationLine</span>
-        @if (!Row.IsPlaceholder)
-        {
-            <span class="realm-row-line realm-row-detail realm-row-parts">
-                @if (Row.Engine is { } engine)
-                {
-                    <span class="realm-row-part">
-                        <MudIcon Icon="@(Row.RemoteStart ? Icons.Material.Filled.Timer : Icons.Material.Filled.Key)" Class="realm-row-part-icon" />
-                        <span>@engine</span>
-                    </span>
-                }
-                @if (Row.Fuel is { } fuel)
-                {
-                    <span class="@(Row.LowFuel ? "realm-row-part realm-row-part--low" : "realm-row-part")">
-                        <MudIcon Icon="@Icons.Material.Filled.LocalGasStation" Class="realm-row-part-icon" />
-                        <span>@fuel</span>
-                    </span>
-                }
-            </span>
-            <span class="@UpdatedClass">
-                @if (Row.UpdatedTone == LineTone.Warning)
-                {
-                    <MudIcon Icon="@Icons.Material.Filled.Schedule" Class="realm-row-clock" />
-                }
-                <span class="realm-row-detail-text">@Row.Updated</span>
-            </span>
-        }
+        <span class="realm-row-line realm-row-status">@Row.LocationLine</span>
+        <span class="@UpdatedClass">
+            @if (Row.UpdatedTone == LineTone.Warning)
+            {
+                <MudIcon Icon="@Icons.Material.Filled.Schedule" Class="realm-row-clock" />
+            }
+            <span class="realm-row-detail-text">@Row.Updated</span>
+        </span>
     </span>
-    @if (!Row.IsPlaceholder)
-    {
-        <MudIcon Icon="@Icons.Material.Filled.ChevronRight" Class="realm-row-chevron" />
-    }
+    <MudIcon Icon="@Icons.Material.Filled.ChevronRight" Class="realm-row-chevron" />
 </button>
-@if (Row.IsPlaceholder)
-{
-    <button type="button"
-            class="realm-row-info"
-            aria-label="About this vehicle"
-            aria-expanded="@(_open ? "true" : "false")"
-            aria-controls="@PopoverId"
-            @onclick="ToggleInfo"
-            @onkeydown="InfoKeyDown">
-        <MudIcon Icon="@Icons.Material.Outlined.Info" />
-    </button>
-    @if (_open)
-    {
-        <div id="@PopoverId" class="realm-row-popover" role="note" @onclick="CloseInfo">@VehicleTextFormatter.PlaceholderExplanation</div>
-    }
-}
 
 @code {
     // A pickup truck seen from the side, facing right (the same silhouette as the map pin): open bed, cab with a windshield, two wheels. The window is wound the other way round,
@@ -84,45 +43,25 @@
         + "<path d=\"M6.2 14.2a2.4 2.4 0 0 1 0 4.8 2.4 2.4 0 0 1 0-4.8z\"/>"
         + "<path d=\"M17.6 14.2a2.4 2.4 0 0 1 0 4.8 2.4 2.4 0 0 1 0-4.8z\"/>";
 
-    private bool _open;
-
     /// <summary>The row to draw, from <c>VmFactory.Vehicle</c>.</summary>
     [Parameter, EditorRequired]
     public VehicleRowVm Row { get; set; } = default!;
 
-    /// <summary>The row is the selected one (<c>aria-current</c>). Never true for the placeholder.</summary>
+    /// <summary>The row is the selected one (<c>aria-current</c>).</summary>
     [Parameter]
     public bool Selected { get; set; }
 
-    /// <summary>A live vehicle was tapped. The placeholder never raises it. The selection itself belongs to the page (S8).</summary>
+    /// <summary>The vehicle was tapped. The selection itself belongs to the page (S8).</summary>
     [Parameter]
     public EventCallback OnClick { get; set; }
 
-    private string PopoverId => "realm-row-info-" + Row.Id;
-
-    private string AriaLabel => Row.IsPlaceholder ? Row.AccessibleName : Row.AccessibleName + " Double tap to show on map.";
+    private string AriaLabel => Row.AccessibleName + " Double tap to show on map.";
 
     private string GlyphIcon => Row.Glyph == VehicleGlyph.Pickup ? PickupGlyph : Icons.Material.Filled.DirectionsCar;
 
-    private string RowClass =>
-        "realm-row realm-row--vehicle"
-        + (Row.IsPlaceholder ? " realm-row--placeholder" : string.Empty)
-        + (Selected && !Row.IsPlaceholder ? " realm-row--selected" : string.Empty);
+    private string RowClass => "realm-row realm-row--vehicle" + (Selected ? " realm-row--selected" : string.Empty);
 
     private string UpdatedClass => "realm-row-line realm-row-detail" + RowClasses.Tone(Row.UpdatedTone);
 
-    // The placeholder is aria-disabled: a tap does nothing (01 section 5.2).
-    private Task Click() => Row.IsPlaceholder ? Task.CompletedTask : OnClick.InvokeAsync();
-
-    private void ToggleInfo() => _open = !_open;
-
-    private void CloseInfo() => _open = false;
-
-    private void InfoKeyDown(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs args)
-    {
-        if (args.Key == "Escape")
-        {
-            _open = false;
-        }
-    }
+    private Task Click() => OnClick.InvokeAsync();
 }

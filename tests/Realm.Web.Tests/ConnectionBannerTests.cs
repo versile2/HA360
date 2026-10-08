@@ -168,7 +168,7 @@ public sealed class ConnectionBannerTests : ComponentTestBase
     // A session whose connection states and Changed event the test controls; the rest (clock, zone, reports) is a Demo session's.
     private sealed class FakeSession : IRealmSession
     {
-        private readonly IRealmSession _inner = new DemoRealmSessionFactory().Create(null);
+        private readonly IRealmSession _inner = FullCast.Session(null);
         private Action? _changed;
         private RealmSnapshot _current;
 
@@ -186,6 +186,8 @@ public sealed class ConnectionBannerTests : ComponentTestBase
             add => _changed += value;
             remove => _changed -= value;
         }
+
+        public IRosterEditor Roster => _inner.Roster;
 
         public TimeProvider Time => _inner.Time;
 
@@ -212,13 +214,11 @@ public sealed class ConnectionBannerTests : ComponentTestBase
 
         public ValueTask DisposeAsync() => _inner.DisposeAsync();
 
-        // Exactly four entries, in the order of 02 section 1.8.
+        // Exactly two entries (Home Assistant and Life360, D105).
         private static IReadOnlyList<ConnectionVm> Connections(ConnectionState homeAssistant, ConnectionState life360) =>
         [
             new ConnectionVm(ConnectionNames.HomeAssistant, homeAssistant, null),
             new ConnectionVm(ConnectionNames.Life360Trackers, life360, null),
-            new ConnectionVm(ConnectionNames.FordPass, ConnectionState.Connected, null),
-            new ConnectionVm(ConnectionNames.VehiclePlaceholder, ConnectionState.NotConnected, null),
         ];
     }
 }

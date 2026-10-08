@@ -188,7 +188,7 @@ public sealed class TripDetector
     {
         FixSource.Companion => _companionReportsSpeed ? 0 : 2,
         FixSource.Life360 => 1,
-        _ => FeedingRanks,                                      // a vehicle tracker never feeds a member's track
+        _ => FeedingRanks,                                      // not a source of a member's track
     };
 
     private FixDecision Consider(RawFix fix, StepAccumulator step)
@@ -669,7 +669,7 @@ public sealed class TripDetector
         var first = track[0];
         var last = track[^1];
         var sources = track
-            .Select(e => e.Fix.Source switch { FixSource.Life360 => "life360", FixSource.Companion => "companion", _ => "fordpass" })
+            .Select(e => e.Fix.Source switch { FixSource.Life360 => "life360", _ => "companion" })
             .Distinct()
             .Order(StringComparer.Ordinal);
 

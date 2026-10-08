@@ -63,7 +63,7 @@ public sealed record MemberPayloadItem(
 /// <param name="MeId">The viewer's member id; empty when there is no member at all.</param>
 public sealed record MembersPayload(int Version, string MeId, IReadOnlyList<MemberPayloadItem> Members);
 
-/// <summary>One vehicle's pin. Lat and Lon are null for a vehicle without a position and for the placeholder vehicle: no pin.</summary>
+/// <summary>One vehicle's pin. Lat and Lon are null for a vehicle without a position: no pin.</summary>
 public sealed record VehiclePayloadItem(
     string Id,
     string Name,

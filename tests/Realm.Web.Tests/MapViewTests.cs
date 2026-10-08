@@ -304,7 +304,7 @@ public sealed class MapViewTests : ComponentTestBase
         cut.Render(parameters => parameters.Add(map => map.Selection, Wagon));
 
         Assert.Empty(ChipOwners(LastMembers()));   // the king is not selected, so his chip is gone as well
-        Assert.Equal("Parked · Engine off", LastVehicles().Vehicles.Single(vehicle => vehicle.Id == DemoCast.Wagon.Id).Chip);
+        Assert.Equal("Parked", LastVehicles().Vehicles.Single(vehicle => vehicle.Id == DemoCast.Wagon.Id).Chip);
 
         cut.Render(parameters => parameters.Add(map => map.Selection, null));
 
@@ -427,7 +427,7 @@ public sealed class MapViewTests : ComponentTestBase
     // The map with the Demo's people, vehicles and places and the Demo's frozen clock, so the payloads carry real chips.
     private IRenderedComponent<MapView> RenderMapWithData(EntityRef? selection)
     {
-        var snapshot = new DemoRealmSessionFactory().Create(null).Current;
+        var snapshot = FullCast.Session(null).Current;
         var cut = Render<MapView>(parameters => parameters
             .Add(map => map.Members, snapshot.Members)
             .Add(map => map.Vehicles, snapshot.Vehicles)
