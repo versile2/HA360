@@ -42,7 +42,7 @@ html:has(.realm-location) body {
   line-height: 1.25;
 }
 
-/* ---- The static reconnect banner (App.razor, reconnect-banner.js). It never covers the gear. ---- */
+/* ---- The static reconnect banner (App.razor, reconnect-banner.js). It stays clear of the attribution control. ---- */
 
 .realm-reconnect {
   position: fixed;
@@ -94,7 +94,7 @@ html:has(.realm-location) body {
  * ---- The static error UI (App.razor). Blazor shows it when the circuit dies on an unhandled exception, by setting style.display = "block"
  * on the element (BootErrors.ts). An inline style beats every rule here, so the rule only has to keep it hidden by default and its layout has
  * to work as a block box; the card is therefore stacked, not a flex row. It sits above everything (dialogs 1400, snackbars 1500), keeps the
- * banner geometry so it never covers the gear, and clears the notch at the top and both sides.
+ * banner geometry so it stays clear of the map controls, and clears the notch at the top and both sides.
  * ----
  */
 
@@ -135,23 +135,6 @@ html:has(.realm-location) body {
   cursor: pointer;
 }
 
-/* ---- TopControls: the settings gear, 48 x 48 at (12 + safe-left, max(12, safe-top + 12)) (03 section 3.4). ---- */
-
-.realm-gear.mud-icon-button {
-  position: fixed;
-  top: max(12px, calc(env(safe-area-inset-top) + 12px));
-  left: calc(12px + env(safe-area-inset-left));
-  z-index: 10;
-  box-sizing: border-box;
-  width: 48px;
-  height: 48px;
-  padding: 0;
-  border: 1px solid var(--realm-line);
-  border-radius: 50%;
-  background: var(--realm-control-bg);
-  color: var(--realm-control-icon);
-}
-
 /* ---- BottomNav: 64 px plus the bottom safe area, above the sheet (1200) and below dialogs (1400) (01 section 3). ---- */
 
 .realm-nav {
@@ -184,6 +167,14 @@ html:has(.realm-location) body {
   font-weight: 700;
   line-height: 1.25;
   text-decoration: none;
+}
+
+.realm-nav-button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  cursor: pointer;
 }
 
 .realm-nav-link[aria-current="page"] {

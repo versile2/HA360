@@ -6,7 +6,7 @@
 @inject NavigationManager Navigation
 @inject ILogger<DriverWeekPage> Logger
 
-@* The driver's week (01 section 6.6; 03 sections 3.3 and 3.4): a full page like Driving (its header row keeps the room of the gear), with a Back link to driving?week=n (relative, like
+@* The driver's week (01 section 6.6; 03 sections 3.3 and 3.4): a full page like Driving, with a Back link to driving?week=n (relative, like
    every link), the driver's avatar, name and lore, and the week under them; the body is DriverWeekDetail. The member comes from the snapshot (the avatar and the name need no wait) and the figures from
    IRealmSession.GetDriverWeekAsync(memberId, week, snapshot.WeekStart); the driver's top speed is the report's per-driver speed (01 section 6.8), so the week report is read too and a
    failure of that second read only leaves the tile "—". ?week= is read on every navigation (D69), in every mode. An id that names no report driver (the static prince, an

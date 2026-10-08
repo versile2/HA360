@@ -158,11 +158,11 @@ test.describe('navigation, right stack, sheet and layout', () => {
     await demo(page);
     const { height } = viewport(page);
 
-    await expect(nav(page).getByRole('link'), 'the links inside the navigation named "Main"').toHaveText(['Location', 'Driving']);
+    await expect(nav(page).getByRole('link'), 'the links inside the navigation named "Main"').toHaveText(['Location', 'Driving']); // the links; Settings is a button (D105)
     const bar = await boxOf(nav(page), 'the bottom nav');
     expectNear(bar.height, NAV_H, TOL, 'nav height');
     expectNear(bar.y, height - NAV_H, TOL, `nav top (y = ${height - NAV_H} at a viewport ${height} high)`);
-    for (const id of ['nav-location', 'nav-driving']) {
+    for (const id of ['nav-location', 'nav-driving', 'btn-settings']) {
       const link = await boxOf(page.getByTestId(id), id);
       expect(link.height, `${id} is at least 48 px tall`).toBeGreaterThanOrEqual(48 - 0.5);
     }

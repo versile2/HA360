@@ -148,7 +148,7 @@ export function partitionAnchors(rect, anchors, opts = {}) {
  *
  * `rect` is R of 01 section 4.10 step 1 (the caller applies `top = safe-top + 8`, left and right 8, and the panel in Expanded). A bubble
  * centre travels on `rect` inset by `radius`. Each keep-out is grown by `keepOutPad + radius`, so the bubble's own box stays `keepOutPad`
- * clear of the rectangle that was passed: the gear, the attribution, the right stack while visible and, D89 (1), the hit box of every pin
+ * clear of the rectangle that was passed: the attribution, the right stack while visible and, D89 (1), the hit box of every pin
  * that is on screen (a fanned one at its shifted place: see `pinKeepOuts` in testHooks.js) and, D90, the chip of each pin that carries one
  * (the chip is part of its pin's footprint). Pure: nothing is mutated, and the same input in any order gives the same output.
  *

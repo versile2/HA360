@@ -1258,7 +1258,7 @@ function bindAttribution(map, scope, styleId) {
     cancel: (handle) => clearTimeout(/** @type {ReturnType<typeof setTimeout>} */ (handle)),
     collapse,
   });
-  // Armed now, not at `load`: `load` waits for every tile of the first view, so on a slow or throttled page the credits stayed open for 10 to 20 s and covered the gear
+  // Armed now, not at `load`: `load` waits for every tile of the first view, so on a slow or throttled page the credits stayed open for 10 to 20 s and covered the controls
   // (v0.1.1, bug 1). The countdown is a fixed ATTRIBUTION_FOLD_MS from the map being made.
   fold.arm();
   // The first tap or key anywhere folds the credits too. The listener is passive and only observes, so the tap itself still reaches its target (it is never swallowed).
@@ -1284,7 +1284,7 @@ function bindAttribution(map, scope, styleId) {
 /**
  * Where the map's controls are (R1-15, 01 section 10.2): MapLibre builds its control container inside the element it draws into, after the canvas, so the attribution would be
  * the keyboard's stop after the map. The page renders an empty `.realm-map-controls` before the bubbles and the right stack (MapControlsHost.razor), and the control container
- * is moved there once the map has made it: the attribution button then comes second in the Tab order (gear, attribution, bubbles, recenter, layers, canvas). MapLibre keeps its own
+ * is moved there once the map has made it: the attribution button then comes first in the map's Tab order (attribution, bubbles, recenter, layers, canvas; the nav, Settings included, follows the sheet). MapLibre keeps its own
  * references to the control container and to its corner elements, and removes the container itself when the map is removed, so nothing else changes. A page without the host
  * (a test page) keeps the controls where MapLibre put them.
  * @param {HTMLElement} container the map's element
@@ -2270,7 +2270,7 @@ function bubbleHost(r, state) {
 }
 
 /**
- * The elements a bubble must keep clear of (01 section 4.10 step 4): the gear, the attribution control (the (i) button, or the whole credits while it is open, so
+ * The elements a bubble must keep clear of (01 section 4.10 step 4): the attribution control (the (i) button, or the whole credits while it is open, so
  * a bubble never hides them) and the right stack while it is visible. Their boxes are read each frame (the stack follows the sheet's own transition, which no
  * map event announces); a resize of any of them also draws a frame.
  * @param {Runtime} r
@@ -2278,12 +2278,11 @@ function bubbleHost(r, state) {
  * @returns {import('./layoutMath.js').Rect[]} container pixels
  */
 function measureKeepOuts(r, state) {
-  const gear = document.querySelector('[data-testid="btn-settings"]');
   const attribution = controlScope(r.container).querySelector('.maplibregl-ctrl-attrib');
   const stack = document.querySelector('.realm-right-stack');
   /** @type {Array<{ left: number, top: number, right: number, bottom: number } | null>} */
   const boxes = [];
-  for (const el of [gear, attribution, stack]) {
+  for (const el of [attribution, stack]) {
     if (!el) {
       boxes.push(null);
       continue;
@@ -2371,7 +2370,7 @@ function layoutBubblesFrame(r) {
       state.reseed = false;
       anchors = reseedAnchors(anchors, rect);
     }
-    // D89 (1): the pins that are on screen, a fanned one at its shifted place, are keep-outs like the gear; D90: so is the chip of a pin that carries one, where
+    // D89 (1): the pins that are on screen, a fanned one at its shifted place, are keep-outs like the attribution; D90: so is the chip of a pin that carries one, where
     // `placeChips` will put it. The reads came first (the chip widths at the top, the boxes here); then the layout and the writes below.
     const keepOuts = measureKeepOuts(r, state);
     const offIds = new Set(partitionAnchors(rect, anchors).offScreen);

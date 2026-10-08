@@ -11,7 +11,7 @@
   --realm-driving-shadow: color-mix(in srgb, var(--realm-scrim) 55%, transparent);
 }
 
-/* ---- the page: a column of at most 720 px, centred; the header row (56 px) holds the wordmark beside the gear, which TopControls fixes at (12, 12) ---- */
+/* ---- the page: a column of at most 720 px, centred; the header row (56 px) holds the wordmark; nothing floats over it since v0.1.1 (D105: Settings is a tab of the bottom nav) ---- */
 
 .realm-driving {
   padding-top: env(safe-area-inset-top);
@@ -29,7 +29,7 @@
   justify-content: center;
   box-sizing: border-box;
   height: 56px;
-  padding: 0 60px;
+  padding: 0 16px;
 }
 
 .realm-driving__wordmark {
@@ -782,7 +782,7 @@
   font-size: 16px;
 }
 
-/* ---- the driver week (01 section 6.6): the header under the row the gear sits in, four tiles (2 x 2, four across from 720 px), the event row, the drives by day ---- */
+/* ---- the driver week (01 section 6.6): the header under the wordmark row, four tiles (2 x 2, four across from 720 px), the event row, the drives by day ---- */
 
 .realm-driver-week__bar {
   display: flex;

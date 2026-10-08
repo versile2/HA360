@@ -13,7 +13,7 @@ using ConnectionState = Realm.Domain.ConnectionState;   // an alias, so that no 
 namespace Realm.Web.Tests;
 
 /// <summary>
-/// The Settings dialog (01 sections 7.9 and 8.9) opened as the gear opens it, with IDialogService into a MudDialogProvider, and the device preferences behind it
+/// The Settings dialog (01 sections 7.9 and 8.9) opened as the Settings tab of the bottom nav opens it, with IDialogService into a MudDialogProvider, and the device preferences behind it
 /// (<see cref="DevicePrefs"/>) against a fake browser storage: the four sections and every string, the rows that must not exist (theme, units, week start, reset), the
 /// Diagnostics row and where it points, the Connections chips of the session, and that a choice is current at once and stored under its key. Esc, the scrim and the
 /// full-screen layout below 600 px are CSS and keys that only a browser exercises (the Playwright gallery shows both sizes).
@@ -109,7 +109,22 @@ public sealed class SettingsDialogTests : ComponentTestBase
         Assert.False(link.GetAttribute("href")!.StartsWith('/'), "the link is a relative URL, so it works under the Ingress prefix");
         Assert.Contains("Diagnostics", link.TextContent, StringComparison.Ordinal);
         Assert.Contains("States and counts only. No locations.", link.TextContent, StringComparison.Ordinal);
-        Assert.Single(cut.FindAll("a[href]"));
+
+        // D105: Report an issue and Star this project follow Diagnostics: three links in About, the two new ones absolute, in a new tab, with no opener.
+        var links = about.QuerySelectorAll("a[href]");
+        Assert.Equal(
+            new[] { "diagnostics.json", "https://github.com/Versile2/ha-cartographer/issues/new/choose", "https://github.com/Versile2/ha-cartographer" },
+            links.Select(l => l.GetAttribute("href")).ToArray());
+        Assert.Equal(3, cut.FindAll("a[href]").Count);
+        foreach (var external in links.Skip(1))
+        {
+            Assert.Equal("_blank", external.GetAttribute("target"));
+            Assert.Equal("noopener noreferrer", external.GetAttribute("rel"));
+        }
+
+        Assert.Contains("Report an issue", links[1].TextContent, StringComparison.Ordinal);
+        Assert.Contains("Star this project", links[2].TextContent, StringComparison.Ordinal);
+        Assert.Contains("Opens GitHub", links[2].TextContent, StringComparison.Ordinal);
     }
 
     // ---- the Connections section -----------------------------------------------------------------------------------------------------------------
@@ -270,13 +285,14 @@ public sealed class SettingsDialogTests : ComponentTestBase
     }
 
     [Fact]
-    public async Task TheGear_OpensTheDialog_WithTheOptionsThatLetEscAndTheScrimCloseIt()
+    public async Task TheSettingsTab_OpensTheDialog_WithTheOptionsThatLetEscAndTheScrimCloseIt()
     {
         var dialogs = RenderWithProviders<MudDialogProvider>();
-        var controls = Render<TopControls>();
+        var controls = Render<BottomNav>();
 
         var gear = controls.Find("[data-testid='btn-settings']");
-        Assert.Equal("Settings", gear.GetAttribute("aria-label"));
+        Assert.Equal("BUTTON", gear.TagName);
+        Assert.Equal("Settings", gear.QuerySelector(".realm-nav-label")!.TextContent);
         await gear.TriggerEventAsync("onclick", new MouseEventArgs());
 
         dialogs.WaitForAssertion(() => dialogs.Find("[data-testid='settings-dialog']"));

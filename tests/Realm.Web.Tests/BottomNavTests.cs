@@ -31,6 +31,23 @@ public sealed class BottomNavTests : ComponentTestBase
     }
 
     [Fact]
+    public void Renders_SettingsAsAThirdItem_AButtonAfterDriving_NeverCurrent()
+    {
+        var cut = RenderWithProviders<BottomNav>();
+
+        var items = cut.FindAll("nav > *");
+        Assert.Equal(new string?[] { "nav-location", "nav-driving", "btn-settings" }, items.Select(i => i.GetAttribute("data-testid")).ToArray());
+        var settings = items[2];
+        Assert.Equal("BUTTON", settings.TagName);
+        Assert.Equal("button", settings.GetAttribute("type"));
+        Assert.Equal("dialog", settings.GetAttribute("aria-haspopup"));
+        Assert.Null(settings.GetAttribute("href"));
+        Assert.Null(settings.GetAttribute("aria-current"));
+        Assert.Equal("Settings", LabelOf(cut, "btn-settings"));
+        Assert.Equal("page", CurrentOf(cut, "nav-location"));
+    }
+
+    [Fact]
     public void AtTheRoot_MarksOnlyLocationAsCurrent()
     {
         var cut = RenderWithProviders<BottomNav>();

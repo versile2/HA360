@@ -63,13 +63,13 @@ export function appearanceOf(styleId) {
 /** How long the credits of a style with third-party data stay open once the map has loaded, when nobody touches the map first. */
 export const ATTRIBUTION_FOLD_MS = 5000;
 
-/** The left edge the open credits keep clear of, in CSS px from the left of the viewport: the gear (12 + 48) plus 8 px (01 section 4.10 keep-out). realm-map.css derives its max-width from the same number. */
-export const ATTRIBUTION_LEFT_KEEP_OUT_PX = 68;
+/** The left edge the open credits keep clear of, in CSS px from the left of the viewport: the 12 px side margin (D105: the settings gear that used to sit there is now a tab of the bottom nav). realm-map.css derives its max-width from the same number. */
+export const ATTRIBUTION_LEFT_KEEP_OUT_PX = 12;
 /** The right margin of the credits (the (i) target's right edge sits 12 px from the viewport edge, AC-03). */
 export const ATTRIBUTION_RIGHT_MARGIN_PX = 12;
 
 /**
- * The widest the open credits may be in a viewport of `viewportWidth` px, so they sit to the right of the gear and never over it.
+ * The widest the open credits may be in a viewport of `viewportWidth` px, so they stay inside both side margins (the (i) button's own 48 px is always inside it).
  * @param {number} viewportWidth
  * @returns {number}
  */

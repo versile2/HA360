@@ -109,7 +109,7 @@ const ZONE_FILL_ALPHA: Record<'dark' | 'light' | 'imagery', { empty: number; occ
 // a coordinate in this file, so the Demo fixture can move (D82, D85) without touching a test; names come from the cast. The screen-pixel numbers of the spec are at the phone
 // project's 412 x 915 (these tests carry no viewport tag, so they run there only).
 
-/** 01 section 4.10 step 4: a bubble keeps 8 px clear of the gear, the attribution, the right stack and the sheet. */
+/** 01 section 4.10 step 4: a bubble keeps 8 px clear of the attribution, the right stack and the sheet. */
 const KEEP_OUT_GAP_PX = 8;
 /** What the browser's own 1/64 px layout units and the 0.01 px rounding of a bubble's position may take off a measured gap (the layout places the bubble to the pixel). */
 const GAP_NOISE_PX = 0.1;
@@ -507,11 +507,11 @@ test.describe('acceptance B: the map', () => {
 
   // [AC-14] Where the two fixture bubbles sit and what they look like. The centres are the spec's pixels (within 12 px); the clearances are measured on the boxes the browser draws.
   // Two rulings move one of them. D89 (1): the spec's (384, 347) for Dara is where her bubble covered the fanned wagon (R1-01), and an on-screen pin, a fanned one included, is a
-  // keep-out for the edge bubbles (the same slide as the gear). D90 extends it to the pin's chip: the King's "Here for" chip is 36 px high, 8 px above his pin, clamped to the right edge
+  // keep-out for the edge bubbles (the same slide as the attribution). D90 extends it to the pin's chip: the King's "Here for" chip is 36 px high, 8 px above his pin, clamped to the right edge
   // of the map, which is where the slide of fix/W8-3 left Dara's bubble ((384, 280)), so her bubble keeps 8 px clear of the chip too and slides on up the right edge, the way she lies,
   // to (384, 240). D90 says the test asserts "no overlap with any pin footprint" (the next test, and the clearances below) and a 12 px tolerance on the new position. Elio's bubble has
   // no pin near it and stays at the spec's (28, 142).
-  test('[AC-14] the two bubbles sit at (384, 240) and (28, 142), 8 px clear of the gear, the right stack and the sheet, 48 px to hit, pointing at their members', async ({ page }) => {
+  test('[AC-14] the two bubbles sit at (384, 240) and (28, 142), 8 px clear of the attribution, the right stack and the sheet, 48 px to hit, pointing at their members', async ({ page }) => {
     await demo(page);
     await mapReady(page);
     const cast = loadDemoCast();
@@ -522,9 +522,9 @@ test.describe('acceptance B: the map', () => {
     if (viewport === null) return;
     expect([viewport.width, viewport.height], 'the spec numbers are those of the phone project').toEqual([412, 915]);
 
-    // The keep-outs as the browser draws them: the gear, the attribution (i), the two buttons of the right stack; and the sheet's top edge from the `sheet()` hook.
+    // The keep-outs as the browser draws them: the attribution (i), the two buttons of the right stack; and the sheet's top edge from the `sheet()` hook.
     const keepOuts: Array<[string, Rect]> = [];
-    for (const testId of ['btn-settings', 'map-attribution', 'btn-recenter', 'btn-layers']) {
+    for (const testId of ['map-attribution', 'btn-recenter', 'btn-layers']) {
       await expect(page.getByTestId(testId), `${testId} is on screen at Peek`).toBeVisible();
       const box = await page.getByTestId(testId).boundingBox();
       expect(box, `${testId} has a bounding box`).not.toBeNull();

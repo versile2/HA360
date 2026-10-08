@@ -233,6 +233,8 @@ These are captures of the add-on installed on a real Home Assistant instance, ru
 
 ### Settings
 
+Settings is the third item of the bottom bar, to the right of Location and Driving. At the bottom of the dialog, **Report an issue** and **Star this project** open GitHub in a new tab.
+
 <table>
   <tr>
     <td align="center"><img src="assets/screenshots/live-phone-settings.png" width="180" alt="Settings: map style, show places, default view and layout"><br><sub>Settings</sub></td>

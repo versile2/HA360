@@ -2,11 +2,21 @@
 
 ## 0.1.1
 
+### Changed
+
+- **Settings moved into the bottom bar.** The floating gear is gone from the map and from the Driving pages, where it
+  overlapped content. The bottom bar is now Location, Driving and Settings; Settings opens the same dialog as before
+  (Back and Esc close it) and leaves the current tab selected. The map credits may use the left of the screen now.
+
+### Added
+
+- **Report an issue and Star this project** in Settings -> About. They open the GitHub issue chooser and the project
+  page in a new tab.
+
 ### Fixed
 
-- **Map credits no longer cover the settings gear** on phones. The credits pill is kept clear of the gear, folds after
-  five seconds from the start of the page (it no longer waits for every map tile), and folds on the first tap without
-  swallowing it.
+- **Map credits no longer cover the map controls** on phones. The credits pill folds after five seconds from the start
+  of the page (it no longer waits for every map tile), and folds on the first tap without swallowing it.
 - **Satellite map style no longer fails to load** when the page is in the background or throttled. Styles built in the
   app are now loaded through a blob URL, which does not wait for an animation frame.
 

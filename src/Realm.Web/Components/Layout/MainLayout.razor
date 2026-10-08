@@ -6,8 +6,8 @@
    dialog renders its content inside its own provider, and Blazor resolves a cascading parameter by walking up from the component that renders the
    fragment, so a value reaches the sheet and every dialog only if the provider is below the cascade. The shell renders no element.
 
-   The DOM order is the Tab order (01 section 10.2, R1-15, [AC-47]): the gear first, then the page (on Location: attribution, bubbles, right stack, map canvas), then
-   MudPopoverProvider, which is where the sheet lives (handle, section tabs, content), then the nav. The provider has to come after the page and before the nav, and the other
+   The DOM order is the Tab order (01 section 10.2, R1-15, [AC-47]): the page first (on Location: attribution, bubbles, right stack, map canvas), then
+   MudPopoverProvider, which is where the sheet lives (handle, section tabs, content), then the nav (Location, Driving, Settings). The provider has to come after the page and before the nav, and the other
    providers draw nothing in the page until a dialog or a snackbar is open, so their place is free. Stacking is by z-index, never by DOM order. *@
 <RealmShell>
     <MudThemeProvider Theme="Realm.Web.Theme.RealmTheme.Create()" IsDarkMode="true" ObserveSystemDarkModeChange="false" />
@@ -16,7 +16,6 @@
     <MudXProvider />
 
     <ConnectionBanner />
-    <TopControls />
 
     <main id="realm-main" aria-label="The Realm">
         @Body

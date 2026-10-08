@@ -399,9 +399,9 @@
 /* Open: the credits read left of the button, on the same pill. */
 :is(.realm-map, .realm-map-controls) .maplibregl-ctrl-top-right .maplibregl-ctrl-attrib.maplibregl-compact-show {
   width: auto;
-  /* Never over the gear: the credits end 12 px from the right edge and start at least 68 px from the left (gear 12 + 48, plus 8), so on a phone they wrap
-     into two or three lines to the right of the gear instead of spanning the screen (mapStyles.js attributionMaxWidthPx is the same sum). */
-  max-width: calc(100vw - 68px - 12px);
+  /* The credits end 12 px from the right edge and start at least 12 px from the left; there is no control at the top left (D105: Settings is a tab of the bottom nav),
+     so on a phone they may use the whole width (mapStyles.js attributionMaxWidthPx is the same sum). */
+  max-width: calc(100vw - 12px - 12px);
   padding: 6px 56px 6px 16px;
   border-radius: 24px;
 }
@@ -421,7 +421,7 @@
 
 /* ---- edge bubbles (01 section 4.10, 03 section 4.6): a member outside the visible rectangle, on its edge, pointing at them --------------- */
 
-/* The container (EdgeBubbles.razor): the whole viewport above the map and below the gear and the right stack (10) and the sheet (1200); it takes no
+/* The container (EdgeBubbles.razor): the whole viewport above the map and below the right stack (10) and the sheet (1200); it takes no
    pointer events, so the map stays draggable under it, and only the bubbles do. realmMap.js creates and moves the bubbles. */
 .realm-bubbles {
   --realm-bubble-outline: color-mix(in srgb, var(--realm-pin-outline) 85%, transparent);
@@ -1107,6 +1107,7 @@
 }
 
 .realm-settings__link-text {
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   gap: 2px;

@@ -18,10 +18,9 @@ const R = { left: 8, top: 8, right: PHONE.width - 8, bottom: PHONE.height - PADD
 const BOX = { left: 28, top: 28, right: 384, bottom: 705 };
 const CENTRE = { x: 206, y: 366.5 };
 
-const GEAR = { left: 12, top: 12, right: 60, bottom: 60 }; // 48 x 48 at (12, 12), AC-03
 const ATTRIBUTION = { left: 352, top: 12, right: 400, bottom: 60 }; // 48 x 48 hit area, right edge 12 px from the viewport's, AC-03
 const STACK = { left: 352, top: 621, right: 400, bottom: 729 }; // two 48 px buttons 12 px apart, bottom edge at 729, left edge x 352, AC-04
-const KEEP_OUTS = [GEAR, ATTRIBUTION, STACK];
+const KEEP_OUTS = [ATTRIBUTION, STACK];
 const SHEET_TOP = PHONE.height - 174; // 741 at Peek
 
 /** A far anchor on the ray from the centre of R through `q` (a power-of-two scale keeps every number exact). */
@@ -70,7 +69,7 @@ function projectDemo() {
   return { zoom, project };
 }
 
-test('[AC-14] the Demo fixture at 412 x 915 Peek, with the gear, the attribution and the stack as the only keep-outs: Dara lands within 12 px of (384, 347) and Elio within 12 px of (28, 142)', () => {
+test('[AC-14] the Demo fixture at 412 x 915 Peek, with the attribution and the stack as the only keep-outs (v0.1.1: no gear): Dara lands within 12 px of (384, 347) and Elio within 12 px of (28, 142)', () => {
   const { project } = projectDemo();
   const anchors = ['king', 'queen', 'jester', 'cryptid', 'prince'].map((id) => ({ id, ...project(id) }));
   const result = layoutBubbles(R, KEEP_OUTS, anchors);
@@ -86,7 +85,7 @@ test('[AC-14] the Demo fixture at 412 x 915 Peek, with the gear, the attribution
   assert.strictEqual(dara.cluster, 1);
   assert.strictEqual(elio.cluster, 1);
 
-  // Each bubble's 40 px box is at least 8 px clear of the gear, the attribution, the right stack and the sheet's top edge.
+  // Each bubble's 40 px box is at least 8 px clear of the attribution, the right stack and the sheet's top edge.
   for (const bubble of [dara, elio]) {
     for (const keepOut of KEEP_OUTS) assert.ok(gapTo(bubble, keepOut) >= 8, `${bubble.ids[0]} is ${gapTo(bubble, keepOut)} px from ${JSON.stringify(keepOut)}`);
     assert.ok(SHEET_TOP - (bubble.y + 20) >= 8);
@@ -235,19 +234,15 @@ test('[AC-19a] a bubble slides along the edge it sits on, never onto another edg
   assert.deepEqual([topEdge.bubbles[0].x, topEdge.bubbles[0].y], [150 - 28, 28]); // the member lies to the left: left, along the top edge
 });
 
-test('[AC-19a] the gear, the attribution and the right stack in their corners: the bubble slides to the one side that is free', () => {
+test('[AC-19a] the attribution and the right stack in their corners: the bubble slides to the one side that is free', () => {
   // A keep-out in a corner leaves room on one side only: the member's own side (toward the corner) runs off the edge, so it goes the other way.
-  const nearGearOnLeftEdge = layoutBubbles(R, KEEP_OUTS, [via('a', { x: 28, y: 50 })]);
-  assert.deepEqual([nearGearOnLeftEdge.bubbles[0].x, nearGearOnLeftEdge.bubbles[0].y], [28, 88]); // GEAR.bottom + 28
-  const nearGearOnTopEdge = layoutBubbles(R, KEEP_OUTS, [via('a', { x: 50, y: 28 })]);
-  assert.deepEqual([nearGearOnTopEdge.bubbles[0].x, nearGearOnTopEdge.bubbles[0].y], [88, 28]); // GEAR.right + 28
   const nearAttributionOnTopEdge = layoutBubbles(R, KEEP_OUTS, [via('a', { x: 370, y: 28 })]);
   assert.deepEqual([nearAttributionOnTopEdge.bubbles[0].x, nearAttributionOnTopEdge.bubbles[0].y], [324, 28]); // ATTRIBUTION.left - 28
   const nearAttributionOnRightEdge = layoutBubbles(R, KEEP_OUTS, [via('a', { x: 384, y: 50 })]);
   assert.deepEqual([nearAttributionOnRightEdge.bubbles[0].x, nearAttributionOnRightEdge.bubbles[0].y], [384, 88]); // ATTRIBUTION.bottom + 28
   const nearStack = layoutBubbles(R, KEEP_OUTS, [via('a', { x: 384, y: 650 })]);
   assert.deepEqual([nearStack.bubbles[0].x, nearStack.bubbles[0].y], [384, 593]); // STACK.top - 28
-  for (const result of [nearGearOnLeftEdge, nearGearOnTopEdge, nearAttributionOnTopEdge, nearAttributionOnRightEdge, nearStack]) {
+  for (const result of [nearAttributionOnTopEdge, nearAttributionOnRightEdge, nearStack]) {
     for (const keepOut of KEEP_OUTS) assert.ok(gapTo(result.bubbles[0], keepOut) >= 8);
   }
 });

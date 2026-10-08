@@ -3,10 +3,12 @@
 @using Realm.Web.State
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
+@inject IDialogService Dialogs
 @inject RealmUiState Ui
 @inject HistorySync History
 
-@* The two tabs (01 section 2.2). The links stay real anchors, so a click before the circuit has connected still navigates; once the circuit is up the handler below takes the click
+@* The two tabs and Settings (01 section 2.2; D105). Settings is a button, not a route: it opens the Settings dialog (S10a, 03 section 3.4, 01 section 7.9) with the standard dialog service, so Esc, the scrim and
+   the dialog's own back arrow close it and MudBlazor returns the focus to this button. Location or Driving stays the current tab (aria-current) while the dialog is open. The two tabs (01 section 2.2). The links stay real anchors, so a click before the circuit has connected still navigates; once the circuit is up the handler below takes the click
    (preventDefault) and runs the rules of the table: a tab change releases the history entries of the page it leaves and navigates with a REPLACE, and a re-tap of the tab you are on is
    a "home" gesture (Location: Peek and nothing selected; Driving: back to the top and This week). A modifier click is not told apart: Blazor's preventDefault is fixed per render. *@
 <nav class="realm-nav" aria-label="Main">
@@ -18,10 +20,25 @@
         <MudIcon Icon="@(OnDriving ? Icons.Material.Filled.DirectionsCar : Icons.Material.Outlined.DirectionsCar)" />
         <span class="realm-nav-label">Driving</span>
     </a>
+    <button type="button" class="realm-nav-link realm-nav-button" data-testid="btn-settings" aria-haspopup="dialog" @onclick="OpenSettingsAsync">
+        <MudIcon Icon="@Icons.Material.Outlined.Settings" />
+        <span class="realm-nav-label">Settings</span>
+    </button>
 </nav>
 
 @code {
     private static readonly char[] QueryOrFragment = ['?', '#'];
+
+    // The scrim is the Realm's own (realm-driving.css); the dialog draws its own back arrow, so MudBlazor's close button is off. Full-screen below 600 px is CSS (realm-map.css).
+    private static readonly DialogOptions SettingsOptions = new()
+    {
+        CloseOnEscapeKey = true,
+        BackdropClick = true,
+        CloseButton = false,
+        BackgroundClass = "realm-popup-scrim",
+    };
+
+    private async Task OpenSettingsAsync() => await Dialogs.ShowAsync<SettingsDialog>(null, SettingsOptions);
 
     // The path below the base URI, without a query or fragment: "" on Location, "driving" and "driving/{member}" on the Driving routes.
     private string CurrentPath

@@ -1,6 +1,6 @@
 // v0.1.1 bug 1 (D103 finding 1): at phone width the open map credits spanned the screen over the gear, swallowed the first tap on the gear and on the layers
-// button and folded only 10 to 20 s after load. The credits now sit to the right of the gear, take no tap meant for another control, and fold after a fixed
-// 5 s from the map being made (D81), or on the first pointer or key press anywhere.
+// button and folded only 10 to 20 s after load. The credits take no tap meant for another control, and fold after a fixed
+// 5 s from the map being made (D81), or on the first pointer or key press anywhere. (D105: the gear moved into the bottom nav as the Settings tab.)
 //
 // The style document of OpenFreeMap is answered in the page (as ac-b-style.spec.ts does) with a style whose geojson source carries the long OpenFreeMap credit, so the
 // credits are as wide as the real ones and no request leaves the ingress proxy.
@@ -17,8 +17,8 @@ const STUB_STYLE = {
   layers: [{ id: 'e2e-background', type: 'background' }],
 };
 
-/** The gear's box plus the 8 px keep-out of 01 section 4.10. */
-const KEEP_OUT_PX = 8;
+/** The side margin of the map controls (AC-03). */
+const SIDE_MARGIN_PX = 12;
 /** D81 says 5 s; the test allows the timer's slack but nowhere near the 10 to 20 s of the bug. */
 const FOLDED_WITHIN_MS = 8000;
 
@@ -49,21 +49,23 @@ async function open(page: Page): Promise<void> {
 const credits = (page: Page) => page.locator('.maplibregl-ctrl-attrib');
 
 test.describe('acceptance B: the map credits on a phone', () => {
-  test('the open credits never overlap the gear, and the first tap on the gear opens Settings', { tag: ['@phone'] }, async ({ page }) => {
+  test('the open credits stay inside the side margins, and the first tap on Settings in the nav opens Settings', { tag: ['@phone'] }, async ({ page }) => {
     await open(page);
     await expect(credits(page), 'the credits are open on load (D81)').toHaveClass(/maplibregl-compact-show/);
-    const gear = await page.getByTestId('btn-settings').boundingBox();
     const pill = await credits(page).boundingBox();
-    expect(gear, 'the gear has a box').not.toBeNull();
     expect(pill, 'the credits have a box').not.toBeNull();
-    if (gear && pill) {
-      expect(pill.x, 'the credits start right of the gear and its keep-out').toBeGreaterThanOrEqual(gear.x + gear.width + KEEP_OUT_PX - 1);
+    if (pill) {
+      // D105: the gear is gone, so the pill may use the left of the screen, but never past either 12 px margin.
       const viewport = page.viewportSize();
-      expect(pill.x + pill.width, 'and end inside the viewport').toBeLessThanOrEqual((viewport?.width ?? 412) + 0.5);
+      expect(pill.x, 'the credits start inside the left margin').toBeGreaterThanOrEqual(SIDE_MARGIN_PX - 1);
+      expect(pill.x + pill.width, 'and end inside the right margin').toBeLessThanOrEqual((viewport?.width ?? 412) - SIDE_MARGIN_PX + 0.5);
     }
-    // The first tap, immediately: it reaches the gear.
+    // The (i) button is part of the pill and stays a target: nothing else sits over its centre.
+    const info = await page.getByTestId('map-attribution').boundingBox();
+    expect(info, 'the (i) button has a box').not.toBeNull();
+    // The first tap, immediately: it reaches Settings in the nav.
     await page.getByTestId('btn-settings').click({ timeout: 2000 });
-    await expect(page.getByTestId('settings-dialog'), 'the first tap on the gear opened Settings').toBeVisible();
+    await expect(page.getByTestId('settings-dialog'), 'the first tap on Settings opened it').toBeVisible();
   });
 
   test('the first tap on the layers button opens the popover while the credits are still open', { tag: ['@phone'] }, async ({ page }) => {

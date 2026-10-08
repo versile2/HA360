@@ -3,7 +3,7 @@
 //            written to ci-out/axe/<project>/<scene>.json (the e2e job uploads ci-out whole).
 //   [AC-45]  every visible interactive element is 48 x 48 or more and 8 px or more from its neighbours; no text under 12 px; no horizontal page scroll at 320 px and 200 % font size.
 //   [AC-46]  the accessible names of 01 section 10.3 that the criterion quotes, and the roles of the landmarks.
-//   [AC-47b] the Tab sequence of Location (01 section 10.2): gear, attribution, bubbles, recenter, layers, map canvas, sheet handle, section tabs, content; pins are not tab stops. The focus flow is [AC-47a]
+//   [AC-47b] the Tab sequence of Location (01 section 10.2): attribution, bubbles, recenter, layers, map canvas, sheet handle, section tabs, content; pins are not tab stops. The focus flow is [AC-47a]
 //            in ac-f-states.spec.ts and the trap of the sheet is [X-13] in appendix-c.spec.ts.
 //   [AC-48]  prefers-reduced-motion: reduce: camera moves report 0, no ring pulse, the sheet's transitions are 0.01 ms or less, bars are at full width at once, dialogs have no enter animation.
 // Reduced motion is on for the whole file: a popup that is still fading in would be scanned at half opacity, and the criterion's motion half needs it anyway.
@@ -348,7 +348,7 @@ async function focusedStop(page: Page): Promise<string> {
 }
 
 test.describe('[AC-47b] the Tab sequence of Location', () => {
-  test('[AC-47b] Tab visits the gear, the attribution, the bubbles, recenter, layers, the map canvas, the sheet handle, the section tabs and then the content, and never a pin', async ({ page }) => {
+  test('[AC-47b] Tab visits the attribution, the bubbles, recenter, layers, the map canvas, the sheet handle, the section tabs and then the content, and never a pin', async ({ page }) => {
     await demo(page);
     await mapReady(page);
     await expect(page.getByTestId('bubble-cryptid'), 'the default view has an off-screen member, so there is a bubble to tab to').toBeVisible();
@@ -380,7 +380,6 @@ test.describe('[AC-47b] the Tab sequence of Location', () => {
     // The order of 01 section 10.2, as indexes into what was visited: each group comes after the one before it.
     const at = (match: (stop: string) => boolean): number[] => visited.flatMap((stop, index) => (match(stop) ? [index] : []));
     const chain: Array<[string, number[]]> = [
-      ['the gear', at((stop) => stop === 'btn-settings')],
       ['the attribution', at((stop) => stop === 'map-attribution')],
       ['the bubbles', at((stop) => stop.startsWith('bubble-'))],
       ['recenter', at((stop) => stop === 'btn-recenter')],
@@ -396,7 +395,7 @@ test.describe('[AC-47b] the Tab sequence of Location', () => {
       if (optional.has(name) && found.length === 0) test.info().annotations.push({ type: 'info', description: `[AC-47b] the sheet handle was skipped by the focus trap (${sequence})` });
       else expect(found.length, `Tab reaches ${name} (${sequence})`).toBeGreaterThan(0);
     }
-    expect(chain[0]![1][0], `the gear is the first stop (${sequence})`).toBe(0);
+    expect(chain[0]![1][0], `the attribution is the first stop (${sequence})`).toBe(0);
     for (let i = 1; i < chain.length; i += 1) {
       const [beforeName, before] = chain[i - 1]!;
       const [afterName, after] = chain[i]!;
@@ -404,8 +403,23 @@ test.describe('[AC-47b] the Tab sequence of Location', () => {
       // First visits are compared: the sheet traps Tab (R-032, [X-13]), so after the section tab the cycle wraps back to the handle, a second visit that says nothing about the order.
       expect(Math.min(...after), `${afterName} comes after ${beforeName} (${sequence})`).toBeGreaterThan(Math.min(...before));
     }
-    const bubbles = chain[2]![1];
+    const bubbles = chain[1]![1];
     expect(Math.max(...bubbles) - Math.min(...bubbles), `the bubbles are consecutive stops (${sequence})`).toBe(bubbles.length - 1);
+
+    // D105: the nav is the last group, in the order of the DOM: Location, Driving, Settings, after the map canvas and the sheet. Settings is the nav's last item, a button.
+    const order = await page.evaluate(() => {
+      const index = (testId: string) => {
+        const element = document.querySelector(`[data-testid="${testId}"]`);
+        return element === null ? null : Array.from(document.querySelectorAll('*')).indexOf(element);
+      };
+      return { canvas: index('map-canvas'), sheet: index('sheet'), location: index('nav-location'), driving: index('nav-driving'), settings: index('btn-settings') };
+    });
+    expect(order.location, 'the nav is in the DOM').not.toBeNull();
+    expect(order.canvas! < order.location! && order.sheet! < order.location!, `the nav follows the map canvas and the sheet (${JSON.stringify(order)})`).toBe(true);
+    expect(order.location! < order.driving! && order.driving! < order.settings!, `Location, Driving, Settings (${JSON.stringify(order)})`).toBe(true);
+    await page.getByTestId('nav-driving').focus();
+    await page.keyboard.press('Tab');
+    expect(await focusedStop(page), 'Tab from Driving reaches Settings').toBe('btn-settings');
   });
 });
 

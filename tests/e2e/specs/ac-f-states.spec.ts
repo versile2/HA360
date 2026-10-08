@@ -139,19 +139,19 @@ test.describe('[AC-47a] the focus flow of D45', () => {
 const HA_DOWN_TEXT = "The royal messengers can't reach Home Assistant. Retrying…";
 
 test.describe('[AC-49a] the Home Assistant banner under ?variant=ha-down', () => {
-  test('[AC-49a] the banner shows its copy as a polite status within 5 s, stays clear of the gear, and clears with a toast when Home Assistant is restored', async ({ page }) => {
+  test('[AC-49a] the banner shows its copy as a polite status within 5 s, stays clear of the attribution button, and clears with a toast when Home Assistant is restored', async ({ page }) => {
     await demo(page, { variant: 'ha-down' });
     const banner = page.getByTestId('banner-ha');
     await expect(banner, 'the banner shows').toBeVisible({ timeout: 5000 });
     await expect(banner).toContainText(HA_DOWN_TEXT);
     await expect(banner, 'a polite status region').toHaveAttribute('role', 'status');
 
-    const gear = await page.getByTestId('btn-settings').boundingBox();
+    const gear = await page.getByTestId('map-attribution').boundingBox();
     const box = await banner.boundingBox();
-    expect(gear, 'the gear has a box').not.toBeNull();
+    expect(gear, 'the attribution button has a box').not.toBeNull();
     expect(box, 'the banner has a box').not.toBeNull();
     const overlaps = box!.x < gear!.x + gear!.width && box!.x + box!.width > gear!.x && box!.y < gear!.y + gear!.height && box!.y + box!.height > gear!.y;
-    expect(overlaps, 'the banner does not cover the gear').toBe(false);
+    expect(overlaps, 'the banner does not cover the attribution button').toBe(false);
 
     await banner.click();
     await expect(banner, 'the banner clears when Home Assistant is back').toHaveCount(0);

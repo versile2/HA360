@@ -7,12 +7,12 @@
 @inject DevicePrefs Prefs
 @inject RealmUiState Ui
 
-@* The Settings dialog (01 sections 7.9 and 8.9; 03 section 3.4), opened from the gear with IDialogService.ShowAsync (TopControls). A full-screen dialog below 600 px with a top bar (the back
+@* The Settings dialog (01 sections 7.9 and 8.9; 03 section 3.4), opened from the Settings tab of the bottom nav with IDialogService.ShowAsync (BottomNav). A full-screen dialog below 600 px with a top bar (the back
    arrow, "Settings", "Royal decrees") and a centred 480 px dialog from 600 px up (realm-map.css). Four sections: Map (the style as a list, which is the popover's list shown for
    discoverability, Show places, Default view), Appearance (Layout), Connections (read-only chips, one row per entry the session lists) and About (the version, the map credits and the
-   48 px Diagnostics row that opens diagnostics.json in a new tab). There is no Save button: every choice applies at once through DevicePrefs, which stores it per device. And there
+   48 px Diagnostics row that opens diagnostics.json in a new tab, then, v0.1.1 (D105), Report an issue and Star this project, which open the GitHub issue chooser and the repository page in new tabs). There is no Save button: every choice applies at once through DevicePrefs, which stores it per device. And there
    are no Theme, Units, 12/24 h, Week starts on or Reset rows: dark and imperial are the only values in v1 (D35). Esc, the scrim and the back arrow close it. The title takes the
-   focus when the dialog opens (PopupTitle), and MudBlazor returns it to the gear. The stored values are read after the first render if no page has read them yet. The open dialog is one
+   focus when the dialog opens (PopupTitle), and MudBlazor returns it to the Settings tab. The stored values are read after the first render if no page has read them yet. The open dialog is one
    history layer (03 section 3.7): the Android Back closes it, and whatever else closes it takes the layer's history entry back. *@
 <MudDialog Class="realm-settings"
            TitleClass="realm-settings__head"
@@ -141,6 +141,22 @@
                 <span class="realm-settings__link-text">
                     <span class="realm-settings__label">Diagnostics</span>
                     <span class="realm-settings__help">States and counts only. No locations.</span>
+                </span>
+                <MudIcon Icon="@Icons.Material.Filled.OpenInNew" />
+            </a>
+            <a class="realm-settings__link" href="https://github.com/Versile2/ha-cartographer/issues/new/choose" target="_blank" rel="noopener noreferrer" data-testid="settings-report-issue">
+                <MudIcon Icon="@Icons.Material.Outlined.BugReport" />
+                <span class="realm-settings__link-text">
+                    <span class="realm-settings__label">Report an issue</span>
+                    <span class="realm-settings__help">Opens GitHub</span>
+                </span>
+                <MudIcon Icon="@Icons.Material.Filled.OpenInNew" />
+            </a>
+            <a class="realm-settings__link" href="https://github.com/Versile2/ha-cartographer" target="_blank" rel="noopener noreferrer" data-testid="settings-star">
+                <MudIcon Icon="@Icons.Material.Outlined.StarBorder" />
+                <span class="realm-settings__link-text">
+                    <span class="realm-settings__label">Star this project</span>
+                    <span class="realm-settings__help">Opens GitHub</span>
                 </span>
                 <MudIcon Icon="@Icons.Material.Filled.OpenInNew" />
             </a>

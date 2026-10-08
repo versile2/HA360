@@ -30,7 +30,7 @@
    placeholder reserving the Peek band is drawn; the map and the sheet start together with the real layout, so the map's first default camera already uses the
    right padding.
 
-   The markup order is the keyboard order (01 section 10.2, R1-15, [AC-47]): the gear comes first (MainLayout), then here the attribution control's host, the edge bubbles' host, the right stack
+   The markup order is the keyboard order (01 section 10.2, R1-15, [AC-47]): the page comes first, so here the attribution control's host, the edge bubbles' host, the right stack
    and the map canvas, and after the page the sheet (MudPopoverProvider, which MainLayout renders after the main element and before the bottom nav). Nothing is moved by CSS: the elements are
    all fixed and stack by z-index. The two hosts are empty; realmMap.js fills them.
 

@@ -94,15 +94,19 @@ test.describe('acceptance A: the shell', () => {
     expect(covers(canvasBox, navBox, TOLERANCE_PX), `the canvas ${JSON.stringify(canvasBox)} covers the Location link ${JSON.stringify(navBox)}`).toBe(true);
   });
 
-  test('[AC-03] the settings button is 48 x 48 at (12, 12) and the attribution control is a 48 x 48 target in the top-right corner', async ({ page }) => {
+  test('[AC-03] there is no floating settings button on the map and the attribution control is a 48 x 48 target in the top-right corner', async ({ page }) => {
     await demo(page);
     const viewport = page.viewportSize();
     expect(viewport, 'the phone project').toEqual({ width: 412, height: 915 });
     const viewportWidth = viewport?.width ?? 412;
 
-    // The gear: 48 x 48 at (12, 12).
-    const gear = page.getByTestId('btn-settings');
-    expectRectApprox(await boxOf(gear, 'btn-settings'), { x: 12, y: 12, width: 48, height: 48 }, TOLERANCE_PX, 'btn-settings');
+    // D105: no gear floats at (12, 12) any more; Settings is the third tab of the bottom nav, to the right of Driving.
+    const settings = page.getByTestId('btn-settings');
+    const settingsBox = await boxOf(settings, 'btn-settings');
+    const drivingBox = await boxOf(page.getByTestId('nav-driving'), 'nav-driving');
+    expect(settingsBox.y, 'btn-settings is in the nav, not at the top').toBeGreaterThan(viewport!.height - 80);
+    expect(settingsBox.x, 'btn-settings is right of nav-driving').toBeGreaterThanOrEqual(drivingBox.x + drivingBox.width + 8 - TOLERANCE_PX);
+    expect(settingsBox.height, 'btn-settings is at least 48 px tall').toBeGreaterThanOrEqual(48 - TOLERANCE_PX);
 
     // The attribution's hit area: 48 x 48, its right edge 12 px from the viewport's right edge, inside the top band (01 section 4.4).
     const attribution = page.getByTestId('map-attribution');
@@ -114,7 +118,7 @@ test.describe('acceptance A: the shell', () => {
     expect.soft(box.y + box.height, `map-attribution lies in the top ${TOP_ZONE_PX} px`).toBeLessThanOrEqual(TOP_ZONE_PX + TOLERANCE_PX);
 
     // The boxes are real targets: nothing else sits over their centre or the middle of their edges.
-    expect(await hitMisses(gear), 'points of btn-settings that something else receives').toEqual([]);
+    expect(await hitMisses(settings), 'points of btn-settings that something else receives').toEqual([]);
     expect(await hitMisses(attribution), 'points of map-attribution that something else receives').toEqual([]);
   });
 

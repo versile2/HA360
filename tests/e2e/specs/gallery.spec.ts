@@ -384,7 +384,7 @@ test.describe('[GAL] screenshot gallery: the Layers popover and the Settings dia
     expectViewportPng(file, page, testInfo.project.name);
   });
 
-  // SC09-settings (S10a): the Settings dialog opened from the gear: full-screen below 600 px, 480 px wide and centred from there up (03 section 8.5, row SC09; 01 section 7.9).
+  // SC09-settings (S10a): the Settings dialog opened from the Settings tab of the nav: full-screen below 600 px, 480 px wide and centred from there up (03 section 8.5, row SC09; 01 section 7.9).
   // Map, Appearance, Connections and About, with the 48 px Diagnostics row and no Theme, Units, Week starts on or Reset rows (D35). The scene is taken twice: the top of the
   // dialog (SC09-settings) and the bottom, scrolled to the About section (SC09-settings-about).
   test('[GAL] SC09-settings', { tag: ['@phone', '@unfolded'] }, async ({ page }, testInfo) => {
@@ -428,7 +428,7 @@ test.describe('[GAL] screenshot gallery: the Layers popover and the Settings dia
     expectViewportPng(file, page, testInfo.project.name);
 
     // The bottom: the version, the credits and the Diagnostics row that opens diagnostics.json in a new tab, 48 px high at least, with its promise under it.
-    const diagnostics = dialog.locator('a.realm-settings__link');
+    const diagnostics = dialog.locator('a.realm-settings__link[href="diagnostics.json"]');
     await diagnostics.scrollIntoViewIfNeeded();
     await expect(diagnostics, 'the Diagnostics row is a link to the diagnostics file, by a relative URL').toHaveAttribute('href', 'diagnostics.json');
     await expect(diagnostics, 'it opens in a new tab').toHaveAttribute('target', '_blank');
@@ -436,6 +436,19 @@ test.describe('[GAL] screenshot gallery: the Layers popover and the Settings dia
     const row = await diagnostics.boundingBox();
     expect(row, 'the Diagnostics row has a box').not.toBeNull();
     expect(row?.height ?? 0, 'the Diagnostics row is at least 48 px high').toBeGreaterThanOrEqual(47.5);
+
+    // D105: the two project links after it, absolute, in a new tab, safe.
+    const issue = dialog.getByTestId('settings-report-issue');
+    const star = dialog.getByTestId('settings-star');
+    await star.scrollIntoViewIfNeeded();
+    await expect(issue, 'Report an issue opens the issue chooser').toHaveAttribute('href', 'https://github.com/Versile2/ha-cartographer/issues/new/choose');
+    await expect(star, 'Star this project opens the repository page').toHaveAttribute('href', 'https://github.com/Versile2/ha-cartographer');
+    for (const link of [issue, star]) {
+      await expect(link).toHaveAttribute('target', '_blank');
+      await expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+      const box = await link.boundingBox();
+      expect(box?.height ?? 0, 'at least 48 px high').toBeGreaterThanOrEqual(47.5);
+    }
 
     const about = await saveShot(page, testInfo, 'SC09-settings-about');
     expectViewportPng(about, page, testInfo.project.name);

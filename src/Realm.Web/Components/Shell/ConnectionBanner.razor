@@ -6,7 +6,7 @@
 @* The persistent banners and the recovery toast of 01 sections 8.6 and 9 (cases 1, 2 and 4). It reads the circuit's session, so Demo and Live look alike.
    Home Assistant wins when it is down: with no data coming in, nothing else the page could say about the data means anything. Then the first-data banner ("Still summoning the
    court…", 01 section 8.6: no snapshot yet and more than 8 s waited, the circuit's FirstDataWatch), then Life360. The banner takes the position and the look of the static
-   reconnect banner of App.razor (class realm-reconnect, which holds the placement between the gear and the attribution control, up to 2 lines; realm-banner trims its padding and gap so the
+   reconnect banner of App.razor (class realm-reconnect, which holds the placement with 72 px each side, clear of the attribution control, up to 2 lines; realm-banner trims its padding and gap so the
    longest copy still fits two lines in the 268 px of a 412 px phone, measured with the real Atkinson Hyperlegible: 190 px of the 215 px the text has); the inline style only swaps its surface
    and adds the status-coloured left border, with tokens, below the 1300 of that banner so the circuit's own "Reconnecting to the court…" is never hidden behind it. Nothing is read in
    OnInitialized: the prerender pass creates a session and throws it away.

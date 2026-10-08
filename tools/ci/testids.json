@@ -38,6 +38,8 @@
     "bar-{memberId}",
     "drive-row-{n}",
     "settings-dialog",
+    "settings-report-issue",
+    "settings-star",
     "banner-{ha|life360|reconnect}",
     "skeleton-row"
   ]

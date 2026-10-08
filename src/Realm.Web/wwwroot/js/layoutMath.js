@@ -18,7 +18,7 @@ import { EARTH_RADIUS_M, TILE_SIZE_PX, metersPerPixel } from './geo.js';
  */
 /** @typedef {{ center: LngLat, zoom: number }} CameraPose */
 
-/** `safe-top + 72` clears the settings gear (01 section 3.4.3). */
+/** `safe-top + 72` clears the attribution (i) button at the top right (01 section 3.4.3; v0.1.1: there is no gear). */
 export const TOP_CLEARANCE_PX = 72;
 /** 12 + 48 + 12: the right-hand button stack while it is visible. */
 export const STACK_CLEARANCE_PX = 72;

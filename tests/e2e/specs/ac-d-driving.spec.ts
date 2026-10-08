@@ -116,7 +116,7 @@ async function tooltipOf(page: Page, trigger: Locator, how: 'hover' | 'focus'): 
 // ---- the tests ------------------------------------------------------------------------------------------------------------------------------
 
 test.describe('acceptance D: driving', () => {
-  test('[AC-32] /driving shows no map and no sheet, nav-driving is current, and the gear is at (12, 12)', async ({ page }) => {
+  test('[AC-32] /driving shows no map and no sheet, nav-driving is current, and Settings is the third item of the nav, not a floating gear', async ({ page }) => {
     await openDriving(page);
 
     // The route is the ingress prefix plus `driving`; there is no map host and no sheet on it.
@@ -130,9 +130,11 @@ test.describe('acceptance D: driving', () => {
     await expect(page.getByTestId('nav-driving')).toHaveAttribute('aria-current', 'page');
     await expect(page.getByTestId('nav-location')).not.toHaveAttribute('aria-current');
 
-    // The gear is the shell's: 48 x 48 at (12, 12), as on Location (AC-03). That it opens Settings is not asserted here: the Settings dialog is S10's and this
-    // slice's branch has none, so the click assertion belongs to the slice that adds the dialog.
-    expectRectApprox(await boxOf(page.getByTestId('btn-settings'), 'btn-settings'), { x: 12, y: 12, width: 48, height: 48 }, TOLERANCE_PX, 'btn-settings');
+    // Settings is the shell's third nav item (D105), as on Location (AC-03): it sits in the nav, right of Driving, and nothing floats at the top left over the page.
+    const settings = await boxOf(page.getByTestId('btn-settings'), 'btn-settings');
+    const driving = await boxOf(page.getByTestId('nav-driving'), 'nav-driving');
+    expect(settings.x, 'btn-settings is right of nav-driving').toBeGreaterThanOrEqual(driving.x + driving.width + 8 - TOLERANCE_PX);
+    expect(Math.abs(settings.y - driving.y), 'btn-settings is on the row of the nav').toBeLessThanOrEqual(TOLERANCE_PX);
   });
 
   test('[AC-33] four week chips with the exact text, This week selected and 48 px high, and the range line follows the choice', async ({ page }) => {

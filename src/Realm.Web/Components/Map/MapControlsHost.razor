@@ -1,5 +1,5 @@
 @* The container of the map's own controls (the attribution (i), 03 section 4.4): empty on purpose, like EdgeBubbles. MapLibre builds its control container inside the
-   element it draws into, and that element must come last in the Location page so that the keyboard reaches the map canvas after the right stack (01 section 10.2: gear,
+   element it draws into, and that element must come last in the Location page so that the keyboard reaches the map canvas after the right stack (01 section 10.2:
    attribution, bubbles, recenter, layers, canvas). realmMap.js therefore moves the control container here once the map exists; the attribution then comes before the
    bubbles and the right stack in the DOM and stays where it was on the screen (realm-map.css: the host is the whole viewport and takes no pointer events). Blazor never diffs the
    children the script adds, because Razor renders none. *@

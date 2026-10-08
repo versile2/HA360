@@ -64,9 +64,10 @@ address opens a demo session while the app runs on real data.
 
 ## Troubleshooting
 
-- **Diagnostics.** In the app open **Settings -> About -> Diagnostics** to see `diagnostics.json`: connection states,
+- **Diagnostics.** In the app tap **Settings** (the third item of the bottom bar, right of Location and Driving), then **About -> Diagnostics**, to see `diagnostics.json`: connection states,
   counts, version numbers, database health and a list of warning codes. It holds no names, positions or tokens, only
-  your option ids, so strip those before pasting it into a public issue.
+  your option ids, so strip those before pasting it into a public issue. **Settings -> About -> Report an issue** opens the
+  GitHub issue chooser in a new tab, and **Star this project** opens the repository page.
 
   | Warning code | Meaning |
   |---|---|
