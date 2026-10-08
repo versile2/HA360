@@ -1,5 +1,7 @@
 {
   "keys": [
+    "demo_mode",
+    "allow_demo_param",
     "log_level",
     "ui_stale_after_minutes",
     "ui_offline_after_hours",
@@ -24,8 +26,6 @@
     "retention_fix_days",
     "backfill_days",
     "privacy_log_positions",
-    "demo_mode",
-    "allow_demo_param",
     "me_fallback_member",
     "ignore_entities",
     "members",

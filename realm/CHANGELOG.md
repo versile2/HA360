@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.2
+
+### Changed
+
+- Demo mode is now the first option in the add-on configuration.
+
 ## 0.1.1
 
 ### Changed

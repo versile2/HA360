@@ -1,5 +1,5 @@
 name: "HA Cartographer"
-version: "0.1.1"                  # equals the image tag; edited by hand only after the image exists; a CHANGELOG.md section of the same name must exist
+version: "0.1.2"                  # equals the image tag; edited by hand only after the image exists; a CHANGELOG.md section of the same name must exist
 slug: realm
 description: "Map-first family map and weekly driving reports, inside Home Assistant."
 url: "https://github.com/Versile2/ha-cartographer"
@@ -32,6 +32,8 @@ backup_exclude:
 watchdog: "http://[HOST]:[PORT:8099]/healthz"   # liveness only; used if the owner switches Watchdog on
 
 options:                          # personal configuration lives here, never in the repository: the lists stay empty
+  demo_mode: false                # first on purpose: Home Assistant renders options in this order
+  allow_demo_param: false
   log_level: information
   ui_stale_after_minutes: 30
   ui_offline_after_hours: 24
@@ -56,8 +58,6 @@ options:                          # personal configuration lives here, never in 
   retention_fix_days: 120
   backfill_days: 10
   privacy_log_positions: false    # debug logs carry positions only when true
-  demo_mode: false
-  allow_demo_param: false
   ignore_entities: []
   members: []
   vehicles: []
@@ -65,6 +65,8 @@ options:                          # personal configuration lives here, never in 
   # me_fallback_member is optional (str?) and therefore deliberately NOT listed here:
   # the Supervisor treats an optional key that has a default as required.
 schema:                           # list-of-dict only (nesting depth 2); enumerated values are lower-case
+  demo_mode: bool
+  allow_demo_param: bool
   log_level: "list(trace|debug|information|warning|error)"
   ui_stale_after_minutes: "int(5,720)"
   ui_offline_after_hours: "int(1,168)"
@@ -89,8 +91,6 @@ schema:                           # list-of-dict only (nesting depth 2); enumera
   retention_fix_days: "int(14,730)"
   backfill_days: "int(0,14)"
   privacy_log_positions: bool
-  demo_mode: bool
-  allow_demo_param: bool
   me_fallback_member: "str?"      # optional: no line in `options` above
   ignore_entities:
     - str
