@@ -37,7 +37,7 @@ the Supervisor.
 ## What is stored and where
 
 - Positions, trips and vehicle samples are stored in `/data/realm.db` (SQLite) and are included in backups. Positions
-  are kept for 120 days by default (option `retention_fix_days`).
+  are kept for 100 days by default (option `retention_fix_days`, 100 to 400; the Driving report's 6-month and 1-year periods need at least 185 and 366 days).
 - Avatar pictures are cached under `/data/cache/avatars`, which is excluded from backups. Home Assistant's frontend may
   also cache them in your browser for the same user.
 - Nothing leaves your Home Assistant box except two things. Map tiles and style files, which your browser (not the app)

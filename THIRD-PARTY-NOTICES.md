@@ -10,7 +10,7 @@ Versions are those of the packages and files the image is built from (`Directory
 
 | Component | Version | Licence | Where it is |
 |---|---|---|---|
-| HA Cartographer (this project) | 0.1.2 | MIT | [LICENSE](LICENSE) |
+| HA Cartographer (this project) | 0.2.0 | MIT | [LICENSE](LICENSE) |
 | MapLibre GL JS | 6.11.2 | BSD-3-Clause (its licence file also covers mapbox-gl-js up to v1.13, glfx.js and d3-color) | `src/Realm.Web/wwwroot/lib/maplibre-gl/`, image |
 | Material Design icons (six glyphs) | n/a | Apache-2.0 | `src/Realm.Web/wwwroot/js/realmMap.js`, image |
 | Cinzel | `@fontsource-variable/cinzel` 5.3.0 | SIL OFL 1.1 | `src/Realm.Web/wwwroot/fonts/`, image |

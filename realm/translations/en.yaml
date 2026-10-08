@@ -70,7 +70,7 @@ configuration:
     description: "How long the screen must be in use while driving to count as phone use."
   retention_fix_days:
     name: "Keep position history (days)"
-    description: "Stored positions older than this are deleted."
+    description: "Stored positions older than this are deleted (100 to 400 days). Each 100 days uses roughly 6–20 MB per tracked person (estimate). The report's 6-month and 1-year periods need at least 185 / 366 days."
   backfill_days:
     name: "Backfill on start (days)"
     description: "How many days of Home Assistant history to read when the app starts. 0 turns it off."

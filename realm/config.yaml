@@ -1,5 +1,5 @@
 name: "HA Cartographer"
-version: "0.1.2"                  # equals the image tag; merging a PR to main with a new version releases it automatically (image, tag v<version>, GitHub release; Actions -> release -> Run workflow re-runs it by hand); a CHANGELOG.md section of the same name must exist
+version: "0.2.0"                  # equals the image tag; merging a PR to main with a new version releases it automatically (image, tag v<version>, GitHub release; Actions -> release -> Run workflow re-runs it by hand); a CHANGELOG.md section of the same name must exist
 slug: realm
 description: "Map-first family map and weekly driving reports, inside Home Assistant."
 url: "https://github.com/Versile2/ha-cartographer"
@@ -55,7 +55,7 @@ options:                          # personal configuration lives here, never in 
   driving_speeding_mph: 80
   driving_speeding_min_seconds: 30
   driving_phone_min_seconds: 10
-  retention_fix_days: 120
+  retention_fix_days: 100
   backfill_days: 10
   privacy_log_positions: false    # debug logs carry positions only when true
   ignore_entities: []
@@ -88,7 +88,7 @@ schema:                           # list-of-dict only (nesting depth 2); enumera
   driving_speeding_mph: "int(50,150)"
   driving_speeding_min_seconds: "int(10,120)"
   driving_phone_min_seconds: "int(3,60)"
-  retention_fix_days: "int(14,730)"
+  retention_fix_days: "int(100,400)"
   backfill_days: "int(0,14)"
   privacy_log_positions: bool
   me_fallback_member: "str?"      # optional: no line in `options` above

@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.2.0
+
+<!-- Driving report (feat/v020-driving) -->
+
+### Added
+
+- **Longer periods in the Driving report.** A fifth control next to the week chips is a split button: the main part
+  re-applies your last long period (Last month by default), the arrow opens a menu with Last month, Last 3 months, Last
+  6 months, Last year and Custom range. Last 6 months and Last year appear only when `retention_fix_days` covers them
+  (185 and 366 days). The period is kept in the page address, so Back, printing and links work.
+- **Custom range** with a start and an end date picker, checked against today and the history that is kept.
+- **Print or save as PDF** from every Driving page: a clean Letter/A4 layout with the totals, drivers and every drive.
+- The drive list of a driver has a pager on top and at the bottom (25, 50 or 100 rows).
+
+### Changed
+
+- **Drives and top speeds now say where they happened**: the zone name, otherwise the city ("near Pinebrook", "I-65
+  near Pinebrook"), otherwise the nearest zone. "Unknown place" is gone.
+- `retention_fix_days` now ranges from 100 to 400 days and defaults to 100. Each 100 days uses roughly 6-20 MB per
+  tracked person (estimate).
+
 ## 0.1.2
 
 ### Fixed

@@ -203,7 +203,7 @@ public class OptionsBindingTests
         Assert.Equal(35.7632, options.DrivingSpeedingMps, 4); // 80 mph
         Assert.Equal(30, options.DrivingSpeedingMinSeconds);
         Assert.Equal(10, options.DrivingPhoneMinSeconds);
-        Assert.Equal(120, options.RetentionFixDays);
+        Assert.Equal(100, options.RetentionFixDays);
         Assert.Equal(10, options.BackfillDays);
         Assert.False(options.PrivacyLogPositions);
         Assert.False(options.DemoMode);

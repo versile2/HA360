@@ -43,7 +43,7 @@ public static class OptionsBinding
         new("driving_speeding_mph", "Driving:SpeedingMps", OptionKind.Number, "80", MphToMps),
         new("driving_speeding_min_seconds", "Driving:SpeedingMinS", OptionKind.Integer, "30"),
         new("driving_phone_min_seconds", "Driving:PhoneMinS", OptionKind.Integer, "10"),
-        new("retention_fix_days", "Retention:FixDays", OptionKind.Integer, "120"),
+        new("retention_fix_days", "Retention:FixDays", OptionKind.Integer, "100"),
         new("backfill_days", "Backfill:Days", OptionKind.Integer, "10"),
         new("privacy_log_positions", "Privacy:LogPositions", OptionKind.Flag, "false"),
         new("demo_mode", "Demo:Mode", OptionKind.Flag, "false"),
