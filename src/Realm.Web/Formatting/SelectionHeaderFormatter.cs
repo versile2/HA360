@@ -188,6 +188,38 @@ public static class SelectionHeaderFormatter
         return address.Length > 0 && (" " + status + " ").Contains(" " + address + " ", StringComparison.Ordinal) ? null : member.FullAddress;
     }
 
+    /// <summary>The two text lines of the person detail's status card (01 section 5.4): the title and the line under it.</summary>
+    public readonly record struct MemberCardLines(string Title, string Detail);
+
+    /// <summary>
+    /// The status card's lines for a person (01 section 5.4, D108). A fresh live member (at a place, out, driving) says how fresh the fix is, once: "Since 9:06 pm · updated 3 min ago · 1.0 mi away" under
+    /// the title, or on the title itself while driving ("Driving · 54 mph on I-65 · updated 1 min ago"). A member with no arrival time already reads "Updated 3 min ago" as the time line, and stale,
+    /// offline, no-fix and static members say theirs in their own line, so those rows are the list row's, unchanged.
+    /// </summary>
+    public static MemberCardLines MemberCard(MemberVm member, MemberRowVm row, RowFacts facts)
+    {
+        ArgumentNullException.ThrowIfNull(member);
+        ArgumentNullException.ThrowIfNull(row);
+        ArgumentNullException.ThrowIfNull(facts);
+        if (row.Status is not (MemberStatus.AtPlace or MemberStatus.Out or MemberStatus.Driving) || member.LastUpdateUtc is not { } at)
+        {
+            return new MemberCardLines(row.StatusLine, row.DetailLine);
+        }
+
+        var updated = "updated " + TimeFormatter.Relative(at, facts.Now, facts.Zone);
+        var timePart = MemberTextFormatter.TimePart(member, row.Status, facts.Now, facts.Zone);
+        var rest = row.DetailLine.StartsWith(timePart, StringComparison.Ordinal) ? row.DetailLine[timePart.Length..] : string.Empty;
+        if (row.Status == MemberStatus.Driving)
+        {
+            // The drive's start stays on its own line; without one that line would only repeat the freshness.
+            return new MemberCardLines(row.StatusLine + " · " + updated, member.SinceUtc is null ? rest.TrimStart(' ', '·') : row.DetailLine);
+        }
+
+        return member.SinceUtc is null
+            ? new MemberCardLines(row.StatusLine, row.DetailLine)
+            : new MemberCardLines(row.StatusLine, timePart + " · " + updated + rest);
+    }
+
     private static string NormalisePlaceText(string text) =>
         string.Join(' ', text.Split(['·', ',', '.', ' ', '\t', '\u00A0'], StringSplitOptions.RemoveEmptyEntries)).ToLowerInvariant();
 

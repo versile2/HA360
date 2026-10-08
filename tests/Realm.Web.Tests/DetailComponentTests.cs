@@ -63,7 +63,7 @@ public sealed class DetailComponentTests : ComponentTestBase
         Assert.Equal("--realm-row-color:" + DemoCast.Jester.Color, cut.Find(".realm-detail-avatar").GetAttribute("style"));
 
         Assert.Equal("At " + DemoPlaces.JesterHall.Name, cut.Find(".realm-detail-status-line").TextContent);
-        Assert.Equal("Since 9:06 pm · 1.0 mi away", cut.Find(".realm-detail-status .realm-detail-line").TextContent);
+        Assert.Equal("Since 9:06 pm · updated 3 min ago · 1.0 mi away", cut.Find(".realm-detail-status .realm-detail-line").TextContent);
 
         var chip = Assert.Single(cut.FindAll(".realm-detail-chip"));
         Assert.Equal("12% · Low battery", chip.TextContent.Trim());
@@ -251,6 +251,24 @@ public sealed class DetailComponentTests : ComponentTestBase
         Assert.Single(Regex.Matches(cut.Markup, "I-65"));
     }
 
+    [Fact(DisplayName = "[AC-30k] A fresh member's status card says how fresh the fix is, once: after the drive on Briar's title, after the arrival time on Cass's line; a stale or static member gets none")]
+    public void AFreshMember_SaysUpdatedOnce_AndTheStaleAndStaticOnesNever()
+    {
+        var briar = MemberOf(DemoCast.Queen.Id);
+        var briarCut = RenderMember(briar);
+        var ago = TimeFormatter.Relative(briar.LastUpdateUtc!.Value, Facts.Now, Facts.Zone);
+        Assert.EndsWith(" · updated " + ago, briarCut.Find(".realm-detail-status-line").TextContent, StringComparison.Ordinal);
+        Assert.Equal("Since 9:12 pm", briarCut.Find(".realm-detail-status .realm-detail-line").TextContent);
+        Assert.Single(Regex.Matches(briarCut.Markup, "updated " + Regex.Escape(ago)));
+
+        var cass = RenderMember(Cass());
+        Assert.Single(Regex.Matches(cass.Markup, "pdated 3 min ago"));
+        Assert.DoesNotContain("Updated", cass.Find("section").TextContent, StringComparison.Ordinal);
+
+        Assert.DoesNotContain("updated", RenderMember(MemberOf(DemoCast.Cryptid.Id)).Find("#realm-detail-status").TextContent, StringComparison.Ordinal);
+        Assert.DoesNotContain("updated", RenderMember(MemberOf(DemoCast.Prince.Id)).Find("#realm-detail-status").TextContent, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData("Eastgate Avenue, Pinebrook, AL", "Eastgate Avenue · Pinebrook, AL", false)]
     [InlineData("  eastgate   avenue,Pinebrook,al ", "Eastgate Avenue · Pinebrook, AL", false)]
@@ -368,7 +386,7 @@ public sealed class DetailComponentTests : ComponentTestBase
         Assert.Equal(1, failing.DriverWeekCalls);
         Assert.Equal([Dash, Dash, Dash], TileValues(cut));
         Assert.Equal(DemoCast.Jester.Name, cut.Find("h2#realm-detail-title").TextContent);
-        Assert.Equal("Since 9:06 pm · 1.0 mi away", cut.Find(".realm-detail-status .realm-detail-line").TextContent);
+        Assert.Equal("Since 9:06 pm · updated 3 min ago · 1.0 mi away", cut.Find(".realm-detail-status .realm-detail-line").TextContent);
         Assert.Single(cut.FindAll("a.realm-detail-link"));
     }
 

@@ -1,4 +1,10 @@
 configuration:
+  demo_mode:
+    name: "Demo mode"
+    description: "Show a fictional family instead of real data, for checking an install."
+  allow_demo_param:
+    name: "Allow demo link"
+    description: "Allow adding ?demo=1 to the address to open a demo session while the app runs on real data."
   log_level:
     name: "Log level"
     description: "Minimum level written to the app log."
@@ -71,12 +77,6 @@ configuration:
   privacy_log_positions:
     name: "Log positions"
     description: "When on, debug logs include positions. Off by default."
-  demo_mode:
-    name: "Demo mode"
-    description: "Show a fictional family instead of real data, for checking an install."
-  allow_demo_param:
-    name: "Allow demo link"
-    description: "Allow adding ?demo=1 to the address to open a demo session while the app runs on real data."
   me_fallback_member:
     name: "Fallback person for 'me'"
     description: "Optional. The member id shown as you when your Home Assistant user is not linked to a person."

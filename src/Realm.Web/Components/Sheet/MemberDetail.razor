@@ -23,6 +23,7 @@
     var accuracy = SelectionHeaderFormatter.AccuracyChip(Member, row.Status, Facts);
     var staticDistance = isStatic ? SelectionHeaderFormatter.StaticDistance(Member, Facts) : null;
     var sentence = isStatic ? SelectionHeaderFormatter.StaticSentence(Member) : null;
+    var card = SelectionHeaderFormatter.MemberCard(Member, row, Facts);
     var address = SelectionHeaderFormatter.MemberAddress(Member, row.StatusLine);
     var colorStyle = row.Color is { } hex ? "--realm-row-color:" + hex : null;
 }
@@ -58,10 +59,10 @@
     <div class="realm-detail-body">
         <div class="realm-detail-status" id="realm-detail-status">
             <div class="realm-detail-status-text">
-                <p class="realm-detail-status-line">@row.StatusLine</p>
-                @if (row.DetailLine.Length > 0)
+                <p class="realm-detail-status-line">@card.Title</p>
+                @if (card.Detail.Length > 0)
                 {
-                    <p class="@("realm-detail-line" + RowClasses.Tone(row.DetailTone))">@row.DetailLine</p>
+                    <p class="@("realm-detail-line" + RowClasses.Tone(row.DetailTone))">@card.Detail</p>
                 }
                 @if (staticDistance is not null)
                 {

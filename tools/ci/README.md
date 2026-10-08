@@ -130,3 +130,7 @@ node --test "tests/js/**/*.test.mjs"
 
 The tests build temporary git repositories and need `git`, `bash` and Node 22. They run locally only until the `js` job
 of slice S5 exists; its quoted glob then picks them up.
+
+## Releases
+
+`release.yml` is not part of the CI summary. It runs automatically when a PR is merged to main (a push to main), and by hand too (Actions -> release -> Run workflow, on main). It reads `version` from `realm/config.yaml`; the tag is `v<version>`. If that tag already exists, a push run skips cleanly (notice and job summary "bump realm/config.yaml version to release") and a by-hand run fails with that message (never re-released). Otherwise it needs the `## <version>` section in `realm/CHANGELOG.md`, builds and pushes `ghcr.io/versile2/ha-cartographer:<version>`, and only after that creates the tag and a GitHub release with notes generated from the merged PRs (`.github/release.yml`). It fails on any ref other than main; the tag exists only once the image does, so a run that failed earlier can be run again by hand. `.github/pull_request_template.md` reminds authors that merging releases.

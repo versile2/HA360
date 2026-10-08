@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.2
+
+### Fixed
+
+- After an update, the first page load no longer logs an antiforgery key error (the app's keys are now kept in /data).
+
+### Changed
+
+- Demo mode is now the first option in the add-on configuration.
+- The status line in a person's details shows how fresh the location is ("updated 3 min ago").
+
 ## 0.1.1
 
 ### Changed

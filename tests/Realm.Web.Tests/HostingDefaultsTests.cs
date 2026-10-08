@@ -171,7 +171,7 @@ public sealed partial class HostingDefaultsTests : IDisposable
     }
 
     [Fact]
-    public void TheKeyDirectory_IsBesideTheDatabase_InLiveAndNeverInDataForDemo()
+    public void TheKeyDirectory_IsBesideTheDatabase_InLiveAndInDemoWhenConfigured()
     {
         var live = new RuntimeOptions(RealmMode.Live, DetailedErrors: false);
         var demo = new RuntimeOptions(RealmMode.Demo, DetailedErrors: true);
@@ -181,8 +181,24 @@ public sealed partial class HostingDefaultsTests : IDisposable
         Assert.Equal(Path.Combine(data, "dp-keys"), RealmHostingExtensions.DataProtectionDirectory(live, Configure(("Realm:Db", Path.Combine(data, "realm.db")))));
         Assert.Equal(Path.Combine(data, "dp-keys"), RealmHostingExtensions.DataProtectionDirectory(live, Configure(("REALM_DB", Path.Combine(data, "realm.db")), ("Realm:Db", "/elsewhere/x.db"))));
         Assert.Equal(Path.Combine(home, "dp-keys"), RealmHostingExtensions.DataProtectionDirectory(demo, Configure(("Realm:Db", Path.Combine(home, "realm.db")))));
-        Assert.Null(RealmHostingExtensions.DataProtectionDirectory(demo, Configure()));   // no database in Demo: the framework's user-profile location, never /data
+        var missing = Path.Combine(Path.GetTempPath(), "realm-no-such-data-" + Guid.NewGuid().ToString("N"));
+        Assert.Null(RealmHostingExtensions.DataProtectionDirectory(demo, Configure(), missing));   // no database and no add-on volume: the framework's user-profile location
         Assert.Null(RealmHostingExtensions.DataProtectionDirectory(demo, null));
+    }
+
+    [Fact]
+    public void TheKeyDirectory_InDemoInTheAddOn_IsUnderTheDataVolume()
+    {
+        var demo = new RuntimeOptions(RealmMode.Demo, DetailedErrors: true);
+        var volume = Directory.CreateTempSubdirectory("realm-addon-data-").FullName;
+        try
+        {
+            Assert.Equal(Path.Combine(volume, "dp-keys"), RealmHostingExtensions.DataProtectionDirectory(demo, Configure(), volume));
+        }
+        finally
+        {
+            Directory.Delete(volume, true);
+        }
     }
 
     [Fact]
