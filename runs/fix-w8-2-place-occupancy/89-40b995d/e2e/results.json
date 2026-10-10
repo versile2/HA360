@@ -1,0 +1,4955 @@
+{
+  "config": {
+    "argv": [
+      "/opt/hostedtoolcache/node/22.23.3/x64/bin/node",
+      "/home/runner/work/HA360/HA360/node_modules/.bin/playwright",
+      "test",
+      "--config",
+      "tests/e2e/playwright.config.ts"
+    ],
+    "configFile": "/home/runner/work/HA360/HA360/tests/e2e/playwright.config.ts",
+    "rootDir": "/home/runner/work/HA360/HA360/tests/e2e/specs",
+    "failOnFlakyTests": false,
+    "forbidOnly": true,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "ci": {
+        "commitHref": "https://github.com/versile2/HA360/commit/40b995df65c9f0fc368fc87b3e1e94dc0f3c36a9",
+        "commitHash": "40b995df65c9f0fc368fc87b3e1e94dc0f3c36a9",
+        "buildHref": "https://github.com/versile2/HA360/actions/runs/37044300351"
+      },
+      "gitCommit": {
+        "shortHash": "40b995d",
+        "hash": "40b995df65c9f0fc368fc87b3e1e94dc0f3c36a9",
+        "subject": "fix/W8-2: count only people when a place is occupied",
+        "body": "fix/W8-2: count only people when a place is occupied\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01KBQausaArk3u4LVWi4qxwu\n",
+        "author": {
+          "name": "Claude",
+          "email": "noreply@anthropic.com",
+          "time": 1790959891000
+        },
+        "committer": {
+          "name": "Claude",
+          "email": "noreply@anthropic.com",
+          "time": 1790959891000
+        },
+        "branch": "fix/W8-2-place-occupancy"
+      },
+      "actualWorkers": 2
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/home/runner/work/HA360/HA360/ci-out/e2e/artifacts",
+        "repeatEach": 1,
+        "retries": 1,
+        "metadata": {
+          "ci": {
+            "commitHref": "https://github.com/versile2/HA360/commit/40b995df65c9f0fc368fc87b3e1e94dc0f3c36a9",
+            "commitHash": "40b995df65c9f0fc368fc87b3e1e94dc0f3c36a9",
+            "buildHref": "https://github.com/versile2/HA360/actions/runs/37044300351"
+          },
+          "gitCommit": {
+            "shortHash": "40b995d",
+            "hash": "40b995df65c9f0fc368fc87b3e1e94dc0f3c36a9",
+            "subject": "fix/W8-2: count only people when a place is occupied",
+            "body": "fix/W8-2: count only people when a place is occupied\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01KBQausaArk3u4LVWi4qxwu\n",
+            "author": {
+              "name": "Claude",
+              "email": "noreply@anthropic.com",
+              "time": 1790959891000
+            },
+            "committer": {
+              "name": "Claude",
+              "email": "noreply@anthropic.com",
+              "time": 1790959891000
+            },
+            "branch": "fix/W8-2-place-occupancy"
+          },
+          "actualWorkers": 2
+        },
+        "id": "phone",
+        "name": "phone",
+        "testDir": "/home/runner/work/HA360/HA360/tests/e2e/specs",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.spec.ts"
+        ],
+        "timeout": 45000
+      },
+      {
+        "outputDir": "/home/runner/work/HA360/HA360/ci-out/e2e/artifacts",
+        "repeatEach": 1,
+        "retries": 1,
+        "metadata": {
+          "ci": {
+            "commitHref": "https://github.com/versile2/HA360/commit/40b995df65c9f0fc368fc87b3e1e94dc0f3c36a9",
+            "commitHash": "40b995df65c9f0fc368fc87b3e1e94dc0f3c36a9",
+            "buildHref": "https://github.com/versile2/HA360/actions/runs/37044300351"
+          },
+          "gitCommit": {
+            "shortHash": "40b995d",
+            "hash": "40b995df65c9f0fc368fc87b3e1e94dc0f3c36a9",
+            "subject": "fix/W8-2: count only people when a place is occupied",
+            "body": "fix/W8-2: count only people when a place is occupied\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01KBQausaArk3u4LVWi4qxwu\n",
+            "author": {
+              "name": "Claude",
+              "email": "noreply@anthropic.com",
+              "time": 1790959891000
+            },
+            "committer": {
+              "name": "Claude",
+              "email": "noreply@anthropic.com",
+              "time": 1790959891000
+            },
+            "branch": "fix/W8-2-place-occupancy"
+          },
+          "actualWorkers": 2
+        },
+        "id": "phone-short",
+        "name": "phone-short",
+        "testDir": "/home/runner/work/HA360/HA360/tests/e2e/specs",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.spec.ts"
+        ],
+        "timeout": 45000
+      },
+      {
+        "outputDir": "/home/runner/work/HA360/HA360/ci-out/e2e/artifacts",
+        "repeatEach": 1,
+        "retries": 1,
+        "metadata": {
+          "ci": {
+            "commitHref": "https://github.com/versile2/HA360/commit/40b995df65c9f0fc368fc87b3e1e94dc0f3c36a9",
+            "commitHash": "40b995df65c9f0fc368fc87b3e1e94dc0f3c36a9",
+            "buildHref": "https://github.com/versile2/HA360/actions/runs/37044300351"
+          },
+          "gitCommit": {
+            "shortHash": "40b995d",
+            "hash": "40b995df65c9f0fc368fc87b3e1e94dc0f3c36a9",
+            "subject": "fix/W8-2: count only people when a place is occupied",
+            "body": "fix/W8-2: count only people when a place is occupied\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01KBQausaArk3u4LVWi4qxwu\n",
+            "author": {
+              "name": "Claude",
+              "email": "noreply@anthropic.com",
+              "time": 1790959891000
+            },
+            "committer": {
+              "name": "Claude",
+              "email": "noreply@anthropic.com",
+              "time": 1790959891000
+            },
+            "branch": "fix/W8-2-place-occupancy"
+          },
+          "actualWorkers": 2
+        },
+        "id": "unfolded",
+        "name": "unfolded",
+        "testDir": "/home/runner/work/HA360/HA360/tests/e2e/specs",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.spec.ts"
+        ],
+        "timeout": 45000
+      },
+      {
+        "outputDir": "/home/runner/work/HA360/HA360/ci-out/e2e/artifacts",
+        "repeatEach": 1,
+        "retries": 1,
+        "metadata": {
+          "ci": {
+            "commitHref": "https://github.com/versile2/HA360/commit/40b995df65c9f0fc368fc87b3e1e94dc0f3c36a9",
+            "commitHash": "40b995df65c9f0fc368fc87b3e1e94dc0f3c36a9",
+            "buildHref": "https://github.com/versile2/HA360/actions/runs/37044300351"
+          },
+          "gitCommit": {
+            "shortHash": "40b995d",
+            "hash": "40b995df65c9f0fc368fc87b3e1e94dc0f3c36a9",
+            "subject": "fix/W8-2: count only people when a place is occupied",
+            "body": "fix/W8-2: count only people when a place is occupied\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01KBQausaArk3u4LVWi4qxwu\n",
+            "author": {
+              "name": "Claude",
+              "email": "noreply@anthropic.com",
+              "time": 1790959891000
+            },
+            "committer": {
+              "name": "Claude",
+              "email": "noreply@anthropic.com",
+              "time": 1790959891000
+            },
+            "branch": "fix/W8-2-place-occupancy"
+          },
+          "actualWorkers": 2
+        },
+        "id": "unfolded-tall",
+        "name": "unfolded-tall",
+        "testDir": "/home/runner/work/HA360/HA360/tests/e2e/specs",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.spec.ts"
+        ],
+        "timeout": 45000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "/home/runner/work/HA360/HA360/ci-out/e2e/results.json"
+        }
+      ],
+      [
+        "html",
+        {
+          "outputFolder": "/home/runner/work/HA360/HA360/ci-out/e2e/html",
+          "open": "never"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.63.0",
+    "workers": 2,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "ac-a-sheet.spec.ts",
+      "file": "ac-a-sheet.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "navigation, right stack, sheet and layout",
+          "file": "ac-a-sheet.spec.ts",
+          "line": 156,
+          "column": 6,
+          "specs": [
+            {
+              "title": "[AC-02] the bottom nav has exactly two links, 64 px high at the bottom edge, each at least 48 px tall, and no Safety or Membership",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 3081,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:01:04.283Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2b634ca0d7678e22b4ca-9f37f8d7485cd3932c94",
+              "file": "ac-a-sheet.spec.ts",
+              "line": 157,
+              "column": 3
+            },
+            {
+              "title": "[AC-04] the right stack has two 48 px buttons, recenter above layers, 12 px apart at x = 352, the layers bottom 12 px above the Peek sheet",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2056,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:01:09.117Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2b634ca0d7678e22b4ca-17800e605b544c938cc1",
+              "file": "ac-a-sheet.spec.ts",
+              "line": 174,
+              "column": 3
+            },
+            {
+              "title": "[AC-05] on load the sheet is at Peek: 174 high (168 at 800), full width, flush with the bottom; only the handle summary and the tabs show",
+              "ok": true,
+              "tags": [
+                "phone",
+                "phone-short"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2228,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:01:11.188Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2b634ca0d7678e22b4ca-310f7f0cc5675a7ab6a2",
+              "file": "ac-a-sheet.spec.ts",
+              "line": 201,
+              "column": 3
+            },
+            {
+              "title": "[AC-06] a tap toggles Peek, 80 %, Peek; the state hook and aria-expanded follow; the sheet stays open, also after Esc",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 6203,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:01:13.431Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2b634ca0d7678e22b4ca-dc439321610dd50e3899",
+              "file": "ac-a-sheet.spec.ts",
+              "line": 236,
+              "column": 3
+            },
+            {
+              "title": "[AC-06] keyboard on the focused handle: Enter and Space toggle, ArrowUp and End go to 80 %, ArrowDown and Home go to Peek",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 6467,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:01:19.647Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2b634ca0d7678e22b4ca-cff7c5e10735568a0dd1",
+              "file": "ac-a-sheet.spec.ts",
+              "line": 280,
+              "column": 3
+            },
+            {
+              "title": "[AC-06] ?sheet=80 starts the sheet at 80 % with the right stack hidden",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1681,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:01:26.128Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2b634ca0d7678e22b4ca-72130e88b46a20cefd0a",
+              "file": "ac-a-sheet.spec.ts",
+              "line": 305,
+              "column": 3
+            },
+            {
+              "title": "[AC-07] a press on the handle that moves up 300 px at Peek resizes nothing (no drag, D73): the sheet stays at Peek and open",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 3075,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:01:27.839Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2b634ca0d7678e22b4ca-09243f94a4bd482d5ea5",
+              "file": "ac-a-sheet.spec.ts",
+              "line": 325,
+              "column": 5
+            },
+            {
+              "title": "[AC-07] a press on the handle that moves down 300 px at 80 % resizes nothing (no drag, D73): the sheet stays at 80 % and open",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 3486,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:01:30.926Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2b634ca0d7678e22b4ca-748cccdf3f93c5f612ea",
+              "file": "ac-a-sheet.spec.ts",
+              "line": 325,
+              "column": 5
+            },
+            {
+              "title": "[AC-08] the right stack sits 12 px above the sheet while it is under 50 % of the viewport height, and is hidden and unfocusable from 50 % up",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 3356,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:01:34.437Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2b634ca0d7678e22b4ca-65ae43d11480143858e8",
+              "file": "ac-a-sheet.spec.ts",
+              "line": 363,
+              "column": 3
+            },
+            {
+              "title": "[AC-09] the map padding is {72, 72, 190, 16} at Peek and {72, 16, 748, 16} at 80 %, and the camera does not move with the sheet",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2734,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:01:37.806Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2b634ca0d7678e22b4ca-52fa575bf2096d402fbd",
+              "file": "ac-a-sheet.spec.ts",
+              "line": 409,
+              "column": 3
+            },
+            {
+              "title": "[AC-10] the Compact sheet is a bottom sheet at the full viewport width, with no width cap",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1666,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:01:40.555Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2b634ca0d7678e22b4ca-2aedef44ed9f1ef5021a",
+              "file": "ac-a-sheet.spec.ts",
+              "line": 448,
+              "column": 3
+            },
+            {
+              "title": "[AC-10] a wider window keeps the bottom sheet at the full width: 700 x 900 and a landscape phone 915 x 412",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2045,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:01:42.235Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2b634ca0d7678e22b4ca-5ac15f2da2f5bef9707c",
+              "file": "ac-a-sheet.spec.ts",
+              "line": 465,
+              "column": 3
+            },
+            {
+              "title": "[AC-05] on load the sheet is at Peek: 174 high (168 at 800), full width, flush with the bottom; only the handle summary and the tabs show",
+              "ok": true,
+              "tags": [
+                "phone",
+                "phone-short"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone-short",
+                  "projectName": "phone-short",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 2736,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:24.726Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2b634ca0d7678e22b4ca-69092985e49ae914c29e",
+              "file": "ac-a-sheet.spec.ts",
+              "line": 201,
+              "column": 3
+            },
+            {
+              "title": "[AC-11] at 884 wide the sheet is a left panel: 400 wide at x = 16, top 76, 16 px above the nav, no handle, tabs and summary visible, map padding-left 432",
+              "ok": true,
+              "tags": [
+                "unfolded",
+                "unfolded-tall"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unfolded",
+                  "projectName": "unfolded",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 3107,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:28.086Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2b634ca0d7678e22b4ca-4c6873f9e19acb55e1dc",
+              "file": "ac-a-sheet.spec.ts",
+              "line": 485,
+              "column": 3
+            },
+            {
+              "title": "[AC-11] ?layout=sheet at 884 wide shows the bottom sheet",
+              "ok": true,
+              "tags": [
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unfolded",
+                  "projectName": "unfolded",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 2573,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:31.314Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2b634ca0d7678e22b4ca-df14a5ebdbd7b23ec156",
+              "file": "ac-a-sheet.spec.ts",
+              "line": 508,
+              "column": 3
+            },
+            {
+              "title": "[AC-11] ?layout=panel shows the panel also when the window is narrowed to 700 wide",
+              "ok": true,
+              "tags": [
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unfolded",
+                  "projectName": "unfolded",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 2012,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:33.903Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2b634ca0d7678e22b4ca-1087a380a8df5d9b713b",
+              "file": "ac-a-sheet.spec.ts",
+              "line": 519,
+              "column": 3
+            },
+            {
+              "title": "[AC-11] at 884 wide the sheet is a left panel: 400 wide at x = 16, top 76, 16 px above the nav, no handle, tabs and summary visible, map padding-left 432",
+              "ok": true,
+              "tags": [
+                "unfolded",
+                "unfolded-tall"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unfolded-tall",
+                  "projectName": "unfolded-tall",
+                  "results": [
+                    {
+                      "workerIndex": 6,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2517,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:52.284Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2b634ca0d7678e22b4ca-4c9d0958314ad2010335",
+              "file": "ac-a-sheet.spec.ts",
+              "line": 485,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "ac-a-shell.spec.ts",
+      "file": "ac-a-shell.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "acceptance A: the shell",
+          "file": "ac-a-shell.spec.ts",
+          "line": 58,
+          "column": 6,
+          "specs": [
+            {
+              "title": "[AC-01] opening / shows Location and the map canvas covers the whole viewport",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 3000,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:01:04.297Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "c0da192f7b82ecb477ff-70548822907c8edc03e6",
+              "file": "ac-a-shell.spec.ts",
+              "line": 59,
+              "column": 3
+            },
+            {
+              "title": "[AC-03] the settings button is 48 x 48 at (12, 12) and the attribution control is a 48 x 48 target in the top-right corner",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 2096,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:01:09.030Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "c0da192f7b82ecb477ff-f810fc4826eb6a7840b3",
+              "file": "ac-a-shell.spec.ts",
+              "line": 82,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "ac-b-map.spec.ts",
+      "file": "ac-b-map.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "acceptance B: the map",
+          "file": "ac-b-map.spec.ts",
+          "line": 248,
+          "column": 6,
+          "specs": [
+            {
+              "title": "[AC-13a] on load no camera animation runs and exactly the four pins of the default view are on screen",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 2605,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:01:11.164Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "dc00f343cbce5b812581-b82ce71dd3a393d2c952",
+              "file": "ac-b-map.spec.ts",
+              "line": 251,
+              "column": 3
+            },
+            {
+              "title": "[AC-16a] member pins are 48 px circles with a 4 px solid ring, the wagon is a 44 px rounded square",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 2333,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:01:13.776Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "dc00f343cbce5b812581-f283b888a51eb54b02fd",
+              "file": "ac-b-map.spec.ts",
+              "line": 278,
+              "column": 3
+            },
+            {
+              "title": "[AC-17] with nothing selected one Here-for chip shows above the King's pin and on no other pin",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [
+                    {
+                      "type": "chip",
+                      "description": "clamped"
+                    }
+                  ],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 2382,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:01:16.132Z",
+                      "annotations": [
+                        {
+                          "type": "chip",
+                          "description": "clamped"
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "dc00f343cbce5b812581-489d1bab9b5df4c7b701",
+              "file": "ac-b-map.spec.ts",
+              "line": 331,
+              "column": 3
+            },
+            {
+              "title": "[AC-18] fourteen zone circles are drawn, two occupied, every circle at least 14 px, the arrival zone not drawn",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 1857,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:01:18.540Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "dc00f343cbce5b812581-3d86e909f97f017814d2",
+              "file": "ac-b-map.spec.ts",
+              "line": 390,
+              "column": 3
+            },
+            {
+              "title": "[AC-13b] bubble-cryptid and bubble-prince exist, pin-member-cryptid and pin-member-prince do not",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 1761,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:01:20.404Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "dc00f343cbce5b812581-8afce7f26c864c7e0726",
+              "file": "ac-b-map.spec.ts",
+              "line": 432,
+              "column": 3
+            },
+            {
+              "title": "[AC-14] the two bubbles sit at (384, 347) and (28, 142), 8 px clear of the gear, the right stack and the sheet, 48 px to hit, pointing at their members",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 2292,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:01:22.179Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "dc00f343cbce5b812581-5c57cea7fc4435b66863",
+              "file": "ac-b-map.spec.ts",
+              "line": 458,
+              "column": 3
+            },
+            {
+              "title": "[AC-15] tapping bubble-cryptid selects Dara: Peek, zoom 13 within 1,000 ms, her pin in the Peek rectangle, her bubble gone and the King's bubble there",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [
+                    {
+                      "type": "info",
+                      "description": "[AC-15] ms from the tap on bubble-cryptid to zoom 13 +-0.1: 990 (limit 1000, slack 500)"
+                    },
+                    {
+                      "type": "info",
+                      "description": "[AC-15] the bubble that holds the King after the flight: bubble-queen-king-jester (cluster of 3)"
+                    }
+                  ],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "failed",
+                      "duration": 3396,
+                      "error": {
+                        "message": "Error: ms from the tap to zoom 13\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: <= \u001b[32m1500\u001b[39m\nReceived:    \u001b[31m1535.600000000035\u001b[39m",
+                        "stack": "Error: ms from the tap to zoom 13\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: <= \u001b[32m1500\u001b[39m\nReceived:    \u001b[31m1535.600000000035\u001b[39m\n    at /home/runner/work/HA360/HA360/tests/e2e/specs/ac-b-map.spec.ts:549:62",
+                        "location": {
+                          "file": "/home/runner/work/HA360/HA360/tests/e2e/specs/ac-b-map.spec.ts",
+                          "column": 62,
+                          "line": 549
+                        },
+                        "snippet": "\u001b[0m \u001b[90m 547 |\u001b[39m     \u001b[36mconst\u001b[39m { elapsedMs } \u001b[33m=\u001b[39m \u001b[36mawait\u001b[39m arrival\u001b[33m;\u001b[39m\n \u001b[90m 548 |\u001b[39m     test\u001b[33m.\u001b[39minfo()\u001b[33m.\u001b[39mannotations\u001b[33m.\u001b[39mpush({ type\u001b[33m:\u001b[39m \u001b[32m'info'\u001b[39m\u001b[33m,\u001b[39m description\u001b[33m:\u001b[39m \u001b[32m`[AC-15] ms from the tap on bubble-cryptid to zoom ${FAR_ZOOM} +-${FAR_ZOOM_TOLERANCE}: ${Math.round(elapsedMs)} (limit ${TAP_TO_ZOOM_MS}, slack ${CI_ROUND_TRIP_SLACK_MS})`\u001b[39m })\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 549 |\u001b[39m     expect(elapsedMs\u001b[33m,\u001b[39m \u001b[32m`ms from the tap to zoom ${FAR_ZOOM}`\u001b[39m)\u001b[33m.\u001b[39mtoBeLessThanOrEqual(\u001b[33mTAP_TO_ZOOM_MS\u001b[39m \u001b[33m+\u001b[39m \u001b[33mCI_ROUND_TRIP_SLACK_MS\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                                                              \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 550 |\u001b[39m     \u001b[36mawait\u001b[39m settled(page)\u001b[33m;\u001b[39m\n \u001b[90m 551 |\u001b[39m\n \u001b[90m 552 |\u001b[39m     \u001b[90m// The flight: 900 ms, ending at zoom 13 with the sheet still at Peek (a selection never changes the size by itself).\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/home/runner/work/HA360/HA360/tests/e2e/specs/ac-b-map.spec.ts",
+                            "column": 62,
+                            "line": 549
+                          },
+                          "message": "Error: ms from the tap to zoom 13\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: <= \u001b[32m1500\u001b[39m\nReceived:    \u001b[31m1535.600000000035\u001b[39m\n\n  547 |     const { elapsedMs } = await arrival;\n  548 |     test.info().annotations.push({ type: 'info', description: `[AC-15] ms from the tap on bubble-cryptid to zoom ${FAR_ZOOM} +-${FAR_ZOOM_TOLERANCE}: ${Math.round(elapsedMs)} (limit ${TAP_TO_ZOOM_MS}, slack ${CI_ROUND_TRIP_SLACK_MS})` });\n> 549 |     expect(elapsedMs, `ms from the tap to zoom ${FAR_ZOOM}`).toBeLessThanOrEqual(TAP_TO_ZOOM_MS + CI_ROUND_TRIP_SLACK_MS);\n      |                                                              ^\n  550 |     await settled(page);\n  551 |\n  552 |     // The flight: 900 ms, ending at zoom 13 with the sheet still at Peek (a selection never changes the size by itself).\n    at /home/runner/work/HA360/HA360/tests/e2e/specs/ac-b-map.spec.ts:549:62"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:01:24.481Z",
+                      "annotations": [
+                        {
+                          "type": "info",
+                          "description": "[AC-15] ms from the tap on bubble-cryptid to zoom 13 +-0.1: 1536 (limit 1000, slack 500)"
+                        }
+                      ],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/home/runner/work/HA360/HA360/ci-out/e2e/artifacts/ac-b-map-acceptance-B-the--32951-and-the-King-s-bubble-there-phone/test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/home/runner/work/HA360/HA360/ci-out/e2e/artifacts/ac-b-map-acceptance-B-the--32951-and-the-King-s-bubble-there-phone/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/home/runner/work/HA360/HA360/ci-out/e2e/artifacts/ac-b-map-acceptance-B-the--32951-and-the-King-s-bubble-there-phone/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/home/runner/work/HA360/HA360/tests/e2e/specs/ac-b-map.spec.ts",
+                        "column": 62,
+                        "line": 549
+                      }
+                    },
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 4331,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 1,
+                      "startTime": "2026-10-02T18:01:28.615Z",
+                      "annotations": [
+                        {
+                          "type": "info",
+                          "description": "[AC-15] ms from the tap on bubble-cryptid to zoom 13 +-0.1: 990 (limit 1000, slack 500)"
+                        },
+                        {
+                          "type": "info",
+                          "description": "[AC-15] the bubble that holds the King after the flight: bubble-queen-king-jester (cluster of 3)"
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "flaky"
+                }
+              ],
+              "id": "dc00f343cbce5b812581-a9342c2c60d9754992c8",
+              "file": "ac-b-map.spec.ts",
+              "line": 535,
+              "column": 3
+            },
+            {
+              "title": "[AC-15] a cluster bubble tap fits me and its members in 700 ms, selects nothing and leaves the sheet and the selection as they were",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 4245,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:01:33.104Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "dc00f343cbce5b812581-900fe497fbd966629a1a",
+              "file": "ac-b-map.spec.ts",
+              "line": 585,
+              "column": 3
+            },
+            {
+              "title": "[AC-15] the selection header of Dara reads her name, her lore, her line and her battery",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [
+                    {
+                      "type": "fixme",
+                      "location": {
+                        "file": "/home/runner/work/HA360/HA360/tests/e2e/specs/ac-b-map.spec.ts",
+                        "line": 625,
+                        "column": 8
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 1,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:01:37.374Z",
+                      "annotations": [
+                        {
+                          "type": "fixme",
+                          "location": {
+                            "file": "/home/runner/work/HA360/HA360/tests/e2e/specs/ac-b-map.spec.ts",
+                            "line": 625,
+                            "column": 8
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "dc00f343cbce5b812581-a17bba5f350bb49fb480",
+              "file": "ac-b-map.spec.ts",
+              "line": 625,
+              "column": 8
+            },
+            {
+              "title": "[AC-16b] pin-vehicle-wagon is drawn 48 px (+-2) to the right of its true anchor, the King stays, and there is no leader line",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 1907,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:01:37.375Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "dc00f343cbce5b812581-5cf3beaaccefba042b45",
+              "file": "ac-b-map.spec.ts",
+              "line": 643,
+              "column": 3
+            },
+            {
+              "title": "[AC-16b] with ?variant=poor-accuracy the Jester shows a halo of 800 m under his pin",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [
+                    {
+                      "type": "info",
+                      "description": "[AC-16b] halo radius expected 22.0 px; changed pixels x 278 to 322, bottom row 375, true point (300.7, 353.2)"
+                    }
+                  ],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 3162,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:01:39.293Z",
+                      "annotations": [
+                        {
+                          "type": "info",
+                          "description": "[AC-16b] halo radius expected 22.0 px; changed pixels x 278 to 322, bottom row 375, true point (300.7, 353.2)"
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "dc00f343cbce5b812581-a7fa2bf289b256a125d6",
+              "file": "ac-b-map.spec.ts",
+              "line": 675,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "ac-b-style.spec.ts",
+      "file": "ac-b-style.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "acceptance B: the map style",
+          "file": "ac-b-style.spec.ts",
+          "line": 98,
+          "column": 6,
+          "specs": [
+            {
+              "title": "[AC-21] btn-layers opens the four tiles and the Show places switch; Day is stored, closes the popover within 200 ms, keeps selection and camera, and survives a reload",
+              "ok": true,
+              "tags": [
+                "phone"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 5788,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:01:42.483Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "95a20b2a8e939f584e41-5959e5e659cf57edc893",
+              "file": "ac-b-style.spec.ts",
+              "line": 99,
+              "column": 3
+            },
+            {
+              "title": "[AC-21] the Show places switch removes the 14 zone circles, is stored as realm.showZones, and a reload keeps it off",
+              "ok": true,
+              "tags": [
+                "phone"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 4316,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:01:48.284Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "95a20b2a8e939f584e41-9c2cbd31e26b7703e094",
+              "file": "ac-b-style.spec.ts",
+              "line": 176,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "ac-c-sheet-content.spec.ts",
+      "file": "ac-c-sheet-content.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Drivers list",
+          "file": "ac-c-sheet-content.spec.ts",
+          "line": 112,
+          "column": 6,
+          "specs": [
+            {
+              "title": "[AC-25] Drivers lists five rows in order, each at least 84 px high and a 48 px target; Alden reads At Hearth Haven, Since 5:52 pm, 19% charging, with no distance",
+              "ok": true,
+              "tags": [
+                "phone",
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2872,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:01:44.311Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "1cc006ef992e727d648d-1dff4972b0e9f64a101f",
+              "file": "ac-c-sheet-content.spec.ts",
+              "line": 113,
+              "column": 3
+            },
+            {
+              "title": "[AC-26] Briar reads Driving · 54 mph on her street with Since 9:12 pm and 62%; Cass reads her hall with Since 9:06 pm · 1.0 mi away and a low 12% pill",
+              "ok": true,
+              "tags": [
+                "phone",
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1488,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:01:47.200Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "1cc006ef992e727d648d-4f3f8a7aff23454a1d85",
+              "file": "ac-c-sheet-content.spec.ts",
+              "line": 146,
+              "column": 3
+            },
+            {
+              "title": "[AC-46a] a Drivers row is named as the map pin is, then Double tap to show on map",
+              "ok": true,
+              "tags": [
+                "phone"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1822,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:01:48.700Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "1cc006ef992e727d648d-a73e1dba18da10081ef8",
+              "file": "ac-c-sheet-content.spec.ts",
+              "line": 174,
+              "column": 3
+            },
+            {
+              "title": "[AC-27] Dara is the stale far-away row (72 percent opacity, a warning line with a clock, a low 10% pill); Elio is the static prince with no pill; the summary counts four",
+              "ok": true,
+              "tags": [
+                "phone",
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1844,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:01:50.537Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "1cc006ef992e727d648d-304240cfdfdc5a7dfbee",
+              "file": "ac-c-sheet-content.spec.ts",
+              "line": 188,
+              "column": 3
+            },
+            {
+              "title": "[AC-25] Drivers lists five rows in order, each at least 84 px high and a 48 px target; Alden reads At Hearth Haven, Since 5:52 pm, 19% charging, with no distance",
+              "ok": true,
+              "tags": [
+                "phone",
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unfolded",
+                  "projectName": "unfolded",
+                  "results": [
+                    {
+                      "workerIndex": 5,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2911,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:30.557Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "1cc006ef992e727d648d-3723036f1d11de19be09",
+              "file": "ac-c-sheet-content.spec.ts",
+              "line": 113,
+              "column": 3
+            },
+            {
+              "title": "[AC-26] Briar reads Driving · 54 mph on her street with Since 9:12 pm and 62%; Cass reads her hall with Since 9:06 pm · 1.0 mi away and a low 12% pill",
+              "ok": true,
+              "tags": [
+                "phone",
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unfolded",
+                  "projectName": "unfolded",
+                  "results": [
+                    {
+                      "workerIndex": 5,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2489,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:33.650Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "1cc006ef992e727d648d-11d0ed66039254c86665",
+              "file": "ac-c-sheet-content.spec.ts",
+              "line": 146,
+              "column": 3
+            },
+            {
+              "title": "[AC-27] Dara is the stale far-away row (72 percent opacity, a warning line with a clock, a low 10% pill); Elio is the static prince with no pill; the summary counts four",
+              "ok": true,
+              "tags": [
+                "phone",
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unfolded",
+                  "projectName": "unfolded",
+                  "results": [
+                    {
+                      "workerIndex": 5,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2114,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:36.149Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "1cc006ef992e727d648d-5922010c6cc7a43b33f5",
+              "file": "ac-c-sheet-content.spec.ts",
+              "line": 188,
+              "column": 3
+            },
+            {
+              "title": "[AC-25] the rows are the same markup in the bottom sheet and in the Expanded panel, for all three lists",
+              "ok": true,
+              "tags": [
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unfolded",
+                  "projectName": "unfolded",
+                  "results": [
+                    {
+                      "workerIndex": 5,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 3851,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:38.279Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "1cc006ef992e727d648d-7d5d2b651b056718dcc9",
+              "file": "ac-c-sheet-content.spec.ts",
+              "line": 221,
+              "column": 3
+            }
+          ]
+        },
+        {
+          "title": "Vehicles list",
+          "file": "ac-c-sheet-content.spec.ts",
+          "line": 249,
+          "column": 6,
+          "specs": [
+            {
+              "title": "[AC-28a] Vehicles lists the pickup on four lines and the hatchback placeholder with its note, no chevron and aria-disabled; the summary reads 2 vehicles · all parked",
+              "ok": true,
+              "tags": [
+                "phone",
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1563,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:01:52.393Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "1cc006ef992e727d648d-412aa04507e6a1aa2c29",
+              "file": "ac-c-sheet-content.spec.ts",
+              "line": 250,
+              "column": 3
+            },
+            {
+              "title": "[AC-28a] tapping the placeholder does nothing; its info button, a 48 px sibling of the row, opens the explanation and Esc closes it",
+              "ok": true,
+              "tags": [
+                "phone",
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1590,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:01:53.974Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "1cc006ef992e727d648d-cd2756c07e467bde1ca7",
+              "file": "ac-c-sheet-content.spec.ts",
+              "line": 290,
+              "column": 3
+            },
+            {
+              "title": "[AC-28a] Vehicles lists the pickup on four lines and the hatchback placeholder with its note, no chevron and aria-disabled; the summary reads 2 vehicles · all parked",
+              "ok": true,
+              "tags": [
+                "phone",
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unfolded",
+                  "projectName": "unfolded",
+                  "results": [
+                    {
+                      "workerIndex": 5,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2320,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:42.143Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "1cc006ef992e727d648d-8595ef2e5b3282fe810c",
+              "file": "ac-c-sheet-content.spec.ts",
+              "line": 250,
+              "column": 3
+            },
+            {
+              "title": "[AC-28a] tapping the placeholder does nothing; its info button, a 48 px sibling of the row, opens the explanation and Esc closes it",
+              "ok": true,
+              "tags": [
+                "phone",
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unfolded",
+                  "projectName": "unfolded",
+                  "results": [
+                    {
+                      "workerIndex": 5,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2455,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:44.477Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "1cc006ef992e727d648d-363ebeb6fe70e5082f8d",
+              "file": "ac-c-sheet-content.spec.ts",
+              "line": 290,
+              "column": 3
+            }
+          ]
+        },
+        {
+          "title": "Places list",
+          "file": "ac-c-sheet-content.spec.ts",
+          "line": 328,
+          "column": 6,
+          "specs": [
+            {
+              "title": "[AC-29] Places lists 14 rows: Hearth Haven then The Jester Hall with 1 here, then the empty places A to Z; the duplicates carry (2) and the arrival zone is absent",
+              "ok": true,
+              "tags": [
+                "phone",
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2155,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:01:55.574Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "1cc006ef992e727d648d-e59fb9bfc754cd1c2476",
+              "file": "ac-c-sheet-content.spec.ts",
+              "line": 329,
+              "column": 3
+            },
+            {
+              "title": "[AC-29] Places lists 14 rows: Hearth Haven then The Jester Hall with 1 here, then the empty places A to Z; the duplicates carry (2) and the arrival zone is absent",
+              "ok": true,
+              "tags": [
+                "phone",
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unfolded",
+                  "projectName": "unfolded",
+                  "results": [
+                    {
+                      "workerIndex": 5,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 3045,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:46.948Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "1cc006ef992e727d648d-d0381ef34645066b9ab7",
+              "file": "ac-c-sheet-content.spec.ts",
+              "line": 329,
+              "column": 3
+            }
+          ]
+        },
+        {
+          "title": "a browser in UTC",
+          "file": "ac-c-sheet-content.spec.ts",
+          "line": 377,
+          "column": 6,
+          "specs": [
+            {
+              "title": "[AC-50a] with the browser time zone forced to UTC the rows read the same: Alden Since 5:52 pm and every other Since and relative string unchanged",
+              "ok": true,
+              "tags": [
+                "phone"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1387,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:01:57.744Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "1cc006ef992e727d648d-05983a0453c5270a5c63",
+              "file": "ac-c-sheet-content.spec.ts",
+              "line": 380,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "ac-d-driving.spec.ts",
+      "file": "ac-d-driving.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "acceptance D: driving",
+          "file": "ac-d-driving.spec.ts",
+          "line": 118,
+          "column": 6,
+          "specs": [
+            {
+              "title": "[AC-32] /driving shows no map and no sheet, nav-driving is current, and the gear is at (12, 12)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 621,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:01:52.642Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "99babb12f15d823c427c-70147e7bdbd705647a9d",
+              "file": "ac-d-driving.spec.ts",
+              "line": 119,
+              "column": 3
+            },
+            {
+              "title": "[AC-33] four week chips with the exact text, This week selected and 48 px high, and the range line follows the choice",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 762,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:01:53.282Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "99babb12f15d823c427c-a56bfe5db8b332453141",
+              "file": "ac-d-driving.spec.ts",
+              "line": 138,
+              "column": 3
+            },
+            {
+              "title": "[AC-33] the arrow keys move the week selection and the focus with it",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 550,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:01:54.054Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "99babb12f15d823c427c-e992adbdf04a8c4ddada",
+              "file": "ac-d-driving.spec.ts",
+              "line": 177,
+              "column": 3
+            },
+            {
+              "title": "[AC-34] the title and the four stat chips of the default fixture, with arrow colours and tooltips",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 926,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:01:54.616Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "99babb12f15d823c427c-a30ed40f6bc9e22066ae",
+              "file": "ac-d-driving.spec.ts",
+              "line": 194,
+              "column": 3
+            },
+            {
+              "title": "[AC-34] last week and the oldest week of the default fixture",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 828,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:01:55.552Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "99babb12f15d823c427c-db53d49e01dcd9e44c20",
+              "file": "ac-d-driving.spec.ts",
+              "line": 228,
+              "column": 3
+            },
+            {
+              "title": "[AC-34] with variant all-sources every chip has a value and an arrow, and no asterisk",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 758,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:01:56.400Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "99babb12f15d823c427c-af3d2a3ae80e5e30a137",
+              "file": "ac-d-driving.spec.ts",
+              "line": 248,
+              "column": 3
+            },
+            {
+              "title": "[AC-35] the stat chips are 2 x 2 at 412 and one row of four at 884, the driver cards one per row",
+              "ok": true,
+              "tags": [
+                "phone",
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 634,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:01:57.175Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "99babb12f15d823c427c-996f1322fa778af926df",
+              "file": "ac-d-driving.spec.ts",
+              "line": 266,
+              "column": 3
+            },
+            {
+              "title": "[AC-36] the Top Speed card shows the driver, \"Top Speed\" and \"96 mph\"; the Drives card shows 64 and 781",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 587,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:01:57.825Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "99babb12f15d823c427c-51c3f429db63a1d4fae7",
+              "file": "ac-d-driving.spec.ts",
+              "line": 325,
+              "column": 3
+            },
+            {
+              "title": "[AC-35] the stat chips are 2 x 2 at 412 and one row of four at 884, the driver cards one per row",
+              "ok": true,
+              "tags": [
+                "phone",
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unfolded",
+                  "projectName": "unfolded",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 772,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:35.958Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "99babb12f15d823c427c-d366ac59978c7c138727",
+              "file": "ac-d-driving.spec.ts",
+              "line": 266,
+              "column": 3
+            }
+          ]
+        },
+        {
+          "title": "acceptance D: driving popups and the driver week",
+          "file": "ac-d-driving.spec.ts",
+          "line": 495,
+          "column": 6,
+          "specs": [
+            {
+              "title": "[AC-37] the driver cards read as in the fixture, and tapping Cass opens driving/jester with Back returning to driving",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 929,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:01:58.421Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "99babb12f15d823c427c-582f9575acb184dffa0c",
+              "file": "ac-d-driving.spec.ts",
+              "line": 501,
+              "column": 3
+            },
+            {
+              "title": "[AC-37] the week survives the round trip: Last week, Cass, Back",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 714,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:01:59.362Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "99babb12f15d823c427c-7666be82bc62379bb577",
+              "file": "ac-d-driving.spec.ts",
+              "line": 543,
+              "column": 3
+            },
+            {
+              "title": "[AC-37] a static member and an unknown id return to driving, replacing the history entry",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 712,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:00.087Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "99babb12f15d823c427c-fe9e044fe935dd8bcb69",
+              "file": "ac-d-driving.spec.ts",
+              "line": 558,
+              "column": 3
+            },
+            {
+              "title": "[AC-38] each of the six items opens a dialog with the title, lore, summary, bars, footnote and a 52 px Got it",
+              "ok": true,
+              "tags": [
+                "phone",
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 2165,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:00.811Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "99babb12f15d823c427c-84a8a1fd71c714963f5c",
+              "file": "ac-d-driving.spec.ts",
+              "line": 579,
+              "column": 3
+            },
+            {
+              "title": "[AC-38] the speeding footnote says the count is sampled, and the phone footnote has the Android Auto information button",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 1052,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:02.991Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "99babb12f15d823c427c-96e91f2f85afc3d9790c",
+              "file": "ac-d-driving.spec.ts",
+              "line": 623,
+              "column": 3
+            },
+            {
+              "title": "[AC-38] Got it, the close button and Esc each close the popup, and focus returns to the opener",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 1399,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:04.053Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "99babb12f15d823c427c-d4ea50675051fe86335e",
+              "file": "ac-d-driving.spec.ts",
+              "line": 642,
+              "column": 3
+            },
+            {
+              "title": "[AC-38] Back closes the popup, and focus returns to the opener",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [
+                    {
+                      "type": "fixme",
+                      "location": {
+                        "file": "/home/runner/work/HA360/HA360/tests/e2e/specs/ac-d-driving.spec.ts",
+                        "line": 674,
+                        "column": 8
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 1,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:05.461Z",
+                      "annotations": [
+                        {
+                          "type": "fixme",
+                          "location": {
+                            "file": "/home/runner/work/HA360/HA360/tests/e2e/specs/ac-d-driving.spec.ts",
+                            "line": 674,
+                            "column": 8
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "99babb12f15d823c427c-847817cec4efdbfd7b76",
+              "file": "ac-d-driving.spec.ts",
+              "line": 674,
+              "column": 8
+            },
+            {
+              "title": "[AC-39] the Total Drives popup: bars 22, 18, 14, 10 in proportion, and the Miles toggle re-orders them",
+              "ok": true,
+              "tags": [
+                "phone",
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 1800,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:05.461Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "99babb12f15d823c427c-619290017896399c9ae8",
+              "file": "ac-d-driving.spec.ts",
+              "line": 688,
+              "column": 3
+            },
+            {
+              "title": "[AC-39] the Phone use popup: 60 for Alden, then three \"—\" rows at the 56 px floor, last, with the info icon",
+              "ok": true,
+              "tags": [
+                "phone",
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 1022,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:07.270Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "99babb12f15d823c427c-12d2b4fdfc5cee9ee176",
+              "file": "ac-d-driving.spec.ts",
+              "line": 712,
+              "column": 3
+            },
+            {
+              "title": "[AC-39] the Speeding and Top Speed bars are in value order with the avatar at the end of each fill",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 1632,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:08.310Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "99babb12f15d823c427c-39c925d78a4370f05f4e",
+              "file": "ac-d-driving.spec.ts",
+              "line": 736,
+              "column": 3
+            },
+            {
+              "title": "[AC-40] with variant phone-unavailable the Phone use chip, popup and Alden's pill read \"—\" and never 0",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 913,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:09.953Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "99babb12f15d823c427c-22e2b555f77b9c5629b1",
+              "file": "ac-d-driving.spec.ts",
+              "line": 752,
+              "column": 3
+            },
+            {
+              "title": "[AC-41] the driver week of Cass: 18 drives in day groups, newest first, chips only for non-zero counts, and the GPS caption",
+              "ok": true,
+              "tags": [
+                "phone",
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 683,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:10.885Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "99babb12f15d823c427c-d5a138e9a36456eeccb3",
+              "file": "ac-d-driving.spec.ts",
+              "line": 784,
+              "column": 3
+            },
+            {
+              "title": "[AC-41] the driver week follows the week of the URL, and a week without a record says so",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 637,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:11.586Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "99babb12f15d823c427c-8464d7d34dbb5b07844f",
+              "file": "ac-d-driving.spec.ts",
+              "line": 835,
+              "column": 3
+            },
+            {
+              "title": "[AC-38] each of the six items opens a dialog with the title, lore, summary, bars, footnote and a 52 px Got it",
+              "ok": true,
+              "tags": [
+                "phone",
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unfolded",
+                  "projectName": "unfolded",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 2579,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:36.751Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "99babb12f15d823c427c-ee80472419c1b0166483",
+              "file": "ac-d-driving.spec.ts",
+              "line": 579,
+              "column": 3
+            },
+            {
+              "title": "[AC-39] the Total Drives popup: bars 22, 18, 14, 10 in proportion, and the Miles toggle re-orders them",
+              "ok": true,
+              "tags": [
+                "phone",
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unfolded",
+                  "projectName": "unfolded",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 2015,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:39.354Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "99babb12f15d823c427c-334fb4aca283016ab81e",
+              "file": "ac-d-driving.spec.ts",
+              "line": 688,
+              "column": 3
+            },
+            {
+              "title": "[AC-39] the Phone use popup: 60 for Alden, then three \"—\" rows at the 56 px floor, last, with the info icon",
+              "ok": true,
+              "tags": [
+                "phone",
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unfolded",
+                  "projectName": "unfolded",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 1135,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:41.393Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "99babb12f15d823c427c-0e08a3fe92645d81e775",
+              "file": "ac-d-driving.spec.ts",
+              "line": 712,
+              "column": 3
+            },
+            {
+              "title": "[AC-41] the driver week of Cass: 18 drives in day groups, newest first, chips only for non-zero counts, and the GPS caption",
+              "ok": true,
+              "tags": [
+                "phone",
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unfolded",
+                  "projectName": "unfolded",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 751,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:42.544Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "99babb12f15d823c427c-a467b3dfb4acb8566452",
+              "file": "ac-d-driving.spec.ts",
+              "line": 784,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "ac-e-visual.spec.ts",
+      "file": "ac-e-visual.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "acceptance E: the visual system",
+          "file": "ac-e-visual.spec.ts",
+          "line": 114,
+          "column": 6,
+          "specs": [
+            {
+              "title": "[AC-42] body is #0B0E1F, the 80 % sheet is #141A33, and the MudBlazor palette carries the same table",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1260,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:01:59.150Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "38563670c78fe76ecfc8-ba2bfb0745695cc3353c",
+              "file": "ac-e-visual.spec.ts",
+              "line": 120,
+              "column": 3
+            },
+            {
+              "title": "[AC-42] the primary button is #E8BC4E with #1A1405 text (the Got it button of a Driving popup)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 765,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:00.418Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "38563670c78fe76ecfc8-449e582250d136fcd2ce",
+              "file": "ac-e-visual.spec.ts",
+              "line": 143,
+              "column": 3
+            },
+            {
+              "title": "[AC-43] on Driving the H1 and the wordmark compute to Cinzel and every other text to Atkinson Hyperlegible",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 454,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:01.194Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "38563670c78fe76ecfc8-4be2ff1cb6bb65a082ce",
+              "file": "ac-e-visual.spec.ts",
+              "line": 158,
+              "column": 3
+            },
+            {
+              "title": "[AC-43] a popup title is Cinzel and the rest of the popup is Atkinson Hyperlegible",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 539,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:01.661Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "38563670c78fe76ecfc8-10f8083d03b41a65e08c",
+              "file": "ac-e-visual.spec.ts",
+              "line": 169,
+              "column": 3
+            },
+            {
+              "title": "[AC-43] on Location the sheet and the navigation are set in Atkinson Hyperlegible",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1328,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:02.215Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "38563670c78fe76ecfc8-5b11db1a7bff15e2d455",
+              "file": "ac-e-visual.spec.ts",
+              "line": 181,
+              "column": 3
+            },
+            {
+              "title": "[AC-43] both faces load from the app, nothing is requested from Google Fonts, and the font files are under 150 KB",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [
+                    {
+                      "type": "info",
+                      "description": "[AC-43] the three font files total 60636 bytes (budget 153600)"
+                    }
+                  ],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1658,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:03.557Z",
+                      "annotations": [
+                        {
+                          "type": "info",
+                          "description": "[AC-43] the three font files total 60636 bytes (budget 153600)"
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "38563670c78fe76ecfc8-74b5d9d5e1042171d778",
+              "file": "ac-e-visual.spec.ts",
+              "line": 191,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "appendix-c.spec.ts",
+      "file": "appendix-c.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "appendix C platform tests",
+          "file": "appendix-c.spec.ts",
+          "line": 6,
+          "column": 6,
+          "specs": [
+            {
+              "title": "[X-14] the page scroll lock of the open sheet adds no padding to <body>, and the map still pans and zooms",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [
+                    {
+                      "type": "info",
+                      "description": "[X-14] body class \"scroll-locked-no-padding\", padding-right 0px, overlays [{\"className\":\"mud-overlay\",\"pointerEvents\":\"none\",\"background\":\"rgba(0, 0, 0, 0)\"}]"
+                    }
+                  ],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 3520,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:05.242Z",
+                      "annotations": [
+                        {
+                          "type": "info",
+                          "description": "[X-14] body class \"scroll-locked-no-padding\", padding-right 0px, overlays [{\"className\":\"mud-overlay\",\"pointerEvents\":\"none\",\"background\":\"rgba(0, 0, 0, 0)\"}]"
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "3a29b21a241c7b273c60-ff805239a0c9c087ec2b",
+              "file": "appendix-c.spec.ts",
+              "line": 13,
+              "column": 3
+            },
+            {
+              "title": "[X-12] the sheet is below the navigation bar, which is below the dialog layer",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [
+                    {
+                      "type": "info",
+                      "description": "[X-12] z-index of the sheet 1201, the navigation 1210; MudBlazor layers: popover 1200, dialog 1400"
+                    }
+                  ],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1402,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:08.772Z",
+                      "annotations": [
+                        {
+                          "type": "info",
+                          "description": "[X-12] z-index of the sheet 1201, the navigation 1210; MudBlazor layers: popover 1200, dialog 1400"
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "3a29b21a241c7b273c60-f77f4766a32e01a861e5",
+              "file": "appendix-c.spec.ts",
+              "line": 76,
+              "column": 3
+            },
+            {
+              "title": "[X-12] a dialog covers the navigation bar: its layer is above the bar and the bar does not receive the tap",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [
+                    {
+                      "type": "info",
+                      "description": "[X-12] z-index of the navigation 1210, of the dialog container 1400"
+                    }
+                  ],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 557,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:10.182Z",
+                      "annotations": [
+                        {
+                          "type": "info",
+                          "description": "[X-12] z-index of the navigation 1210, of the dialog container 1400"
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "3a29b21a241c7b273c60-eb8276c5086d7b720df8",
+              "file": "appendix-c.spec.ts",
+              "line": 106,
+              "column": 3
+            },
+            {
+              "title": "[X-12] the sheet's non-modal overlay computes pointer-events: none and has no background",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [
+                    {
+                      "type": "info",
+                      "description": "[X-12] overlays [{\"className\":\"mud-overlay\",\"pointerEvents\":\"none\",\"background\":\"rgba(0, 0, 0, 0)\",\"backgroundImage\":\"none\",\"scrim\":null}]"
+                    }
+                  ],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1277,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:10.751Z",
+                      "annotations": [
+                        {
+                          "type": "info",
+                          "description": "[X-12] overlays [{\"className\":\"mud-overlay\",\"pointerEvents\":\"none\",\"background\":\"rgba(0, 0, 0, 0)\",\"backgroundImage\":\"none\",\"scrim\":null}]"
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "3a29b21a241c7b273c60-0332a138d9764f3b4e77",
+              "file": "appendix-c.spec.ts",
+              "line": 141,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "gallery.spec.ts",
+      "file": "gallery.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "[GAL] screenshot gallery",
+          "file": "gallery.spec.ts",
+          "line": 62,
+          "column": 6,
+          "specs": [
+            {
+              "title": "[GAL] SC01-location-peek",
+              "ok": true,
+              "tags": [
+                "phone",
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1411,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:12.053Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0087bd98ece4956907e4-f96eb512a9ed1da60146",
+              "file": "gallery.spec.ts",
+              "line": 65,
+              "column": 3
+            },
+            {
+              "title": "[GAL] SC02-drivers-peek",
+              "ok": true,
+              "tags": [
+                "phone",
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1428,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:13.471Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0087bd98ece4956907e4-1b60cf58e35adf78abfa",
+              "file": "gallery.spec.ts",
+              "line": 88,
+              "column": 3
+            },
+            {
+              "title": "[GAL] SC03-drivers-tall",
+              "ok": true,
+              "tags": [
+                "phone"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1541,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:14.911Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0087bd98ece4956907e4-fc0a703396eb59fcc842",
+              "file": "gallery.spec.ts",
+              "line": 110,
+              "column": 3
+            },
+            {
+              "title": "[GAL] SC04-vehicles-list",
+              "ok": true,
+              "tags": [
+                "phone",
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1656,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:16.464Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0087bd98ece4956907e4-cf01491e84505b9e48b3",
+              "file": "gallery.spec.ts",
+              "line": 126,
+              "column": 3
+            },
+            {
+              "title": "[GAL] SC05-places-list",
+              "ok": true,
+              "tags": [
+                "phone",
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2049,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:18.130Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0087bd98ece4956907e4-a50b965a7eeaedd9ba5a",
+              "file": "gallery.spec.ts",
+              "line": 143,
+              "column": 3
+            },
+            {
+              "title": "[GAL] SC01-location-peek",
+              "ok": true,
+              "tags": [
+                "phone",
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unfolded",
+                  "projectName": "unfolded",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 1828,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:43.331Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0087bd98ece4956907e4-1bd60d62237463635065",
+              "file": "gallery.spec.ts",
+              "line": 65,
+              "column": 3
+            },
+            {
+              "title": "[GAL] SC02-drivers-peek",
+              "ok": true,
+              "tags": [
+                "phone",
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unfolded",
+                  "projectName": "unfolded",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 1900,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:45.174Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0087bd98ece4956907e4-650b6301446a26d986a2",
+              "file": "gallery.spec.ts",
+              "line": 88,
+              "column": 3
+            },
+            {
+              "title": "[GAL] SC04-vehicles-list",
+              "ok": true,
+              "tags": [
+                "phone",
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unfolded",
+                  "projectName": "unfolded",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 2273,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:47.103Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0087bd98ece4956907e4-c51befc8b4e63b53a4df",
+              "file": "gallery.spec.ts",
+              "line": 126,
+              "column": 3
+            },
+            {
+              "title": "[GAL] SC05-places-list",
+              "ok": true,
+              "tags": [
+                "phone",
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unfolded",
+                  "projectName": "unfolded",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 2106,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:49.389Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0087bd98ece4956907e4-3485136161f3a3662e0a",
+              "file": "gallery.spec.ts",
+              "line": 143,
+              "column": 3
+            }
+          ]
+        },
+        {
+          "title": "[GAL] screenshot gallery: Driving",
+          "file": "gallery.spec.ts",
+          "line": 172,
+          "column": 6,
+          "specs": [
+            {
+              "title": "[GAL] SC10-driving",
+              "ok": true,
+              "tags": [
+                "phone",
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 608,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:20.197Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0087bd98ece4956907e4-741920a7e892de5245ba",
+              "file": "gallery.spec.ts",
+              "line": 173,
+              "column": 3
+            },
+            {
+              "title": "[GAL] SC10-driving",
+              "ok": true,
+              "tags": [
+                "phone",
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unfolded",
+                  "projectName": "unfolded",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 434,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:51.515Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0087bd98ece4956907e4-ff54c28b518726bac945",
+              "file": "gallery.spec.ts",
+              "line": 173,
+              "column": 3
+            }
+          ]
+        },
+        {
+          "title": "[GAL] screenshot gallery: Driving popups, the driver week and the variants",
+          "file": "gallery.spec.ts",
+          "line": 210,
+          "column": 6,
+          "specs": [
+            {
+              "title": "[GAL] SC11-popup-drives",
+              "ok": true,
+              "tags": [
+                "phone",
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 835,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:20.822Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0087bd98ece4956907e4-ef343d076d579a94371b",
+              "file": "gallery.spec.ts",
+              "line": 213,
+              "column": 3
+            },
+            {
+              "title": "[GAL] SC12-popup-speeding",
+              "ok": true,
+              "tags": [
+                "phone",
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 681,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:21.677Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0087bd98ece4956907e4-c2e868172cdab7599066",
+              "file": "gallery.spec.ts",
+              "line": 239,
+              "column": 3
+            },
+            {
+              "title": "[GAL] SC13-driver-week",
+              "ok": true,
+              "tags": [
+                "phone",
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 525,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:22.375Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0087bd98ece4956907e4-82a7482486e0a4714dfb",
+              "file": "gallery.spec.ts",
+              "line": 255,
+              "column": 3
+            },
+            {
+              "title": "[GAL] SC14-variant-phone-unavailable",
+              "ok": true,
+              "tags": [
+                "phone",
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 490,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:22.912Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0087bd98ece4956907e4-b483dcff3bf14bbb419a",
+              "file": "gallery.spec.ts",
+              "line": 270,
+              "column": 3
+            },
+            {
+              "title": "[GAL] SC17-variant-fresh-install",
+              "ok": true,
+              "tags": [
+                "phone",
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 764,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:23.419Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0087bd98ece4956907e4-2ce0901eb187a19ac33d",
+              "file": "gallery.spec.ts",
+              "line": 286,
+              "column": 3
+            },
+            {
+              "title": "[GAL] SC11-popup-drives",
+              "ok": true,
+              "tags": [
+                "phone",
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unfolded",
+                  "projectName": "unfolded",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 956,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:51.956Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0087bd98ece4956907e4-2c3721f5def6b559b3a6",
+              "file": "gallery.spec.ts",
+              "line": 213,
+              "column": 3
+            },
+            {
+              "title": "[GAL] SC12-popup-speeding",
+              "ok": true,
+              "tags": [
+                "phone",
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unfolded",
+                  "projectName": "unfolded",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 735,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:52.932Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0087bd98ece4956907e4-4b26c28f2776636e1bd8",
+              "file": "gallery.spec.ts",
+              "line": 239,
+              "column": 3
+            },
+            {
+              "title": "[GAL] SC13-driver-week",
+              "ok": true,
+              "tags": [
+                "phone",
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unfolded",
+                  "projectName": "unfolded",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 533,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:53.691Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0087bd98ece4956907e4-012e733a071c791f83a7",
+              "file": "gallery.spec.ts",
+              "line": 255,
+              "column": 3
+            },
+            {
+              "title": "[GAL] SC14-variant-phone-unavailable",
+              "ok": true,
+              "tags": [
+                "phone",
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unfolded",
+                  "projectName": "unfolded",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 536,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:54.236Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0087bd98ece4956907e4-58e6788cfec2c938f20a",
+              "file": "gallery.spec.ts",
+              "line": 270,
+              "column": 3
+            },
+            {
+              "title": "[GAL] SC17-variant-fresh-install",
+              "ok": true,
+              "tags": [
+                "phone",
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unfolded",
+                  "projectName": "unfolded",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 674,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:54.784Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0087bd98ece4956907e4-6d888147e7c0f38a4678",
+              "file": "gallery.spec.ts",
+              "line": 286,
+              "column": 3
+            }
+          ]
+        },
+        {
+          "title": "[GAL] screenshot gallery: the accuracy halo",
+          "file": "gallery.spec.ts",
+          "line": 311,
+          "column": 6,
+          "specs": [
+            {
+              "title": "[GAL] SC15-variant-poor-accuracy",
+              "ok": true,
+              "tags": [
+                "phone",
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1753,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:24.197Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0087bd98ece4956907e4-2208d161322f52786a6b",
+              "file": "gallery.spec.ts",
+              "line": 312,
+              "column": 3
+            },
+            {
+              "title": "[GAL] SC15-variant-poor-accuracy",
+              "ok": true,
+              "tags": [
+                "phone",
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unfolded",
+                  "projectName": "unfolded",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 1178,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:55.466Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0087bd98ece4956907e4-78c5ac4f1a17f068fae3",
+              "file": "gallery.spec.ts",
+              "line": 312,
+              "column": 3
+            }
+          ]
+        },
+        {
+          "title": "[GAL] screenshot gallery: the Layers popover and the Settings dialog",
+          "file": "gallery.spec.ts",
+          "line": 329,
+          "column": 6,
+          "specs": [
+            {
+              "title": "[GAL] SC08-style-popover",
+              "ok": true,
+              "tags": [
+                "phone",
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1737,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:25.960Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0087bd98ece4956907e4-a04ec4f9dcb726ceded0",
+              "file": "gallery.spec.ts",
+              "line": 332,
+              "column": 3
+            },
+            {
+              "title": "[GAL] SC09-settings",
+              "ok": true,
+              "tags": [
+                "phone",
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2182,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:27.706Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0087bd98ece4956907e4-fd03706a668952f9b9f5",
+              "file": "gallery.spec.ts",
+              "line": 372,
+              "column": 3
+            },
+            {
+              "title": "[GAL] SC08-style-popover",
+              "ok": true,
+              "tags": [
+                "phone",
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unfolded",
+                  "projectName": "unfolded",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 1421,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:56.659Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0087bd98ece4956907e4-c9e9aba3ce0b1ff2f4b6",
+              "file": "gallery.spec.ts",
+              "line": 332,
+              "column": 3
+            },
+            {
+              "title": "[GAL] SC09-settings",
+              "ok": true,
+              "tags": [
+                "phone",
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unfolded",
+                  "projectName": "unfolded",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 1480,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:58.089Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0087bd98ece4956907e4-12bf0621d739f0bf98d7",
+              "file": "gallery.spec.ts",
+              "line": 372,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "harness.spec.ts",
+      "file": "harness.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "harness",
+          "file": "harness.spec.ts",
+          "line": 4,
+          "column": 6,
+          "specs": [
+            {
+              "title": "demoUrl() writes the seven parameters in order and percent-encodes every value (CR2-008)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 1,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:12.243Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2726d9e30a893a88bbed-4418a16a673a13656e4d",
+              "file": "harness.spec.ts",
+              "line": 5,
+              "column": 3
+            },
+            {
+              "title": "demoUrl() refuses a path that would leave the ingress prefix",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 1,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:12.254Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2726d9e30a893a88bbed-44795aed5eb6bf09bf13",
+              "file": "harness.spec.ts",
+              "line": 15,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "ingress.spec.ts",
+      "file": "ingress.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "ingress platform tests",
+          "file": "ingress.spec.ts",
+          "line": 10,
+          "column": 6,
+          "specs": [
+            {
+              "title": "[X-01] the page, its assets and the _blazor websocket all live under the ingress prefix",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 2045,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:12.269Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "ac416494832f376feef3-d16b03c0a1855ae69973",
+              "file": "ingress.spec.ts",
+              "line": 11,
+              "column": 3
+            },
+            {
+              "title": "[X-03] the module scripts are text/javascript and the MapLibre worker starts",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 1778,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:14.332Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "ac416494832f376feef3-f71c6cf4c4d934e3bda8",
+              "file": "ingress.spec.ts",
+              "line": 82,
+              "column": 3
+            },
+            {
+              "title": "[X-05] the only cookie / sets is the antiforgery cookie, scoped to the ingress prefix",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [
+                    {
+                      "type": "info",
+                      "description": "Set-Cookie on /: .AspNetCore.Antiforgery.fU4C0xp-sPg"
+                    }
+                  ],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 256,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:16.126Z",
+                      "annotations": [
+                        {
+                          "type": "info",
+                          "description": "Set-Cookie on /: .AspNetCore.Antiforgery.fU4C0xp-sPg"
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "ac416494832f376feef3-c30c8068db0f32b065a8",
+              "file": "ingress.spec.ts",
+              "line": 100,
+              "column": 3
+            },
+            {
+              "title": "[X-10] an invalid or missing X-Ingress-Path is ignored and <base href> stays \"/\"",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 174,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:16.394Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "ac416494832f376feef3-492ab1c670b71c42d970",
+              "file": "ingress.spec.ts",
+              "line": 117,
+              "column": 3
+            },
+            {
+              "title": "[X-07] a map pan and a zoom send fewer than 6 websocket frames",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [
+                    {
+                      "type": "info",
+                      "description": "[X-07] websocket frames sent by the browser during a map pan and zoom: 2 (limit: fewer than 6)"
+                    }
+                  ],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 4696,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:16.577Z",
+                      "annotations": [
+                        {
+                          "type": "info",
+                          "description": "[X-07] websocket frames sent by the browser during a map pan and zoom: 2 (limit: fewer than 6)"
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "ac416494832f376feef3-766d547767576f34ce99",
+              "file": "ingress.spec.ts",
+              "line": 146,
+              "column": 3
+            },
+            {
+              "title": "[X-08] exactly one popover div[mudsheet] and one [data-testid=\"sheet\"], nested, and the selector list resolves to the popover",
+              "ok": true,
+              "tags": [
+                "phone",
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 1470,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:21.286Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "ac416494832f376feef3-d2a2e4c9f99cde1ac1ed",
+              "file": "ingress.spec.ts",
+              "line": 194,
+              "column": 3
+            },
+            {
+              "title": "[X-11] window.__realm exists in Demo and exposes exactly the ten hooks of 4.10",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "phone",
+                  "projectName": "phone",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 1422,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:22.767Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "ac416494832f376feef3-1b3aadaf41f7066dc63b",
+              "file": "ingress.spec.ts",
+              "line": 221,
+              "column": 3
+            },
+            {
+              "title": "[X-08] exactly one popover div[mudsheet] and one [data-testid=\"sheet\"], nested, and the selector list resolves to the popover",
+              "ok": true,
+              "tags": [
+                "phone",
+                "unfolded"
+              ],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "unfolded",
+                  "projectName": "unfolded",
+                  "results": [
+                    {
+                      "workerIndex": 5,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1770,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-02T18:02:50.021Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "ac416494832f376feef3-a404d64594e806fa4a60",
+              "file": "ingress.spec.ts",
+              "line": 194,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-10-02T18:01:00.437Z",
+    "duration": 119235.75300000001,
+    "expected": 117,
+    "skipped": 2,
+    "unexpected": 0,
+    "flaky": 1
+  }
+}

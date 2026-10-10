@@ -1,0 +1,2317 @@
+TAP version 13
+# Subtest: the numbers of 01 section 4.10: 8 px from the edge, a 48 px hit area, the cluster fit of 700 ms to zoom 15, 150 ms fades and 120 ms slides
+ok 1 - the numbers of 01 section 4.10: 8 px from the edge, a 48 px hit area, the cluster fit of 700 ms to zoom 15, 150 ms fades and 120 ms slides
+  ---
+  duration_ms: 1.367484
+  type: 'test'
+  ...
+# Subtest: the helpers add no name to window.__realm: the ten hooks of O-10 are unchanged
+ok 2 - the helpers add no name to window.__realm: the ten hooks of O-10 are unchanged
+  ---
+  duration_ms: 0.299923
+  type: 'test'
+  ...
+# Subtest: [AC-14] R at 412 x 915 Peek is x 8..404, y 8..725: 8 px from the top, right and left, the bottom at the sheet padding
+ok 3 - [AC-14] R at 412 x 915 Peek is x 8..404, y 8..725: 8 px from the top, right and left, the bottom at the sheet padding
+  ---
+  duration_ms: 0.849131
+  type: 'test'
+  ...
+# Subtest: R starts below the safe-area inset at the top (safe-top + 8) and follows the padding at the bottom
+ok 4 - R starts below the safe-area inset at the top (safe-top + 8) and follows the padding at the bottom
+  ---
+  duration_ms: 0.207691
+  type: 'test'
+  ...
+# Subtest: in Expanded with the panel shown the left edge of R is the panel's right edge plus 8; with the panel hidden it is 8 again
+ok 5 - in Expanded with the panel shown the left edge of R is the panel's right edge plus 8; with the panel hidden it is 8 again
+  ---
+  duration_ms: 0.308622
+  type: 'test'
+  ...
+# Subtest: keep-outs: boxes come in page pixels, leave in container pixels; a missing, hidden or empty box is dropped
+ok 6 - keep-outs: boxes come in page pixels, leave in container pixels; a missing, hidden or empty box is dropped
+  ---
+  duration_ms: 0.298195
+  type: 'test'
+  ...
+# Subtest: [AC-19c] an id seen for the first time has no wasOff; one seen last frame carries its verdict
+ok 7 - [AC-19c] an id seen for the first time has no wasOff; one seen last frame carries its verdict
+  ---
+  duration_ms: 0.26673
+  type: 'test'
+  ...
+# Subtest: a member without a position (no fix) has no anchor, hence neither a pin nor a bubble
+ok 8 - a member without a position (no fix) has no anchor, hence neither a pin nor a bubble
+  ---
+  duration_ms: 0.229352
+  type: 'test'
+  ...
+# Subtest: [AC-19b] the priority of a cluster is the fan-out's: selected, then driving, then the others
+ok 9 - [AC-19b] the priority of a cluster is the fan-out's: selected, then driving, then the others
+  ---
+  duration_ms: 0.538711
+  type: 'test'
+  ...
+# Subtest: [AC-13] a camera command decides afresh: a member that was off screen and is now 8 px inside R is on screen, where the hysteresis alone keeps it off
+ok 10 - [AC-13] a camera command decides afresh: a member that was off screen and is now 8 px inside R is on screen, where the hysteresis alone keeps it off
+  ---
+  duration_ms: 1.602441
+  type: 'test'
+  ...
+# Subtest: [AC-13] the plain verdict is R grown by a pixel: the pin the fit leaves exactly on the bottom edge (or a hair past it) is on screen, 2 px past it is not
+ok 11 - [AC-13] the plain verdict is R grown by a pixel: the pin the fit leaves exactly on the bottom edge (or a hair past it) is on screen, 2 px past it is not
+  ---
+  duration_ms: 1.335591
+  type: 'test'
+  ...
+# Subtest: reseeding keeps the anchors: same order, same ids, positions and priorities, the input untouched, and a member without a previous verdict gets one
+ok 12 - reseeding keeps the anchors: same order, same ids, positions and priorities, the input untouched, and a member without a previous verdict gets one
+  ---
+  duration_ms: 0.242184
+  type: 'test'
+  ...
+# Subtest: after the fresh frame the memory is the normal one again: a pin 8 px inside R that came back stays on screen, and goes off only 12 px outside R
+ok 13 - after the fresh frame the memory is the normal one again: a pin 8 px inside R that came back stays on screen, and goes off only 12 px outside R
+  ---
+  duration_ms: 0.323027
+  type: 'test'
+  ...
+# Subtest: [O-10] the bubbles hook: id is the test-id suffix and cluster is the member COUNT (a number, 1 for a single bubble), never a boolean
+ok 14 - [O-10] the bubbles hook: id is the test-id suffix and cluster is the member COUNT (a number, 1 for a single bubble), never a boolean
+  ---
+  duration_ms: 0.301421
+  type: 'test'
+  ...
+# Subtest: the rows of the hook are copies: changing one does not change the layout it came from
+ok 15 - the rows of the hook are copies: changing one does not change the layout it came from
+  ---
+  duration_ms: 0.139001
+  type: 'test'
+  ...
+# Subtest: [AC-14] the hook of a real layout: one bubble per off-screen member, cluster 1, in the order of the layout
+ok 16 - [AC-14] the hook of a real layout: one bubble per off-screen member, cluster 1, in the order of the layout
+  ---
+  duration_ms: 0.513779
+  type: 'test'
+  ...
+# Subtest: fillTemplate fills {n} and {names} and leaves an unknown placeholder alone
+ok 17 - fillTemplate fills {n} and {names} and leaves an unknown placeholder alone
+  ---
+  duration_ms: 0.298946
+  type: 'test'
+  ...
+# Subtest: a single bubble uses the label and tooltip C\# sent; a cluster fills the two templates with the count and the names in the order of the bubble
+ok 18 - a single bubble uses the label and tooltip C\# sent; a cluster fills the two templates with the count and the names in the order of the bubble
+  ---
+  duration_ms: 0.257969
+  type: 'test'
+  ...
+# Subtest: texts degrade to the names when the templates are missing, and to empty text for an id nobody knows
+ok 19 - texts degrade to the names when the templates are missing, and to empty text for an id nobody knows
+  ---
+  duration_ms: 0.114105
+  type: 'test'
+  ...
+# Subtest: [AC-15] the viewer's own single bubble is Recenter and is never reported; any cluster, and any other member, is
+ok 20 - [AC-15] the viewer's own single bubble is Recenter and is never reported; any cluster, and any other member, is
+  ---
+  duration_ms: 0.114994
+  type: 'test'
+  ...
+# Subtest: the cluster fit frames the viewer's member plus the tapped members that have a position, and nobody else (synthetic points)
+ok 21 - the cluster fit frames the viewer's member plus the tapped members that have a position, and nobody else (synthetic points)
+  ---
+  duration_ms: 0.341916
+  type: 'test'
+  ...
+# Subtest: [AC-16] fan-out items: the id is kind:id, the priority is selected, then driving, then members, then vehicles
+ok 22 - [AC-16] fan-out items: the id is kind:id, the priority is selected, then driving, then members, then vehicles
+  ---
+  duration_ms: 0.414951
+  type: 'test'
+  ...
+# Subtest: [AC-16] a vehicle on its member's point is drawn 48 px to the right and the member stays; nothing connects them (no leader, dy 0)
+ok 23 - [AC-16] a vehicle on its member's point is drawn 48 px to the right and the member stays; nothing connects them (no leader, dy 0)
+  ---
+  duration_ms: 0.308306
+  type: 'test'
+  ...
+# Subtest: [AC-16] a selected vehicle keeps its true place and the member beside it steps aside
+ok 24 - [AC-16] a selected vehicle keeps its true place and the member beside it steps aside
+  ---
+  duration_ms: 0.152222
+  type: 'test'
+  ...
+# Subtest: [AC-14] the Demo fixture at 412 x 915 Peek: Dara lands within 12 px of (384, 347) and Elio within 12 px of (28, 142)
+ok 25 - [AC-14] the Demo fixture at 412 x 915 Peek: Dara lands within 12 px of (384, 347) and Elio within 12 px of (28, 142)
+  ---
+  duration_ms: 3.433899
+  type: 'test'
+  ...
+# Subtest: [AC-14] the fixture bubbles are the same whether the previous frame had them off screen or not
+ok 26 - [AC-14] the fixture bubbles are the same whether the previous frame had them off screen or not
+  ---
+  duration_ms: 0.954519
+  type: 'test'
+  ...
+# Subtest: the default camera of the fixture fits the four in-view pins (a check on the projection used above)
+ok 27 - the default camera of the fixture fits the four in-view pins (a check on the projection used above)
+  ---
+  duration_ms: 0.234597
+  type: 'test'
+  ...
+# Subtest: [AC-19a] a bubble inside a keep-out (plus 8 px and its own radius) slides along its edge, the way its member lies
+ok 28 - [AC-19a] a bubble inside a keep-out (plus 8 px and its own radius) slides along its edge, the way its member lies
+  ---
+  duration_ms: 0.653133
+  type: 'test'
+  ...
+# Subtest: [AC-19a] a member exactly in line with its bubble slides clockwise (the right edge: down)
+ok 29 - [AC-19a] a member exactly in line with its bubble slides clockwise (the right edge: down)
+  ---
+  duration_ms: 0.365871
+  type: 'test'
+  ...
+# Subtest: [AC-19a] the keep-out grows by exactly 8 + 20 px: a bubble on the grown boundary stays, one pixel inside it moves
+ok 30 - [AC-19a] the keep-out grows by exactly 8 + 20 px: a bubble on the grown boundary stays, one pixel inside it moves
+  ---
+  duration_ms: 0.277779
+  type: 'test'
+  ...
+# Subtest: [AC-19a] it keeps sliding until clear: a second keep-out behind the first is passed too
+ok 31 - [AC-19a] it keeps sliding until clear: a second keep-out behind the first is passed too
+  ---
+  duration_ms: 0.255579
+  type: 'test'
+  ...
+# Subtest: [AC-19a] a bubble slides along the edge it sits on, never onto another edge
+ok 32 - [AC-19a] a bubble slides along the edge it sits on, never onto another edge
+  ---
+  duration_ms: 0.29883
+  type: 'test'
+  ...
+# Subtest: [AC-19a] the gear, the attribution and the right stack in their corners: the bubble slides to the one side that is free
+ok 33 - [AC-19a] the gear, the attribution and the right stack in their corners: the bubble slides to the one side that is free
+  ---
+  duration_ms: 0.554081
+  type: 'test'
+  ...
+# Subtest: [AC-19a] the pointer still follows the ray to the member after a slide
+ok 34 - [AC-19a] the pointer still follows the ray to the member after a slide
+  ---
+  duration_ms: 0.536274
+  type: 'test'
+  ...
+# Subtest: [AC-19a] a bubble that cannot clear on its edge joins the nearest bubble as a cluster and leaves it where it is
+ok 35 - [AC-19a] a bubble that cannot clear on its edge joins the nearest bubble as a cluster and leaves it where it is
+  ---
+  duration_ms: 0.374807
+  type: 'test'
+  ...
+# Subtest: [AC-19a] a bubble that cannot clear and has no neighbour is clamped at the end of its edge
+ok 36 - [AC-19a] a bubble that cannot clear and has no neighbour is clamped at the end of its edge
+  ---
+  duration_ms: 0.247047
+  type: 'test'
+  ...
+# Subtest: [AC-19b] two anchors with centres under 44 px apart become ONE bubble with the member count (a number, never a boolean)
+ok 37 - [AC-19b] two anchors with centres under 44 px apart become ONE bubble with the member count (a number, never a boolean)
+  ---
+  duration_ms: 0.303633
+  type: 'test'
+  ...
+# Subtest: [AC-19b] the 44 px gap is exclusive: centres exactly 44 px apart stay two bubbles, each with cluster 1
+ok 38 - [AC-19b] the 44 px gap is exclusive: centres exactly 44 px apart stay two bubbles, each with cluster 1
+  ---
+  duration_ms: 0.223262
+  type: 'test'
+  ...
+# Subtest: [AC-19b] a cluster shows the first avatar: the highest priority leads, then the member nearer to the centre, then the id
+ok 39 - [AC-19b] a cluster shows the first avatar: the highest priority leads, then the member nearer to the centre, then the id
+  ---
+  duration_ms: 0.427765
+  type: 'test'
+  ...
+# Subtest: [AC-19b] a cluster has no second avatar and no +N pill: the bubble is {ids, x, y, angleDeg, cluster} and nothing else
+ok 40 - [AC-19b] a cluster has no second avatar and no +N pill: the bubble is {ids, x, y, angleDeg, cluster} and nothing else
+  ---
+  duration_ms: 0.191663
+  type: 'test'
+  ...
+# Subtest: [AC-19b] merging is transitive: a chain of bubbles each under 44 px from the next is one cluster of three
+ok 41 - [AC-19b] merging is transitive: a chain of bubbles each under 44 px from the next is one cluster of three
+  ---
+  duration_ms: 0.157745
+  type: 'test'
+  ...
+# Subtest: [AC-19b] the count badge is the number of members: 2, 3, 4 and 5 members make cluster 2, 3, 4 and 5
+ok 42 - [AC-19b] the count badge is the number of members: 2, 3, 4 and 5 members make cluster 2, 3, 4 and 5
+  ---
+  duration_ms: 0.313237
+  type: 'test'
+  ...
+# Subtest: [AC-19b] a single bubble has cluster 1, and members far apart never merge
+ok 43 - [AC-19b] a single bubble has cluster 1, and members far apart never merge
+  ---
+  duration_ms: 0.188042
+  type: 'test'
+  ...
+# Subtest: [AC-19b] a tighter option merges less: clusterGap 10 keeps 43.5 px apart bubbles apart
+ok 44 - [AC-19b] a tighter option merges less: clusterGap 10 keeps 43.5 px apart bubbles apart
+  ---
+  duration_ms: 0.129768
+  type: 'test'
+  ...
+# Subtest: [AC-19c] with no history the plain rectangle decides (on its boundary is on screen)
+ok 45 - [AC-19c] with no history the plain rectangle decides (on its boundary is on screen)
+  ---
+  duration_ms: 0.176513
+  type: 'test'
+  ...
+# Subtest: [AC-19c] an on-screen member goes off only beyond 12 px outside R
+ok 46 - [AC-19c] an on-screen member goes off only beyond 12 px outside R
+  ---
+  duration_ms: 0.158534
+  type: 'test'
+  ...
+# Subtest: [AC-19c] an off-screen member comes back only 12 px or more inside R
+ok 47 - [AC-19c] an off-screen member comes back only 12 px or more inside R
+  ---
+  duration_ms: 0.915636
+  type: 'test'
+  ...
+# Subtest: [AC-19c] the same holds on the top and bottom edges
+ok 48 - [AC-19c] the same holds on the top and bottom edges
+  ---
+  duration_ms: 0.257671
+  type: 'test'
+  ...
+# Subtest: [AC-19c] a member jittering across the boundary does not flicker: it changes state only after crossing the 24 px band
+ok 49 - [AC-19c] a member jittering across the boundary does not flicker: it changes state only after crossing the 24 px band
+  ---
+  duration_ms: 0.300126
+  type: 'test'
+  ...
+# Subtest: [AC-19c] a member kept off screen by the hysteresis still has its bubble, on the inset rectangle along the ray
+ok 50 - [AC-19c] a member kept off screen by the hysteresis still has its bubble, on the inset rectangle along the ray
+  ---
+  duration_ms: 0.141567
+  type: 'test'
+  ...
+# Subtest: [AC-19c] the hysteresis follows the option
+ok 51 - [AC-19c] the hysteresis follows the option
+  ---
+  duration_ms: 0.12223
+  type: 'test'
+  ...
+# Subtest: [AC-19d] the mean of two bubbles around a corner lies inside the rectangle; the cluster anchor is snapped back onto its edge
+ok 52 - [AC-19d] the mean of two bubbles around a corner lies inside the rectangle; the cluster anchor is snapped back onto its edge
+  ---
+  duration_ms: 0.320281
+  type: 'test'
+  ...
+# Subtest: [AC-19d] snap-back also holds at the other three corners
+ok 53 - [AC-19d] snap-back also holds at the other three corners
+  ---
+  duration_ms: 0.426615
+  type: 'test'
+  ...
+# Subtest: [AC-19d] a cluster on a single edge stays on that edge at the mean
+ok 54 - [AC-19d] a cluster on a single edge stays on that edge at the mean
+  ---
+  duration_ms: 0.1611
+  type: 'test'
+  ...
+# Subtest: the defaults are the values of 01 section 4.10
+ok 55 - the defaults are the values of 01 section 4.10
+  ---
+  duration_ms: 0.103689
+  type: 'test'
+  ...
+# Subtest: the bubble sits where the ray from the centre of R meets R inset by 20, and the angle is the ray angle (east 0, south 90, north -90)
+ok 56 - the bubble sits where the ray from the centre of R meets R inset by 20, and the angle is the ray angle (east 0, south 90, north -90)
+  ---
+  duration_ms: 0.2139
+  type: 'test'
+  ...
+# Subtest: the panel in Expanded moves the left edge: a member to the west lands at panel right + 16 + the radius
+ok 57 - the panel in Expanded moves the left edge: a member to the west lands at panel right + 16 + the radius
+  ---
+  duration_ms: 0.134962
+  type: 'test'
+  ...
+# Subtest: bubbles come out clockwise from the top-left of the inset rectangle (the DOM order of 01 section 10.2)
+ok 58 - bubbles come out clockwise from the top-left of the inset rectangle (the DOM order of 01 section 10.2)
+  ---
+  duration_ms: 0.170171
+  type: 'test'
+  ...
+# Subtest: pure and deterministic: inputs are not mutated, and the order of the anchors does not matter
+ok 59 - pure and deterministic: inputs are not mutated, and the order of the anchors does not matter
+  ---
+  duration_ms: 0.453809
+  type: 'test'
+  ...
+# Subtest: an anchor with a non-finite coordinate is ignored (neither on screen nor off)
+ok 60 - an anchor with a non-finite coordinate is ignored (neither on screen nor off)
+  ---
+  duration_ms: 0.163724
+  type: 'test'
+  ...
+# Subtest: no anchors, no bubbles; a rectangle too small for the bubbles collapses to its middle without NaN
+ok 61 - no anchors, no bubbles; a rectangle too small for the bubbles collapses to its middle without NaN
+  ---
+  duration_ms: 0.188629
+  type: 'test'
+  ...
+# Subtest: a member on the very centre of R (only reachable through a huge hysteresis) still gets a finite bubble
+ok 62 - a member on the very centre of R (only reachable through a huge hysteresis) still gets a finite bubble
+  ---
+  duration_ms: 0.131911
+  type: 'test'
+  ...
+# Subtest: property: random layouts keep every member once, every bubble on the inset rectangle, no two bubbles under 44 px apart and cluster = member count
+ok 63 - property: random layouts keep every member once, every bubble on the inset rectangle, no two bubbles under 44 px apart and cluster = member count
+  ---
+  duration_ms: 32.451628
+  type: 'test'
+  ...
+# Subtest: [AC-16][AC-19] two markers on one point: the lower priority shifts exactly 48 px to the right, the other stays
+ok 64 - [AC-16][AC-19] two markers on one point: the lower priority shifts exactly 48 px to the right, the other stays
+  ---
+  duration_ms: 1.552832
+  type: 'test'
+  ...
+# Subtest: [AC-16] the fixture: the pickup, 7.8 m from the king, is a fraction of a pixel away at the default zoom, so it fans out 48 px to the right
+ok 65 - [AC-16] the fixture: the pickup, 7.8 m from the king, is a fraction of a pixel away at the default zoom, so it fans out 48 px to the right
+  ---
+  duration_ms: 0.437496
+  type: 'test'
+  ...
+# Subtest: [AC-19] the threshold is 36 px and exclusive: 35.9 px apart fan out, exactly 36 px apart do not
+ok 66 - [AC-19] the threshold is 36 px and exclusive: 35.9 px apart fan out, exactly 36 px apart do not
+  ---
+  duration_ms: 0.245036
+  type: 'test'
+  ...
+# Subtest: [AC-19] the shift disappears as soon as the true points are 36 px or more apart (recomputed from scratch each frame)
+ok 67 - [AC-19] the shift disappears as soon as the true points are 36 px or more apart (recomputed from scratch each frame)
+  ---
+  duration_ms: 0.220822
+  type: 'test'
+  ...
+# Subtest: [AC-16] each further marker steps another 48 px: 0, 48, 96, 144
+ok 68 - [AC-16] each further marker steps another 48 px: 0, 48, 96, 144
+  ---
+  duration_ms: 0.146251
+  type: 'test'
+  ...
+# Subtest: the group is the already-processed markers near THIS marker's true anchor: a chain of near neighbours does not stack
+ok 69 - the group is the already-processed markers near THIS marker's true anchor: a chain of near neighbours does not stack
+  ---
+  duration_ms: 0.17542
+  type: 'test'
+  ...
+# Subtest: priority decides who stays: selected, then a driving member, then a member, then a vehicle; ties go to the lower id
+ok 70 - priority decides who stays: selected, then a driving member, then a member, then a vehicle; ties go to the lower id
+  ---
+  duration_ms: 0.181092
+  type: 'test'
+  ...
+# Subtest: [AC-19] no leader-line geometry in v1: a result is {id, dx, dy, fanned} and dy is always 0
+ok 71 - [AC-19] no leader-line geometry in v1: a result is {id, dx, dy, fanned} and dy is always 0
+  ---
+  duration_ms: 0.184147
+  type: 'test'
+  ...
+# Subtest: markers far apart and a single marker are never shifted
+ok 72 - markers far apart and a single marker are never shifted
+  ---
+  duration_ms: 0.301656
+  type: 'test'
+  ...
+# Subtest: results keep the order of the input, the input is not mutated, and the input order does not change the shifts
+ok 73 - results keep the order of the input, the input is not mutated, and the input order does not change the shifts
+  ---
+  duration_ms: 0.403219
+  type: 'test'
+  ...
+# Subtest: the defaults are 36 px and 48 px, and the options override them
+ok 74 - the defaults are 36 px and 48 px, and the options override them
+  ---
+  duration_ms: 0.232291
+  type: 'test'
+  ...
+# Subtest: a marker with a non-finite anchor is never grouped with another (it just stays put)
+ok 75 - a marker with a non-finite anchor is never grouped with another (it just stays put)
+  ---
+  duration_ms: 0.123261
+  type: 'test'
+  ...
+# Subtest: circlePolygon: every vertex is within half a metre of the radius (100 m and 5 km, four latitudes)
+ok 76 - circlePolygon: every vertex is within half a metre of the radius (100 m and 5 km, four latitudes)
+  ---
+  duration_ms: 3.451199
+  type: 'test'
+  ...
+# Subtest: circlePolygon: a closed ring of 64 steps plus the closing vertex, a Polygon feature
+ok 77 - circlePolygon: a closed ring of 64 steps plus the closing vertex, a Polygon feature
+  ---
+  duration_ms: 0.726169
+  type: 'test'
+  ...
+# Subtest: circlePolygon: the steps argument sets the vertex count
+ok 78 - circlePolygon: the steps argument sets the vertex count
+  ---
+  duration_ms: 0.183179
+  type: 'test'
+  ...
+# Subtest: circlePolygon: vertex 0 is due north and vertex 32 due south, 2r apart
+ok 79 - circlePolygon: vertex 0 is due north and vertex 32 due south, 2r apart
+  ---
+  duration_ms: 0.144772
+  type: 'test'
+  ...
+# Subtest: circlePolygon: properties are copied into the feature, not shared
+ok 80 - circlePolygon: properties are copied into the feature, not shared
+  ---
+  duration_ms: 0.186632
+  type: 'test'
+  ...
+# Subtest: circlePolygon: longitudes stay in [-180, 180) across the antimeridian
+ok 81 - circlePolygon: longitudes stay in [-180, 180) across the antimeridian
+  ---
+  duration_ms: 0.366018
+  type: 'test'
+  ...
+# Subtest: boundsOf: the box of the points in [[west, south], [east, north]] order; null without points
+ok 82 - boundsOf: the box of the points in [[west, south], [east, north]] order; null without points
+  ---
+  duration_ms: 0.478027
+  type: 'test'
+  ...
+# Subtest: growBounds: a ratio of 0.2 grows width and height by 20 percent about the centre
+ok 83 - growBounds: a ratio of 0.2 grows width and height by 20 percent about the centre
+  ---
+  duration_ms: 0.187866
+  type: 'test'
+  ...
+# Subtest: metersPerPixel: 512 px world, halves per zoom level, shrinks with the cosine of the latitude
+ok 84 - metersPerPixel: 512 px world, halves per zoom level, shrinks with the cosine of the latitude
+  ---
+  duration_ms: 0.286314
+  type: 'test'
+  ...
+# Subtest: EARTH_RADIUS_M is the sphere MapLibre itself uses
+ok 85 - EARTH_RADIUS_M is the sphere MapLibre itself uses
+  ---
+  duration_ms: 0.268772
+  type: 'test'
+  ...
+# Subtest: the baseline add-on passes the twelve guards of 03 section 7.3, one line each, in order
+ok 86 - the baseline add-on passes the twelve guards of 03 section 7.3, one line each, in order
+  ---
+  duration_ms: 18.628338
+  type: 'test'
+  ...
+# Subtest: a guard whose target does not exist yet prints PASS name (nothing to check yet)
+ok 87 - a guard whose target does not exist yet prints PASS name (nothing to check yet)
+  ---
+  duration_ms: 6.130641
+  type: 'test'
+  ...
+# Subtest: an unexpected exception inside a guard is a FAIL line, not a crash
+ok 88 - an unexpected exception inside a guard is a FAIL line, not a crash
+  ---
+  duration_ms: 2.818221
+  type: 'test'
+  ...
+# Subtest: stripComments keeps line numbers and does not mistake strings for comments
+ok 89 - stripComments keeps line numbers and does not mistake strings for comments
+  ---
+  duration_ms: 0.475856
+  type: 'test'
+  ...
+# Subtest: allow-list: an entry with a reason silences its file (and only the lines containing `contains`)
+ok 90 - allow-list: an entry with a reason silences its file (and only the lines containing `contains`)
+  ---
+  duration_ms: 19.102638
+  type: 'test'
+  ...
+# Subtest: allow-list: an entry without a reason is a FAIL and silences nothing; so are an unknown guard and bad JSON
+ok 91 - allow-list: an entry without a reason is a FAIL and silences nothing; so are an unknown guard and bad JSON
+  ---
+  duration_ms: 28.346753
+  type: 'test'
+  ...
+# Subtest: allow-list: every entry of the real tools/ci/guards.allow.json names an allowable guard, a file and a reason
+ok 92 - allow-list: every entry of the real tools/ci/guards.allow.json names an allowable guard, a file and a reason
+  ---
+  duration_ms: 0.350911
+  type: 'test'
+  ...
+# Subtest: config-name: passes with realm/config.yaml alone, ignoring node_modules, dot directories and build output
+ok 93 - config-name: passes with realm/config.yaml alone, ignoring node_modules, dot directories and build output
+  ---
+  duration_ms: 4.142807
+  type: 'test'
+  ...
+# Subtest: config-name: fails on any other config.yaml, config.yml or config.json
+ok 94 - config-name: fails on any other config.yaml, config.yml or config.json
+  ---
+  duration_ms: 13.644173
+  type: 'test'
+  ...
+# Subtest: addon-validate: the baseline passes; a newer top CHANGELOG section, the Dockerfile and the watchdog variants are fine
+ok 95 - addon-validate: the baseline passes; a newer top CHANGELOG section, the Dockerfile and the watchdog variants are fine
+  ---
+  duration_ms: 38.516281
+  type: 'test'
+  ...
+# Subtest: addon-validate: fails when a required key is missing
+ok 96 - addon-validate: fails when a required key is missing
+  ---
+  duration_ms: 10.721436
+  type: 'test'
+  ...
+# Subtest: addon-validate: fails when arch is empty
+ok 97 - addon-validate: fails when arch is empty
+  ---
+  duration_ms: 3.167741
+  type: 'test'
+  ...
+# Subtest: addon-validate: fails when image carries a tag
+ok 98 - addon-validate: fails when image carries a tag
+  ---
+  duration_ms: 3.295205
+  type: 'test'
+  ...
+# Subtest: addon-validate: fails when image uses {arch}
+ok 99 - addon-validate: fails when image uses {arch}
+  ---
+  duration_ms: 8.700485
+  type: 'test'
+  ...
+# Subtest: addon-validate: fails when image is not lower case
+ok 100 - addon-validate: fails when image is not lower case
+  ---
+  duration_ms: 12.782459
+  type: 'test'
+  ...
+# Subtest: addon-validate: fails when image is absent
+ok 101 - addon-validate: fails when image is absent
+  ---
+  duration_ms: 13.608378
+  type: 'test'
+  ...
+# Subtest: addon-validate: fails when version is not plain semver
+ok 102 - addon-validate: fails when version is not plain semver
+  ---
+  duration_ms: 5.924111
+  type: 'test'
+  ...
+# Subtest: addon-validate: fails when version has a build suffix
+ok 103 - addon-validate: fails when version has a build suffix
+  ---
+  duration_ms: 4.307315
+  type: 'test'
+  ...
+# Subtest: addon-validate: fails when CHANGELOG has no section for the version
+ok 104 - addon-validate: fails when CHANGELOG has no section for the version
+  ---
+  duration_ms: 4.028123
+  type: 'test'
+  ...
+# Subtest: addon-validate: fails when CHANGELOG is missing
+ok 105 - addon-validate: fails when CHANGELOG is missing
+  ---
+  duration_ms: 6.07871
+  type: 'test'
+  ...
+# Subtest: addon-validate: fails when ingress_port differs from the Dockerfile
+ok 106 - addon-validate: fails when ingress_port differs from the Dockerfile
+  ---
+  duration_ms: 4.756465
+  type: 'test'
+  ...
+# Subtest: addon-validate: fails when the Dockerfile sets no port
+ok 107 - addon-validate: fails when the Dockerfile sets no port
+  ---
+  duration_ms: 2.615562
+  type: 'test'
+  ...
+# Subtest: addon-validate: fails when watchdog does not match the Supervisor pattern
+ok 108 - addon-validate: fails when watchdog does not match the Supervisor pattern
+  ---
+  duration_ms: 2.45207
+  type: 'test'
+  ...
+# Subtest: addon-validate: fails when options nest deeper than 2
+ok 109 - addon-validate: fails when options nest deeper than 2
+  ---
+  duration_ms: 3.602178
+  type: 'test'
+  ...
+# Subtest: addon-validate: fails when an options key lacks a schema entry
+ok 110 - addon-validate: fails when an options key lacks a schema entry
+  ---
+  duration_ms: 2.487338
+  type: 'test'
+  ...
+# Subtest: addon-validate: fails when a password option has a default
+ok 111 - addon-validate: fails when a password option has a default
+  ---
+  duration_ms: 2.819867
+  type: 'test'
+  ...
+# Subtest: addon-validate: fails when a map entry exists
+ok 112 - addon-validate: fails when a map entry exists
+  ---
+  duration_ms: 2.921811
+  type: 'test'
+  ...
+# Subtest: addon-validate: fails when build.yaml exists
+ok 113 - addon-validate: fails when build.yaml exists
+  ---
+  duration_ms: 3.536023
+  type: 'test'
+  ...
+# Subtest: addon-validate: fails when icon.png is not 128 x 128
+ok 114 - addon-validate: fails when icon.png is not 128 x 128
+  ---
+  duration_ms: 2.793133
+  type: 'test'
+  ...
+# Subtest: addon-validate: fails when icon.png is missing
+ok 115 - addon-validate: fails when icon.png is missing
+  ---
+  duration_ms: 2.625468
+  type: 'test'
+  ...
+# Subtest: addon-validate: fails when logo.png is not about 250 x 100
+ok 116 - addon-validate: fails when logo.png is not about 250 x 100
+  ---
+  duration_ms: 2.751593
+  type: 'test'
+  ...
+# Subtest: addon-validate: fails when logo.png is not a PNG
+ok 117 - addon-validate: fails when logo.png is not a PNG
+  ---
+  duration_ms: 4.037876
+  type: 'test'
+  ...
+# Subtest: addon-validate: fails when repository.yaml lacks name
+ok 118 - addon-validate: fails when repository.yaml lacks name
+  ---
+  duration_ms: 7.74177
+  type: 'test'
+  ...
+# Subtest: addon-validate: fails when repository.yaml is missing
+ok 119 - addon-validate: fails when repository.yaml is missing
+  ---
+  duration_ms: 8.848294
+  type: 'test'
+  ...
+# Subtest: addon-validate: fails when config.yaml is missing
+ok 120 - addon-validate: fails when config.yaml is missing
+  ---
+  duration_ms: 4.087935
+  type: 'test'
+  ...
+# Subtest: addon-validate: fails when config.yaml is not YAML
+ok 121 - addon-validate: fails when config.yaml is not YAML
+  ---
+  duration_ms: 2.791895
+  type: 'test'
+  ...
+# Subtest: addon-validate: a password option without a default is fine; an absent ingress_port means 8099
+ok 122 - addon-validate: a password option without a default is fine; an absent ingress_port means 8099
+  ---
+  duration_ms: 7.508762
+  type: 'test'
+  ...
+# Subtest: validate-addon.mjs runs on its own: PASS exits 0, FAIL lines exit 1, a bad argument exits 64
+ok 123 - validate-addon.mjs runs on its own: PASS exits 0, FAIL lines exit 1, a bad argument exits 64
+  ---
+  duration_ms: 214.621422
+  type: 'test'
+  ...
+# Subtest: option-bindings: passes when schema, translations and option-bindings.json agree
+ok 124 - option-bindings: passes when schema, translations and option-bindings.json agree
+  ---
+  duration_ms: 2.701697
+  type: 'test'
+  ...
+# Subtest: option-bindings: fails on every kind of disagreement
+ok 125 - option-bindings: fails on every kind of disagreement
+  ---
+  duration_ms: 26.430609
+  type: 'test'
+  ...
+# Subtest: no-leading-slash: passes on relative links, LocalRedirect, comments and absolute URLs
+ok 126 - no-leading-slash: passes on relative links, LocalRedirect, comments and absolute URLs
+  ---
+  duration_ms: 4.844084
+  type: 'test'
+  ...
+# Subtest: no-leading-slash: fails on href="/
+ok 127 - no-leading-slash: fails on href="/
+  ---
+  duration_ms: 3.005169
+  type: 'test'
+  ...
+# Subtest: no-leading-slash: fails on src="/ (single quotes)
+ok 128 - no-leading-slash: fails on src="/ (single quotes)
+  ---
+  duration_ms: 1.632976
+  type: 'test'
+  ...
+# Subtest: no-leading-slash: fails on href=\\"/ inside a C\# string
+ok 129 - no-leading-slash: fails on href=\\"/ inside a C\# string
+  ---
+  duration_ms: 1.992252
+  type: 'test'
+  ...
+# Subtest: no-leading-slash: fails on NavigateTo("/
+ok 130 - no-leading-slash: fails on NavigateTo("/
+  ---
+  duration_ms: 2.367902
+  type: 'test'
+  ...
+# Subtest: no-leading-slash: fails on NavigateTo($"/
+ok 131 - no-leading-slash: fails on NavigateTo($"/
+  ---
+  duration_ms: 2.286091
+  type: 'test'
+  ...
+# Subtest: no-leading-slash: fails on Results.Redirect(
+ok 132 - no-leading-slash: fails on Results.Redirect(
+  ---
+  duration_ms: 2.456351
+  type: 'test'
+  ...
+# Subtest: no-leading-slash: fails on Response.Redirect(
+ok 133 - no-leading-slash: fails on Response.Redirect(
+  ---
+  duration_ms: 3.29694
+  type: 'test'
+  ...
+# Subtest: no-leading-slash: fails on new Uri(..., "/
+ok 134 - no-leading-slash: fails on new Uri(..., "/
+  ---
+  duration_ms: 2.296965
+  type: 'test'
+  ...
+# Subtest: no-leading-slash: fails on href="/ in a script file
+ok 135 - no-leading-slash: fails on href="/ in a script file
+  ---
+  duration_ms: 2.090751
+  type: 'test'
+  ...
+# Subtest: no-leading-slash: fails on HREF="/ (upper case attribute)
+ok 136 - no-leading-slash: fails on HREF="/ (upper case attribute)
+  ---
+  duration_ms: 2.485642
+  type: 'test'
+  ...
+# Subtest: no-leading-slash: fails on Src='/ (mixed case attribute)
+ok 137 - no-leading-slash: fails on Src='/ (mixed case attribute)
+  ---
+  duration_ms: 2.566329
+  type: 'test'
+  ...
+# Subtest: no-leading-slash: fails on import("/ in a script
+ok 138 - no-leading-slash: fails on import("/ in a script
+  ---
+  duration_ms: 3.15189
+  type: 'test'
+  ...
+# Subtest: no-leading-slash: fails on import(`/ in a module (template literal)
+ok 139 - no-leading-slash: fails on import(`/ in a module (template literal)
+  ---
+  duration_ms: 2.496857
+  type: 'test'
+  ...
+# Subtest: no-leading-slash: fails on fetch("/ in a script
+ok 140 - no-leading-slash: fails on fetch("/ in a script
+  ---
+  duration_ms: 2.199312
+  type: 'test'
+  ...
+# Subtest: no-leading-slash: fails on new Worker("/ in a script
+ok 141 - no-leading-slash: fails on new Worker("/ in a script
+  ---
+  duration_ms: 1.664176
+  type: 'test'
+  ...
+# Subtest: no-leading-slash: fails on new SharedWorker("/ in a script
+ok 142 - no-leading-slash: fails on new SharedWorker("/ in a script
+  ---
+  duration_ms: 2.988949
+  type: 'test'
+  ...
+# Subtest: no-leading-slash: fails on import("/ in an inline script
+ok 143 - no-leading-slash: fails on import("/ in an inline script
+  ---
+  duration_ms: 1.598023
+  type: 'test'
+  ...
+# Subtest: no-leading-slash: fails on url(/ in a stylesheet
+ok 144 - no-leading-slash: fails on url(/ in a stylesheet
+  ---
+  duration_ms: 2.366999
+  type: 'test'
+  ...
+# Subtest: no-leading-slash: fails on url("/ in a stylesheet (quoted, upper case)
+ok 145 - no-leading-slash: fails on url("/ in a stylesheet (quoted, upper case)
+  ---
+  duration_ms: 2.363532
+  type: 'test'
+  ...
+# Subtest: no-leading-slash: fails on url('/ in a style attribute
+ok 146 - no-leading-slash: fails on url('/ in a style attribute
+  ---
+  duration_ms: 2.226802
+  type: 'test'
+  ...
+# Subtest: no-leading-slash: passes on relative URLs in scripts and styles, and on each rule outside its file kind
+ok 147 - no-leading-slash: passes on relative URLs in scripts and styles, and on each rule outside its file kind
+  ---
+  duration_ms: 8.485207
+  type: 'test'
+  ...
+# Subtest: no-leading-slash: a script finding is allowed by file and line text, with a reason; the other line still fails
+ok 148 - no-leading-slash: a script finding is allowed by file and line text, with a reason; the other line still fails
+  ---
+  duration_ms: 4.96253
+  type: 'test'
+  ...
+# Subtest: no-static-files: passes on MapStaticAssets, framework @Assets and comments
+ok 149 - no-static-files: passes on MapStaticAssets, framework @Assets and comments
+  ---
+  duration_ms: 2.441856
+  type: 'test'
+  ...
+# Subtest: no-static-files: fails on UseStaticFiles, UseRealmStaticFiles and @Assets of our own js/lib/css/fonts/img files
+ok 150 - no-static-files: fails on UseStaticFiles, UseRealmStaticFiles and @Assets of our own js/lib/css/fonts/img files
+  ---
+  duration_ms: 34.309665
+  type: 'test'
+  ...
+# Subtest: no-wallclock: passes on TimeProvider and comments
+ok 151 - no-wallclock: passes on TimeProvider and comments
+  ---
+  duration_ms: 2.232509
+  type: 'test'
+  ...
+# Subtest: no-wallclock: fails on each wall-clock read, and an allow-listed clock adapter is exempt
+ok 152 - no-wallclock: fails on each wall-clock read, and an allow-listed clock adapter is exempt
+  ---
+  duration_ms: 17.176254
+  type: 'test'
+  ...
+# Subtest: no-colour-literals: passes on tokens, entities, anchors, comments, other file types and the vendored folder
+ok 153 - no-colour-literals: passes on tokens, entities, anchors, comments, other file types and the vendored folder
+  ---
+  duration_ms: 3.120558
+  type: 'test'
+  ...
+# Subtest: no-colour-literals: fails on hex and rgb() literals in razor, scoped css, css and js
+ok 154 - no-colour-literals: fails on hex and rgb() literals in razor, scoped css, css and js
+  ---
+  duration_ms: 12.38892
+  type: 'test'
+  ...
+# Subtest: no-colour-literals: the allow-listed demo style is exempt, another script is not
+ok 155 - no-colour-literals: the allow-listed demo style is exempt, another script is not
+  ---
+  duration_ms: 5.422556
+  type: 'test'
+  ...
+# Subtest: vendored-maplibre: passes when the digests match and VERSION.txt agrees with package.json
+ok 156 - vendored-maplibre: passes when the digests match and VERSION.txt agrees with package.json
+  ---
+  duration_ms: 5.373674
+  type: 'test'
+  ...
+# Subtest: vendored-maplibre: fails on a changed file, a missing file or SHA256SUMS, and a version disagreement
+ok 157 - vendored-maplibre: fails on a changed file, a missing file or SHA256SUMS, and a version disagreement
+  ---
+  duration_ms: 17.758999
+  type: 'test'
+  ...
+# Subtest: font-budget: passes at exactly 153,600 bytes with an OFL text, and on a comment that names a font host
+ok 158 - font-budget: passes at exactly 153,600 bytes with an OFL text, and on a comment that names a font host
+  ---
+  duration_ms: 2.537159
+  type: 'test'
+  ...
+# Subtest: font-budget: fails over the budget, without an OFL text, and on a Google Fonts host
+ok 159 - font-budget: fails over the budget, without an OFL text, and on a Google Fonts host
+  ---
+  duration_ms: 7.713331
+  type: 'test'
+  ...
+# Subtest: package-pins: passes on central exact pins, versionless references, case differences and XML comments
+ok 160 - package-pins: passes on central exact pins, versionless references, case differences and XML comments
+  ---
+  duration_ms: 7.943135
+  type: 'test'
+  ...
+# Subtest: package-pins: fails on Version=, ranges, wildcards, unknown packages and a moved MudBlazor
+ok 161 - package-pins: fails on Version=, ranges, wildcards, unknown packages and a moved MudBlazor
+  ---
+  duration_ms: 15.599758
+  type: 'test'
+  ...
+# Subtest: package-pins: a recorded decision (an allow-list entry with a reason) lets MudBlazor move
+ok 162 - package-pins: a recorded decision (an allow-list entry with a reason) lets MudBlazor move
+  ---
+  duration_ms: 2.783179
+  type: 'test'
+  ...
+# Subtest: testid-contract: REPORTs a missing id in report mode and never fails; passes when every id or prefix is a literal in src
+ok 163 - testid-contract: REPORTs a missing id in report mode and never fails; passes when every id or prefix is a literal in src
+  ---
+  duration_ms: 5.78593
+  type: 'test'
+  ...
+# Subtest: testid-contract: a quoted literal is required, comments do not count, and enforce mode FAILs
+ok 164 - testid-contract: a quoted literal is required, comments do not count, and enforce mode FAILs
+  ---
+  duration_ms: 7.745832
+  type: 'test'
+  ...
+# Subtest: ac-coverage: finds an AC id in a C\# DisplayName ([Fact] and [Theory]) and in the title of a Playwright or node test
+ok 165 - ac-coverage: finds an AC id in a C\# DisplayName ([Fact] and [Theory]) and in the title of a Playwright or node test
+  ---
+  duration_ms: 3.575091
+  type: 'test'
+  ...
+# Subtest: ac-coverage: report mode prints REPORT lines and never fails; text that is not a test title does not count
+ok 166 - ac-coverage: report mode prints REPORT lines and never fails; text that is not a test title does not count
+  ---
+  duration_ms: 2.897984
+  type: 'test'
+  ...
+# Subtest: ac-coverage: passes with all fifty ids, REPORTs the missing ones, and FAILs them in enforce mode
+ok 167 - ac-coverage: passes with all fifty ids, REPORTs the missing ones, and FAILs them in enforce mode
+  ---
+  duration_ms: 10.98903
+  type: 'test'
+  ...
+# Subtest: ac-coverage: an id on the enforced list FAILs even in report mode; a bad ac-scope.json is a FAIL
+ok 168 - ac-coverage: an id on the enforced list FAILs even in report mode; a bad ac-scope.json is a FAIL
+  ---
+  duration_ms: 6.989781
+  type: 'test'
+  ...
+# Subtest: the real tree prints only PASS and REPORT lines and does not fail
+ok 169 - the real tree prints only PASS and REPORT lines and does not fail
+  ---
+  duration_ms: 170.942317
+  type: 'test'
+  ...
+# Subtest: tools/ci/ac-scope.json and testids.json are created empty, in report mode (D50)
+ok 170 - tools/ci/ac-scope.json and testids.json are created empty, in report mode (D50)
+  ---
+  duration_ms: 0.247057
+  type: 'test'
+  ...
+# Subtest: this file never spells an AC id in the title form (ac-coverage scans tests/js on the real tree)
+ok 171 - this file never spells an AC id in the title form (ac-coverage scans tests/js on the real tree)
+  ---
+  duration_ms: 0.206085
+  type: 'test'
+  ...
+# Subtest: guards.mjs on the command line: exit 0 on PASS/REPORT, 1 on FAIL, 64 on a bad argument, under 30 s
+ok 172 - guards.mjs on the command line: exit 0 on PASS/REPORT, 1 on FAIL, 64 on a bad argument, under 30 s
+  ---
+  duration_ms: 465.16789
+  type: 'test'
+  ...
+# Subtest: prefix
+    # Subtest: the constants: a 43-character token and a prefix without a trailing slash
+    ok 1 - the constants: a 43-character token and a prefix without a trailing slash
+      ---
+      duration_ms: 1.011388
+      type: 'test'
+      ...
+    # Subtest: strips the prefix and keeps the path and the query string exactly as sent
+    ok 2 - strips the prefix and keeps the path and the query string exactly as sent
+      ---
+      duration_ms: 41.017324
+      type: 'test'
+      ...
+    # Subtest: the root of the prefix is "/" for the app, with and without a query
+    ok 3 - the root of the prefix is "/" for the app, with and without a query
+      ---
+      duration_ms: 18.935078
+      type: 'test'
+      ...
+    # Subtest: forwards the method and the request body (a SignalR negotiate is a POST)
+    ok 4 - forwards the method and the request body (a SignalR negotiate is a POST)
+      ---
+      duration_ms: 7.481357
+      type: 'test'
+      ...
+    # Subtest: answers 404 outside the prefix and never reaches the app
+    ok 5 - answers 404 outside the prefix and never reaches the app
+      ---
+      duration_ms: 13.067744
+      type: 'test'
+      ...
+    # Subtest: passes Location verbatim: no redirect is followed or rewritten
+    ok 6 - passes Location verbatim: no redirect is followed or rewritten
+      ---
+      duration_ms: 4.090895
+      type: 'test'
+      ...
+    # Subtest: answers 502 "502: Bad Gateway" when the app is down
+    ok 7 - answers 502 "502: Bad Gateway" when the app is down
+      ---
+      duration_ms: 21.839838
+      type: 'test'
+      ...
+    1..7
+ok 173 - prefix
+  ---
+  duration_ms: 119.870959
+  type: 'suite'
+  ...
+# Subtest: headers
+    # Subtest: adds the headers of HA Core and the Supervisor
+    ok 1 - adds the headers of HA Core and the Supervisor
+      ---
+      duration_ms: 8.57983
+      type: 'test'
+      ...
+    # Subtest: defaults X-Forwarded-Proto to http and X-Forwarded-Host to the Host the client used
+    ok 2 - defaults X-Forwarded-Proto to http and X-Forwarded-Host to the Host the client used
+      ---
+      duration_ms: 5.89664
+      type: 'test'
+      ...
+    # Subtest: replaces what a client could spoof and drops the Supervisor tokens
+    ok 3 - replaces what a client could spoof and drops the Supervisor tokens
+      ---
+      duration_ms: 5.744966
+      type: 'test'
+      ...
+    # Subtest: drops the browser's Accept-Encoding, like Core, and adds no compression
+    ok 4 - drops the browser's Accept-Encoding, like Core, and adds no compression
+      ---
+      duration_ms: 7.376538
+      type: 'test'
+      ...
+    # Subtest: passes the browser cookie through to the app (the ingress_session cookie is not stripped)
+    ok 5 - passes the browser cookie through to the app (the ingress_session cookie is not stripped)
+      ---
+      duration_ms: 7.76261
+      type: 'test'
+      ...
+    1..5
+ok 174 - headers
+  ---
+  duration_ms: 36.254339
+  type: 'suite'
+  ...
+# Subtest: ingress_session cookie
+    # Subtest: is set on first contact, as HA sets it: path /api/hassio_ingress/, SameSite=Strict
+    ok 1 - is set on first contact, as HA sets it: path /api/hassio_ingress/, SameSite=Strict
+      ---
+      duration_ms: 8.071916
+      type: 'test'
+      ...
+    # Subtest: is not set again while the browser sends a valid one
+    ok 2 - is not set again while the browser sends a valid one
+      ---
+      duration_ms: 4.795275
+      type: 'test'
+      ...
+    # Subtest: a cookie the proxy never issued is no session: a new one is set
+    ok 3 - a cookie the proxy never issued is no session: a new one is set
+      ---
+      duration_ms: 2.300929
+      type: 'test'
+      ...
+    # Subtest: keeps the app's own Set-Cookie (the Blazor antiforgery cookie) next to it
+    ok 4 - keeps the app's own Set-Cookie (the Blazor antiforgery cookie) next to it
+      ---
+      duration_ms: 2.27673
+      type: 'test'
+      ...
+    # Subtest: is not set on a request outside the prefix
+    ok 5 - is not set on a request outside the prefix
+      ---
+      duration_ms: 2.583238
+      type: 'test'
+      ...
+    1..5
+ok 175 - ingress_session cookie
+  ---
+  duration_ms: 20.398416
+  type: 'suite'
+  ...
+# Subtest: websocket upgrade
+    # Subtest: with the session cookie: 101, prefix stripped, headers added, bytes piped both ways
+    ok 1 - with the session cookie: 101, prefix stripped, headers added, bytes piped both ways
+      ---
+      duration_ms: 6.056019
+      type: 'test'
+      ...
+    # Subtest: without the cookie: 401 and the app never sees it
+    ok 2 - without the cookie: 401 and the app never sees it
+      ---
+      duration_ms: 2.787576
+      type: 'test'
+      ...
+    # Subtest: with a cookie the proxy never issued: 401
+    ok 3 - with a cookie the proxy never issued: 401
+      ---
+      duration_ms: 4.575665
+      type: 'test'
+      ...
+    # Subtest: outside the prefix: 404
+    ok 4 - outside the prefix: 404
+      ---
+      duration_ms: 3.154169
+      type: 'test'
+      ...
+    1..4
+ok 176 - websocket upgrade
+  ---
+  duration_ms: 16.892803
+  type: 'suite'
+  ...
+# Subtest: control endpoints
+    # Subtest: GET /__proxy/health is 200 ok, outside the prefix
+    ok 1 - GET /__proxy/health is 200 ok, outside the prefix
+      ---
+      duration_ms: 3.509937
+      type: 'test'
+      ...
+    # Subtest: POST /__proxy/drop-websockets closes every upgraded socket and counts them
+    ok 2 - POST /__proxy/drop-websockets closes every upgraded socket and counts them
+      ---
+      duration_ms: 7.177136
+      type: 'test'
+      ...
+    # Subtest: POST /__proxy/expire-session answers 401 to the next upgrade only, then recovers
+    ok 3 - POST /__proxy/expire-session answers 401 to the next upgrade only, then recovers
+      ---
+      duration_ms: 4.677583
+      type: 'test'
+      ...
+    # Subtest: expire-session?upgrades=2 keeps the 401 window open for two attempts; plain HTTP is unaffected
+    ok 4 - expire-session?upgrades=2 keeps the 401 window open for two attempts; plain HTTP is unaffected
+      ---
+      duration_ms: 18.440479
+      type: 'test'
+      ...
+    # Subtest: an unknown control path is 404 and a wrong method is 405
+    ok 5 - an unknown control path is 404 and a wrong method is 405
+      ---
+      duration_ms: 4.487837
+      type: 'test'
+      ...
+    1..5
+ok 177 - control endpoints
+  ---
+  duration_ms: 38.62723
+  type: 'suite'
+  ...
+# Subtest: Compact at Peek on 412 x 915: {72, 72, 190, 16} (sheet 174 plus the 16 px gutter)
+ok 178 - Compact at Peek on 412 x 915: {72, 72, 190, 16} (sheet 174 plus the 16 px gutter)
+  ---
+  duration_ms: 1.692443
+  type: 'test'
+  ...
+# Subtest: Compact at Tall (a measured 732 px sheet, stack hidden): {72, 16, 748, 16}
+ok 179 - Compact at Tall (a measured 732 px sheet, stack hidden): {72, 16, 748, 16}
+  ---
+  duration_ms: 0.182179
+  type: 'test'
+  ...
+# Subtest: Compact: the measured sheet height wins over the Peek default, and a non-finite one falls back to Peek
+ok 180 - Compact: the measured sheet height wins over the Peek default, and a non-finite one falls back to Peek
+  ---
+  duration_ms: 0.134618
+  type: 'test'
+  ...
+# Subtest: Expanded: the left padding clears the panel (16 + 400 + 16 = 432), the bottom clears the navigation
+ok 181 - Expanded: the left padding clears the panel (16 + 400 + 16 = 432), the bottom clears the navigation
+  ---
+  duration_ms: 0.104481
+  type: 'test'
+  ...
+# Subtest: Expanded with the panel hidden: the left padding is the plain gutter
+ok 182 - Expanded with the panel hidden: the left padding is the plain gutter
+  ---
+  duration_ms: 1.010887
+  type: 'test'
+  ...
+# Subtest: Expanded ignores the measured sheet height (there is no sheet)
+ok 183 - Expanded ignores the measured sheet height (there is no sheet)
+  ---
+  duration_ms: 0.151564
+  type: 'test'
+  ...
+# Subtest: safe-area insets are added to each side
+ok 184 - safe-area insets are added to each side
+  ---
+  duration_ms: 0.183917
+  type: 'test'
+  ...
+# Subtest: 412 x 800 at Peek: the sheet is held at the NAV_H + 104 = 168 px floor
+ok 185 - 412 x 800 at Peek: the sheet is held at the NAV_H + 104 = 168 px floor
+  ---
+  duration_ms: 0.080218
+  type: 'test'
+  ...
+# Subtest: peekSheetHeight: max(round(19 percent of the height), navTotal + 104)
+ok 186 - peekSheetHeight: max(round(19 percent of the height), navTotal + 104)
+  ---
+  duration_ms: 0.228504
+  type: 'test'
+  ...
+# Subtest: navTotalPx: the bar plus the bottom inset
+ok 187 - navTotalPx: the bar plus the bottom inset
+  ---
+  duration_ms: 0.30803
+  type: 'test'
+  ...
+# Subtest: at least 48 px of map stay visible: the bottom padding gives way
+ok 188 - at least 48 px of map stay visible: the bottom padding gives way
+  ---
+  duration_ms: 0.164188
+  type: 'test'
+  ...
+# Subtest: computePadding does not modify the layout it reads
+ok 189 - computePadding does not modify the layout it reads
+  ---
+  duration_ms: 0.072723
+  type: 'test'
+  ...
+# Subtest: DEFAULT_LAYOUT: Compact, sheet at Peek, stack visible, no inset; frozen
+ok 190 - DEFAULT_LAYOUT: Compact, sheet at Peek, stack visible, no inset; frozen
+  ---
+  duration_ms: 0.105219
+  type: 'test'
+  ...
+# Subtest: visibleRect and rectCenter: the part of the container the padding leaves, and its middle
+ok 191 - visibleRect and rectCenter: the part of the container the padding leaves, and its middle
+  ---
+  duration_ms: 0.090997
+  type: 'test'
+  ...
+# Subtest: haversine: great-circle metres on the sphere MapLibre uses
+ok 192 - haversine: great-circle metres on the sphere MapLibre uses
+  ---
+  duration_ms: 0.145484
+  type: 'test'
+  ...
+# Subtest: isAtDefault: within 40 m and 0.3 zoom of the target
+ok 193 - isAtDefault: within 40 m and 0.3 zoom of the target
+  ---
+  duration_ms: 0.13002
+  type: 'test'
+  ...
+# Subtest: isAtDefault: false without a target; the tolerances can be overridden
+ok 194 - isAtDefault: false without a target; the tolerances can be overridden
+  ---
+  duration_ms: 0.14012
+  type: 'test'
+  ...
+# Subtest: quantizeZoom: rounds to the step (0.05 by default) without float noise
+ok 195 - quantizeZoom: rounds to the step (0.05 by default) without float noise
+  ---
+  duration_ms: 0.086317
+  type: 'test'
+  ...
+# Subtest: selectionPadding, Compact: the Peek padding {72, 72, 190, 16} at 412 x 915 and {72, 72, 184, 16} at 412 x 800
+ok 196 - selectionPadding, Compact: the Peek padding {72, 72, 190, 16} at 412 x 915 and {72, 72, 184, 16} at 412 x 800
+  ---
+  duration_ms: 0.131846
+  type: 'test'
+  ...
+# Subtest: selectionPadding, Compact: the TARGET Peek padding, whatever the sheet is at while the flight starts (a row tapped at Tall)
+ok 197 - selectionPadding, Compact: the TARGET Peek padding, whatever the sheet is at while the flight starts (a row tapped at Tall)
+  ---
+  duration_ms: 0.067596
+  type: 'test'
+  ...
+# Subtest: selectionPadding, Compact: AC-22, the Peek rectangle is x 16 to 340, y 72 to 725 and its centre is within 24 px of (178, 399)
+ok 198 - selectionPadding, Compact: AC-22, the Peek rectangle is x 16 to 340, y 72 to 725 and its centre is within 24 px of (178, 399)
+  ---
+  duration_ms: 0.080818
+  type: 'test'
+  ...
+# Subtest: selectionPadding, Compact: safe insets are added and the 48 px minimum visible height still applies
+ok 199 - selectionPadding, Compact: safe insets are added and the 48 px minimum visible height still applies
+  ---
+  duration_ms: 0.062336
+  type: 'test'
+  ...
+# Subtest: selectionPadding, Expanded: the panel padding, which is the measured one: {72, 72, 80, 432}, left 16 with the panel hidden
+ok 200 - selectionPadding, Expanded: the panel padding, which is the measured one: {72, 72, 80, 432}, left 16 with the panel hidden
+  ---
+  duration_ms: 0.072331
+  type: 'test'
+  ...
+# Subtest: selectionPadding does not modify the layout it reads
+ok 201 - selectionPadding does not modify the layout it reads
+  ---
+  duration_ms: 0.050998
+  type: 'test'
+  ...
+# Subtest: selectionFlightPlan: an on-screen member eases to max(current zoom, 15) over 600 ms
+ok 202 - selectionFlightPlan: an on-screen member eases to max(current zoom, 15) over 600 ms
+  ---
+  duration_ms: 0.109536
+  type: 'test'
+  ...
+# Subtest: selectionFlightPlan: a far member who is off screen flies to zoom 13 over 900 ms; a far member on screen eases like anyone
+ok 203 - selectionFlightPlan: a far member who is off screen flies to zoom 13 over 900 ms; a far member on screen eases like anyone
+  ---
+  duration_ms: 0.06546
+  type: 'test'
+  ...
+# Subtest: selectionFlightPlan: every duration is 0 under reduced motion
+ok 204 - selectionFlightPlan: every duration is 0 under reduced motion
+  ---
+  duration_ms: 0.057935
+  type: 'test'
+  ...
+# Subtest: zoomToFit: at the zoom it returns, the circle is exactly sidePx across
+ok 205 - zoomToFit: at the zoom it returns, the circle is exactly sidePx across
+  ---
+  duration_ms: 0.299037
+  type: 'test'
+  ...
+# Subtest: fitCircle: the circle grown 20 percent fills the shorter side of the Peek rectangle less the 56 px pin allowance
+ok 206 - fitCircle: the circle grown 20 percent fills the shorter side of the Peek rectangle less the 56 px pin allowance
+  ---
+  duration_ms: 0.200611
+  type: 'test'
+  ...
+# Subtest: fitCircle: never zooms in past 16, and never out past the minimum zoom
+ok 207 - fitCircle: never zooms in past 16, and never out past the minimum zoom
+  ---
+  duration_ms: 0.07921
+  type: 'test'
+  ...
+# Subtest: fitCircle: the camera centre sits 28 px (half the allowance) above the circle centre, on the same meridian
+ok 208 - fitCircle: the camera centre sits 28 px (half the allowance) above the circle centre, on the same meridian
+  ---
+  duration_ms: 0.088965
+  type: 'test'
+  ...
+# Subtest: layoutFootprint: the mode and the room the panel takes; sheet, stack and safe insets are not part of it
+ok 209 - layoutFootprint: the mode and the room the panel takes; sheet, stack and safe insets are not part of it
+  ---
+  duration_ms: 0.092976
+  type: 'test'
+  ...
+# Subtest: refitNeeded (D75): the camera is at the default view and the layout switched Compact to Expanded, or back
+ok 210 - refitNeeded (D75): the camera is at the default view and the layout switched Compact to Expanded, or back
+  ---
+  duration_ms: 0.108206
+  type: 'test'
+  ...
+# Subtest: refitNeeded (D75): the panel appearing, disappearing or changing width at the default view
+ok 211 - refitNeeded (D75): the panel appearing, disappearing or changing width at the default view
+  ---
+  duration_ms: 0.078698
+  type: 'test'
+  ...
+# Subtest: refitNeeded (D75): not when the camera was moved away from the default view, and not without a previous layout
+ok 212 - refitNeeded (D75): not when the camera was moved away from the default view, and not without a previous layout
+  ---
+  duration_ms: 0.055842
+  type: 'test'
+  ...
+# Subtest: refitNeeded (D75): not when only the sheet, the right stack or the safe insets changed, nor when nothing changed
+ok 213 - refitNeeded (D75): not when only the sheet, the right stack or the safe insets changed, nor when nothing changed
+  ---
+  duration_ms: 0.101727
+  type: 'test'
+  ...
+# Subtest: refitNeeded: the layout sequence of a fold and an unfold, with a pan in between
+ok 214 - refitNeeded: the layout sequence of a fold and an unfold, with a pan in between
+  ---
+  duration_ms: 0.046
+  type: 'test'
+  ...
+# Subtest: nextRecenter: away goes to the default view, the default view to me alone, me alone back to the default view
+ok 215 - nextRecenter: away goes to the default view, the default view to me alone, me alone back to the default view
+  ---
+  duration_ms: 0.052812
+  type: 'test'
+  ...
+# Subtest: isCentered: within 2 px of the middle of the rectangle; the re-centre after a sheet change skips it
+ok 216 - isCentered: within 2 px of the middle of the rectangle; the re-centre after a sheet change skips it
+  ---
+  duration_ms: 0.116966
+  type: 'test'
+  ...
+# Subtest: chipRoom: the whole map less 8 px each side, and in Expanded with the panel shown only the part right of the panel
+ok 217 - chipRoom: the whole map less 8 px each side, and in Expanded with the panel shown only the part right of the panel
+  ---
+  duration_ms: 0.703126
+  type: 'test'
+  ...
+# Subtest: clampChipShift: a chip that fits is not moved
+ok 218 - clampChipShift: a chip that fits is not moved
+  ---
+  duration_ms: 0.114868
+  type: 'test'
+  ...
+# Subtest: clampChipShift: a pin near the left edge, the right edge: the chip is brought inside
+ok 219 - clampChipShift: a pin near the left edge, the right edge: the chip is brought inside
+  ---
+  duration_ms: 0.052148
+  type: 'test'
+  ...
+# Subtest: clampChipShift: the Expanded panel keeps the chip right of itself
+ok 220 - clampChipShift: the Expanded panel keeps the chip right of itself
+  ---
+  duration_ms: 0.043106
+  type: 'test'
+  ...
+# Subtest: clampChipShift: a chip wider than the room is centred in it
+ok 221 - clampChipShift: a chip wider than the room is centred in it
+  ---
+  duration_ms: 0.044353
+  type: 'test'
+  ...
+# Subtest: clampChipShift: over every centre and width the shifted chip lies inside the room, and a chip that fits is untouched
+ok 222 - clampChipShift: over every centre and width the shifted chip lies inside the room, and a chip that fits is untouched
+  ---
+  duration_ms: 0.315606
+  type: 'test'
+  ...
+# Subtest: chipCaretX: a chip that is not moved has its caret in the middle
+ok 223 - chipCaretX: a chip that is not moved has its caret in the middle
+  ---
+  duration_ms: 0.068172
+  type: 'test'
+  ...
+# Subtest: chipCaretX: the AC-17 case at 412 px wide, the King at x 340, puts the caret on the pin
+ok 224 - chipCaretX: the AC-17 case at 412 px wide, the King at x 340, puts the caret on the pin
+  ---
+  duration_ms: 0.280656
+  type: 'test'
+  ...
+# Subtest: chipCaretX: it moves against the shift, a chip moved left has the caret right of the middle and the other way round
+ok 225 - chipCaretX: it moves against the shift, a chip moved left has the caret right of the middle and the other way round
+  ---
+  duration_ms: 0.056104
+  type: 'test'
+  ...
+# Subtest: chipCaretX: it stays 18 px from either end, so a pin at the very edge keeps the caret on the straight part of the body
+ok 226 - chipCaretX: it stays 18 px from either end, so a pin at the very edge keeps the caret on the straight part of the body
+  ---
+  duration_ms: 0.052856
+  type: 'test'
+  ...
+# Subtest: chipCaretX: a chip narrower than twice the inset has its caret in the middle
+ok 227 - chipCaretX: a chip narrower than twice the inset has its caret in the middle
+  ---
+  duration_ms: 0.038808
+  type: 'test'
+  ...
+# Subtest: chipCaretX: over every pin x and chip width the clamped chip has its caret exactly on the pin, unless the pin is too near an end of the chip
+ok 228 - chipCaretX: over every pin x and chip width the clamped chip has its caret exactly on the pin, unless the pin is too near an end of the chip
+  ---
+  duration_ms: 0.441717
+  type: 'test'
+  ...
+# Subtest: compiler errors: deduplicated, workspace paths made relative, project suffix dropped
+ok 229 - compiler errors: deduplicated, workspace paths made relative, project suffix dropped
+  ---
+  duration_ms: 50.908714
+  type: 'test'
+  ...
+# Subtest: compiler errors: the SUMMARY shows 40 distinct errors, errors.log keeps all of them
+ok 230 - compiler errors: the SUMMARY shows 40 distinct errors, errors.log keeps all of them
+  ---
+  duration_ms: 49.224681
+  type: 'test'
+  ...
+# Subtest: failed tests: found by regular expression in the .trx, name decoded, message cut to 15 lines
+ok 231 - failed tests: found by regular expression in the .trx, name decoded, message cut to 15 lines
+  ---
+  duration_ms: 78.052271
+  type: 'test'
+  ...
+# Subtest: failed tests: a .trx whose counters say "failed" but whose results the regex cannot read is a failure with a note
+ok 232 - failed tests: a .trx whose counters say "failed" but whose results the regex cannot read is a failure with a note
+  ---
+  duration_ms: 46.815175
+  type: 'test'
+  ...
+# Subtest: verdict: success only when every job succeeded and nothing failed
+ok 233 - verdict: success only when every job succeeded and nothing failed
+  ---
+  duration_ms: 153.347765
+  type: 'test'
+  ...
+# Subtest: header: branch, sha, run and url come from the GitHub variables
+ok 234 - header: branch, sha, run and url come from the GitHub variables
+  ---
+  duration_ms: 58.565318
+  type: 'test'
+  ...
+# Subtest: every input absent: still writes a SUMMARY.md (failure, nothing found), exit 0
+ok 235 - every input absent: still writes a SUMMARY.md (failure, nothing found), exit 0
+  ---
+  duration_ms: 139.804947
+  type: 'test'
+  ...
+# Subtest: --needs that is not JSON is a failure with the reason written down
+ok 236 - --needs that is not JSON is a failure with the reason written down
+  ---
+  duration_ms: 49.706244
+  type: 'test'
+  ...
+# Subtest: no errors.log: the tail of restore.log is shown and written to errors.log
+ok 237 - no errors.log: the tail of restore.log is shown and written to errors.log
+  ---
+  duration_ms: 87.932209
+  type: 'test'
+  ...
+# Subtest: warnings from restore.log are listed once and never fail a run
+ok 238 - warnings from restore.log are listed once and never fail a run
+  ---
+  duration_ms: 39.294952
+  type: 'test'
+  ...
+# Subtest: build.log: its last 300 lines are kept as build.tail.log
+ok 239 - build.log: its last 300 lines are kept as build.tail.log
+  ---
+  duration_ms: 41.856937
+  type: 'test'
+  ...
+# Subtest: a crash inside make-summary is written as a failed run with the stack, in the same header format
+ok 240 - a crash inside make-summary is written as a failed run with the stack, in the same header format
+  ---
+  duration_ms: 0.827488
+  type: 'test'
+  ...
+# Subtest: command line: an unknown argument is a usage error (64)
+ok 241 - command line: an unknown argument is a usage error (64)
+  ---
+  duration_ms: 36.999836
+  type: 'test'
+  ...
+# Subtest: helpers: normalizeDiagnostic and parseTrx on small inputs
+ok 242 - helpers: normalizeDiagnostic and parseTrx on small inputs
+  ---
+  duration_ms: 2.164651
+  type: 'test'
+  ...
+# Subtest: guards: FAIL lines are shown verbatim, first; the why line and the Notes name the guards, not the compiler
+ok 243 - guards: FAIL lines are shown verbatim, first; the why line and the Notes name the guards, not the compiler
+  ---
+  duration_ms: 48.342537
+  type: 'test'
+  ...
+# Subtest: guards: REPORT findings become one line per guard, with consecutive ids as ranges
+ok 244 - guards: REPORT findings become one line per guard, with consecutive ids as ranges
+  ---
+  duration_ms: 87.552397
+  type: 'test'
+  ...
+# Subtest: guards: the guards job failed without a FAIL line (crash, no log): the why line says so and the raw log is the pointer
+ok 245 - guards: the guards job failed without a FAIL line (crash, no log): the why line says so and the raw log is the pointer
+  ---
+  duration_ms: 91.815246
+  type: 'test'
+  ...
+# Subtest: guards: no guards.log means no Guards section and no error; a passing log keeps the old verdict rules
+ok 246 - guards: no guards.log means no Guards section and no error; a passing log keeps the old verdict rules
+  ---
+  duration_ms: 67.99121
+  type: 'test'
+  ...
+# Subtest: guards: the real output of tools/ci/guards.mjs is understood
+ok 247 - guards: the real output of tools/ci/guards.mjs is understood
+  ---
+  duration_ms: 301.069215
+  type: 'test'
+  ...
+# Subtest: helpers: parseGuardsLog and reportLine on small inputs
+ok 248 - helpers: parseGuardsLog and reportLine on small inputs
+  ---
+  duration_ms: 0.866419
+  type: 'test'
+  ...
+# Subtest: docker smoke: image size, time to healthy and every item are rendered; a passing smoke keeps the run green
+ok 249 - docker smoke: image size, time to healthy and every item are rendered; a passing smoke keeps the run green
+  ---
+  duration_ms: 36.28645
+  type: 'test'
+  ...
+# Subtest: docker smoke: a FAIL item fails the run and is named in why; the job is not blamed on the raw log; the container log is shown
+ok 250 - docker smoke: a FAIL item fails the run and is named in why; the job is not blamed on the raw log; the container log is shown
+  ---
+  duration_ms: 65.759396
+  type: 'test'
+  ...
+# Subtest: docker smoke: a slow start (WARN) and sizes over the 6.5 lines are reported but never fail the run
+ok 251 - docker smoke: a slow start (WARN) and sizes over the 6.5 lines are reported but never fail the run
+  ---
+  duration_ms: 33.952317
+  type: 'test'
+  ...
+# Subtest: docker smoke: items that were skipped because the container never started are shown; item 1 fails the run
+ok 252 - docker smoke: items that were skipped because the container never started are shown; item 1 fails the run
+  ---
+  duration_ms: 33.297914
+  type: 'test'
+  ...
+# Subtest: docker smoke: no smoke.json. A failed or succeeded job is a failure with a pointer; a skipped job and a missing --needs give no section
+ok 253 - docker smoke: no smoke.json. A failed or succeeded job is a failure with a pointer; a skipped job and a missing --needs give no section
+  ---
+  duration_ms: 133.398249
+  type: 'test'
+  ...
+# Subtest: docker smoke: an unreadable smoke.json, an empty one and a script error fail the run, never pass silently
+ok 254 - docker smoke: an unreadable smoke.json, an empty one and a script error fail the run, never pass silently
+  ---
+  duration_ms: 134.32433
+  type: 'test'
+  ...
+# Subtest: helpers: parseSmoke reads items by number, tolerates case and gaps, and counts an unknown status as a failure
+ok 255 - helpers: parseSmoke reads items by number, tolerates case and gaps, and counts an unknown status as a failure
+  ---
+  duration_ms: 0.971871
+  type: 'test'
+  ...
+# Subtest: helpers: acTokens reads [AC-nn] and [AC-nna], ignores ids outside AC-01..AC-50
+ok 256 - helpers: acTokens reads [AC-nn] and [AC-nna], ignores ids outside AC-01..AC-50
+  ---
+  duration_ms: 0.207713
+  type: 'test'
+  ...
+# Subtest: helpers: parseTrxAcTests keeps the tests whose name carries a token, decodes the name and maps the outcome
+ok 257 - helpers: parseTrxAcTests keeps the tests whose name carries a token, decodes the name and maps the outcome
+  ---
+  duration_ms: 0.430241
+  type: 'test'
+  ...
+# Subtest: helpers: parseTap reads ok, not ok and directives, the counters and the YAML block of a failure
+ok 258 - helpers: parseTap reads ok, not ok and directives, the counters and the YAML block of a failure
+  ---
+  duration_ms: 1.168026
+  type: 'test'
+  ...
+# Subtest: helpers: parsePlaywright maps passed, failed, flaky and skipped, joins the titles and keeps the first error and its screenshots
+ok 259 - helpers: parsePlaywright maps passed, failed, flaky and skipped, joins the titles and keeps the first error and its screenshots
+  ---
+  duration_ms: 0.923518
+  type: 'test'
+  ...
+# Subtest: helpers: buildAcMatrix gives every criterion one row; failed beats flaky beats passed beats skipped; a suffix counts for its criterion
+ok 260 - helpers: buildAcMatrix gives every criterion one row; failed beats flaky beats passed beats skipped; a suffix counts for its criterion
+  ---
+  duration_ms: 0.58499
+  type: 'test'
+  ...
+# Subtest: AC matrix: 50 rows built from the .trx, results.json and the js TAP; report-only, so the verdict does not move
+ok 261 - AC matrix: 50 rows built from the .trx, results.json and the js TAP; report-only, so the verdict does not move
+  ---
+  duration_ms: 38.836812
+  type: 'test'
+  ...
+# Subtest: AC matrix: a failed test turns its criterion red and nothing else; a run without any test source has no matrix
+ok 262 - AC matrix: a failed test turns its criterion red and nothing else; a run without any test source has no matrix
+  ---
+  duration_ms: 109.180846
+  type: 'test'
+  ...
+# Subtest: AC matrix: the grouped ac-coverage guards line is kept as it was
+ok 263 - AC matrix: the grouped ac-coverage guards line is kept as it was
+  ---
+  duration_ms: 40.126851
+  type: 'test'
+  ...
+# Subtest: e2e: a clean run is summarised in one section, the matrix counts its tests, and results.json is published beside SUMMARY.md
+ok 264 - e2e: a clean run is summarised in one section, the matrix counts its tests, and results.json is published beside SUMMARY.md
+  ---
+  duration_ms: 47.820049
+  type: 'test'
+  ...
+# Subtest: e2e: a failed test fails the run, with its message, its criteria and the app log; the job is not listed a second time
+ok 265 - e2e: a failed test fails the run, with its message, its criteria and the app log; the job is not listed a second time
+  ---
+  duration_ms: 35.175687
+  type: 'test'
+  ...
+# Subtest: e2e: a flaky test is listed, reported in the matrix, and does not fail the run
+ok 266 - e2e: a flaky test is listed, reported in the matrix, and does not fail the run
+  ---
+  duration_ms: 35.683805
+  type: 'test'
+  ...
+# Subtest: e2e: no results.json after a failed job is explained; after a successful job it is a failure; a skipped job says nothing
+ok 267 - e2e: no results.json after a failed job is explained; after a successful job it is a failure; a skipped job says nothing
+  ---
+  duration_ms: 105.813209
+  type: 'test'
+  ...
+# Subtest: e2e: an unreadable results.json and a report without a test are failures, never silent
+ok 268 - e2e: an unreadable results.json and a report without a test are failures, never silent
+  ---
+  duration_ms: 103.496466
+  type: 'test'
+  ...
+# Subtest: e2e: a failing payload contract fails the run and its TAP detail is shown
+ok 269 - e2e: a failing payload contract fails the run and its TAP detail is shown
+  ---
+  duration_ms: 38.562502
+  type: 'test'
+  ...
+# Subtest: screenshots: the gallery under shots/ and the first 20 failure screenshots are copied and indexed with their sha256
+ok 270 - screenshots: the gallery under shots/ and the first 20 failure screenshots are copied and indexed with their sha256
+  ---
+  duration_ms: 43.033165
+  type: 'test'
+  ...
+# Subtest: helpers: screenshotCopies ignores PNGs outside a shots folder and numbers two failures of one test and project
+ok 271 - helpers: screenshotCopies ignores PNGs outside a shots folder and numbers two failures of one test and project
+  ---
+  duration_ms: 0.615229
+  type: 'test'
+  ...
+# Subtest: helpers: e2eReport with nothing to report is empty
+ok 272 - helpers: e2eReport with nothing to report is empty
+  ---
+  duration_ms: 0.368853
+  type: 'test'
+  ...
+# Subtest: helpers: parseTap names a nested failure by its describe chain, lists the cause and not the parents that only roll it up, and keeps a crashed file with its crash text
+ok 273 - helpers: parseTap names a nested failure by its describe chain, lists the cause and not the parents that only roll it up, and keeps a crashed file with its crash text
+  ---
+  duration_ms: 1.118811
+  type: 'test'
+  ...
+# Subtest: helpers: parseTap lists a suite whose hook threw although node counts "fail 0", and flags the tests cancelled behind it
+ok 274 - helpers: parseTap lists a suite whose hook threw although node counts "fail 0", and flags the tests cancelled behind it
+  ---
+  duration_ms: 0.178887
+  type: 'test'
+  ...
+# Subtest: helpers: parseTap does not read the lines of a YAML block as tests, and ends a block that is not closed at the next entry
+ok 275 - helpers: parseTap does not read the lines of a YAML block as tests, and ends a block that is not closed at the next entry
+  ---
+  duration_ms: 0.145514
+  type: 'test'
+  ...
+# Subtest: helpers: parseTsc keeps the distinct "error TS" lines, without continuation lines and without the runner path
+ok 276 - helpers: parseTsc keeps the distinct "error TS" lines, without continuation lines and without the runner path
+  ---
+  duration_ms: 0.409308
+  type: 'test'
+  ...
+# Subtest: helpers: jsReport has nothing to say without a TAP, a tsc.log or a js job that ran
+ok 277 - helpers: jsReport has nothing to say without a TAP, a tsc.log or a js job that ran
+  ---
+  duration_ms: 0.288261
+  type: 'test'
+  ...
+# Subtest: js: failing Node tests are named in SUMMARY.md: counts, one block per failure under its describe, the why line, and the order of the sections
+ok 278 - js: failing Node tests are named in SUMMARY.md: counts, one block per failure under its describe, the why line, and the order of the sections
+  ---
+  duration_ms: 38.314082
+  type: 'test'
+  ...
+# Subtest: js: a job that failed next to a failing js job is still reported as unexplained, the js job is not named in the note
+ok 279 - js: a job that failed next to a failing js job is still reported as unexplained, the js job is not named in the note
+  ---
+  duration_ms: 36.501327
+  type: 'test'
+  ...
+# Subtest: js: the detail of a failing test is its first 40 lines
+ok 280 - js: the detail of a failing test is its first 40 lines
+  ---
+  duration_ms: 35.061712
+  type: 'test'
+  ...
+# Subtest: js: more than 50 failing tests: the first 50 are shown, the count is the whole, causes come before the tests cancelled behind them
+ok 281 - js: more than 50 failing tests: the first 50 are shown, the count is the whole, causes come before the tests cancelled behind them
+  ---
+  duration_ms: 39.320044
+  type: 'test'
+  ...
+# Subtest: js: type errors of tsc.log are listed once each and counted in the why line; with them, a js job without a TAP is explained
+ok 282 - js: type errors of tsc.log are listed once each and counted in the why line; with them, a js job without a TAP is explained
+  ---
+  duration_ms: 33.33569
+  type: 'test'
+  ...
+# Subtest: js: at most 50 type errors are shown; the why line counts all of them
+ok 283 - js: at most 50 type errors are shown; the why line counts all of them
+  ---
+  duration_ms: 33.974226
+  type: 'test'
+  ...
+# Subtest: js: a failed js job with no failing test and no type error says so, and the generic note stays
+ok 284 - js: a failed js job with no failing test and no type error says so, and the generic note stays
+  ---
+  duration_ms: 134.488431
+  type: 'test'
+  ...
+# Subtest: js: a clean js job: counts, no failure section, success
+ok 285 - js: a clean js job: counts, no failure section, success
+  ---
+  duration_ms: 33.629423
+  type: 'test'
+  ...
+# Subtest: js: without --needs a failing test or a type error still fails the run; a TAP that counts failures but lists none is a failure with a note
+ok 286 - js: without --needs a failing test or a type error still fails the run; a TAP that counts failures but lists none is a failure with a note
+  ---
+  duration_ms: 100.71657
+  type: 'test'
+  ...
+# Subtest: js: a section appears only when there is a TAP, a tsc.log or a js job that ran
+ok 287 - js: a section appears only when there is a TAP, a tsc.log or a js job that ran
+  ---
+  duration_ms: 103.068522
+  type: 'test'
+  ...
+# Subtest: js: js-tests.tap and tsc.log are published beside SUMMARY.md, and a file over 400 KB is cut to its last part
+ok 288 - js: js-tests.tap and tsc.log are published beside SUMMARY.md, and a file over 400 KB is cut to its last part
+  ---
+  duration_ms: 128.461099
+  type: 'test'
+  ...
+# Subtest: helpers: keepTail returns null for a file that fits and never cuts a character in two
+ok 289 - helpers: keepTail returns null for a file that fits and never cuts a character in two
+  ---
+  duration_ms: 3.577838
+  type: 'test'
+  ...
+# Subtest: attributionStartsExpanded: every style but demo-offline starts with the credits open
+ok 290 - attributionStartsExpanded: every style but demo-offline starts with the credits open
+  ---
+  duration_ms: 3.129728
+  type: 'test'
+  ...
+# Subtest: attributionStartsExpanded: an unknown or missing id counts as third-party data (the safe side)
+ok 291 - attributionStartsExpanded: an unknown or missing id counts as third-party data (the safe side)
+  ---
+  duration_ms: 0.382131
+  type: 'test'
+  ...
+# Subtest: attributionStartsExpanded: it is true exactly for the styles that load third-party data
+ok 292 - attributionStartsExpanded: it is true exactly for the styles that load third-party data
+  ---
+  duration_ms: 0.981597
+  type: 'test'
+  ...
+# Subtest: the fold delay is five seconds
+ok 293 - the fold delay is five seconds
+  ---
+  duration_ms: 0.15963
+  type: 'test'
+  ...
+# Subtest: arm: nothing happens before five seconds, then the credits collapse once
+ok 294 - arm: nothing happens before five seconds, then the credits collapse once
+  ---
+  duration_ms: 0.522144
+  type: 'test'
+  ...
+# Subtest: arm twice starts one countdown, and nothing is scheduled until arm is called
+ok 295 - arm twice starts one countdown, and nothing is scheduled until arm is called
+  ---
+  duration_ms: 0.272511
+  type: 'test'
+  ...
+# Subtest: fold (the first interaction) collapses at once and cancels the countdown
+ok 296 - fold (the first interaction) collapses at once and cancels the countdown
+  ---
+  duration_ms: 0.357068
+  type: 'test'
+  ...
+# Subtest: fold before the map has loaded collapses at once, and a later arm starts nothing
+ok 297 - fold before the map has loaded collapses at once, and a later arm starts nothing
+  ---
+  duration_ms: 0.177961
+  type: 'test'
+  ...
+# Subtest: only the first interaction folds: later ones leave credits the person reopened alone
+ok 298 - only the first interaction folds: later ones leave credits the person reopened alone
+  ---
+  duration_ms: 0.391203
+  type: 'test'
+  ...
+# Subtest: release (the person used the (i) button) cancels the countdown and nothing collapses afterwards
+ok 299 - release (the person used the (i) button) cancels the countdown and nothing collapses afterwards
+  ---
+  duration_ms: 0.515866
+  type: 'test'
+  ...
+# Subtest: release before arm: the countdown never starts
+ok 300 - release before arm: the countdown never starts
+  ---
+  duration_ms: 0.264731
+  type: 'test'
+  ...
+# Subtest: dispose cancels the countdown without collapsing
+ok 301 - dispose cancels the countdown without collapsing
+  ---
+  duration_ms: 1.027501
+  type: 'test'
+  ...
+# Subtest: a countdown callback that was already queued when the fold ended does nothing
+ok 302 - a countdown callback that was already queued when the fold ended does nothing
+  ---
+  duration_ms: 0.30598
+  type: 'test'
+  ...
+# Subtest: a different delay is honoured
+ok 303 - a different delay is honoured
+  ---
+  duration_ms: 0.228339
+  type: 'test'
+  ...
+# Subtest: first publish creates ci-artifacts: README, LATEST.md, LATEST.json and runs/<slug>/<run>-<sha7>/
+ok 304 - first publish creates ci-artifacts: README, LATEST.md, LATEST.json and runs/<slug>/<run>-<sha7>/
+  ---
+  duration_ms: 112.577416
+  type: 'test'
+  ...
+# Subtest: the branch is one orphan commit, however many runs were published
+ok 305 - the branch is one orphan commit, however many runs were published
+  ---
+  duration_ms: 243.761564
+  type: 'test'
+  ...
+# Subtest: the runs/ folders of other branches are kept; the folder of the same branch is replaced
+ok 306 - the runs/ folders of other branches are kept; the folder of the same branch is replaced
+  ---
+  duration_ms: 204.736133
+  type: 'test'
+  ...
+# Subtest: everything in ci-out goes into the run folder; a missing errors.log becomes an empty file
+ok 307 - everything in ci-out goes into the run folder; a missing errors.log becomes an empty file
+  ---
+  duration_ms: 59.44374
+  type: 'test'
+  ...
+# Subtest: the remote defaults to "origin" of the current repository
+ok 308 - the remote defaults to "origin" of the current repository
+  ---
+  duration_ms: 74.528033
+  type: 'test'
+  ...
+# Subtest: two publishers racing: the loser retries on top of the winner and both runs end up published
+ok 309 - two publishers racing: the loser retries on top of the winner and both runs end up published
+  ---
+  duration_ms: 2134.926944
+  type: 'test'
+  ...
+# Subtest: five publishers racing (three branches finishing together is the real case): every run ends up under runs/, none is lost
+ok 310 - five publishers racing (three branches finishing together is the real case): every run ends up under runs/, none is lost
+  ---
+  duration_ms: 5852.197672
+  type: 'test'
+  ...
+# Subtest: GH_TOKEN: an https://github.com remote is pushed through the x-access-token URL, and the token is never printed
+ok 311 - GH_TOKEN: an https://github.com remote is pushed through the x-access-token URL, and the token is never printed
+  ---
+  duration_ms: 138.205736
+  type: 'test'
+  ...
+# Subtest: GH_TOKEN: a failing push gives up after 6 attempts (exit 1) without printing the token
+ok 312 - GH_TOKEN: a failing push gives up after 6 attempts (exit 1) without printing the token
+  ---
+  duration_ms: 81.59168
+  type: 'test'
+  ...
+# Subtest: a token is not applied to a remote that is not https://github.com
+ok 313 - a token is not applied to a remote that is not https://github.com
+  ---
+  duration_ms: 43.003576
+  type: 'test'
+  ...
+# Subtest: usage errors exit 64: no SUMMARY.md, and a header without a usable sha, run or branch
+ok 314 - usage errors exit 64: no SUMMARY.md, and a header without a usable sha, run or branch
+  ---
+  duration_ms: 46.878216
+  type: 'test'
+  ...
+# Subtest: PUBLISH_BACKOFF_S must be a number of seconds; decimals are fine
+ok 315 - PUBLISH_BACKOFF_S must be a number of seconds; decimals are fine
+  ---
+  duration_ms: 45.686542
+  type: 'test'
+  ...
+# Subtest: branch_slug (shared by publish and wait): lower-case, everything outside [a-z0-9._-] becomes "-"
+ok 316 - branch_slug (shared by publish and wait): lower-case, everything outside [a-z0-9._-] becomes "-"
+  ---
+  duration_ms: 12.941661
+  type: 'test'
+  ...
+# Subtest: both scripts use the one branch_slug of ci-common.sh and neither traces
+ok 317 - both scripts use the one branch_slug of ci-common.sh and neither traces
+  ---
+  duration_ms: 0.5388
+  type: 'test'
+  ...
+# [realmShell] observeSheet failed ReferenceError: document is not defined
+#     at applyMetricsToDocument (file:///home/runner/work/HA360/HA360/src/Realm.Web/wwwroot/js/realmShell.js:306:16)
+#     at setMetrics (file:///home/runner/work/HA360/HA360/src/Realm.Web/wwwroot/js/realmShell.js:323:3)
+#     at observeSheet (file:///home/runner/work/HA360/HA360/src/Realm.Web/wwwroot/js/realmShell.js:370:7)
+#     at dispose (file:///home/runner/work/HA360/HA360/src/Realm.Web/wwwroot/js/realmShell.js:280:5)
+#     at TestContext.<anonymous> (file:///home/runner/work/HA360/HA360/tests/js/realmShell.test.mjs:143:3)
+#     at TestHook.runInAsyncScope (node:async_hooks:214:14)
+#     at TestHook.run (node:internal/test_runner/test:1047:25)
+#     at TestHook.run (node:internal/test_runner/test:1354:18)
+#     at Test.runHook (node:internal/test_runner/test:965:20)
+#     at node:internal/test_runner/test:1010:27
+# [realmShell] dispose failed ReferenceError: document is not defined
+#     at dispose (file:///home/runner/work/HA360/HA360/src/Realm.Web/wwwroot/js/realmShell.js:281:5)
+#     at TestContext.<anonymous> (file:///home/runner/work/HA360/HA360/tests/js/realmShell.test.mjs:143:3)
+#     at TestHook.runInAsyncScope (node:async_hooks:214:14)
+#     at TestHook.run (node:internal/test_runner/test:1047:25)
+#     at TestHook.run (node:internal/test_runner/test:1354:18)
+#     at Test.runHook (node:internal/test_runner/test:965:20)
+#     at node:internal/test_runner/test:1010:27
+#     at node:internal/util:580:20
+#     at Test.run (node:internal/test_runner/test:1069:13)
+#     at async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+# [realmShell] observeSheet failed ReferenceError: document is not defined
+#     at applyMetricsToDocument (file:///home/runner/work/HA360/HA360/src/Realm.Web/wwwroot/js/realmShell.js:306:16)
+#     at setMetrics (file:///home/runner/work/HA360/HA360/src/Realm.Web/wwwroot/js/realmShell.js:323:3)
+#     at observeSheet (file:///home/runner/work/HA360/HA360/src/Realm.Web/wwwroot/js/realmShell.js:370:7)
+#     at dispose (file:///home/runner/work/HA360/HA360/src/Realm.Web/wwwroot/js/realmShell.js:280:5)
+#     at TestContext.<anonymous> (file:///home/runner/work/HA360/HA360/tests/js/realmShell.test.mjs:143:3)
+#     at TestHook.runInAsyncScope (node:async_hooks:214:14)
+#     at TestHook.run (node:internal/test_runner/test:1047:25)
+#     at TestHook.run (node:internal/test_runner/test:1354:18)
+#     at Test.runHook (node:internal/test_runner/test:965:20)
+#     at node:internal/test_runner/test:1010:27
+# [realmShell] dispose failed ReferenceError: document is not defined
+#     at dispose (file:///home/runner/work/HA360/HA360/src/Realm.Web/wwwroot/js/realmShell.js:281:5)
+#     at TestContext.<anonymous> (file:///home/runner/work/HA360/HA360/tests/js/realmShell.test.mjs:143:3)
+#     at TestHook.runInAsyncScope (node:async_hooks:214:14)
+#     at TestHook.run (node:internal/test_runner/test:1047:25)
+#     at TestHook.run (node:internal/test_runner/test:1354:18)
+#     at Test.runHook (node:internal/test_runner/test:965:20)
+#     at node:internal/test_runner/test:1010:27
+#     at node:internal/util:580:20
+#     at Test.run (node:internal/test_runner/test:1069:13)
+#     at async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+# [realmShell] observeSheet failed ReferenceError: document is not defined
+#     at applyMetricsToDocument (file:///home/runner/work/HA360/HA360/src/Realm.Web/wwwroot/js/realmShell.js:306:16)
+#     at setMetrics (file:///home/runner/work/HA360/HA360/src/Realm.Web/wwwroot/js/realmShell.js:323:3)
+#     at observeSheet (file:///home/runner/work/HA360/HA360/src/Realm.Web/wwwroot/js/realmShell.js:370:7)
+#     at dispose (file:///home/runner/work/HA360/HA360/src/Realm.Web/wwwroot/js/realmShell.js:280:5)
+#     at TestContext.<anonymous> (file:///home/runner/work/HA360/HA360/tests/js/realmShell.test.mjs:143:3)
+#     at TestHook.runInAsyncScope (node:async_hooks:214:14)
+#     at TestHook.run (node:internal/test_runner/test:1047:25)
+#     at TestHook.run (node:internal/test_runner/test:1354:18)
+#     at Test.runHook (node:internal/test_runner/test:965:20)
+#     at node:internal/test_runner/test:1010:27
+# [realmShell] dispose failed ReferenceError: document is not defined
+#     at dispose (file:///home/runner/work/HA360/HA360/src/Realm.Web/wwwroot/js/realmShell.js:281:5)
+#     at TestContext.<anonymous> (file:///home/runner/work/HA360/HA360/tests/js/realmShell.test.mjs:143:3)
+#     at TestHook.runInAsyncScope (node:async_hooks:214:14)
+#     at TestHook.run (node:internal/test_runner/test:1047:25)
+#     at TestHook.run (node:internal/test_runner/test:1354:18)
+#     at Test.runHook (node:internal/test_runner/test:965:20)
+#     at node:internal/test_runner/test:1010:27
+#     at node:internal/util:580:20
+#     at Test.run (node:internal/test_runner/test:1069:13)
+#     at async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+# [realmShell] observeSheet failed ReferenceError: document is not defined
+#     at applyMetricsToDocument (file:///home/runner/work/HA360/HA360/src/Realm.Web/wwwroot/js/realmShell.js:306:16)
+#     at setMetrics (file:///home/runner/work/HA360/HA360/src/Realm.Web/wwwroot/js/realmShell.js:323:3)
+#     at observeSheet (file:///home/runner/work/HA360/HA360/src/Realm.Web/wwwroot/js/realmShell.js:370:7)
+#     at dispose (file:///home/runner/work/HA360/HA360/src/Realm.Web/wwwroot/js/realmShell.js:280:5)
+#     at TestContext.<anonymous> (file:///home/runner/work/HA360/HA360/tests/js/realmShell.test.mjs:143:3)
+#     at TestHook.runInAsyncScope (node:async_hooks:214:14)
+#     at TestHook.run (node:internal/test_runner/test:1047:25)
+#     at TestHook.run (node:internal/test_runner/test:1354:18)
+#     at Test.runHook (node:internal/test_runner/test:965:20)
+#     at node:internal/test_runner/test:1010:27
+# [realmShell] dispose failed ReferenceError: document is not defined
+#     at dispose (file:///home/runner/work/HA360/HA360/src/Realm.Web/wwwroot/js/realmShell.js:281:5)
+#     at TestContext.<anonymous> (file:///home/runner/work/HA360/HA360/tests/js/realmShell.test.mjs:143:3)
+#     at TestHook.runInAsyncScope (node:async_hooks:214:14)
+#     at TestHook.run (node:internal/test_runner/test:1047:25)
+#     at TestHook.run (node:internal/test_runner/test:1354:18)
+#     at Test.runHook (node:internal/test_runner/test:965:20)
+#     at node:internal/test_runner/test:1010:27
+#     at node:internal/util:580:20
+#     at Test.run (node:internal/test_runner/test:1069:13)
+#     at async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+# Subtest: isSheetTall: from half the viewport height up in Compact, never in the panel, never without a measurement
+ok 318 - isSheetTall: from half the viewport height up in Compact, never in the panel, never without a measurement
+  ---
+  duration_ms: 2.231752
+  type: 'test'
+  ...
+# Subtest: sheetHeightForPadding: the measured height, or null while there is no sheet
+ok 319 - sheetHeightForPadding: the measured height, or null while there is no sheet
+  ---
+  duration_ms: 0.50122
+  type: 'test'
+  ...
+# Subtest: findSheetElement tries the selector list in the order written: the popover wins over the contract element
+ok 320 - findSheetElement tries the selector list in the order written: the popover wins over the contract element
+  ---
+  duration_ms: 0.622506
+  type: 'test'
+  ...
+# Subtest: describeSheet: state from data-state, geometry from the metrics, open only with an element and a height
+ok 321 - describeSheet: state from data-state, geometry from the metrics, open only with an element and a height
+  ---
+  duration_ms: 0.975028
+  type: 'test'
+  ...
+# Subtest: observeSheet follows the popover: --realm-sheet-h, --realm-sheet-top, data-sheet-tall and the subscribers
+ok 322 - observeSheet follows the popover: --realm-sheet-h, --realm-sheet-top, data-sheet-tall and the subscribers
+  ---
+  duration_ms: 1.154051
+  type: 'test'
+  ...
+# Subtest: observeSheet re-attaches when MudX replaces the popover (Compact to Expanded makes a new one)
+ok 323 - observeSheet re-attaches when MudX replaces the popover (Compact to Expanded makes a new one)
+  ---
+  duration_ms: 0.370319
+  type: 'test'
+  ...
+# Subtest: observeSheet with the aside host: the contract element is the sheet
+ok 324 - observeSheet with the aside host: the contract element is the sheet
+  ---
+  duration_ms: 1.112794
+  type: 'test'
+  ...
+# Subtest: readSheet reads the state from the contract element and reports a missing one as null state, closed
+ok 325 - readSheet reads the state from the contract element and reports a missing one as null state, closed
+  ---
+  duration_ms: 0.307444
+  type: 'test'
+  ...
+# Subtest: the metrics feed the map padding: Peek gives bottom 190, Tall gives 748 with the stack gone, no sheet falls back to Peek
+ok 326 - the metrics feed the map padding: Peek gives bottom 190, Tall gives 748 with the stack gone, no sheet falls back to Peek
+  ---
+  duration_ms: 0.391881
+  type: 'test'
+  ...
+# Subtest: a subscriber that throws does not stop the others
+ok 327 - a subscriber that throws does not stop the others
+  ---
+  duration_ms: 0.37182
+  type: 'test'
+  ...
+# Subtest: readViewport reports CSS pixels, the orientation, the preferences and the safe area
+ok 328 - readViewport reports CSS pixels, the orientation, the preferences and the safe area
+  ---
+  duration_ms: 0.31538
+  type: 'test'
+  ...
+# Subtest: init returns the window, loads nothing twice, and reports a resize once, debounced
+ok 329 - init returns the window, loads nothing twice, and reports a resize once, debounced
+  ---
+  duration_ms: 480.625239
+  type: 'test'
+  ...
+# Subtest: init adds the MudX script when the helper is missing, and waits for it
+ok 330 - init adds the MudX script when the helper is missing, and waits for it
+  ---
+  duration_ms: 75.995327
+  type: 'test'
+  ...
+# Subtest: init puts no pointer, mouse, touch or click listener on the document: the handle is a plain button, with no tap shim and no drag to compensate for
+ok 331 - init puts no pointer, mouse, touch or click listener on the document: the handle is a plain button, with no tap shim and no drag to compensate for
+  ---
+  duration_ms: 0.537729
+  type: 'test'
+  ...
+# Subtest: exit 0: a successful run for the SHA; prints SUMMARY.md, RESULT=success and the run URL
+ok 332 - exit 0: a successful run for the SHA; prints SUMMARY.md, RESULT=success and the run URL
+  ---
+  duration_ms: 96.161752
+  type: 'test'
+  ...
+# Subtest: exit 1: a failed run; a 7-character SHA is enough
+ok 333 - exit 1: a failed run; a 7-character SHA is enough
+  ---
+  duration_ms: 81.145005
+  type: 'test'
+  ...
+# Subtest: exit 2: nothing is published for the SHA before WAIT_TIMEOUT_S (2 s) runs out
+ok 334 - exit 2: nothing is published for the SHA before WAIT_TIMEOUT_S (2 s) runs out
+  ---
+  duration_ms: 2034.526807
+  type: 'test'
+  ...
+# Subtest: exit 2 also when other runs exist but none is ours and none is newer
+ok 335 - exit 2 also when other runs exist but none is ours and none is newer
+  ---
+  duration_ms: 2134.153978
+  type: 'test'
+  ...
+# Subtest: exit 3: a newer run of the same branch was published, so the run for our SHA will never appear
+ok 336 - exit 3: a newer run of the same branch was published, so the run for our SHA will never appear
+  ---
+  duration_ms: 1093.144251
+  type: 'test'
+  ...
+# Subtest: exit 3 needs a run of the SAME branch: a newer run of another branch does not supersede ours
+ok 337 - exit 3 needs a run of the SAME branch: a newer run of another branch does not supersede ours
+  ---
+  duration_ms: 4139.117258
+  type: 'test'
+  ...
+# Subtest: match by directory (PR-1 rule 2): works when LATEST.json already names another branch's run
+ok 338 - match by directory (PR-1 rule 2): works when LATEST.json already names another branch's run
+  ---
+  duration_ms: 137.583575
+  type: 'test'
+  ...
+# Subtest: match by LATEST.json (PR-1 rule 1): the same SHA was built on another branch
+ok 339 - match by LATEST.json (PR-1 rule 1): the same SHA was built on another branch
+  ---
+  duration_ms: 80.084819
+  type: 'test'
+  ...
+# Subtest: the branch argument overrides HEAD and is slugged (case and slashes)
+ok 340 - the branch argument overrides HEAD and is slugged (case and slashes)
+  ---
+  duration_ms: 80.659879
+  type: 'test'
+  ...
+# Subtest: our run appears while waiting: the match comes before the exit-3 rule, although its number is above the baseline
+ok 341 - our run appears while waiting: the match comes before the exit-3 rule, although its number is above the baseline
+  ---
+  duration_ms: 1101.951262
+  type: 'test'
+  ...
+# Subtest: exit 64: usage errors
+ok 342 - exit 64: usage errors
+  ---
+  duration_ms: 1092.322081
+  type: 'test'
+  ...
+# Subtest: -h prints the usage on stdout and exits 0
+ok 343 - -h prints the usage on stdout and exits 0
+  ---
+  duration_ms: 3.691601
+  type: 'test'
+  ...
+1..343
+# tests 364
+# suites 5
+# pass 364
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 14495.524064

@@ -1,0 +1,12 @@
+2026-10-02T07:10:50.949Z warn: Microsoft.AspNetCore.DataProtection.KeyManagement.XmlKeyManager[35] No XML encryptor configured. Key {d0b904f1-7fab-4ee4-a852-b14f70d6a90d} may be persisted to storage in unencrypted form.
+2026-10-02T07:10:51.494Z info: Microsoft.Hosting.Lifetime[14] Now listening on: http://[::]:8099
+2026-10-02T07:10:51.497Z info: Microsoft.Hosting.Lifetime[0] Application started. Press Ctrl+C to shut down.
+2026-10-02T07:10:51.497Z info: Microsoft.Hosting.Lifetime[0] Hosting environment: Production
+2026-10-02T07:10:51.497Z info: Microsoft.Hosting.Lifetime[0] Content root path: /home/runner/work/HA360/HA360/publish/web
+2026-10-02T07:10:57.804Z warn: Realm.Web.Hosting.IngressPathBase[6001] Ignoring X-Ingress-Path value 'no-leading-slash/path': it must start with '/' and contain no whitespace, quote or angle bracket.
+2026-10-02T07:10:57.828Z warn: Realm.Web.Hosting.IngressPathBase[6001] Ignoring X-Ingress-Path value 'x': it must start with '/' and contain no whitespace, quote or angle bracket.
+2026-10-02T07:10:57.844Z warn: Realm.Web.Hosting.IngressPathBase[6001] Ignoring X-Ingress-Path value '/with"quote': it must start with '/' and contain no whitespace, quote or angle bracket.
+2026-10-02T07:10:57.857Z warn: Realm.Web.Hosting.IngressPathBase[6001] Ignoring X-Ingress-Path value '/with'quote': it must start with '/' and contain no whitespace, quote or angle bracket.
+2026-10-02T07:10:57.871Z warn: Realm.Web.Hosting.IngressPathBase[6001] Ignoring X-Ingress-Path value '/with<angle': it must start with '/' and contain no whitespace, quote or angle bracket.
+2026-10-02T07:10:57.883Z warn: Realm.Web.Hosting.IngressPathBase[6001] Ignoring X-Ingress-Path value '/with>angle': it must start with '/' and contain no whitespace, quote or angle bracket.
+2026-10-02T07:10:57.895Z warn: Realm.Web.Hosting.IngressPathBase[6001] Ignoring X-Ingress-Path value '/with space': it must start with '/' and contain no whitespace, quote or angle bracket.
