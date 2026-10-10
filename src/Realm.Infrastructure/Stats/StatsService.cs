@@ -120,7 +120,7 @@ public sealed class StatsService
     }
 
     /// <summary>
-    /// One member's Location History for a local day (0.3.0, D123): null for a member that has none (not tracked, a tracker, a static pin, unknown) and for a day outside the
+    /// One member's Location History for a local day (0.3.0, D123): null for a member that has none (not tracked, a tracker with Keep history off and nothing stored, a static pin, unknown) and for a day outside the
     /// retained range. Reads only the day and a day either side (two indexed range queries).
     /// </summary>
     public async ValueTask<HistoryDayVm?> GetHistoryDayAsync(string memberId, DateOnly day, CancellationToken cancellationToken)
@@ -137,7 +137,14 @@ public sealed class StatsService
     {
         var snapshot = _state.Current;
         var member = snapshot.Members.FirstOrDefault(m => string.Equals(m.Id, memberId, StringComparison.Ordinal));
-        if (member is null || member.Kind != MemberKind.Live)
+        var tracker = member is null ? snapshot.Vehicles.FirstOrDefault(v => string.Equals(v.Id, memberId, StringComparison.Ordinal)) : null;
+        if (tracker is null && (member is null || member.Kind != MemberKind.Live))
+        {
+            return [];
+        }
+
+        // A tracker (0.3.1, D125) has history when its owner keeps it, or when positions are still stored from when they did (retention removes them in time).
+        if (tracker is not null && !tracker.KeepHistory && !await HasStoredFixesAsync(memberId, cancellationToken))
         {
             return [];
         }
@@ -154,10 +161,17 @@ public sealed class StatsService
 
         var window = HistoryRange.ReadWindow(from, to, zone);
         var fixes = await _queries.GetFixesAsync(memberId, window.StartUtc, window.EndUtc, cancellationToken);
-        var trips = await _queries.GetTripsAsync(window.StartUtc, window.EndUtc, memberId, cancellationToken);
         var places = snapshot.Places.Select(p => new RawPlace(p.Id, p.DisplayName, p.Lat, p.Lon, p.RadiusM, false)).ToList();
-        return HistoryRange.Build(memberId, from, to, zone, fixes, trips, places, now, includeTrail);
+        var trips = tracker is null
+            ? await _queries.GetTripsAsync(window.StartUtc, window.EndUtc, memberId, cancellationToken)
+            : MovementDeriver.Derive(memberId, fixes, places);
+        return HistoryRange.Build(memberId, from, to, zone, fixes, trips, places, now, includeTrail, movement: tracker is not null);
     }
+
+    // One indexed read per source: is anything of this tracker stored at all.
+    private async Task<bool> HasStoredFixesAsync(string memberId, CancellationToken cancellationToken) =>
+        await _queries.GetLatestFixAsync(memberId, FixSource.Companion, cancellationToken) is not null
+        || await _queries.GetLatestFixAsync(memberId, FixSource.Life360, cancellationToken) is not null;
 
     /// <summary>
     /// Stores a trip the detector closed: attaches the phone-use count (<see cref="PhoneUseDetector"/> over the stored signals, with Android Auto time left

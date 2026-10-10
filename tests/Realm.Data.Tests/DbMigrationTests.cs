@@ -44,6 +44,7 @@ public class DbMigrationTests
             C("first_seen", "INTEGER", notNull: true), C("last_active", "INTEGER", notNull: true), C("auto_moved_at", "INTEGER"),
             C("source_name", "TEXT"), C("source_title", "TEXT"), C("source_color", "TEXT"),
             C("name_override", "TEXT"), C("title_override", "TEXT"), C("color_override", "TEXT"), C("icon", "TEXT"),
+            C("keep_history", "INTEGER", notNull: true, dflt: "1"),
         ],
         ["signals"] =
         [
@@ -158,6 +159,22 @@ public class DbMigrationTests
 
         Assert.Contains("Sql/0003_roster_overrides.sql", typeof(SchemaRunner).Assembly.GetManifestResourceNames());
         Assert.Contains(scripts, s => s.Version == 3 && s.Name == "Sql/0003_roster_overrides.sql");
+    }
+
+    [Fact]
+    public void The_tracker_history_script_is_embedded_as_Sql_0004_and_adds_keep_history_on_for_every_existing_row()
+    {
+        var scripts = SchemaRunner.LoadEmbeddedScripts();
+        Assert.Contains(scripts, s => s.Version == 4 && s.Name == "Sql/0004_tracker_history.sql");
+
+        using var db = new TempDatabase();
+        using var connection = RealmDb.OpenConnection(db.FilePath, pooling: false);
+        Assert.Equal(3, SchemaRunner.Apply(connection, scripts.Where(s => s.Version <= 3).ToArray(), NullLogger.Instance));
+        Exec(connection, "INSERT INTO roster(entity_id, kind, grp, display_name, lore_title, color, sort_order, source, first_seen, last_active) VALUES ('device_tracker.t', 'tracker', 'vehicles', 'Wagon', NULL, '#E8BC4E', 0, 'Home Assistant', 1, 2)");
+
+        Assert.Equal(HighestScriptNumber(), SchemaRunner.Apply(connection, scripts, NullLogger.Instance));
+
+        Assert.Equal(1, ScalarInt(connection, "SELECT keep_history FROM roster WHERE entity_id = 'device_tracker.t'"));
     }
 
     // 0.2.1 (D117): a roster row of 0.2.0 keeps its name, title and colour; they count as the owner's until the first discovery.

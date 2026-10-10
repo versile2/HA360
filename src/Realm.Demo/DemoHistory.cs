@@ -30,9 +30,15 @@ internal sealed class DemoHistory
             member => member.Id,
             member => new Lazy<Generated>(() => Generate(member)),
             StringComparer.Ordinal);
+
+        // 0.3.1 (D125): the wagon keeps its history too (Keep history is on by default).
+        _byMember[DemoCast.Wagon.Id] = new Lazy<Generated>(GenerateWagon);
     }
 
-    /// <summary>True for the people that have a history.</summary>
+    /// <summary>The first day of the wagon's history: five days (Sat 2026-09-26 to the fixture's day).</summary>
+    public static readonly DateOnly WagonFirstDay = new(2026, 9, 26);
+
+    /// <summary>True for the people and the tracker that have a history.</summary>
     public bool Has(string memberId) => _byMember.ContainsKey(memberId);
 
     /// <summary>The stored fixes of a person, oldest first.</summary>
@@ -202,6 +208,51 @@ internal sealed class DemoHistory
         return new Generated(
             [.. fixes.Where(fix => fix.Ts <= cap).OrderBy(fix => fix.Ts)],
             [.. trips.OrderBy(trip => trip.StartUtc)]);
+    }
+
+    // The wagon (0.3.1, D125): a few days of stored positions of a tracker, five days parked at home with an errand each (Saturday the wheel hall, Sunday the park, Monday work, Tuesday the vet, and
+    // the fixture's day Mara's in the evening), ending at home where the map shows it (last position 21:05). Only the fixes are generated: the moves are derived from them at read time
+    // (MovementDeriver), exactly as for a Live tracker, and the trips list stays empty.
+    private Generated GenerateWagon()
+    {
+        var fixes = new List<RawFix>();
+        var cap = DemoDataSource.Anchor.AddMinutes(-20);
+        const string entity = "device_tracker.wagon";
+        var home = Pt.Of(DemoPlaces.Home);
+        for (var day = WagonFirstDay; day <= LastDay; day = day.AddDays(1))
+        {
+            var rng = new DemoPrng($"wagon:{HistoryDayMath.Iso(day)}:history");
+            var midnight = HistoryDayMath.Bounds(day, _zone).StartUtc;
+            IReadOnlyList<Stop> plan = day.DayOfWeek switch
+            {
+                DayOfWeek.Saturday => [new(home, Min(11, 30)), new(Pt.Of(DemoPlaces.Wheels), Min(14, 10)), new(home, 1440)],
+                DayOfWeek.Sunday => [new(home, Min(10, 15)), new(Pt.Of(DemoPlaces.Park), Min(11, 50)), new(home, 1440)],
+                DayOfWeek.Monday => [new(home, Min(8, 0)), new(Pt.Of(DemoPlaces.Work), Min(17, 20)), new(home, 1440)],
+                DayOfWeek.Tuesday => [new(home, Min(16, 20)), new(Pt.Of(DemoPlaces.Vet), Min(17, 5)), new(home, 1440)],
+                _ => [new(home, Min(18, 0)), new(Pt.Of(DemoPlaces.Mara), Min(20, 15)), new(home, 1440)],
+            };
+            var arrive = midnight;
+            for (var i = 0; i < plan.Count; i++)
+            {
+                var stop = plan[i];
+                var leave = i == plan.Count - 1 ? midnight.AddMinutes(1440) : midnight.AddMinutes(stop.LeaveMin);
+                if (i > 0)
+                {
+                    var departed = midnight.AddMinutes(plan[i - 1].LeaveMin);
+                    var drive = Drive(DemoCast.King, entity, rng, plan[i - 1].At, stop.At, departed, null, null, plan[i - 1].At.Id, stop.At.Id);
+                    fixes.AddRange(drive.Fixes);
+                    arrive = drive.ArrivedUtc;
+                    if (leave < arrive.AddMinutes(6))
+                    {
+                        leave = arrive.AddMinutes(6);
+                    }
+                }
+
+                fixes.AddRange(Stationary(entity, rng, stop.At, arrive, leave, cap));
+            }
+        }
+
+        return new Generated([.. fixes.Where(fix => fix.Ts <= cap).OrderBy(fix => fix.Ts)], []);
     }
 
     // The heartbeat fixes of a stay: a minute after arriving, every half hour, and a minute before leaving.

@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.3.1
+
+### Added
+
+- **Trackers keep a history, like people.** A tracker (a GPS device tracker under **Trackers**) now stores its positions, and
+  its **History** screen shows the same day view, timeline and trail as a person's: the places it stayed and its moves, written
+  **Moved - 12.4 mi - 24 mins** (a tracker has no driver, so there is no speed or phone-use chip). Positions are stored in the same
+  place as a person's, so they age out with `retention_fix_days` and a tracker that is **Not tracked** stores nothing.
+- **A "Keep history" switch per tracker.** Settings, Who's on the map, tap a tracker, then **Keep history** (on by default, for
+  existing and new trackers; remember to press Save). Off: new positions are no longer stored, the tracker shows only its latest
+  position again, and what was stored stays in History until it ages out. With the switch off and nothing stored, its History page
+  says so and how to turn it on. The helper text gives the size: about 6-20 MB per 100 days.
+- **Backfill.** When the add-on starts, a tracker that keeps its history is filled from Home Assistant's recorder, back as far as
+  `backfill_days` (so a tracker you switch on today has its past days at the next start).
+- **Demo.** The Ford Pickup in the demo has five days of history.
+
+### Notes
+
+- A database migration (`0004`) adds one column to the roster. Moves are worked out from the stored positions when History is
+  opened, so a tracker that reports rarely shows a rough (dashed) path.
+
 ## 0.3.0
 
 ### Added

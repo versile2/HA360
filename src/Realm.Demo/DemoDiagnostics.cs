@@ -35,7 +35,7 @@ public sealed class DemoDiagnostics : IDiagnostics
             Counts: new DiagnosticsSnapshot.EntityCounts(DemoCast.Members.Count, DemoCast.Vehicles.Count, DemoPlaces.Drawn.Count),
             Ha: new DiagnosticsSnapshot.HaCounters("connected", Reconnects: 0, LastMessageUtc: DemoDataSource.Anchor, WatchedEntities: 24, MessagesPerMinute: 12),
             Ingestion: new DiagnosticsSnapshot.IngestionCounters(EventsPerMinute: 12, QueueDepth: 0, Dropped: 0),
-            Db: new DiagnosticsSnapshot.DbCounters(SchemaVersion: 3, UncleanShutdownAtStart: false, SizeBytes: 0, WriterQueueDepth: 0, LastCommitUtc: DemoDataSource.Anchor),
+            Db: new DiagnosticsSnapshot.DbCounters(SchemaVersion: 4, UncleanShutdownAtStart: false, SizeBytes: 0, WriterQueueDepth: 0, LastCommitUtc: DemoDataSource.Anchor),
             Members: members,
             Warnings: []);
     }

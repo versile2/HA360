@@ -129,4 +129,28 @@ test.describe("Settings, Who's on the map", () => {
     await expect(page.getByTestId('roster-row-person-king').locator('.realm-roster__name'), 'the row has the new name and title').toContainText('Alden the Bold');
     await expect(page.getByTestId('roster-row-person-king').locator('.realm-roster__lore'), 'and the title').toHaveText('Keeper of the Keys');
   });
+
+  // 0.3.1, D125: a tracker has the Keep history switch (on by default); Save keeps it, and a person has none.
+  test('[ROSTER] a tracker\'s edit panel has the Keep history switch, on by default, and Save keeps it off', { tag: ['@phone', '@unfolded'] }, async ({ page }) => {
+    await openRoster(page);
+
+    await page.getByTestId('roster-open-person-king').click();
+    await expect(page.getByTestId('roster-edit')).toBeVisible();
+    await expect(page.getByTestId('roster-keep-history'), 'a person has no such switch').toHaveCount(0);
+    await page.getByTestId('roster-cancel').click();
+
+    await page.getByTestId('roster-open-device-tracker-wagon').click();
+    const keep = page.getByTestId('roster-keep-history');
+    await expect(keep).toHaveAttribute('role', 'switch');
+    await expect(keep).toHaveAttribute('aria-checked', 'true');
+    await expect(page.getByTestId('roster-keep-history-help')).toHaveText("Store this tracker's positions for Location History (about 6–20 MB per 100 days).");
+    await keep.click();
+    await expect(keep).toHaveAttribute('aria-checked', 'false');
+    await expect(page.getByTestId('roster-keep-history-off')).toBeVisible();
+    await page.getByTestId('roster-save').click();
+    await expect(page.getByTestId('roster-edit')).toHaveCount(0);
+
+    await page.getByTestId('roster-open-device-tracker-wagon').click();
+    await expect(page.getByTestId('roster-keep-history'), 'the setting was kept').toHaveAttribute('aria-checked', 'false');
+  });
 });

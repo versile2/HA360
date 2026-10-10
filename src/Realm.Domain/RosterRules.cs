@@ -253,6 +253,10 @@ public static class RosterRules
         return result;
     }
 
+    /// <summary>The roster after <see cref="IRosterEditor.SetKeepHistoryAsync"/>. Unknown id: the same roster.</summary>
+    public static IReadOnlyList<RosterEntry> SetKeepHistory(IReadOnlyList<RosterEntry> entries, string entityId, bool keep) =>
+        [.. entries.Select(entry => entry.EntityId == entityId ? entry with { KeepHistory = keep } : entry)];
+
     /// <summary>The roster after "Reset to Home Assistant / Life360": the owner's name, title, colour and picture are cleared and the source's values are in effect. Unknown id: the same roster.</summary>
     public static IReadOnlyList<RosterEntry> Reset(IReadOnlyList<RosterEntry> entries, string entityId)
     {

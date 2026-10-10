@@ -104,7 +104,7 @@ public sealed class SqliteRealmQueries : IRealmQueries
     {
         return QueryAsync(
             "SELECT entity_id, kind, grp, display_name, lore_title, color, sort_order, source, first_seen, last_active, auto_moved_at, "
-            + "source_name, source_title, source_color, name_override, title_override, color_override, icon "
+            + "source_name, source_title, source_color, name_override, title_override, color_override, icon, keep_history "
             + "FROM roster ORDER BY CASE grp WHEN 'people' THEN 0 WHEN 'vehicles' THEN 1 ELSE 2 END, sort_order, entity_id",
             ReadRoster,
             cancellationToken);
@@ -132,6 +132,7 @@ public sealed class SqliteRealmQueries : IRealmQueries
             TitleOverride = SqlValues.NullableText(reader, 15),
             ColorOverride = SqlValues.NullableText(reader, 16),
             Icon = SqlValues.NullableText(reader, 17),
+            KeepHistory = reader.GetInt32(18) != 0,
         };
     }
 

@@ -48,6 +48,12 @@ public sealed record RosterEntry(
     /// <summary>The owner's choice of picture (see <see cref="RosterIcons"/>); null: automatic (the photo when the source has one, else the initial or a car).</summary>
     public string? Icon { get; init; }
 
+    /// <summary>
+    /// Keep history (0.3.1, D125): a tracker stores its positions for Location History. Default true, for existing and new entries. It is a setting, not an override of the source, so
+    /// "Reset to source" leaves it as it is. Only trackers under Trackers read it; a person's history is always kept while the person is tracked.
+    /// </summary>
+    public bool KeepHistory { get; init; } = true;
+
     /// <summary>True when the owner changed anything that "Reset to Home Assistant / Life360" would undo.</summary>
     public bool IsCustomised => NameOverride is not null || TitleOverride is not null || ColorOverride is not null || Icon is not null;
 

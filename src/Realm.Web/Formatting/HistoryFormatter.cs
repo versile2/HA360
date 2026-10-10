@@ -118,10 +118,13 @@ public static class HistoryFormatter
     /// <summary>"8:05 am – 5:42 pm · 9 hrs 37 mins".</summary>
     public static string StayDetail(HistoryStay stay, TimeZoneInfo zone) => StaySpan(stay, zone) + " · " + Duration(stay.Duration);
 
-    /// <summary>"Drive · 12.4 mi · 24 mins · top 71 mph" (the top speed is left out when it is unknown).</summary>
+    /// <summary>The word for a line of the timeline that is not a stay: a person's "Drive", a tracker's "Moved" (0.3.1, D125).</summary>
+    public static string DriveWord(HistoryDrive drive) => drive.Movement ? "Moved" : "Drive";
+
+    /// <summary>"Drive · 12.4 mi · 24 mins · top 71 mph" (the top speed is left out when it is unknown); a tracker's move reads "Moved · 12.4 mi · 24 mins".</summary>
     public static string DriveTitle(HistoryDrive drive, UnitSystem units = UnitSystem.Imperial)
     {
-        var text = "Drive · " + UnitFormatter.Distance(drive.Meters, units) + " · " + Duration(drive.Duration);
+        var text = DriveWord(drive) + " · " + UnitFormatter.Distance(drive.Meters, units) + " · " + Duration(drive.Duration);
         return drive.TopSpeedMps is { } top ? text + " · top " + UnitFormatter.Speed(top, units) : text;
     }
 
@@ -194,7 +197,7 @@ public static class HistoryFormatter
         }
 
         var places = Plural(day.StayCount, "place");
-        var drives = Plural(day.DriveCount, "drive");
+        var drives = day.Drives.Any(drive => drive.Movement) ? Plural(day.DriveCount, "move") : Plural(day.DriveCount, "drive");
         return day.DriveCount == 0 ? places + " · " + drives : places + " · " + drives + " · " + UnitFormatter.Distance(day.TotalMeters, units);
     }
 
@@ -238,7 +241,7 @@ public static class HistoryFormatter
                     heading,
                     [
                         DriveSpan(drive, zone),
-                        "Drive",
+                        DriveWord(drive),
                         Route(drive),
                         Duration(drive.Duration),
                         UnitFormatter.Distance(drive.Meters, units),

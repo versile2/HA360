@@ -75,7 +75,7 @@ Status: experimental. [realm/CHANGELOG.md](realm/CHANGELOG.md) lists what each v
   <tr>
     <td colspan="2" valign="top">
       <h3>Location History</h3>
-      Open a person and press <b>History</b> for their day: the trail on the map, every place they stayed (named after your Home Assistant zones, never "unknown") and every drive, with times, distance, top speed and speeding or phone-use chips. Step through the days, look at the last 7 days, tap a row to see it on the map, and print the day or save it as PDF.
+      Open a person (or a tracker that keeps its history) and press <b>History</b> for their day: the trail on the map, every place they stayed (named after your Home Assistant zones, never "unknown") and every drive, with times, distance, top speed and speeding or phone-use chips. Step through the days, look at the last 7 days, tap a row to see it on the map, and print the day or save it as PDF.
     </td>
   </tr>
   <tr>

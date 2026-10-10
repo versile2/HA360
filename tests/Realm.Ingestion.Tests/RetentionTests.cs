@@ -46,6 +46,21 @@ public sealed class RetentionTests
         Assert.Equal(StoreRig.Start, retention.LastRunUtc);
     }
 
+    // 0.3.1, D125: a tracker's positions are rows of `fixes` like a person's, so the same job ages them out; its member row stays.
+    [Fact]
+    public async Task ATrackersFixes_AgeOutWithTheOthers()
+    {
+        await using var rig = await StoreRig.StartAsync(ThirtyDays);
+        var old = new DateTimeOffset(2026, 8, 1, 12, 0, 0, TimeSpan.Zero);
+        await rig.StoreFixesAsync("tracker_pickup", [Fix(old), Fix(Cutoff.AddDays(1))]);
+
+        var deleted = await rig.NewRetention().PruneAsync(CancellationToken.None);
+
+        Assert.Equal(1, deleted);
+        Assert.Equal(1, rig.Count("fixes"));
+        Assert.Equal(1, rig.Count("members"));
+    }
+
     [Fact]
     public async Task ARetentionOfZeroDays_KeepsEverything()
     {

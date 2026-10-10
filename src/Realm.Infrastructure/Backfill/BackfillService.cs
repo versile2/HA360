@@ -25,8 +25,8 @@ namespace Realm.Infrastructure.Backfill;
 /// insert is <c>OR IGNORE</c> and a stored trip is never rewritten, so a second run, or an overlap with live data, changes nothing.
 /// </para>
 /// <para>
-/// Not done: the battery sensors (the Life360 fixes carry the battery), <c>detected_activity</c> (no consumer), the vehicles (nothing is derived from vehicle
-/// samples in v1, and there is no stored-sample cursor to resume from) and the <c>job_state</c> cursor (the stored fixes are the cursor). An entity whose
+/// Not done: the battery sensors (the Life360 fixes carry the battery), <c>detected_activity</c> (no consumer), the replay of a tracker (0.3.1: a tracker's fixes are only
+/// stored, <see cref="BackfillVehiclesAsync"/>) and the <c>job_state</c> cursor (the stored fixes are the cursor). An entity whose
 /// history cannot be fetched is logged and skipped; the rest carry on.
 /// </para>
 /// </remarks>
@@ -56,6 +56,7 @@ public sealed class BackfillService : BackgroundService
     private readonly ServiceCounters? _counters;
     private readonly ResilientLoop _loop;
     private readonly DetectionSettings _detection;
+    private readonly HashSet<string> _vehiclesDone = new(StringComparer.Ordinal);
     private long _rows;
     private long _trips;
 
@@ -117,6 +118,8 @@ public sealed class BackfillService : BackgroundService
             }
         }
 
+        await BackfillVehiclesAsync(now, cancellationToken);
+
         // A run that finished: a run that was switched off (above) or that threw is not one.
         _counters?.RecordBackfillRun(RowsBackfilled - before);
     }
@@ -140,6 +143,65 @@ public sealed class BackfillService : BackgroundService
         var before = RowsBackfilled;
         await RunOnceAsync(cancellationToken);
         _logger.LogInformation("Backfill finished: {Rows} rows queued, {Trips} trips recovered", RowsBackfilled - before, TripsRecovered);
+    }
+
+    /// <summary>
+    /// The gap-fill of the trackers that keep their history (0.3.1, D125), once per tracker and process (so a tracker whose switch is turned on later is filled at the next start): the positions Home Assistant's recorder has for the tracker's entity from
+    /// <c>now - backfill_days</c> up to the earliest position stored for it (or up to now when none is stored), 12 hour chunks like a person's. They are stored as they are (no trips, no
+    /// detector: a tracker's moves are derived when History is read). Every insert is <c>OR IGNORE</c>. A tracker whose history cannot be fetched is logged and skipped. <c>backfill_days = 0</c> does nothing.
+    /// </summary>
+    public async Task BackfillVehiclesAsync(DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        if (_options.BackfillDays <= 0)
+        {
+            return;
+        }
+
+        var horizon = now - TimeSpan.FromDays(_options.BackfillDays);
+        foreach (var vehicle in _discovery.Current.Vehicles.Where(v => v.KeepHistory && v.TrackerId is not null))
+        {
+            if (!_vehiclesDone.Add(vehicle.Id))
+            {
+                continue;
+            }
+
+            var starts = await _queries.GetRecordingStartsAsync(cancellationToken);
+            var to = starts.TryGetValue(vehicle.Id, out var first) && first + Overlap < now ? first + Overlap : now;
+            if (to <= horizon)
+            {
+                continue;
+            }
+
+            var fixes = new List<RawFix>();
+            await FetchVehicleAsync(vehicle, horizon, to, now, fixes, cancellationToken);
+            var queued = 0;
+            foreach (var fix in fixes)
+            {
+                _writer.EnqueueFix(vehicle.Id, fix, true, null);
+                queued++;
+                await FlushEveryAsync(queued, cancellationToken);
+            }
+
+            await _writer.FlushAsync(cancellationToken);
+            Interlocked.Add(ref _rows, queued);
+        }
+    }
+
+    private async Task FetchVehicleAsync(ResolvedVehicle vehicle, DateTimeOffset from, DateTimeOffset to, DateTimeOffset now, List<RawFix> fixes, CancellationToken cancellationToken)
+    {
+        for (var start = from; start < to; start += TrackerChunk)
+        {
+            var end = start + TrackerChunk < to ? start + TrackerChunk : to;
+            try
+            {
+                ParseTracker(await _gateway.GetHistoryAsync(vehicle.TrackerId!, start, end, true, cancellationToken), start, from, vehicle.Source, now, to, fixes);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogWarning("The history of a tracker ({TrackerId}) could not be fetched ({ErrorType}); the rest of it is skipped", vehicle.Id, ex.GetType().Name);
+                return;
+            }
+        }
     }
 
     private async Task BackfillMemberAsync(ResolvedMember member, HydrationMark mark, DateTimeOffset now, CancellationToken cancellationToken)

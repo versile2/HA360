@@ -138,6 +138,14 @@ internal sealed class StoreRig : IAsyncDisposable
         await Pipeline.ProcessAsync(new DiscoveryUpdated(plan), CancellationToken.None);
     }
 
+    /// <summary>As <see cref="DiscoverAsync"/>, with the trackers under Trackers (vehicles) too.</summary>
+    public async Task DiscoverWithVehiclesAsync(IReadOnlyList<ResolvedVehicle> vehicles, params ResolvedMember[] members)
+    {
+        var plan = Plans.Discovery(vehicles: vehicles, members: members);
+        Discovery.Publish(plan);
+        await Pipeline.ProcessAsync(new DiscoveryUpdated(plan), CancellationToken.None);
+    }
+
     /// <summary>Each entity goes into the pipeline as a state change, the way the websocket delivers it.</summary>
     public async Task FeedAsync(params HaEntitySnapshot[] entities)
     {

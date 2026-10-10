@@ -37,6 +37,7 @@ public sealed record HistoryStay(
 /// <param name="TopSpeedMps">Null for a coarse trip.</param>
 /// <param name="SpeedingCount">Null when unknown (a coarse trip), never 0 for "unknown".</param>
 /// <param name="PhoneCount">Null when phone use could not be measured.</param>
+/// <param name="Movement">0.3.1 (D125): the line is a move of a tracker, derived from its fixes (<see cref="MovementDeriver"/>), not a stored trip of a person; it reads "Moved", not "Drive".</param>
 /// <param name="Coarse">The trip was recorded from sparse fixes: its path is a rough line.</param>
 public sealed record HistoryDrive(
     string Id,
@@ -52,7 +53,8 @@ public sealed record HistoryDrive(
     double? StartLat,
     double? StartLon,
     double? EndLat,
-    double? EndLon) : HistoryEntry(Id, StartUtc, EndUtc);
+    double? EndLon,
+    bool Movement = false) : HistoryEntry(Id, StartUtc, EndUtc);
 
 /// <summary>
 /// One piece of the day's trail: the path of a drive as <c>[lon, lat]</c> points, thinned. A segment is <paramref name="Dashed"/> when the fixes behind it were far apart (a straight

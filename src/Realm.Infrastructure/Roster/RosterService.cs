@@ -103,6 +103,10 @@ public sealed class RosterService : IRosterEditor
         ApplyAsync(entries => RosterRules.Edit(entries, entityId, displayName, loreTitle, color, icon), cancellationToken);
 
     /// <inheritdoc />
+    public Task SetKeepHistoryAsync(string entityId, bool keep, CancellationToken cancellationToken = default) =>
+        ApplyAsync(entries => RosterRules.SetKeepHistory(entries, entityId, keep), cancellationToken);
+
+    /// <inheritdoc />
     public Task ResetAsync(string entityId, CancellationToken cancellationToken = default) =>
         ApplyAsync(entries => RosterRules.Reset(entries, entityId), cancellationToken);
 

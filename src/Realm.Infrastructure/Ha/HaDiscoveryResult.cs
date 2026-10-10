@@ -70,4 +70,5 @@ public sealed record ResolvedVehicle(
     FixSource Source = FixSource.Companion,
     string Color = "",
     string? Icon = null,
-    string? AvatarUpstream = null);
+    string? AvatarUpstream = null,
+    bool KeepHistory = true);

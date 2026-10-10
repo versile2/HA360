@@ -191,6 +191,26 @@
                                         }
                                     </div>
                                 </div>
+                                @if (entry.Group == RosterGroup.Vehicles)
+                                {
+                                    <button type="button"
+                                            role="switch"
+                                            class="realm-switch-row realm-roster__keep"
+                                            aria-checked="@(_keep ? "true" : "false")"
+                                            aria-describedby="@("realm-roster-keep-help-" + slug)"
+                                            data-testid="roster-keep-history"
+                                            @onclick="() => _keep = !_keep">
+                                        <span class="realm-switch-row__text">
+                                            <span class="realm-switch-row__label">Keep history</span>
+                                            <span id="@("realm-roster-keep-help-" + slug)" class="realm-settings__help" data-testid="roster-keep-history-help">@KeepHistoryHelp</span>
+                                        </span>
+                                        <span class="realm-switch" aria-hidden="true"><span class="realm-switch__thumb"></span></span>
+                                    </button>
+                                    @if (!_keep)
+                                    {
+                                        <p class="realm-settings__help realm-roster__keep-off" data-testid="roster-keep-history-off">@KeepHistoryOffNote</p>
+                                    }
+                                }
                                 <div class="realm-roster__actions">
                                     <button type="button" class="realm-roster__action realm-roster__action--primary" data-testid="roster-save" @onclick="() => SaveAsync(entry)">Save</button>
                                     <button type="button" class="realm-roster__action" data-testid="roster-cancel" @onclick="() => CancelEditAsync(entry)">Cancel</button>
@@ -228,6 +248,13 @@
     private string _title = string.Empty;
     private string _color = string.Empty;
     private string? _icon;
+    private bool _keep = true;
+
+    /// <summary>The helper text under the Keep history switch of a tracker (0.3.1, D125).</summary>
+    public const string KeepHistoryHelp = "Store this tracker's positions for Location History (about 6–20 MB per 100 days).";
+
+    /// <summary>Said while the switch is off: the tracker shows only its latest position, and what was stored is not deleted.</summary>
+    public const string KeepHistoryOffNote = "New positions are not stored. History already stored stays in Location History until it ages out.";
 
     /// <summary>The circuit's session, cascaded by <c>RealmShell</c>; without one the section lists nobody.</summary>
     [CascadingParameter]
@@ -435,6 +462,7 @@
         _title = entry.LoreTitle ?? string.Empty;
         _color = entry.Color;
         _icon = entry.Icon;
+        _keep = entry.KeepHistory;
         _focusId = "realm-roster-name-" + Slug(entry.EntityId);
     }
 
@@ -445,6 +473,11 @@
         if (_roster is not null)
         {
             await _roster.EditAsync(entry.EntityId, _name, _title, _color, _icon);
+            if (entry.Group == RosterGroup.Vehicles && _keep != entry.KeepHistory)
+            {
+                await _roster.SetKeepHistoryAsync(entry.EntityId, _keep);
+            }
+
             _status = "Saved";
         }
     }
