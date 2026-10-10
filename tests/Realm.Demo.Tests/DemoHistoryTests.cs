@@ -121,7 +121,7 @@ public class DemoHistoryTests
         var today = await session.GetHistoryDayAsync("wagon", Today, CancellationToken.None);
         Assert.NotNull(today);
         Assert.NotEmpty(today.Trail);
-        Assert.Contains(today.Stays, stay => stay.Label == "At Hearth Haven");
+        Assert.Contains(today.Stays, stay => stay.Label == "Hearth Haven");
         await session.DisposeAsync();
     }
 
