@@ -33,7 +33,7 @@ public class ZoneCreateTests
     }
 
     [Theory]
-    [InlineData(1, 25)]
+    [InlineData(-1, 0)]
     [InlineData(100, 100)]
     [InlineData(99999, 2000)]
     public void TheRadius_IsKeptInsideTheRangeTheSliderOffers(double given, double sent)
@@ -187,5 +187,26 @@ public class ZoneCreateTests
         Assert.False(result.Ok);
         Assert.Equal("Give the place a name.", result.Message);
         Assert.Empty(gateway.CreatedZones);
+    }
+
+    [Theory]
+    [InlineData("km", LengthUnits.Metric)]
+    [InlineData("mi", LengthUnits.Imperial)]
+    [InlineData(null, LengthUnits.Metric)]
+    public async Task TheUnits_FollowTheLengthUnitOfHomeAssistantsConfig(string? length, LengthUnits expected)
+    {
+        var gateway = new FakeHaGateway { Config = new HaConfig("UTC", "2026.9.1", length) };
+        var service = new ZoneService(gateway, new ZoneRefreshSignal(), new ManualTimeProvider(ConnectionRig.Start), NullLogger<ZoneService>.Instance);
+
+        Assert.Equal(expected, await service.GetLengthUnitsAsync());
+    }
+
+    [Fact]
+    public async Task TheUnits_AreMetric_WhenTheConfigCannotBeRead()
+    {
+        var gateway = new FakeHaGateway { Failure = new HttpRequestException("down") };
+        var service = new ZoneService(gateway, new ZoneRefreshSignal(), new ManualTimeProvider(ConnectionRig.Start), NullLogger<ZoneService>.Instance);
+
+        Assert.Equal(LengthUnits.Metric, await service.GetLengthUnitsAsync());
     }
 }

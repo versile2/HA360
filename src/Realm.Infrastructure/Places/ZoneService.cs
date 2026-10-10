@@ -58,6 +58,21 @@ public sealed class ZoneService : IPlaceEditor
         return PlaceCreateResult.Success;
     }
 
+    /// <inheritdoc />
+    public async Task<LengthUnits> GetLengthUnitsAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var config = await _gateway.GetConfigAsync(cancellationToken);
+            return RadiusUnits.FromHa(config.LengthUnit);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning("The unit system could not be read ({ErrorType}); the radius is shown in metres", ex.GetType().Name);
+            return LengthUnits.Metric;
+        }
+    }
+
     // Home Assistant answers zone/create when the item is stored; its entity can show up a moment later, so the zones are read a second time.
     private async Task RingAgainAsync()
     {

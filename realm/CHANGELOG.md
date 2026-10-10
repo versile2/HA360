@@ -25,6 +25,25 @@
 - History is built from the positions and trips the app already keeps, for as many days as `retention_fix_days` allows (100 by
   default). Nothing new is stored, there is no migration and no new option. A person who is **Not tracked**, and a tracker (which
   keeps only its latest position), have no history. Days before the app first recorded a person are empty.
+## 0.2.3
+
+### Changed
+
+- **Add place now behaves like Home Assistant's own zone editor.** The radius starts at 100 m (Home Assistant's default for a
+  new zone) and the slider moves in single steps from 0 up to 2 km. Home Assistant's editor is a number box that starts at 0,
+  steps by 1 and has no upper limit; the 2 km cap is this app's, because the control is a slider.
+- **The radius is shown in your Home Assistant unit system.** A metric Home Assistant shows metres and kilometres, a US customary
+  one shows feet and miles (the slider then runs 0 to 6,500 ft). The app reads the unit system from Home Assistant's
+  configuration when you start adding a place; the Demo is imperial. What is sent to Home Assistant is always metres.
+- **New wording.** The add-on description now reads "A Life360-style family map with driving reports, inside Home Assistant.",
+  and the introduction in the README, the add-on's Documentation tab and the landing page says what the app is: a map-focused
+  alternative to Home Assistant's built-in map with Life360-style features.
+
+Home Assistant's values, for the record: default radius 100 (`DEFAULT_RADIUS` in
+[`homeassistant/const.py`](https://github.com/home-assistant/core/blob/dev/homeassistant/const.py), also the new-zone value in
+[`dialog-zone-detail.ts`](https://github.com/home-assistant/frontend/blob/dev/src/panels/config/zone/dialog-zone-detail.ts));
+radius field min 0, step 1, no max, unit "meters" in
+[`ha-selector-location.ts`](https://github.com/home-assistant/frontend/blob/dev/src/components/ha-selector/ha-selector-location.ts).
 
 ## 0.2.2
 
@@ -37,7 +56,7 @@
   it comes from. What is already on the map is greyed out ("Already on the map"); what is Not tracked can be chosen. A search
   box filters. Choosing one moves it to People or Trackers, exactly like Settings, and selects it on the map.
 - **Add place** puts a pin in the middle of the map with a radius circle. Drag the pin (or tap the map, or use the arrow keys),
-  set the radius from 25 m to 2 km, give the place a name and an icon, and press Save: the app creates a real **zone in Home
+  set the radius, give the place a name and an icon, and press Save: the app creates a real **zone in Home
   Assistant** (the same as Settings -> Areas, labels and zones -> Zones) and it appears on the map and in Places within a few
   seconds. Esc, Back or Cancel leave without adding anything. Creating a zone needs a Home Assistant administrator; if Home
   Assistant refuses, you get a clear message and nothing is added.
