@@ -94,7 +94,7 @@ test.describe('Adding drivers, trackers and places', () => {
     await expect(panel, 'the panel is open').toBeVisible();
     await expect(page.getByTestId('placement-pin'), 'the pin is on the map').toBeVisible();
     await expect(page.getByTestId('sheet'), 'the sheet gives way').toBeHidden();
-    await expect(page.getByTestId('placement-radius-text'), 'the radius starts at 100 m').toHaveText('100 m · 328 ft');
+    await expect(page.getByTestId('placement-radius-text'), 'the radius starts at 100 m, shown in feet in the imperial Demo').toHaveText('328 ft');
 
     const before = await page.getByTestId('placement-pin').boundingBox();
     const canvas = await page.getByTestId('map-canvas').boundingBox();
@@ -103,7 +103,7 @@ test.describe('Adding drivers, trackers and places', () => {
     await expect.poll(async () => (await page.getByTestId('placement-pin').boundingBox())?.x, { message: 'a tap on the map moves the pin' }).not.toBe(before?.x);
 
     await page.getByTestId('placement-radius').fill('300');
-    await expect(page.getByTestId('placement-radius-text'), 'the slider sets the radius').toHaveText('300 m · 984 ft');
+    await expect(page.getByTestId('placement-radius-text'), 'the slider sets the radius').toHaveText('300 ft');
 
     await page.getByTestId('placement-save').click();
     await expect(page.getByTestId('placement-error'), 'a name is required').toHaveText('Give the place a name.');

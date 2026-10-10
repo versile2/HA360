@@ -25,4 +25,7 @@ public sealed class DemoPlaceEditor : IPlaceEditor
         _source.AddPlace(zone);
         return Task.FromResult(PlaceCreateResult.Success);
     }
+
+    /// <summary>The Demo is imperial (D35), like a US Home Assistant.</summary>
+    public Task<LengthUnits> GetLengthUnitsAsync(CancellationToken cancellationToken = default) => Task.FromResult(LengthUnits.Imperial);
 }
