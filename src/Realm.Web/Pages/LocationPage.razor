@@ -98,6 +98,7 @@
         @if (_placing)
         {
             <PlacementPanel RadiusM="@_placeRadius"
+                            Units="@_placeUnits"
                             RadiusMChanged="OnPlacementRadiusAsync"
                             OnSave="SavePlaceAsync"
                             OnCancel="CancelPlacementAsync"
@@ -173,6 +174,7 @@
 
     private bool _placing;
     private double _placeRadius = NewZone.DefaultRadiusM;
+    private LengthUnits _placeUnits = LengthUnits.Metric;   // Home Assistant's unit system (0.2.3, D122); read when the placement begins
     private double? _placeLat;
     private double? _placeLon;
     private bool _placeBusy;
@@ -593,8 +595,36 @@
         _placeLon = null;
         _placeBusy = false;
         _placeError = null;
+        var units = Session.PlaceEditor.GetLengthUnitsAsync();
+        _placeUnits = units.IsCompletedSuccessfully ? units.Result : LengthUnits.Metric;
+        if (!units.IsCompletedSuccessfully)
+        {
+            _ = ApplyPlaceUnitsAsync(units);
+        }
+
         Ui.OpenOverlay(PlacementLayer, PlacementClosedByBack);
         StateHasChanged();
+    }
+
+    // The units come from Home Assistant's configuration: until they arrive the panel is metric (Home Assistant's own default); a failed read leaves it so.
+    private async Task ApplyPlaceUnitsAsync(Task<LengthUnits> pending)
+    {
+        try
+        {
+            var units = await pending;
+            await InvokeAsync(() =>
+            {
+                if (_placing)
+                {
+                    _placeUnits = units;
+                    StateHasChanged();
+                }
+            });
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogDebug(exception, "The unit system could not be read.");
+        }
     }
 
     // The Android Back or Esc popped the layer already (it arrives off the renderer's context).

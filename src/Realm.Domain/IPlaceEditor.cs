@@ -8,6 +8,9 @@ public interface IPlaceEditor
 {
     /// <summary>Creates the place. Never throws for a refusal: the result says what happened, in a sentence fit for a toast. Nothing is kept locally when it fails.</summary>
     Task<PlaceCreateResult> CreateAsync(NewZone zone, CancellationToken cancellationToken = default);
+
+    /// <summary>The length units of Home Assistant's unit system, which the radius of a new place is shown in (0.2.3, D122). Metric when it cannot be read.</summary>
+    Task<LengthUnits> GetLengthUnitsAsync(CancellationToken cancellationToken = default) => Task.FromResult(LengthUnits.Metric);
 }
 
 /// <summary>The outcome of <see cref="IPlaceEditor.CreateAsync"/>.</summary>

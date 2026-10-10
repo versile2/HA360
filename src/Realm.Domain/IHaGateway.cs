@@ -17,7 +17,7 @@ public interface IHaGateway
     /// </summary>
     void SetWatchList(IReadOnlyCollection<string>? entityIds);
 
-    /// <summary><c>GET config</c>: the time zone and the version.</summary>
+    /// <summary><c>GET config</c>: the time zone, the version and the length unit.</summary>
     Task<HaConfig> GetConfigAsync(CancellationToken cancellationToken);
 
     /// <summary><c>GET states</c>, one snapshot per entity for which <paramref name="include"/> returns true (all when it is null).</summary>
@@ -59,7 +59,8 @@ public interface IHaGateway
 /// <summary>The part of <c>GET config</c> the add-on uses.</summary>
 /// <param name="TimeZone">HA's IANA time zone id.</param>
 /// <param name="Version">HA's version text, null when absent.</param>
-public record HaConfig(string TimeZone, string? Version);
+/// <param name="LengthUnit">HA's <c>unit_system.length</c> (<c>km</c> for metric, <c>mi</c> for US customary), null when absent.</param>
+public record HaConfig(string TimeZone, string? Version, string? LengthUnit = null);
 
 /// <summary>The entity ids that <c>integration_entities</c> reports for the two integrations the add-on reads (02 section 1.2 step 2).</summary>
 public record HaIntegrationEntities(

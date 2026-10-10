@@ -39,7 +39,7 @@ public sealed class HaRestClientTests : IDisposable
 
         var config = await rig.Client.GetConfigAsync(CancellationToken.None);
 
-        Assert.Equal(new HaConfig("America/Chicago", "2026.9.1"), config);
+        Assert.Equal(new HaConfig("America/Chicago", "2026.9.1", "mi"), config);
         var request = Assert.Single(rig.Handler.Requests);
         Assert.Equal(HttpMethod.Get, request.Method);
         Assert.Equal("http://supervisor/core/api/config", request.Uri?.AbsoluteUri);

@@ -9,6 +9,15 @@ public class DemoPlaceEditorTests
     private static readonly NewZone Park = new("Dog Park", 31.1, -85.3, 150, "mdi:tree");
 
     [Fact]
+    public async Task TheDemo_IsImperial_AndTheUnavailableEditorIsMetric()
+    {
+        await using var session = new DemoRealmSessionFactory().Create(null);
+
+        Assert.Equal(LengthUnits.Imperial, await session.PlaceEditor.GetLengthUnitsAsync());
+        Assert.Equal(LengthUnits.Metric, await ((IPlaceEditor)UnavailablePlaceEditor.Instance).GetLengthUnitsAsync());
+    }
+
+    [Fact]
     public async Task APlaceCreatedInTheDemo_JoinsThePlacesAndTheSessionChanges()
     {
         await using var session = new DemoRealmSessionFactory().Create(null);

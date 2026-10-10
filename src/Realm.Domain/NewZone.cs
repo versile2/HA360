@@ -11,17 +11,17 @@ namespace Realm.Domain;
 /// <param name="Icon">A Home Assistant icon name such as <c>mdi:home</c> (see <see cref="PlaceKindIcons.HaIcon"/>).</param>
 public sealed record NewZone(string Name, double Latitude, double Longitude, double RadiusM, string Icon)
 {
-    /// <summary>The smallest radius the slider offers, in metres.</summary>
-    public const double MinRadiusM = 25;
+    /// <summary>The smallest radius, in metres: Home Assistant's zone editor allows 0 (0.2.3, D122).</summary>
+    public const double MinRadiusM = 0;
 
-    /// <summary>The largest radius the slider offers, in metres (2 km).</summary>
+    /// <summary>The largest radius the slider offers, in metres (2 km; Home Assistant's editor has no upper limit).</summary>
     public const double MaxRadiusM = 2000;
 
-    /// <summary>The radius the placement starts with, in metres.</summary>
+    /// <summary>The radius the placement starts with, in metres: Home Assistant's own default (<c>DEFAULT_RADIUS = 100</c>, and the editor's new zone).</summary>
     public const double DefaultRadiusM = 100;
 
-    /// <summary>The slider's step, in metres.</summary>
-    public const double RadiusStepM = 25;
+    /// <summary>The slider's step in the displayed unit (whole metres or whole feet); see <see cref="RadiusUnits.Step"/>.</summary>
+    public const double RadiusStep = RadiusUnits.Step;
 
     /// <summary>The longest name accepted.</summary>
     public const int MaxNameLength = 64;

@@ -1,9 +1,8 @@
 # HA Cartographer
 
-HA Cartographer is a map-first family tracker that runs inside Home Assistant. It shows where everyone is on a full-screen
-map with a bottom sheet (Drivers, Trackers, Places) and keeps its own history, so it can show driving reports (by week, month, 3, 6 or 12 months, or a custom range; printable)
-that go back further than Home Assistant's recorder does. It opens from the Home Assistant sidebar, so Home Assistant's
-own login is the only login.
+HA Cartographer is a map-focused Home Assistant add-on: a more capable and convenient alternative to Home Assistant's built-in map. It brings familiar Life360-style features into Home Assistant: an interactive family map, location history, places that match your Home Assistant zones, and weekly driving reports with speeding, phone use and top speed.
+
+It shows where everyone is on a full-screen map with a bottom sheet (Drivers, Trackers, Places) and keeps its own history, so driving reports (by week, month, 3, 6 or 12 months, or a custom range; printable) go back further than Home Assistant's recorder does. It opens from the Home Assistant sidebar, so Home Assistant's own login is the only login.
 
 ## Setup
 

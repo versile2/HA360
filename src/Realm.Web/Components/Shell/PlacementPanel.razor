@@ -5,7 +5,7 @@
 @using Realm.Web.Sheet
 
 @* The bottom panel of "+ Add place" (0.2.2, D119, D120): the map shows a draggable pin and a radius circle (realmMap.js beginPlacement); this panel holds what the map cannot: the name (required), the radius
-   slider (25 m to 2 km in 25 m steps, 100 m to start), the icon (the place kinds of the Places list) and Save / Cancel. It owns the draft (name, kind) and raises OnSave with it; the page owns the pin
+   slider (in the units of Home Assistant: 0 to 2000 m or 6500 ft in steps of 1, 100 m to start), the icon (the place kinds of the Places list) and Save / Cancel. It owns the draft (name, kind) and raises OnSave with it; the page owns the pin
    position and the radius, creates the Home Assistant zone, and says what went wrong in Error (shown here, role="alert"). Esc cancels from the two inputs here, because the global Esc handler (realmShell.js) leaves text fields alone; from anywhere else the global handler pops the page's overlay layer, which cancels too. The heading takes the focus when the panel opens. *@
 <section class="realm-placement" aria-labelledby="realm-placement-title" data-testid="placement-panel">
     <h2 id="realm-placement-title" @ref="_heading" class="realm-placement__title" tabindex="-1">New place</h2>
@@ -17,15 +17,15 @@
     </label>
 
     <div class="realm-roster__field">
-        <label class="realm-settings__label" for="realm-placement-radius">Radius <span class="realm-placement__radius" data-testid="placement-radius-text">@PlacementFormatter.Radius(RadiusM)</span></label>
+        <label class="realm-settings__label" for="realm-placement-radius">Radius <span class="realm-placement__radius" data-testid="placement-radius-text">@PlacementFormatter.Radius(RadiusM, Units)</span></label>
         <input id="realm-placement-radius"
                type="range"
                class="realm-placement__slider"
-               min="@NewZone.MinRadiusM"
-               max="@NewZone.MaxRadiusM"
-               step="@NewZone.RadiusStepM"
-               value="@RadiusM"
-               aria-valuetext="@PlacementFormatter.Radius(RadiusM)"
+               min="@RadiusUnits.Min"
+               max="@RadiusUnits.Max(Units)"
+               step="@RadiusUnits.Step"
+               value="@RadiusUnits.ToSlider(Units, RadiusM)"
+               aria-valuetext="@PlacementFormatter.Radius(RadiusM, Units)"
                data-testid="placement-radius"
                @oninput="OnRadiusAsync"
                @onkeydown="OnKeyDownAsync" />
@@ -71,7 +71,11 @@
     [Parameter]
     public double RadiusM { get; set; } = NewZone.DefaultRadiusM;
 
-    /// <summary>The slider moved: the new radius, already clamped and stepped.</summary>
+    /// <summary>The length units of the owner's Home Assistant: the slider and its text are in these; the radius itself stays in metres (0.2.3, D122).</summary>
+    [Parameter]
+    public LengthUnits Units { get; set; } = LengthUnits.Metric;
+
+    /// <summary>The slider moved: the new radius in metres, already clamped.</summary>
     [Parameter]
     public EventCallback<double> RadiusMChanged { get; set; }
 
@@ -117,7 +121,7 @@
             return Task.CompletedTask;
         }
 
-        return RadiusMChanged.InvokeAsync(NewZone.ClampRadius(value));
+        return RadiusMChanged.InvokeAsync(RadiusUnits.ToMeters(Units, value));
     }
 
     private async Task SaveAsync()

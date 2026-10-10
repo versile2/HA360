@@ -65,7 +65,13 @@ public sealed partial class HaRestClient
                 using var document = await ReadJsonAsync(response, token);
                 var root = document.RootElement;
                 var zone = Text(root, "time_zone") ?? throw new InvalidDataException("Home Assistant's configuration has no time_zone");
-                return new HaConfig(zone, Text(root, "version"));
+                string? length = null;
+                if (root.TryGetProperty("unit_system", out var units) && units.ValueKind == JsonValueKind.Object)
+                {
+                    length = Text(units, "length");
+                }
+
+                return new HaConfig(zone, Text(root, "version"), length);
             },
             cancellationToken);
     }
