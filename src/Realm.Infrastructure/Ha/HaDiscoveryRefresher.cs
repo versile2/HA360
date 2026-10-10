@@ -202,6 +202,7 @@ public sealed class HaDiscoveryRefresher : BackgroundService
 
         // The 30 day rule only matters on the first start: a later pass does not look at the history.
         var recent = _roster.Entries.Count == 0 ? await RecentTrackersAsync(entities, states, now, cancellationToken) : EmptySet;
+        _roster.SetIdentities(entities.Where(e => e.Identity is not null).ToDictionary(e => e.EntityId, e => e.Identity!, StringComparer.Ordinal));
         var reconciliation = await _roster.ReconcileAsync([.. entities.Select(e => e.ToCandidate())], recent, cancellationToken);
 
         _found = new Found(config, entities, states, warnings);

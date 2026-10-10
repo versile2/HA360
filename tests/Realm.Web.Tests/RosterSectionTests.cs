@@ -25,7 +25,7 @@ public sealed class RosterSectionTests : ComponentTestBase
 
         var cut = Open(session);
 
-        Assert.Equal(["PEOPLE4", "VEHICLES1", "NOTTRACKED2"], cut.FindAll(".realm-roster__heading").Select(heading => System.Text.RegularExpressions.Regex.Replace(heading.TextContent, "\\s+", string.Empty)));
+        Assert.Equal(["PEOPLE4", "TRACKERS1", "NOTTRACKED2"], cut.FindAll(".realm-roster__heading").Select(heading => System.Text.RegularExpressions.Regex.Replace(heading.TextContent, "\\s+", string.Empty)));
         Assert.Equal("4", cut.Find("[data-testid='roster-count-people']").TextContent);
         Assert.Equal("1", cut.Find("[data-testid='roster-count-vehicles']").TextContent);
         Assert.Equal("2", cut.Find("[data-testid='roster-count-not-tracked']").TextContent);
@@ -63,7 +63,7 @@ public sealed class RosterSectionTests : ComponentTestBase
         await more.TriggerEventAsync("onclick", new MouseEventArgs());
 
         Assert.Equal("true", cut.Find("[data-testid='roster-more-person-king']").GetAttribute("aria-expanded"));
-        Assert.Equal(["Move to Vehicles", "Move to Not tracked", "Move down"], MenuItems(cut));
+        Assert.Equal(["Move to Trackers", "Move to Not tracked", "Move down"], MenuItems(cut));
         Assert.Single(cut.FindAll("[data-testid='roster-menu']"));
     }
 
@@ -75,7 +75,7 @@ public sealed class RosterSectionTests : ComponentTestBase
 
         await cut.Find("[data-testid='roster-more-person-cryptid']").TriggerEventAsync("onclick", new MouseEventArgs());
 
-        Assert.Equal(["Move to Vehicles", "Move to Not tracked", "Move up"], MenuItems(cut));
+        Assert.Equal(["Move to Trackers", "Move to Not tracked", "Move up"], MenuItems(cut));
     }
 
     [Fact]
@@ -129,7 +129,7 @@ public sealed class RosterSectionTests : ComponentTestBase
         var cut = Open(session);
 
         await cut.Find("[data-testid='roster-more-person-prince']").TriggerEventAsync("onclick", new MouseEventArgs());
-        Assert.Equal(["Move to People", "Move to Vehicles", "Move down"], MenuItems(cut));
+        Assert.Equal(["Move to People", "Move to Trackers", "Move down"], MenuItems(cut));
         await cut.Find("[data-testid='roster-move-people']").TriggerEventAsync("onclick", new MouseEventArgs());
 
         cut.WaitForAssertion(() => Assert.Equal("5", cut.Find("[data-testid='roster-count-people']").TextContent));
@@ -209,6 +209,59 @@ public sealed class RosterSectionTests : ComponentTestBase
         Assert.Equal("Keeper of the Keys", saved.LoreTitle);
         Assert.Equal(palette[2], saved.Color, ignoreCase: true);
         Assert.Equal("Alden the Bold", cut.Find("[data-testid='roster-row-person-king'] .realm-roster__name > span").TextContent);
+    }
+
+    [Fact]
+    public async Task EveryRow_HasTheSameStructure_AndTheAvatarOfThePin()
+    {
+        await using var session = new DemoRealmSessionFactory().Create(null);
+        var cut = Open(session);
+
+        var rows = cut.FindAll(".realm-roster__item");
+        Assert.NotEmpty(rows);
+        foreach (var row in rows)
+        {
+            Assert.Single(row.QuerySelectorAll(".realm-roster__avatar"));
+            Assert.Single(row.QuerySelectorAll(".realm-roster__main"));
+            Assert.Single(row.QuerySelectorAll(".realm-roster__more"));
+            Assert.Equal(2, row.QuerySelectorAll(".realm-roster__name, .realm-roster__meta").Length);
+        }
+
+        var king = cut.Find("[data-testid='roster-row-person-king'] .realm-roster__avatar");
+        Assert.Equal("person", king.GetAttribute("data-shape"));
+        var wagon = cut.Find("[data-testid='roster-row-device-tracker-wagon'] .realm-roster__avatar");
+        Assert.Equal("tracker", wagon.GetAttribute("data-shape"));
+        Assert.Equal("glyph", wagon.GetAttribute("data-face"));
+    }
+
+    [Fact]
+    public async Task TheEditPanel_ListsTheEntities_AndAPictureChoiceIsSaved_ThenResetGivesTheSourceBack()
+    {
+        await using var session = new DemoRealmSessionFactory().Create(null);
+        var cut = Open(session);
+
+        await cut.Find("[data-testid='roster-open-person-king']").TriggerEventAsync("onclick", new MouseEventArgs());
+        Assert.Contains("person.king", cut.Find("[data-testid='roster-identity']").TextContent, StringComparison.Ordinal);
+        Assert.NotEmpty(cut.FindAll("[data-testid='roster-life360']"));
+        Assert.Empty(cut.FindAll("[data-testid='roster-reset']"));
+
+        cut.Find("[data-testid='roster-name']").Input("Alden");
+        await cut.Find("[data-testid='roster-icon-glyph-pet']").TriggerEventAsync("onclick", new MouseEventArgs());
+        await cut.Find("[data-testid='roster-save']").TriggerEventAsync("onclick", new MouseEventArgs());
+
+        cut.WaitForAssertion(() => Assert.Empty(cut.FindAll("[data-testid='roster-edit']")));
+        var saved = Entry(session, King);
+        Assert.Equal("Alden", saved.DisplayName);
+        Assert.Equal(RosterIcons.TokenOf(VehicleGlyph.Pet), saved.Icon);
+        Assert.True(saved.IsCustomised);
+        Assert.Equal("glyph", cut.Find("[data-testid='roster-row-person-king'] .realm-roster__avatar").GetAttribute("data-face"));
+
+        await cut.Find("[data-testid='roster-open-person-king']").TriggerEventAsync("onclick", new MouseEventArgs());
+        await cut.Find("[data-testid='roster-reset']").TriggerEventAsync("onclick", new MouseEventArgs());
+
+        cut.WaitForAssertion(() => Assert.Equal(DemoCast.King.Name, Entry(session, King).DisplayName));
+        Assert.Null(Entry(session, King).Icon);
+        Assert.False(Entry(session, King).IsCustomised);
     }
 
     [Fact]

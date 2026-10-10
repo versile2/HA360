@@ -262,7 +262,7 @@ test.describe('Drivers list', () => {
 // ---- AC-28 (the list half): Vehicles -------------------------------------------------------------------------------------------------------
 
 test.describe('Vehicles list', () => {
-  test('[AC-28a] Vehicles lists the pickup on three lines and the stale hatchback as an ordinary row with a chevron; the summary reads 2 vehicles · all parked', { tag: ['@phone', '@unfolded'] }, async ({ page }) => {
+  test('[AC-28a] Vehicles lists the pickup on three lines and the stale hatchback as an ordinary row with a chevron; the summary reads 2 trackers · all parked', { tag: ['@phone', '@unfolded'] }, async ({ page }) => {
     const cast = loadDemoCast();
     await openList(page);
     await showSection(page, 'vehicles');
@@ -270,7 +270,7 @@ test.describe('Vehicles list', () => {
     await expect(rowsOf(page, 'vehicle'), 'two vehicles are listed').toHaveCount(2);
     const ids = await rowsOf(page, 'vehicle').evaluateAll((rows) => rows.map((element) => element.getAttribute('data-testid')));
     expect(ids, 'the vehicles, in list order').toEqual(['row-vehicle-wagon', 'row-vehicle-chariot']);
-    await expect(page.getByTestId('sheet-summary'), 'the Vehicles summary').toHaveText('2 vehicles · all parked');
+    await expect(page.getByTestId('sheet-summary'), 'the Trackers summary').toHaveText('2 trackers · all parked');
 
     // The pickup: L1 name and lore, L2 where it is, L3 how old that is. A vehicle is a device tracker (D107): no engine and no fuel line.
     const wagon = castVehicle(cast, 'wagon');
@@ -533,11 +533,11 @@ test.describe('S8c: selecting from the lists', () => {
     // At 80 % again (his detail), a tab switch keeps the size, clears the selection and shows the section with its summary.
     await openDetail(page, 'after the handle tap on Alden');
     await page.getByTestId('tab-vehicles').click();
-    await expect(page.getByTestId('tab-vehicles'), 'the Vehicles tab is selected').toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByTestId('tab-vehicles'), 'the Trackers tab is selected').toHaveAttribute('aria-selected', 'true');
     await expect(page.getByTestId('detail-back'), 'the selection is cleared: no detail').toHaveCount(0);
     await expect(header(page), 'the selection is cleared: no header').toHaveCount(0);
     expect((await readHook(page, 'sheet')).state, 'the tab switch kept the size').toBe('80');
-    await expect(rowsOf(page, 'vehicle'), 'the Vehicles list shows').toHaveCount(2);
-    await expect(page.getByTestId('sheet-summary'), 'the summary follows the section').toHaveText('2 vehicles · all parked');
+    await expect(rowsOf(page, 'vehicle'), 'the Trackers list shows').toHaveCount(2);
+    await expect(page.getByTestId('sheet-summary'), 'the summary follows the section').toHaveText('2 trackers · all parked');
   });
 });

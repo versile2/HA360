@@ -126,6 +126,34 @@ public class DbWriterTests
         new(entityId, entityId.StartsWith("person.", StringComparison.Ordinal) ? RosterKind.Person : RosterKind.Tracker, group, "Name " + entityId, lore, "#E8BC4E", order, "Home Assistant + Life360", TestData.Start, TestData.Start.AddHours(1), autoMoved);
 
     [Fact]
+    public async Task The_owners_overrides_and_the_source_values_are_stored_apart_and_read_back()
+    {
+        await using var rig = await WriterRig.StartAsync();
+        var entry = RosterRow("person.alden", RosterGroup.People, 0, "The King") with
+        {
+            SourceName = "Alden (HA)",
+            SourceTitle = null,
+            SourceColor = "#112233",
+            NameOverride = "Name person.alden",
+            TitleOverride = "The King",
+            ColorOverride = "#E8BC4E",
+            Icon = "glyph:pet",
+        };
+
+        await rig.Writer.WriteRosterAsync([entry], CancellationToken.None);
+
+        var stored = Assert.Single(await rig.Queries.GetRosterAsync(CancellationToken.None));
+        Assert.Equal("Alden (HA)", stored.SourceName);
+        Assert.Null(stored.SourceTitle);
+        Assert.Equal("#112233", stored.SourceColor);
+        Assert.Equal("Name person.alden", stored.NameOverride);
+        Assert.Equal("The King", stored.TitleOverride);
+        Assert.Equal("#E8BC4E", stored.ColorOverride);
+        Assert.Equal("glyph:pet", stored.Icon);
+        Assert.True(stored.IsCustomised);
+    }
+
+    [Fact]
     public async Task The_roster_is_stored_by_entity_id_and_a_second_write_replaces_the_row()
     {
         await using var rig = await WriterRig.StartAsync();

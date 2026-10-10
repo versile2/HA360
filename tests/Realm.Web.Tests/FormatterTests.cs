@@ -30,7 +30,7 @@ public sealed class FormatterTests
     [Fact]
     public void Vehicles_FromTheDemoCast_ReadsTwoVehiclesAllParked()
     {
-        Assert.Equal("2 vehicles · all parked", HandleSummaryFormatter.Vehicles(Demo.Vehicles));
+        Assert.Equal("2 trackers · all parked", HandleSummaryFormatter.Vehicles(Demo.Vehicles));
     }
 
     [Fact]
@@ -41,7 +41,7 @@ public sealed class FormatterTests
 
     [Theory]
     [InlineData(Section.Drivers, "4 in the Realm · 1 driving")]
-    [InlineData(Section.Vehicles, "2 vehicles · all parked")]
+    [InlineData(Section.Vehicles, "2 trackers · all parked")]
     [InlineData(Section.Places, "14 places · 2 occupied")]
     public void Format_PicksTheSummaryOfTheSectionThatShows(Section section, string expected)
     {
@@ -155,12 +155,12 @@ public sealed class FormatterTests
     // ---- vehicles --------------------------------------------------------------------------------------------------------------------------
 
     [Theory]
-    [InlineData(0, 2, "2 vehicles · all parked")]
-    [InlineData(1, 2, "2 vehicles · 1 on the road")]
-    [InlineData(2, 2, "2 vehicles · 2 on the road")]
-    [InlineData(0, 1, "1 vehicle · all parked")]
-    [InlineData(1, 1, "1 vehicle · 1 on the road")]
-    [InlineData(0, 3, "3 vehicles · all parked")]
+    [InlineData(0, 2, "2 trackers · all parked")]
+    [InlineData(1, 2, "2 trackers · 1 on the road")]
+    [InlineData(2, 2, "2 trackers · 2 on the road")]
+    [InlineData(0, 1, "1 tracker · all parked")]
+    [InlineData(1, 1, "1 tracker · 1 on the road")]
+    [InlineData(0, 3, "3 trackers · all parked")]
     public void Vehicles_CountsTheMovingOnes(int moving, int total, string expected)
     {
         var vehicles = Enumerable.Range(0, total).Select(index => Vehicle($"v{index}", isMoving: index < moving)).ToList();
@@ -173,7 +173,7 @@ public sealed class FormatterTests
     {
         var vehicles = new[] { Vehicle("wagon"), Vehicle("chariot", noFix: true) };
 
-        Assert.Equal("2 vehicles · all parked", HandleSummaryFormatter.Vehicles(vehicles));
+        Assert.Equal("2 trackers · all parked", HandleSummaryFormatter.Vehicles(vehicles));
     }
 
     // ---- places ----------------------------------------------------------------------------------------------------------------------------
@@ -263,7 +263,7 @@ public sealed class FormatterTests
         var places = new[] { Place("p", memberIds: ["a"], vehicleIds: []) };
 
         Assert.Equal("2 in the Realm · 1 driving", HandleSummaryFormatter.Format(Section.Drivers, members, vehicles, places, Now));
-        Assert.Equal("1 vehicle · 1 on the road", HandleSummaryFormatter.Format(Section.Vehicles, members, vehicles, places, Now));
+        Assert.Equal("1 tracker · 1 on the road", HandleSummaryFormatter.Format(Section.Vehicles, members, vehicles, places, Now));
         Assert.Equal("1 place · 1 occupied", HandleSummaryFormatter.Format(Section.Places, members, vehicles, places, Now));
     }
 

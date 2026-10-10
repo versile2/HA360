@@ -84,6 +84,20 @@ public static class RosterRules
                 visible = true;
             }
 
+            if (candidate is not null && (entry.SourceName is not null || entry.NameOverride is not null))
+            {
+                // 0.2.1 (D117): the source's name follows Home Assistant and Life360; the owner's own name, if any, wins and is kept. An override equal to the source
+                // (a 0.2.0 row, whose name could not be told apart) is dropped, so "customised" means what it says. An entry that knows neither (built in memory, never stored) is left alone.
+                var sourceName = CleanName(candidate.Name, entry.EntityId);
+                var nameOverride = string.Equals(entry.NameOverride, sourceName, StringComparison.Ordinal) ? null : entry.NameOverride;
+                var name = nameOverride ?? sourceName;
+                if (entry.SourceName != sourceName || entry.NameOverride != nameOverride || entry.DisplayName != name)
+                {
+                    updated = updated with { SourceName = sourceName, NameOverride = nameOverride, DisplayName = name };
+                    visible |= entry.DisplayName != name;
+                }
+            }
+
             if (entry.Group != RosterGroup.NotTracked)
             {
                 if (candidate is { Active: true })
@@ -131,7 +145,11 @@ public static class RosterRules
                 candidate.Source,
                 now,
                 now,
-                null);
+                null)
+            {
+                SourceName = CleanName(candidate.Name, candidate.EntityId),
+            };
+            entry = entry with { SourceColor = entry.Color };
             entries[entry.EntityId] = entry;
             changed[entry.EntityId] = entry;
             visible = true;
@@ -148,7 +166,7 @@ public static class RosterRules
                 notices.Add(new RosterNotice(
                     NotificationIdOf(entry.EntityId),
                     $"HA Cartographer: New {what} found",
-                    $"{entry.DisplayName} ({entry.EntityId}) was added to People. Open {Where} to move it to Vehicles or Not tracked."));
+                    $"{entry.DisplayName} ({entry.EntityId}) was added to People. Open {Where} to move it to Trackers or Not tracked."));
             }
         }
 
@@ -196,8 +214,47 @@ public static class RosterRules
         return Sorted(result);
     }
 
-    /// <summary>The roster after <see cref="IRosterEditor.UpdateAsync"/>'s rules were applied to one entry. Unknown id: the same roster.</summary>
-    public static IReadOnlyList<RosterEntry> Update(IReadOnlyList<RosterEntry> entries, string entityId, string displayName, string? loreTitle, string? color)
+    /// <summary>The roster after <see cref="IRosterEditor.UpdateAsync"/>'s rules were applied to one entry (its picture is left as it is). Unknown id: the same roster.</summary>
+    public static IReadOnlyList<RosterEntry> Update(IReadOnlyList<RosterEntry> entries, string entityId, string displayName, string? loreTitle, string? color) =>
+        Edit(entries, entityId, displayName, loreTitle, color, entries.FirstOrDefault(e => e.EntityId == entityId)?.Icon);
+
+    /// <summary>
+    /// The roster after <see cref="IRosterEditor.EditAsync"/>'s rules were applied to one entry: the name, title, colour and picture are stored as the owner's own values
+    /// (an override), but only where they differ from the source's, and the values in effect follow. Unknown id: the same roster.
+    /// </summary>
+    public static IReadOnlyList<RosterEntry> Edit(IReadOnlyList<RosterEntry> entries, string entityId, string displayName, string? loreTitle, string? color, string? icon)
+    {
+        var result = new List<RosterEntry>(entries.Count);
+        foreach (var entry in entries)
+        {
+            if (entry.EntityId != entityId)
+            {
+                result.Add(entry);
+                continue;
+            }
+
+            var sourceName = entry.SourceName ?? entry.DisplayName;
+            var sourceColor = entry.SourceColor ?? entry.Color;
+            var name = CleanName(displayName, entry.DisplayName);
+            var title = CleanTitle(loreTitle);
+            var chosen = IsColor(color) ? color!.ToUpperInvariant() : entry.Color;
+            result.Add(entry with
+            {
+                DisplayName = name,
+                LoreTitle = title,
+                Color = chosen,
+                NameOverride = string.Equals(name, sourceName, StringComparison.Ordinal) ? null : name,
+                TitleOverride = string.Equals(title, entry.SourceTitle, StringComparison.Ordinal) ? null : title ?? string.Empty,
+                ColorOverride = string.Equals(chosen, sourceColor, StringComparison.OrdinalIgnoreCase) ? null : chosen,
+                Icon = RosterIcons.IsValid(icon) ? icon : null,
+            });
+        }
+
+        return result;
+    }
+
+    /// <summary>The roster after "Reset to Home Assistant / Life360": the owner's name, title, colour and picture are cleared and the source's values are in effect. Unknown id: the same roster.</summary>
+    public static IReadOnlyList<RosterEntry> Reset(IReadOnlyList<RosterEntry> entries, string entityId)
     {
         var result = new List<RosterEntry>(entries.Count);
         foreach (var entry in entries)
@@ -206,16 +263,20 @@ public static class RosterRules
                 ? entry
                 : entry with
                 {
-                    DisplayName = CleanName(displayName, entry.DisplayName),
-                    LoreTitle = CleanTitle(loreTitle),
-                    Color = IsColor(color) ? color!.ToUpperInvariant() : entry.Color,
+                    DisplayName = entry.SourceName ?? entry.DisplayName,
+                    LoreTitle = entry.SourceTitle,
+                    Color = entry.SourceColor ?? entry.Color,
+                    NameOverride = null,
+                    TitleOverride = null,
+                    ColorOverride = null,
+                    Icon = null,
                 });
         }
 
         return result;
     }
 
-    /// <summary>All entries, People first, then Vehicles, then Not tracked, each by sort order and then entity id.</summary>
+    /// <summary>All entries, People first, then Trackers, then Not tracked, each by sort order and then entity id.</summary>
     public static List<RosterEntry> Sorted(IEnumerable<RosterEntry> entries) =>
         entries.OrderBy(e => e.Group).ThenBy(e => e.SortOrder).ThenBy(e => e.EntityId, StringComparer.Ordinal).ToList();
 

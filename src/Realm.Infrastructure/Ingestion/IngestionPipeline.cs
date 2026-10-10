@@ -761,21 +761,15 @@ public sealed class IngestionPipeline : BackgroundService
         member.Heartbeat = FreshnessRules.Heartbeat(member.FixTimes.Values.Select(times => (IReadOnlyList<DateTimeOffset>)times), _options.UiStaleAfterMinutes);
     }
 
-    // The zones as drawn (02 section 1.9): the oversized ones left out, duplicate names told apart.
+    // The zones as drawn (02 section 1.9): every zone whatever its radius (0.2.1), duplicate names told apart.
     private void RebuildPlaces()
     {
         _zonesDirty = false;
         var zones = _zones.Values.OrderBy(z => z.Id, StringComparer.Ordinal).ToList();
-        var maxRadiusM = _options.UiMaxZoneRadiusKm * 1000;
         var seen = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         var places = new List<PlaceDef>();
         foreach (var zone in zones)
         {
-            if (zone.RadiusM > maxRadiusM)
-            {
-                continue;
-            }
-
             var name = zone.Name.Trim();
             seen[name] = seen.GetValueOrDefault(name) + 1;
             var count = seen[name];

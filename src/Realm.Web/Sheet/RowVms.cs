@@ -35,6 +35,7 @@ public sealed record BatteryBadgeVm(int Percent, string Text, bool Charging, boo
 /// <param name="DetailTone">How L3 is drawn.</param>
 /// <param name="Battery">The pill; null when the battery is unknown and for the static prince.</param>
 /// <param name="AccessibleName">The pin's accessible name (01 section 10.3), without "Double tap to show on map." which the component adds.</param>
+/// <param name="Glyph">The glyph the owner chose instead of the initial (0.2.1); null otherwise.</param>
 public sealed record MemberRowVm(
     string Id,
     string Name,
@@ -47,7 +48,8 @@ public sealed record MemberRowVm(
     string DetailLine,
     LineTone DetailTone,
     BatteryBadgeVm? Battery,
-    string AccessibleName)
+    string AccessibleName,
+    VehicleGlyph? Glyph = null)
 {
     /// <summary>The test id of 01 Appendix B.</summary>
     public string TestId => "row-member-" + Id;

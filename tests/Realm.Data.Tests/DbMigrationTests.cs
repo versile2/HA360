@@ -42,6 +42,8 @@ public class DbMigrationTests
             C("display_name", "TEXT", notNull: true), C("lore_title", "TEXT"), C("color", "TEXT", notNull: true),
             C("sort_order", "INTEGER", notNull: true), C("source", "TEXT", notNull: true),
             C("first_seen", "INTEGER", notNull: true), C("last_active", "INTEGER", notNull: true), C("auto_moved_at", "INTEGER"),
+            C("source_name", "TEXT"), C("source_title", "TEXT"), C("source_color", "TEXT"),
+            C("name_override", "TEXT"), C("title_override", "TEXT"), C("color_override", "TEXT"), C("icon", "TEXT"),
         ],
         ["signals"] =
         [
@@ -147,6 +149,30 @@ public class DbMigrationTests
 
         Assert.Contains("Sql/0002_roster.sql", typeof(SchemaRunner).Assembly.GetManifestResourceNames());
         Assert.Contains(scripts, s => s.Version == 2 && s.Name == "Sql/0002_roster.sql" && s.Sql.Contains("CREATE TABLE roster", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void The_override_script_is_embedded_as_Sql_0003_roster_overrides_sql()
+    {
+        var scripts = SchemaRunner.LoadEmbeddedScripts();
+
+        Assert.Contains("Sql/0003_roster_overrides.sql", typeof(SchemaRunner).Assembly.GetManifestResourceNames());
+        Assert.Contains(scripts, s => s.Version == 3 && s.Name == "Sql/0003_roster_overrides.sql");
+    }
+
+    // 0.2.1 (D117): a roster row of 0.2.0 keeps its name, title and colour; they count as the owner's until the first discovery.
+    [Fact]
+    public void Upgrading_a_0_2_0_roster_row_turns_its_name_and_title_into_overrides()
+    {
+        using var db = new TempDatabase();
+        using var connection = RealmDb.OpenConnection(db.FilePath, pooling: false);
+        var scripts = SchemaRunner.LoadEmbeddedScripts();
+        Assert.Equal(2, SchemaRunner.Apply(connection, scripts.Where(s => s.Version <= 2).ToArray(), NullLogger.Instance));
+        Exec(connection, "INSERT INTO roster(entity_id, kind, grp, display_name, lore_title, color, sort_order, source, first_seen, last_active) VALUES ('person.a', 'person', 'people', 'Alden', 'The King', '#E8BC4E', 0, 'Home Assistant', 1, 2)");
+
+        Assert.Equal(HighestScriptNumber(), SchemaRunner.Apply(connection, scripts, NullLogger.Instance));
+
+        Assert.Equal(1, ScalarInt(connection, "SELECT count(*) FROM roster WHERE source_name = 'Alden' AND name_override = 'Alden' AND title_override = 'The King' AND source_color = '#E8BC4E' AND color_override IS NULL AND icon IS NULL"));
     }
 
     // 0.2.0 (D114): a database of 0.1 has vehicle_samples; the new script drops it and adds the roster, and keeps everything else.

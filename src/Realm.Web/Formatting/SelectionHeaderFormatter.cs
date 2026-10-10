@@ -66,7 +66,7 @@ public static class SelectionHeaderFormatter
             Initial: row.Initial,
             Color: row.Color,
             AvatarUrl: row.AvatarUrl,
-            Glyph: null,
+            Glyph: row.Glyph,
             ZoneKind: null,
             Battery: row.Battery,
             AccessibleName: row.AccessibleName);

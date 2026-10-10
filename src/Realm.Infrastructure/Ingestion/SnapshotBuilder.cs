@@ -130,7 +130,9 @@ internal static class SnapshotBuilder
     private static MemberVm MemberOf(MemberRuntime runtime, FusedPosition? fused, BuildInput input)
     {
         var plan = runtime.Plan;
-        var avatar = plan.AvatarUpstream is null ? null : AvatarRoute + plan.Id;
+        var face = AvatarFace.Resolve(plan.Icon, asTracker: false, hasPhoto: plan.AvatarUpstream is not null);
+        var avatar = face.Mode == FaceMode.Photo ? AvatarRoute + plan.Id : null;
+        VehicleGlyph? glyph = face.Mode == FaceMode.Glyph ? face.Glyph : null;
         if (plan.Kind == MemberKind.Static)
         {
             var hasPin = plan.StaticLat is not null && plan.StaticLon is not null;
@@ -158,7 +160,8 @@ internal static class SnapshotBuilder
                 LastUpdateUtc: null,
                 SortOrder: plan.SortOrder,
                 Freshness: hasPin ? Freshness.Static : Freshness.NoFix,
-                StaticLabel: plan.StaticLabel);
+                StaticLabel: plan.StaticLabel,
+                Glyph: glyph);
         }
 
         var staleAfter = FreshnessRules.StaleAfter(input.Options.UiStaleAfterMinutes, runtime.Heartbeat, input.Options.FusionStaleGraceMinutes);
@@ -187,7 +190,8 @@ internal static class SnapshotBuilder
             SinceUtc: fused is null ? null : runtime.RunStartUtc,
             LastUpdateUtc: fused?.Ts,
             SortOrder: plan.SortOrder,
-            Freshness: freshness);
+            Freshness: freshness,
+            Glyph: glyph);
     }
 
     // ---- vehicles -----------------------------------------------------------------------------------------------
@@ -197,11 +201,12 @@ internal static class SnapshotBuilder
         var plan = runtime.Plan;
         var fix = runtime.Fix;
         var lastUpdate = fix?.Ts;
+        var face = AvatarFace.Resolve(plan.Icon, asTracker: true, hasPhoto: plan.AvatarUpstream is not null);
         return new VehicleVm(
             Id: plan.Id,
             Name: plan.Name,
             LoreTitle: plan.LoreTitle,
-            Glyph: plan.Glyph,
+            Glyph: RosterIcons.GlyphOf(plan.Icon) ?? plan.Glyph,
             Lat: fix?.Lat,
             Lon: fix?.Lon,
             Street: BorrowedStreet(runtime, input, fused),
@@ -209,7 +214,10 @@ internal static class SnapshotBuilder
             LastUpdateUtc: lastUpdate,
             SpeedMps: VehicleRules.FreshSpeedMps(fix?.SpeedMps, lastUpdate, input.Now),
             IsMoving: VehicleRules.IsMoving(fix?.SpeedMps, lastUpdate, input.Now),
-            Freshness: FreshnessRules.ForVehicle(input.Now, lastUpdate, input.Options.UiVehicleStaleAfterMinutes));
+            Freshness: FreshnessRules.ForVehicle(input.Now, lastUpdate, input.Options.UiVehicleStaleAfterMinutes),
+            Color: string.IsNullOrEmpty(plan.Color) ? "#E8BC4E" : plan.Color,
+            AvatarUrl: face.Mode == FaceMode.Photo ? AvatarRoute + plan.Id : null,
+            ShowInitial: face.Mode == FaceMode.Initial);
     }
 
     // 02 section 1.9: the street of a member whose fused fix is within 75 m of the vehicle and within 10 minutes of the vehicle's fix; else none (no geocoder).

@@ -89,7 +89,7 @@ const SCENES: readonly Scene[] = [
     },
   },
   { id: 'sheet-80-drivers', label: 'the 80 % state, Drivers', open: (page) => sheetAt80(page, 'drivers') },
-  { id: 'sheet-80-vehicles', label: 'the 80 % state, Vehicles', open: (page) => sheetAt80(page, 'vehicles') },
+  { id: 'sheet-80-vehicles', label: 'the 80 % state, Trackers', open: (page) => sheetAt80(page, 'vehicles') },
   { id: 'sheet-80-places', label: 'the 80 % state, Places', open: (page) => sheetAt80(page, 'places') },
   {
     id: 'person-detail',

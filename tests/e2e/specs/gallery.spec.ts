@@ -131,7 +131,7 @@ test.describe('[GAL] screenshot gallery', () => {
     await expect(page.getByTestId('row-vehicle-chariot'), 'the hatchback is on screen').toBeVisible();
     await expect(page.getByTestId('row-vehicle-chariot'), 'the hatchback is an ordinary row').not.toHaveAttribute('aria-disabled', 'true');
     await expect(page.locator('.realm-row-info'), 'no vehicle has an info button').toHaveCount(0);
-    await expect(page.getByTestId('sheet-summary'), 'the Vehicles summary').toHaveText('2 vehicles · all parked');
+    await expect(page.getByTestId('sheet-summary'), 'the Trackers summary').toHaveText('2 trackers · all parked');
 
     const file = await saveShot(page, testInfo, 'SC04-vehicles-list');
     expectViewportPng(file, page, testInfo.project.name);
@@ -396,7 +396,7 @@ test.describe('[GAL] screenshot gallery: the Layers popover and the Settings dia
     await expect(dialog, 'the Settings dialog is open').toBeVisible();
     await expect(frame.locator('.realm-popup__title'), 'the title').toHaveText('Settings');
     await expect(dialog.locator('.realm-settings__section h3'), 'the five sections, in order').toHaveText(["Who's on the map", 'Map', 'Appearance', 'Connections', 'About']);
-    await expect(dialog.locator('.realm-roster__heading'), 'the roster groups with their counts (the Demo starts with 4, 1 and 2)').toHaveText(['PEOPLE 4', 'VEHICLES 1', 'NOT TRACKED 2']);
+    await expect(dialog.locator('.realm-roster__heading'), 'the roster groups with their counts (the Demo starts with 4, 1 and 2)').toHaveText(['PEOPLE 4', 'TRACKERS 1', 'NOT TRACKED 2']);
 
     // Its size: the whole window below 600 px, a 480 px column in the middle from there up.
     const viewport = viewportOf(page);

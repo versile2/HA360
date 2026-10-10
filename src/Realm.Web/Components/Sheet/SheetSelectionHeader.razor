@@ -17,7 +17,14 @@
     @if (Header.Entity.Kind == EntityKind.Member)
     {
         <span class="realm-sel-avatar" style="@ColorStyle" aria-hidden="true">
-            <span class="realm-row-initial">@Header.Initial</span>
+            @if (Header.Glyph is { } glyph)
+            {
+                <MudIcon Icon="@GlyphPaths.Markup(glyph)" Class="realm-row-glyph" />
+            }
+            else
+            {
+                <span class="realm-row-initial">@Header.Initial</span>
+            }
             @if (Header.AvatarUrl is { } photo)
             {
                 <img class="realm-row-photo" src="@photo" alt="" loading="lazy" />
@@ -103,7 +110,7 @@
     private Task ClearAsync() => OnClear.InvokeAsync();
 
     // The pickup is the silhouette, the hatchback the car icon (01 section 5.2).
-    internal static string GlyphIcon(VehicleGlyph glyph) => glyph == VehicleGlyph.Pickup ? PickupGlyph : Icons.Material.Filled.DirectionsCar;
+    internal static string GlyphIcon(VehicleGlyph glyph) => glyph == VehicleGlyph.Pickup ? PickupGlyph : GlyphPaths.Markup(glyph);
 
     // 01 section 5.3: home, work, family, fun, park, vet, cemetery; anything else is a pin. The same mapping as PlaceRow's, which keeps its own.
     internal static string PlaceIcon(PlaceKind kind) =>

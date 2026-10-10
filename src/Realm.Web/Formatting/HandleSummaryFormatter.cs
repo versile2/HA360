@@ -60,12 +60,12 @@ public static class HandleSummaryFormatter
             : FormattableString.Invariant($"{live.Count} in the Realm");
     }
 
-    /// <summary>"{n} vehicles" (singular "1 vehicle") and " · {k} on the road" when k &gt; 0, else " · all parked".</summary>
+    /// <summary>"{n} trackers" (singular "1 tracker") and " · {k} on the road" when k &gt; 0, else " · all parked".</summary>
     /// <remarks>k counts <see cref="VehicleVm.IsMoving"/>; a vehicle with no data is parked.</remarks>
     public static string Vehicles(IReadOnlyList<VehicleVm> vehicles)
     {
         var moving = vehicles.Count(vehicle => vehicle.IsMoving);
-        var count = vehicles.Count == 1 ? "1 vehicle" : FormattableString.Invariant($"{vehicles.Count} vehicles");
+        var count = vehicles.Count == 1 ? "1 tracker" : FormattableString.Invariant($"{vehicles.Count} trackers");
         return moving > 0 ? FormattableString.Invariant($"{count} · {moving} on the road") : $"{count} · all parked";
     }
 

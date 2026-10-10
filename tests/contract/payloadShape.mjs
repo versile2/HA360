@@ -127,6 +127,9 @@ export const LayoutPayload = object({
   navHeightPx: num,
 });
 
+/** The glyphs a pin can show (0.2.1: the owner may choose one for a person too). */
+const GLYPHS = ['pickup', 'car', 'person', 'pet', 'phone', 'tag'];
+
 export const MemberPayloadItem = object(
   {
     id: str,
@@ -153,6 +156,7 @@ export const MemberPayloadItem = object(
     tooltip: str,
     bubbleLabel: str,
     bubbleTooltip: str,
+    glyph: nullable(oneOf(...GLYPHS)),
   },
   bothOrNeither,
 );
@@ -160,7 +164,10 @@ export const MemberPayloadItem = object(
 export const MembersPayload = object({ version: nonNegativeInt, meId: str, members: arrayOf(MemberPayloadItem) }, (value, at, errors) => uniqueIds(value.members, `${at}.members`, errors, 'member'));
 
 export const VehiclePayloadItem = object(
-  { id: str, name: str, glyph: oneOf('pickup', 'car'), lat: nullable(lat), lon: nullable(lon), ring, stale: bool, chip: nullable(str), ariaLabel: str, tooltip: str },
+  {
+    id: str, name: str, glyph: oneOf(...GLYPHS), lat: nullable(lat), lon: nullable(lon), ring, stale: bool, chip: nullable(str), ariaLabel: str, tooltip: str,
+    initial: str, color: colour, avatarUrl: nullable(relativeUrl), showInitial: bool,
+  },
   bothOrNeither,
 );
 

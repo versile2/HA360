@@ -38,7 +38,14 @@
             <MudIcon Icon="@Icons.Material.Filled.ArrowBack" />
         </button>
         <span class="realm-detail-avatar" style="@colorStyle" aria-hidden="true">
-            <span class="realm-row-initial">@row.Initial</span>
+            @if (row.Glyph is { } glyph)
+            {
+                <MudIcon Icon="@GlyphPaths.Markup(glyph)" Class="realm-row-glyph" />
+            }
+            else
+            {
+                <span class="realm-row-initial">@row.Initial</span>
+            }
             @if (row.AvatarUrl is { } photo)
             {
                 <img class="realm-row-photo" src="@photo" alt="" loading="lazy" />

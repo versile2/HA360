@@ -11,6 +11,7 @@ namespace Realm.Domain;
 /// <param name="SpeedMps">The reported speed only, never an implied one.</param>
 /// <param name="Freshness">Decided by the data layer with the heartbeat-aware threshold.</param>
 /// <param name="StaticLabel">The text shown for a static pin (for example "Home · {town}"); null for live members.</param>
+/// <param name="Glyph">The glyph the face shows instead of the initial, when the owner chose one (0.2.1); null otherwise. <see cref="AvatarUrl"/> is null whenever the owner chose the initial or a glyph.</param>
 public record MemberVm(
     string Id,
     string DisplayName,
@@ -35,4 +36,5 @@ public record MemberVm(
     DateTimeOffset? LastUpdateUtc,
     int SortOrder,
     Freshness Freshness,
+    VehicleGlyph? Glyph = null,
     string? StaticLabel = null);

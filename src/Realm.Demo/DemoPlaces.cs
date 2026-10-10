@@ -8,9 +8,6 @@ namespace Realm.Demo;
 /// </summary>
 public static class DemoPlaces
 {
-    /// <summary>The largest radius a zone may have and still be drawn: the default of ui_max_zone_radius_km (5) in metres.</summary>
-    public const double MaxDrawnRadiusM = 5_000;
-
     public static readonly DemoPlace Home = new("home", "Hearth Haven", "Hearth Haven", "Home", PlaceKind.Home, 31.0990, -85.3410, 100);
     public static readonly DemoPlace JesterHall = new("jester_hall", "The Jester's Hall", "The Jester's Hall", "Cass's house", PlaceKind.Family, 31.1040, -85.3560, 100);
     public static readonly DemoPlace Work = new("work", "Work", "Work", "The Counting House", PlaceKind.Work, 31.1530, -85.4080, 150);
@@ -26,13 +23,13 @@ public static class DemoPlaces
     public static readonly DemoPlace Vet = new("vet", "Vet Clinic", "Vet Clinic", "The Beast Healer", PlaceKind.Vet, 31.1180, -85.4350, 100);
     public static readonly DemoPlace Wheels = new("wheels", "Wheel Hall", "Wheel Hall", "The Wheeled Hall", PlaceKind.Fun, 31.1900, -85.3300, 200);
 
-    /// <summary>The arrival zone: a 20 mile circle centred on home, never drawn or listed.</summary>
+    /// <summary>The 20 mile arrival circle centred on home: a fixture row the Demo itself does not use (the Demo shows the 14 others).</summary>
     public static readonly DemoPlace Approach = new("approach", "(arrival zone, never shown)", "(arrival zone, never shown)", "n/a", PlaceKind.Other, 31.0990, -85.3410, 32_187);
 
     /// <summary>All 15 zones in the order of the table.</summary>
     public static readonly IReadOnlyList<DemoPlace> All =
         [Home, JesterHall, Work, Work2, Park, Orrin, Mara, SkateOne, SkateTwo, QueenOffice, Derby, Cemetery, Vet, Wheels, Approach];
 
-    /// <summary>The 14 zones that are drawn and listed: those within the maximum radius.</summary>
-    public static readonly IReadOnlyList<DemoPlace> Drawn = All.Where(place => place.RadiusM <= MaxDrawnRadiusM).ToArray();
+    /// <summary>The 14 zones the Demo draws and lists (every one but the fixture's arrival circle).</summary>
+    public static readonly IReadOnlyList<DemoPlace> Drawn = All.Where(place => place != Approach).ToArray();
 }

@@ -1,0 +1,88 @@
+@using Realm.Domain
+@using Realm.Web.Map
+
+@* The avatar of a roster row in Settings (0.2.1, D117). It draws what the map pin of the entry draws: AvatarFace.Resolve is the one answer for both (the pin's payload is built from the same
+   rule in the snapshot builder), and the glyph paths are the ones realmMap.js has (GlyphPaths). A person is a circle and a tracker a rounded square, as their pins are; the face sits on the entry's colour;
+   the photo (the avatar proxy's `avatars/{id}`, the same address as the pin's) covers the glyph or the initial and removes itself when it fails. An entry that is Not tracked has no pin and
+   no served photo, so it shows what is beneath. Decorative: the name is always next to it. *@
+<span class="@RootClass"
+      style="@ColorStyle"
+      data-face="@FaceName"
+      data-shape="@(AsTracker ? "tracker" : "person")"
+      aria-hidden="true">
+    @if (Face.Mode == FaceMode.Glyph || (Face.Mode == FaceMode.Photo && AsTracker))
+    {
+        <svg class="realm-roster__glyph" viewBox="0 0 24 24" focusable="false">@((MarkupString)GlyphPaths.Markup(Face.Glyph))</svg>
+    }
+    else
+    {
+        <span class="realm-roster__initial">@MapText.Initial(Entry.DisplayName)</span>
+    }
+    @if (ShowPhoto)
+    {
+        <img class="realm-roster__photo" src="@PhotoUrl" alt="" @onerror="OnPhotoError" />
+    }
+</span>
+
+@code {
+    private bool _photoFailed;
+    private string? _photoOf;
+
+    /// <summary>The entry to draw.</summary>
+    [Parameter, EditorRequired]
+    public RosterEntry Entry { get; set; } = default!;
+
+    /// <summary>The source has a picture (<see cref="RosterIdentity.HasPhoto"/>).</summary>
+    [Parameter]
+    public bool HasPhoto { get; set; }
+
+    /// <summary>Draw this token instead of the entry's own (the edit panel's preview of a choice not yet saved). Null: the entry's.</summary>
+    [Parameter]
+    public string? PreviewIcon { get; set; }
+
+    /// <summary>The colour to draw on instead of the entry's (a preview). Null: the entry's.</summary>
+    [Parameter]
+    public string? PreviewColor { get; set; }
+
+    /// <summary>The entry is drawn as a tracker's pin (the Trackers group, or a tracker that is not tracked) rather than a person's.</summary>
+    public bool AsTracker => AsTrackerOf(Entry);
+
+    /// <summary>True when the entry's pin would be a tracker's.</summary>
+    public static bool AsTrackerOf(RosterEntry entry) =>
+        entry.Group == RosterGroup.Vehicles || (entry.Group == RosterGroup.NotTracked && entry.Kind == RosterKind.Tracker);
+
+    /// <summary>What the avatar of <paramref name="entry"/> shows, for <paramref name="icon"/> (null: the owner's own choice, else automatic).</summary>
+    public static AvatarFace FaceOf(RosterEntry entry, bool hasPhoto, string? icon) =>
+        AvatarFace.Resolve(icon, AsTrackerOf(entry), hasPhoto && entry.Group != RosterGroup.NotTracked);
+
+    private AvatarFace Face => FaceOf(Entry, HasPhoto, PreviewIcon ?? Entry.Icon);
+
+    private string FaceName => Face.Mode.ToString().ToLowerInvariant();
+
+    private bool ShowPhoto => Face.Mode == FaceMode.Photo && !_photoFailed;
+
+    private string PhotoUrl => "avatars/" + Entry.Id;
+
+    private string RootClass => "realm-roster__avatar" + (AsTracker ? " realm-roster__avatar--tracker" : string.Empty);
+
+    private string ColorStyle
+    {
+        get
+        {
+            var color = PreviewColor ?? Entry.Color;
+            return RosterRules.IsColor(color) ? "--roster-color:" + color : string.Empty;
+        }
+    }
+
+    // A new address gets a fresh chance; a failed photo stays failed until then.
+    protected override void OnParametersSet()
+    {
+        if (!string.Equals(_photoOf, PhotoUrl, StringComparison.Ordinal))
+        {
+            _photoOf = PhotoUrl;
+            _photoFailed = false;
+        }
+    }
+
+    private void OnPhotoError() => _photoFailed = true;
+}

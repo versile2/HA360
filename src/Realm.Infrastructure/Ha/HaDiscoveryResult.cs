@@ -51,11 +51,15 @@ public sealed record ResolvedMember(
     string? StaticAddress,
     double? StaticLat,
     double? StaticLon,
-    bool StaticShowAddress);
+    bool StaticShowAddress,
+    string? Icon = null);
 
-/// <summary>One vehicle: a roster entry in Vehicles, followed by the position of its device tracker.</summary>
+/// <summary>One tracker pin: a roster entry in Trackers, followed by the position of its device tracker.</summary>
 /// <param name="TrackerId">The device tracker whose position the vehicle shows; null when the entry has none.</param>
 /// <param name="Source">How the tracker is read: <see cref="FixSource.Life360"/> for a Life360 tracker, else <see cref="FixSource.Companion"/>.</param>
+/// <param name="Color">The roster colour in effect; the pin's face takes it (0.2.1).</param>
+/// <param name="Icon">The owner's choice of picture (<see cref="RosterIcons"/>); null: automatic.</param>
+/// <param name="AvatarUpstream">The servable picture of the source; null for none.</param>
 public sealed record ResolvedVehicle(
     string Id,
     string Name,
@@ -63,4 +67,7 @@ public sealed record ResolvedVehicle(
     VehicleGlyph Glyph,
     int SortOrder,
     string? TrackerId,
-    FixSource Source = FixSource.Companion);
+    FixSource Source = FixSource.Companion,
+    string Color = "",
+    string? Icon = null,
+    string? AvatarUpstream = null);

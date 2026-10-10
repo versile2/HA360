@@ -277,6 +277,24 @@ test.describe('navigation, right stack, sheet and layout', () => {
     }
   });
 
+  test('[AC-06] a tab tapped at Peek opens the sheet to 80 % and switches to that tab; Back returns to Peek', async ({ page }) => {
+    await demo(page);
+    await untilSettled(page, 'peek', 'on load');
+
+    await page.getByTestId('tab-places').click();
+    await untilSettled(page, '80', 'after tapping Places at Peek');
+    await expect(page.getByTestId('tab-places'), 'Places is selected').toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByTestId('tab-drivers'), 'Drivers is not').toHaveAttribute('aria-selected', 'false');
+
+    await page.goBack();
+    await untilSettled(page, 'peek', 'after Back from 80 %');
+    await expect(page.getByTestId('tab-places'), 'the tab stays on Places at Peek').toHaveAttribute('aria-selected', 'true');
+
+    await page.getByTestId('tab-vehicles').click();
+    await untilSettled(page, '80', 'after tapping Trackers at Peek');
+    await expect(page.getByTestId('tab-vehicles'), 'Trackers is selected').toHaveAttribute('aria-selected', 'true');
+  });
+
   test('[AC-06] keyboard on the focused handle: Enter and Space toggle, ArrowUp and End go to 80 %, ArrowDown and Home go to Peek', async ({ page }) => {
     await demo(page);
     await untilSettled(page, 'peek', 'on load');

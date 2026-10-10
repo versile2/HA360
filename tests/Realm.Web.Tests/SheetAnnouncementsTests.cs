@@ -99,7 +99,7 @@ public sealed class SheetAnnouncementsTests
 
     [Theory]
     [InlineData(Section.Drivers, "5 drivers")]
-    [InlineData(Section.Vehicles, "2 vehicles")]
+    [InlineData(Section.Vehicles, "2 trackers")]
     [InlineData(Section.Places, "14 places")]
     public void ASectionChange_AnnouncesTheCountOfTheSectionThatShows(Section section, string expected)
     {
@@ -110,7 +110,7 @@ public sealed class SheetAnnouncementsTests
 
     [Theory]
     [InlineData(Section.Drivers, "1 driver")]
-    [InlineData(Section.Vehicles, "1 vehicle")]
+    [InlineData(Section.Vehicles, "1 tracker")]
     [InlineData(Section.Places, "1 place")]
     public void OneRow_IsSingular(Section section, string expected) =>
         Assert.Equal(expected, SheetAnnouncements.SectionCount(section, 1, 1, 1));

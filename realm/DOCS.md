@@ -1,7 +1,7 @@
 # HA Cartographer
 
 HA Cartographer is a map-first family tracker that runs inside Home Assistant. It shows where everyone is on a full-screen
-map with a bottom sheet (Drivers, Vehicles, Places) and keeps its own history, so it can show driving reports (by week, month, 3, 6 or 12 months, or a custom range; printable)
+map with a bottom sheet (Drivers, Trackers, Places) and keeps its own history, so it can show driving reports (by week, month, 3, 6 or 12 months, or a custom range; printable)
 that go back further than Home Assistant's recorder does. It opens from the Home Assistant sidebar, so Home Assistant's
 own login is the only login.
 
@@ -16,9 +16,13 @@ own login is the only login.
 5. Choose who is on the map inside the app: open **Settings** (the third item of the bottom bar) and use **Who's on the
    map**. On the first start the app puts every `person` entity, and every GPS `device_tracker` that reported a position in
    the last 30 days, under **People**, and leaves one notification in Home Assistant ("HA Cartographer: ...") that says so.
-   Drag a row to **People**, **Vehicles** or **Not tracked**, or use the row's menu (the three dots, **Move to...**). Tap a row to
-   change its name, title (a secondary label) and colour. A vehicle is a tracker you put under Vehicles; it follows the
-   tracker's position and has no odometer or fuel.
+   Drag a row to **People**, **Trackers** or **Not tracked**, or use the row's menu (the three dots, **Move to...**). Tap a row to
+   see which Home Assistant entities it is (entity ids with their friendly names, and the Life360 member name when Life360
+   feeds it) and to change its name, title (a secondary label), colour and picture (the photo of Home Assistant or Life360,
+   the first letter of the name, or a car, truck, person, pet, phone or tag). What you change is kept apart from what Home
+   Assistant and Life360 say, so a later change there never replaces it; **Reset to Home Assistant / Life360** brings the
+   source's values back. The map, the lists and the reports use your values. A tracker you put under Trackers follows
+   its position and has no odometer or fuel.
 
 Later, anything new that Home Assistant reports joins **People** with a notification of its own, and a person or tracker that has
 been unavailable, unknown or removed for 7 days moves to **Not tracked** by itself, again with a notification. Not tracked means

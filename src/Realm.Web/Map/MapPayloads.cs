@@ -30,7 +30,8 @@ public sealed record LayoutPayload(
 /// <param name="Initial">The first letter of the display name, shown on the member colour when there is no photo.</param>
 /// <param name="PoorAccuracy">Draws the accuracy halo (01 section 9 item 12).</param>
 /// <param name="ZClass">Draw order: stale 0, at a place 1, out 2, driving 3; JavaScript raises the selected pin to 4.</param>
-/// <param name="AvatarUrl">The relative <c>avatars/{id}</c>, or null for the initials.</param>
+/// <param name="AvatarUrl">The relative <c>avatars/{id}</c>, or null for the initials (or the glyph).</param>
+/// <param name="Glyph">The glyph shown instead of the initials when the owner chose one (0.2.1); null otherwise.</param>
 /// <param name="Chip">The chip text, decided here (01 section 4.4); null means no chip.</param>
 /// <param name="ChipMinute">The epoch minute the chip was computed for; JavaScript never recomputes it.</param>
 public sealed record MemberPayloadItem(
@@ -57,13 +58,18 @@ public sealed record MemberPayloadItem(
     string AriaLabel,
     string Tooltip,
     string BubbleLabel,
-    string BubbleTooltip);
+    string BubbleTooltip,
+    MapGlyph? Glyph = null);
 
 /// <summary>The full member list, versioned: JavaScript ignores a payload whose version is lower than the one it holds.</summary>
 /// <param name="MeId">The viewer's member id; empty when there is no member at all.</param>
 public sealed record MembersPayload(int Version, string MeId, IReadOnlyList<MemberPayloadItem> Members);
 
-/// <summary>One vehicle's pin. Lat and Lon are null for a vehicle without a position: no pin.</summary>
+/// <summary>One tracker's pin. Lat and Lon are null for a tracker without a position: no pin.</summary>
+/// <param name="Initial">The first letter of the name, drawn when <paramref name="ShowInitial"/> is set.</param>
+/// <param name="Color">The roster colour: the face is drawn on it (0.2.1).</param>
+/// <param name="AvatarUrl">The relative <c>avatars/{id}</c> when the face is the photo; null otherwise.</param>
+/// <param name="ShowInitial">The owner chose the initial: it replaces the glyph.</param>
 public sealed record VehiclePayloadItem(
     string Id,
     string Name,
@@ -74,12 +80,16 @@ public sealed record VehiclePayloadItem(
     bool Stale,
     string? Chip,
     string AriaLabel,
-    string Tooltip);
+    string Tooltip,
+    string Initial = "",
+    string Color = "#E8BC4E",
+    string? AvatarUrl = null,
+    bool ShowInitial = false);
 
 /// <summary>The full vehicle list, versioned.</summary>
 public sealed record VehiclesPayload(int Version, IReadOnlyList<VehiclePayloadItem> Vehicles);
 
-/// <summary>One drawn zone. A zone whose radius is above the maximum is never in the payload (01 section 4.6).</summary>
+/// <summary>One drawn zone. Every zone is in the payload whatever its radius (0.2.1), except one with no radius.</summary>
 public sealed record ZoneItem(string Id, string Name, double Lat, double Lon, double RadiusM, bool Occupied);
 
 /// <summary>The zone colours for one kind of map style (01 section 4.6).</summary>

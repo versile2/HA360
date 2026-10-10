@@ -28,11 +28,11 @@ public static class SheetAnnouncements
         return "Showing " + name;
     }
 
-    /// <summary>"5 drivers", "1 driver", "2 vehicles", "14 places": what the section that now shows holds.</summary>
+    /// <summary>"5 drivers", "1 driver", "2 trackers", "14 places": what the section that now shows holds.</summary>
     public static string SectionCount(Section section, int drivers, int vehicles, int places) =>
         section switch
         {
-            Section.Vehicles => Count(vehicles, "vehicle", "vehicles"),
+            Section.Vehicles => Count(vehicles, "tracker", "trackers"),
             Section.Places => Count(places, "place", "places"),
             _ => Count(drivers, "driver", "drivers"),
         };

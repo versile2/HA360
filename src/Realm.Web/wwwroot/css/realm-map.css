@@ -129,15 +129,15 @@
   opacity: 0.8;
 }
 
-/* A vehicle: a rounded square on the surface colour with a gold glyph (01 section 4.7). */
+/* A tracker: a rounded square on its roster colour with a glyph, an initial or the photo (01 section 4.7; 0.2.1 draws it on the colour, like a person's pin). */
 .realm-pin--vehicle .realm-pin__disc {
   border-radius: 14px;
 }
 
 .realm-pin--vehicle .realm-pin__face {
   border-radius: 11px;
-  background: var(--realm-surface);
-  color: var(--realm-primary);
+  background: var(--realm-pin-member, var(--realm-primary));
+  color: var(--realm-bg);
 }
 
 .realm-pin__glyph {
@@ -1090,32 +1090,40 @@
 }
 
 .realm-roster__item {
+  margin: 0;
   padding: 4px 0;
   border-bottom: 1px solid var(--realm-line);
 }
 
+/* Every row is the same grid, whatever it holds (0.2.1): handle 24, then the row button (avatar 40 and two lines that never wrap), then the ⋮ button 48. */
 .realm-roster__row {
-  display: flex;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) 48px;
   align-items: center;
-  gap: 8px;
-  min-height: 56px;
+  column-gap: 8px;
+  min-height: 64px;
+  margin: 0;
+  padding: 0;
 }
 
 .realm-roster__handle {
   display: flex;
   align-items: center;
-  flex: none;
+  justify-content: center;
+  width: 24px;
   color: var(--realm-text-2);
   cursor: grab;
 }
 
 .realm-roster__main {
-  display: flex;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
   align-items: center;
-  flex: 1 1 auto;
-  gap: 12px;
+  column-gap: 12px;
   min-width: 0;
-  min-height: 48px;
+  min-height: 56px;
   margin: 0;
   padding: 4px 4px;
   border: 0;
@@ -1128,36 +1136,72 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+/* What the map pin draws: a person is a circle, a tracker a rounded square, on the entry's colour. */
 .realm-roster__avatar {
+  position: relative;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: center;
   flex: none;
-  width: 36px;
-  height: 36px;
-  border-radius: 12px;
+  width: 40px;
+  height: 40px;
+  overflow: hidden;
+  border-radius: 50%;
   background: var(--roster-color, var(--realm-surface-2));
   color: var(--realm-bg);
+  font-size: 1rem;
   font-weight: 700;
+  line-height: 1;
 }
 
-.realm-roster__avatar .mud-icon-root {
-  width: 20px;
-  height: 20px;
-  font-size: 20px;
+.realm-roster__avatar--tracker {
+  border-radius: 12px;
+}
+
+.realm-roster__glyph {
+  width: 22px;
+  height: 22px;
+  fill: currentcolor;
+}
+
+.realm-roster__photo {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .realm-roster__text {
   display: flex;
   flex-direction: column;
+  justify-content: center;
   min-width: 0;
 }
 
 .realm-roster__name {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0 8px;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
   font-weight: 700;
+  white-space: nowrap;
+}
+
+.realm-roster__name-text {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.realm-roster__lore {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .realm-roster__lore,
@@ -1167,11 +1211,18 @@
   color: var(--realm-text-2);
 }
 
+.realm-roster__meta {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 .realm-roster__more {
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: center;
-  flex: none;
   width: 48px;
   height: 48px;
   margin: 0;
@@ -1190,6 +1241,7 @@
 .realm-roster__menu-item:focus-visible,
 .realm-roster__swatch:focus-visible,
 .realm-roster__action:focus-visible,
+.realm-roster__icon:focus-visible,
 .realm-roster__input:focus-visible {
   outline: 2px solid var(--realm-focus);
   outline-offset: 2px;
@@ -1284,7 +1336,91 @@
 
 .realm-roster__actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
+}
+
+.realm-roster__identity {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.realm-roster__entities {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.realm-roster__entity {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 8px;
+  padding: 2px 0;
+  font-size: 0.8125rem;
+  overflow-wrap: anywhere;
+}
+
+.realm-roster__entity-role {
+  color: var(--realm-text-2);
+}
+
+.realm-roster__entity-id {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--realm-text);
+}
+
+.realm-roster__entity-name {
+  color: var(--realm-text-2);
+}
+
+.realm-roster__life360 {
+  margin: 0;
+  font-size: 0.8125rem;
+}
+
+.realm-roster__icons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.realm-roster__icon {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--realm-line);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--realm-text);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.realm-roster__icon[aria-checked="true"] {
+  border-color: var(--realm-primary);
+  background: color-mix(in srgb, var(--realm-primary) 18%, transparent);
+}
+
+.realm-roster__icon svg {
+  width: 24px;
+  height: 24px;
+  fill: currentcolor;
+}
+
+.realm-roster__icon .mud-icon-root {
+  width: 24px;
+  height: 24px;
+  font-size: 24px;
 }
 
 .realm-settings__connections {

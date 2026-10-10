@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.2.1
+
+### Added
+
+- **Edit what a row shows.** Tap a row in Settings -> Who's on the map to see which Home Assistant entities it is (entity
+  ids with their friendly names, and the Life360 member name when Life360 feeds it) and to change its name, title, colour
+  and picture: the photo from Home Assistant or Life360, the first letter of the name, or a car, truck, person, pet,
+  phone or tag. The map, the lists and the reports use your values.
+- Your values are kept apart from the source's: a later change of a name in Home Assistant or Life360 never replaces
+  them. **Reset to Home Assistant / Life360** (shown once you changed something) brings the source's values back.
+
+### Changed
+
+- **Zones match Home Assistant exactly.** Every zone is drawn and listed, whatever its radius (a very large zone such
+  as a regional "approach" zone used to be left out). A circle wider than the map view is drawn as an outline with a
+  very faint fill, and a tap inside it is a tap on the map, so pins and controls stay easy to hit.
+- **Tapping Drivers, Trackers or Places while the sheet is low now opens it to 80 % and switches to that tab.** Back
+  from 80 % returns to the low sheet. The side panel is unchanged.
+- **"Vehicles" is now "Trackers"** everywhere you see it: the sheet tab, Settings, the summary line, the notifications and
+  the documentation.
+- **Settings rows are all the same shape** (handle, avatar, two lines of text, the three-dot button), and the avatar is
+  what the map pin shows for that entry: the photo when the pin shows one, else the same initial or glyph on the same colour.
+- A tracker's pin is now drawn on its roster colour (a rounded square), like a person's pin.
+- The database gets a small schema update (0003) that adds columns for the values above; nothing is lost.
+
 ## 0.2.0
 
 ### Added

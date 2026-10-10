@@ -6,7 +6,7 @@ namespace Realm.Web.State;
 /// <summary>
 /// The sheet's state transitions as one pure function (03 section 3.6, 01 section 5.7), with no Blazor and no JavaScript in it. The component layer calls
 /// it and then calls the history sync (03 section 3.7). Every selection event leaves with <see cref="SheetSize.Peek"/> (D45); the sheet reaches Tall only
-/// through <see cref="SheetEvent.HandleToggle"/> or <see cref="SheetEvent.HandleSet"/>, which the handle and the Peek header both raise (D46). The
+/// through <see cref="SheetEvent.HandleToggle"/> or <see cref="SheetEvent.HandleSet"/>, which the handle and the Peek header both raise (D46), or (0.2.1, D117) a <see cref="SheetEvent.SegmentTap"/>, which opens a Peek sheet to Tall and switches the tab. The
 /// Expanded panel has no size, so the two handle events change nothing there; <see cref="LayoutMode.Unknown"/> counts as Compact.
 /// </summary>
 public static class SheetStateMachine
@@ -26,7 +26,7 @@ public static class SheetStateMachine
             SheetEvent.BubbleTap { Ids.Count: 1 } bubble => SelectUnlessSelected(state, new EntityRef(EntityKind.Member, bubble.Ids[0])),
             SheetEvent.BubbleTap => state,
             SheetEvent.HereNowTap here => Select(state, new EntityRef(EntityKind.Member, here.MemberId)),
-            SheetEvent.SegmentTap segment => state with { Section = segment.Section, Selection = null },
+            SheetEvent.SegmentTap segment => state with { Section = segment.Section, Selection = null, Size = expanded ? state.Size : SheetSize.Tall },
             SheetEvent.ClearTap or SheetEvent.NavReTap => state with { Selection = null, Size = SheetSize.Peek },
             SheetEvent.MapTap => MapTap(state, expanded),
             SheetEvent.HandleToggle => expanded ? state : state with { Size = state.Size == SheetSize.Peek ? SheetSize.Tall : SheetSize.Peek },
