@@ -2,7 +2,7 @@
 // print view. The Demo app frozen at Wed 2026-09-30 21:25 CDT; its generated history has a home-work-home day for Alden on every weekday. Not an acceptance criterion: no AC tags.
 import type { Locator, Page } from '@playwright/test';
 
-import { castMember, demo, expect, loadDemoCast, test } from '../fixtures.js';
+import { castMember, demo, demoUrl, expect, loadDemoCast, test, waitForInteractive } from '../fixtures.js';
 
 const TODAY = '2026-09-30';
 const YESTERDAY = '2026-09-29';
@@ -26,8 +26,11 @@ async function openFromPerson(page: Page, id: string): Promise<void> {
   await expect(page.getByTestId('history-summary'), 'the day has loaded').toBeVisible();
 }
 
+/** Opens `history/{id}` with the Demo parameters first and the History query after them (`demo()` would put its own `?` after a path that carries a query). */
 async function openHistory(page: Page, id: string, query = ''): Promise<void> {
-  await demo(page, { path: `history/${id}${query}`, hooks: false });
+  const url = demoUrl({ path: `history/${id}`, variant: 'full-cast' }) + query;
+  await page.goto(url);
+  await waitForInteractive(page, url);
   await expect(page.getByTestId('history-summary'), 'the day has loaded').toBeVisible();
 }
 
@@ -54,10 +57,8 @@ test.describe('Location History', () => {
     await openHistory(page, 'king');
     expect(await dayOf(page)).toBe(TODAY);
 
-    await expect(async () => {
-      await page.getByTestId('history-prev').click();
-      expect(await dayOf(page)).toBe(YESTERDAY);
-    }).toPass({ timeout: 20_000 });
+    await page.getByTestId('history-prev').click();
+    await expect.poll(() => dayOf(page), { message: 'one step back is yesterday' }).toBe(YESTERDAY);
     expect(new URL(page.url()).searchParams.get('date')).toBe(YESTERDAY);
     await expect(page.getByTestId('history-date')).toContainText('Sep 29');
     await expect(entries(page).first(), 'the day lists its visits and drives').toBeVisible();
@@ -65,12 +66,12 @@ test.describe('Location History', () => {
     await page.getByTestId('history-today').click();
     await expect.poll(() => dayOf(page)).toBe(TODAY);
 
-    await openHistory(page, 'king', `?date=${YESTERDAY}`);
+    await openHistory(page, 'king', `&date=${YESTERDAY}`);
     expect(await dayOf(page)).toBe(YESTERDAY);
   });
 
   test('a day reads home, work and home again, with the zone names and the drives between', async ({ page }) => {
-    await openHistory(page, 'king', `?date=${YESTERDAY}`);
+    await openHistory(page, 'king', `&date=${YESTERDAY}`);
 
     const list = page.getByTestId('history-list');
     await expect(list).toContainText('At Hearth Haven');
@@ -81,7 +82,7 @@ test.describe('Location History', () => {
   });
 
   test('tapping a drive highlights its path on the map, and tapping it again clears it', async ({ page }) => {
-    await openHistory(page, 'king', `?date=${YESTERDAY}`);
+    await openHistory(page, 'king', `&date=${YESTERDAY}`);
     const map = page.getByTestId('history-map');
     await expect(map).toHaveAttribute('data-history-ready', 'true', { timeout: 30_000 });
     await expect(map, 'the trail is drawn').not.toHaveAttribute('data-history-segments', '0');
@@ -102,7 +103,7 @@ test.describe('Location History', () => {
   });
 
   test('the last seven days are a list of days, and a day opens its own', async ({ page }) => {
-    await openHistory(page, 'king', '?range=7d');
+    await openHistory(page, 'king', '&range=7d');
 
     await expect(page.getByTestId('history-page')).toHaveAttribute('data-mode', 'range');
     await expect(page.getByTestId(`history-day-${TODAY}`)).toBeVisible();
@@ -114,7 +115,7 @@ test.describe('Location History', () => {
   });
 
   test('the print stylesheet shows the timeline as a table with the header, and no map', async ({ page }) => {
-    await openHistory(page, 'king', `?date=${YESTERDAY}`);
+    await openHistory(page, 'king', `&date=${YESTERDAY}`);
     await expect(page.getByTestId('btn-print')).toBeVisible();
 
     await page.emulateMedia({ media: 'print' });
