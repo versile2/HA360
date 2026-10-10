@@ -116,7 +116,7 @@ public sealed class DemoRealmSession : IRealmSession
     }
 
     /// <inheritdoc />
-    /// <remarks>Only the live people on the map have a history: someone moved to Not tracked has none (their history is not shown), and a day outside the 400 retained days is none.</remarks>
+    /// <remarks>Only the live people and the trackers that keep their history are on the map with one: someone moved to Not tracked has none (their history is not shown), and a day outside the 400 retained days is none.</remarks>
     public ValueTask<HistoryDayVm?> GetHistoryDayAsync(string memberId, DateOnly day, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
@@ -134,13 +134,20 @@ public sealed class DemoRealmSession : IRealmSession
     private IReadOnlyList<HistoryDayVm> HistoryDays(string memberId, DateOnly from, DateOnly to, bool includeTrail)
     {
         var member = Current.Members.FirstOrDefault(m => string.Equals(m.Id, memberId, StringComparison.Ordinal));
-        if (member is null || member.Kind != MemberKind.Live)
+        var tracker = member is null ? Current.Vehicles.FirstOrDefault(v => string.Equals(v.Id, memberId, StringComparison.Ordinal)) : null;
+        if (tracker is null && (member is null || member.Kind != MemberKind.Live))
+        {
+            return [];
+        }
+
+        // A tracker (0.3.1, D125) has history when its owner keeps it on, or when positions were stored before it was switched off (the wagon's).
+        if (tracker is not null && !tracker.KeepHistory && !_source.HasTrackerHistory(memberId))
         {
             return [];
         }
 
         var (oldest, newest) = HistoryDayMath.Range(Time.GetUtcNow(), Zone, DemoDataSource.DemoRetentionFixDays);
-        return _source.HistoryDays(memberId, HistoryDayMath.Clamp(from, oldest, newest), HistoryDayMath.Clamp(to, oldest, newest), includeTrail);
+        return _source.HistoryDays(memberId, HistoryDayMath.Clamp(from, oldest, newest), HistoryDayMath.Clamp(to, oldest, newest), includeTrail, tracker is not null);
     }
 
     /// <inheritdoc />

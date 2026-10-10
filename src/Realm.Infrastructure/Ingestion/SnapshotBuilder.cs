@@ -217,7 +217,8 @@ internal static class SnapshotBuilder
             Freshness: FreshnessRules.ForVehicle(input.Now, lastUpdate, input.Options.UiVehicleStaleAfterMinutes),
             Color: string.IsNullOrEmpty(plan.Color) ? "#E8BC4E" : plan.Color,
             AvatarUrl: face.Mode == FaceMode.Photo ? AvatarRoute + plan.Id : null,
-            ShowInitial: face.Mode == FaceMode.Initial);
+            ShowInitial: face.Mode == FaceMode.Initial,
+            KeepHistory: plan.KeepHistory);
     }
 
     // 02 section 1.9: the street of a member whose fused fix is within 75 m of the vehicle and within 10 minutes of the vehicle's fix; else none (no geocoder).

@@ -94,9 +94,54 @@ public class DemoHistoryTests
         var session = NewSession();
 
         Assert.Null(await session.GetHistoryDayAsync("prince", Today, CancellationToken.None));
-        Assert.Null(await session.GetHistoryDayAsync("wagon", Today, CancellationToken.None));
         Assert.Null(await session.GetHistoryDayAsync("nobody", Today, CancellationToken.None));
         Assert.Empty(await session.GetHistoryRangeAsync("prince", Today.AddDays(-6), Today, CancellationToken.None));
+        await session.DisposeAsync();
+    }
+
+    // 0.3.1, D125: the wagon keeps its history by default: five days, an errand a day from home, its moves worked out from its fixes by the production rule.
+    [Fact]
+    public async Task The_wagon_has_five_days_of_history_with_a_move_and_a_trail_each_day()
+    {
+        var session = NewSession();
+
+        var days = await session.GetHistoryRangeAsync("wagon", Today.AddDays(-5), Today, CancellationToken.None);
+
+        Assert.Equal(6, days.Count);
+        Assert.False(days[^1].Recorded);   // 2026-09-25: before the history starts
+        foreach (var day in days.Take(5))
+        {
+            Assert.True(day.Recorded);
+            Assert.NotEmpty(day.Drives);
+            Assert.All(day.Drives, drive => Assert.True(drive.Movement));
+            Assert.All(day.Drives, drive => Assert.Null(drive.TopSpeedMps));
+            Assert.NotEmpty(day.Stays);
+        }
+
+        var today = await session.GetHistoryDayAsync("wagon", Today, CancellationToken.None);
+        Assert.NotNull(today);
+        Assert.NotEmpty(today.Trail);
+        Assert.Contains(today.Stays, stay => stay.Label == "At Hearth Haven");
+        await session.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task Switching_Keep_history_off_leaves_the_stored_days_and_a_tracker_without_data_has_none()
+    {
+        var session = NewSession();
+
+        await session.Roster.SetKeepHistoryAsync("device_tracker.wagon", false);
+        var kept = await session.GetHistoryDayAsync("wagon", Today.AddDays(-1), CancellationToken.None);
+        await session.Roster.MoveAsync("device_tracker.hatchback", RosterGroup.Vehicles);
+        var empty = await session.GetHistoryDayAsync("chariot", Today, CancellationToken.None);
+        await session.Roster.SetKeepHistoryAsync("device_tracker.hatchback", false);
+        var none = await session.GetHistoryDayAsync("chariot", Today, CancellationToken.None);
+
+        Assert.NotNull(kept);
+        Assert.True(kept.Recorded);
+        Assert.NotNull(empty);
+        Assert.False(empty.Recorded);
+        Assert.Null(none);
         await session.DisposeAsync();
     }
 

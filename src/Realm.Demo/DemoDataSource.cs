@@ -125,13 +125,16 @@ public sealed class DemoDataSource
     /// <summary>One driver's period over the fixture's drives; null for an unknown or non-report member.</summary>
     public DriverWeek? GetDriverPeriod(string memberId, ReportWindow window) => _driving.DriverPeriod(memberId, window);
 
+    /// <summary>True when the Demo has stored positions for the tracker (the wagon): they stay in History when its Keep history switch is turned off.</summary>
+    public bool HasTrackerHistory(string trackerId) => _history.Has(trackerId);
+
     /// <summary>
     /// The days <paramref name="from"/> to <paramref name="to"/> of a person's Location History (0.3.0, D123), newest first, built by the same rules as the Live app over the
     /// generated fixes and trips (<see cref="DemoHistory"/>); empty for anyone who has none. The zones are the drawn ones and the ones added in this session.
     /// </summary>
-    public IReadOnlyList<HistoryDayVm> HistoryDays(string memberId, DateOnly from, DateOnly to, bool includeTrail)
+    public IReadOnlyList<HistoryDayVm> HistoryDays(string memberId, DateOnly from, DateOnly to, bool includeTrail, bool tracker = false)
     {
-        if (!_history.Has(memberId) || to < from)
+        if (to < from || (!_history.Has(memberId) && !tracker))
         {
             return [];
         }
@@ -145,8 +148,10 @@ public sealed class DemoDataSource
         var zones = DemoPlaces.Drawn.Concat(added).Select(place => new RawPlace(place.Id, place.Name, place.Lat, place.Lon, place.RadiusM, false)).ToList();
         var window = HistoryRange.ReadWindow(from, to, Zone);
         var fixes = _history.Fixes(memberId).Where(fix => fix.Ts >= window.StartUtc && fix.Ts < window.EndUtc).ToList();
-        var trips = _history.Trips(memberId).Where(trip => trip.StartUtc >= window.StartUtc && trip.StartUtc < window.EndUtc).ToList();
-        return HistoryRange.Build(memberId, from, to, Zone, fixes, trips, zones, Time.GetUtcNow(), includeTrail);
+        IReadOnlyList<StatsTrip> trips = tracker
+            ? MovementDeriver.Derive(memberId, fixes, zones)
+            : _history.Trips(memberId).Where(trip => trip.StartUtc >= window.StartUtc && trip.StartUtc < window.EndUtc).ToList();
+        return HistoryRange.Build(memberId, from, to, Zone, fixes, trips, zones, Time.GetUtcNow(), includeTrail, movement: tracker);
     }
 
     /// <summary>
@@ -245,7 +250,8 @@ public sealed class DemoDataSource
             Freshness: FreshnessRules.ForVehicle(now, spot.Fix?.Ts, VehicleStaleAfterMinutes),
             Color: entry.Color,
             AvatarUrl: null,
-            ShowInitial: entry.Icon == RosterIcons.Initial);
+            ShowInitial: entry.Icon == RosterIcons.Initial,
+            KeepHistory: entry.KeepHistory);
 
         // 02 section 9.3: positions, accuracies, batteries and fix ages are Appendix A.1 verbatim; "since" is the local time of the table.
         var spots = Spots();

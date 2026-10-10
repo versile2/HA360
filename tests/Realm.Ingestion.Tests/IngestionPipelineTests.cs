@@ -708,15 +708,15 @@ public sealed class IngestionPipelineTests : IDisposable
         Assert.All(rig.Writer.Signals, s => Assert.Equal(PhoneSignalKind.Screen, s.Signal.Kind));
     }
 
-    private static ResolvedVehicle Pickup(string trackerId = "device_tracker.pickup_gps", FixSource source = FixSource.Companion) =>
-        new("tracker_pickup_gps", "Pickup", null, VehicleGlyph.Pickup, 0, trackerId, source);
+    private static ResolvedVehicle Pickup(string trackerId = "device_tracker.pickup_gps", FixSource source = FixSource.Companion, bool keepHistory = true) =>
+        new("tracker_pickup_gps", "Pickup", null, VehicleGlyph.Pickup, 0, trackerId, source, KeepHistory: keepHistory);
 
-    // A vehicle is a GPS tracker (D113): it follows the tracker's position and update time, and nothing about it is stored.
+    // A vehicle is a GPS tracker (D113): it follows the tracker's position and update time; with Keep history off (0.3.1, D125) nothing about it is stored.
     [Fact]
-    public async Task AVehicle_FollowsItsTracker_AndIsNeverStored()
+    public async Task AVehicleThatDoesNotKeepHistory_FollowsItsTracker_AndIsNotStored()
     {
         var rig = NewRig();
-        await rig.DiscoverWithAsync(null, [Pickup()], Plans.Member("king", life360: Plans.KingTracker));
+        await rig.DiscoverWithAsync(null, [Pickup(keepHistory: false)], Plans.Member("king", life360: Plans.KingTracker));
         var seen = Start.AddMinutes(-2);
 
         await rig.FeedAsync(Companion("device_tracker.pickup_gps", seen, HomeLat + 0.01, HomeLon));
@@ -728,6 +728,30 @@ public sealed class IngestionPipelineTests : IDisposable
         Assert.Equal(seen, vehicle.LastUpdateUtc);
         Assert.Equal(Freshness.Fresh, vehicle.Freshness);
         Assert.Empty(rig.Writer.Fixes);
+    }
+
+    // 0.3.1 (D125): Keep history is on by default; the fix is stored under the roster id like a person's, once per position, and the switch stops it.
+    [Fact]
+    public async Task AVehicleThatKeepsHistory_StoresEachPositionUnderItsRosterId_UntilTheSwitchIsOff()
+    {
+        var rig = NewRig();
+        await rig.DiscoverWithAsync(null, [Pickup()], Plans.Member("king", life360: Plans.KingTracker));
+        var first = Start.AddMinutes(-4);
+        var second = Start.AddMinutes(-2);
+
+        await rig.FeedAsync(Companion("device_tracker.pickup_gps", first, HomeLat + 0.01, HomeLon));
+        await rig.FeedAsync(Companion("device_tracker.pickup_gps", second, HomeLat + 0.02, HomeLon));
+
+        Assert.Equal([first, second], rig.Writer.Fixes.Where(f => f.MemberId == "tracker_pickup_gps").Select(f => f.Fix.Ts));
+        Assert.All(rig.Writer.Fixes.Where(f => f.MemberId == "tracker_pickup_gps"), f => Assert.True(f.InTrack));
+
+        await rig.DiscoverWithAsync(null, [Pickup(keepHistory: false)], Plans.Member("king", life360: Plans.KingTracker));
+        var before = rig.Writer.Fixes.Count;
+        await rig.FeedAsync(Companion("device_tracker.pickup_gps", Start, HomeLat + 0.03, HomeLon));
+
+        Assert.Equal(before, rig.Writer.Fixes.Count);
+        Assert.Equal(HomeLat + 0.03, Assert.Single(rig.State.Current.Vehicles).Lat);
+        Assert.False(Assert.Single(rig.State.Current.Vehicles).KeepHistory);
     }
 
     [Fact]

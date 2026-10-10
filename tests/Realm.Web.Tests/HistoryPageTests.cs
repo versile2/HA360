@@ -146,6 +146,50 @@ public sealed class HistoryPageTests : ComponentTestBase
         Assert.Empty(cut.FindAll("[data-testid='history-list']"));
     }
 
+    // ---- trackers (0.3.1, D125) ----------------------------------------------------------------------------------------------------------------
+
+    [Fact]
+    public async Task ATrackerThatKeepsItsHistory_HasTheScreenOfAPerson_WithMovedLines()
+    {
+        await using var session = DrivingFormatterTests.Demo();
+        var cut = RenderPage(session, "wagon", "2026-09-30");
+
+        Assert.Equal("Ford Pickup", cut.Find("h1.realm-history__name").TextContent);
+        Assert.NotNull(cut.Find("[data-testid='history-prev']"));
+        Assert.NotNull(cut.Find("[data-testid='history-range']"));
+        Assert.Empty(cut.FindAll("[data-testid='history-none']"));
+        var list = cut.Find(".realm-history__list").TextContent;
+        Assert.Contains("Moved · ", list, StringComparison.Ordinal);
+        Assert.DoesNotContain("Drive · ", list, StringComparison.Ordinal);
+        Assert.Contains("At Hearth Haven", list, StringComparison.Ordinal);
+        Assert.Contains(" move", cut.Find("[data-testid='history-summary']").TextContent, StringComparison.Ordinal);
+        Assert.DoesNotContain("drive", cut.Find("[data-testid='history-summary']").TextContent, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ATrackerWithKeepHistoryOffAndNothingStored_KeepsTheLatestPositionPage_WithAHintToTurnTheSwitchOn()
+    {
+        await using var session = DrivingFormatterTests.Demo();
+        await session.Roster.MoveAsync("device_tracker.hatchback", RosterGroup.Vehicles);
+        await session.Roster.SetKeepHistoryAsync("device_tracker.hatchback", false);
+        var cut = RenderPage(session, "chariot", null, ready: "[data-testid='history-none']");
+
+        Assert.Contains("keeps only its latest position", cut.Find(".realm-history__none-note").TextContent, StringComparison.Ordinal);
+        Assert.Contains("Keep history", cut.Find(".realm-history__none-note").TextContent, StringComparison.Ordinal);
+        Assert.Empty(cut.FindAll("[data-testid='history-prev']"));
+    }
+
+    [Fact]
+    public async Task ATrackerWithKeepHistoryOffButStoredPositions_StillShowsThem()
+    {
+        await using var session = DrivingFormatterTests.Demo();
+        await session.Roster.SetKeepHistoryAsync("device_tracker.wagon", false);
+        var cut = RenderPage(session, "wagon", "2026-09-29");
+
+        Assert.Empty(cut.FindAll("[data-testid='history-none']"));
+        Assert.Contains("Moved · ", cut.Find(".realm-history__list").TextContent, StringComparison.Ordinal);
+    }
+
     // ---- the list on its own -------------------------------------------------------------------------------------------------------------------
 
     [Fact]

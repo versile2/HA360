@@ -1259,6 +1259,15 @@
   background: var(--realm-surface);
 }
 
+.realm-roster__keep {
+  margin: 4px 0 0;
+  padding: 8px 0;
+}
+
+.realm-roster__keep-off {
+  margin: 0;
+}
+
 .realm-roster__menu-item,
 .realm-roster__action {
   box-sizing: border-box;

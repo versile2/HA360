@@ -47,13 +47,13 @@ public sealed class DbWriter : BackgroundService, IRealmWriter
 
     private const string RosterSql =
         "INSERT INTO roster(entity_id, kind, grp, display_name, lore_title, color, sort_order, source, first_seen, last_active, auto_moved_at, "
-        + "source_name, source_title, source_color, name_override, title_override, color_override, icon) "
-        + "VALUES (@id, @kind, @grp, @name, @lore, @color, @sort, @source, @first, @active, @moved, @sname, @stitle, @scolor, @oname, @otitle, @ocolor, @icon) "
+        + "source_name, source_title, source_color, name_override, title_override, color_override, icon, keep_history) "
+        + "VALUES (@id, @kind, @grp, @name, @lore, @color, @sort, @source, @first, @active, @moved, @sname, @stitle, @scolor, @oname, @otitle, @ocolor, @icon, @keep) "
         + "ON CONFLICT(entity_id) DO UPDATE SET kind = excluded.kind, grp = excluded.grp, display_name = excluded.display_name, lore_title = excluded.lore_title, "
         + "color = excluded.color, sort_order = excluded.sort_order, source = excluded.source, first_seen = excluded.first_seen, "
         + "last_active = excluded.last_active, auto_moved_at = excluded.auto_moved_at, source_name = excluded.source_name, source_title = excluded.source_title, "
         + "source_color = excluded.source_color, name_override = excluded.name_override, title_override = excluded.title_override, "
-        + "color_override = excluded.color_override, icon = excluded.icon";
+        + "color_override = excluded.color_override, icon = excluded.icon, keep_history = excluded.keep_history";
 
     private const string MetaSql = "INSERT OR REPLACE INTO meta(key, value) VALUES (@key, @value)";
 
@@ -521,7 +521,7 @@ public sealed class DbWriter : BackgroundService, IRealmWriter
             using (var upsert = new SqlStatement(
                 connection, transaction, RosterSql,
                 "@id", "@kind", "@grp", "@name", "@lore", "@color", "@sort", "@source", "@first", "@active", "@moved",
-                "@sname", "@stitle", "@scolor", "@oname", "@otitle", "@ocolor", "@icon"))
+                "@sname", "@stitle", "@scolor", "@oname", "@otitle", "@ocolor", "@icon", "@keep"))
             {
                 foreach (var entry in command.Entries)
                 {
@@ -529,7 +529,7 @@ public sealed class DbWriter : BackgroundService, IRealmWriter
                         entry.EntityId, RosterText.Kind(entry.Kind), RosterText.Group(entry.Group), entry.DisplayName, SqlValues.Text(entry.LoreTitle),
                         entry.Color, (long)entry.SortOrder, entry.Source, SqlValues.Millis(entry.FirstSeenUtc), SqlValues.Millis(entry.LastActiveUtc),
                         SqlValues.Millis(entry.AutoMovedUtc), SqlValues.Text(entry.SourceName), SqlValues.Text(entry.SourceTitle), SqlValues.Text(entry.SourceColor),
-                        SqlValues.Text(entry.NameOverride), SqlValues.Text(entry.TitleOverride), SqlValues.Text(entry.ColorOverride), SqlValues.Text(entry.Icon));
+                        SqlValues.Text(entry.NameOverride), SqlValues.Text(entry.TitleOverride), SqlValues.Text(entry.ColorOverride), SqlValues.Text(entry.Icon), entry.KeepHistory ? 1L : 0L);
                 }
             }
 

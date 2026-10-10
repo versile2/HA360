@@ -196,7 +196,8 @@ public static class HaDiscovery
                     Source: entity.PrimaryTrackerId is not null && entity.PrimaryTrackerId == entity.Life360TrackerId ? FixSource.Life360 : FixSource.Companion,
                     Color: entry.Color,
                     Icon: entry.Icon,
-                    AvatarUpstream: entity.AvatarUpstream));
+                    AvatarUpstream: entity.AvatarUpstream,
+                    KeepHistory: entry.KeepHistory));
             }
         }
 

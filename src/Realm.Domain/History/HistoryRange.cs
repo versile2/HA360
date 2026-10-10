@@ -15,7 +15,7 @@ public static class HistoryRange
 
     /// <summary>
     /// The days <paramref name="from"/> to <paramref name="to"/> (inclusive), newest day first. <paramref name="fixes"/> and <paramref name="trips"/> are what was read for
-    /// <see cref="ReadWindow"/>, in any order.
+    /// <see cref="ReadWindow"/>, in any order. <paramref name="movement"/> says the trips are the moves of a tracker (<see cref="MovementDeriver"/>).
     /// </summary>
     public static IReadOnlyList<HistoryDayVm> Build(
         string memberId,
@@ -26,7 +26,8 @@ public static class HistoryRange
         IReadOnlyList<StatsTrip> trips,
         IReadOnlyList<RawPlace> zones,
         DateTimeOffset now,
-        bool includeTrail)
+        bool includeTrail,
+        bool movement = false)
     {
         ArgumentNullException.ThrowIfNull(zone);
         var sortedFixes = fixes.OrderBy(fix => fix.Ts).ToList();
@@ -45,7 +46,8 @@ public static class HistoryRange
                 Slice(sortedTrips, trip => trip.StartUtc, lo, hi),
                 zones,
                 now,
-                includeTrail)));
+                includeTrail,
+                movement)));
         }
 
         return days;

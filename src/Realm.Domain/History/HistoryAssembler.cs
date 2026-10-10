@@ -7,6 +7,7 @@ namespace Realm.Domain;
 /// <param name="Trips">The member's stored trips around the day (a day either side is enough), so the drives that arrive at or leave a visit are known. Any order.</param>
 /// <param name="Zones">The places that exist now (their display names).</param>
 /// <param name="Now">The clock: the last visit of the data is "ongoing" when this is not far past its last fix.</param>
+/// <param name="Movement">True for a tracker (0.3.1, D125): <paramref name="Trips"/> are moves derived from its fixes, and the drives of the day are marked as such.</param>
 /// <param name="IncludeTrail">False for a day that is only listed (the range view), which saves building the path.</param>
 public sealed record HistoryInput(
     string MemberId,
@@ -16,7 +17,8 @@ public sealed record HistoryInput(
     IReadOnlyList<StatsTrip> Trips,
     IReadOnlyList<RawPlace> Zones,
     DateTimeOffset Now,
-    bool IncludeTrail = true);
+    bool IncludeTrail = true,
+    bool Movement = false);
 
 /// <summary>
 /// Builds a member's day (0.3.0, D123): the visits of <see cref="StayDeriver"/> clipped to the local day, the drives that started in it, the trail of the drives and the two ends of the day.
@@ -103,7 +105,8 @@ public static class HistoryAssembler
                 StartLat: trip.StartLat,
                 StartLon: trip.StartLon,
                 EndLat: trip.EndLat,
-                EndLon: trip.EndLon));
+                EndLon: trip.EndLon,
+                Movement: input.Movement));
             if (input.IncludeTrail)
             {
                 trail.AddRange(Segments(id, trip, fixes));

@@ -133,8 +133,28 @@ test.describe('Location History', () => {
     await expect(page.getByTestId('print-header')).toBeHidden();
   });
 
-  test('a tracker has no history: a sentence and the way back, no map', async ({ page }) => {
-    await demo(page, { path: 'history/wagon', hooks: false });
+  // 0.3.1, D125: a tracker keeps its history by default. The Demo wagon has five days: Tuesday it goes from home to the vet and back.
+  test('a tracker that keeps its history shows a trail on the map and a timeline of its moves', async ({ page }) => {
+    await openHistory(page, 'wagon', `&date=${YESTERDAY}`);
+
+    await expect(page.getByTestId('history-none')).toHaveCount(0);
+    await expect(page.locator('h1.realm-history__name')).toContainText('Pickup');
+    const map = page.getByTestId('history-map');
+    await expect(map).toHaveAttribute('data-history-ready', 'true', { timeout: 30_000 });
+    await expect(map, 'the trail is drawn').not.toHaveAttribute('data-history-segments', '0');
+
+    const list = page.getByTestId('history-list');
+    await expect(list).toContainText('At Hearth Haven');
+    await expect(list).toContainText('At Vet Clinic');
+    await expect(list).toContainText(/Moved · [\d.]+ mi · /);
+    await expect(list).toContainText('Hearth Haven → Vet Clinic');
+    await expect(list).not.toContainText('Drive ·');
+    expect(await entries(page).count()).toBeGreaterThan(3);
+  });
+
+  test('someone who is not on the map has no history: a sentence and the way back, no map', async ({ page }) => {
+    // The hatchback has no demo history; the Demo roster starts with it under Not tracked, so it has none either way.
+    await demo(page, { path: 'history/hatchback', hooks: false });
     await expect(page.getByTestId('history-none')).toBeVisible();
     await expect(page.getByTestId('history-map')).toHaveCount(0);
   });

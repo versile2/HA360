@@ -21,7 +21,7 @@ It shows where everyone is on a full-screen map with a bottom sheet (Drivers, Tr
    the first letter of the name, or a car, truck, person, pet, phone or tag). What you change is kept apart from what Home
    Assistant and Life360 say, so a later change there never replaces it; **Reset to Home Assistant / Life360** brings the
    source's values back. The map, the lists and the reports use your values. A tracker you put under Trackers follows
-   its position and has no odometer or fuel.
+   its position, has no odometer or fuel, and keeps its position history unless you switch **Keep history** off in its panel.
 
 Later, anything new that Home Assistant reports joins **People** with a notification of its own, and a person or tracker that has
 been unavailable, unknown or removed for 7 days moves to **Not tracked** by itself, again with a notification. Not tracked means
@@ -67,7 +67,7 @@ the Supervisor. It changes nothing in Home Assistant except to create the persis
 
 ## Location History
 
-Open a person (or a tracker) on the map, open their detail and press **History**. The day shows on the map as a trail with a marker for every place they stayed, and below it as a list: **At Hearth Haven, 8:05 am - 5:42 pm, 9 hrs 37 mins**, and **Drive, 12.4 mi, 24 mins, top 71 mph** with where it started and ended. A visit is named after the Home Assistant zone, otherwise the town or street. Use the arrows, the date button or **Today** to change the day, and **Last 7 days** to list the week. The days go back as far as `retention_fix_days`; a person who is Not tracked has no history, and a tracker keeps only its latest position. **Print** saves the day as a table without the map.
+Open a person (or a tracker) on the map, open their detail and press **History**. The day shows on the map as a trail with a marker for every place they stayed, and below it as a list: **At Hearth Haven, 8:05 am - 5:42 pm, 9 hrs 37 mins**, and **Drive, 12.4 mi, 24 mins, top 71 mph** with where it started and ended. A visit is named after the Home Assistant zone, otherwise the town or street. Use the arrows, the date button or **Today** to change the day, and **Last 7 days** to list the week. The days go back as far as `retention_fix_days`; a person who is Not tracked has no history. A tracker keeps its history too (its drives read **Moved, 12.4 mi, 24 mins**): the **Keep history** switch in Settings, Who's on the map, tap the tracker, is on by default; switch it off and the tracker keeps only its latest position, while what was stored stays until it ages out (about 6-20 MB per 100 days when on). **Print** saves the day as a table without the map.
 
 ## What is stored and where
 

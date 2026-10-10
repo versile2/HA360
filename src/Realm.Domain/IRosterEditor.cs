@@ -35,6 +35,12 @@ public interface IRosterEditor
     /// <summary>Clears the owner's name, title, colour and picture of the entry, so the values of Home Assistant or Life360 are in effect again. An unknown entity id does nothing.</summary>
     Task ResetAsync(string entityId, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Switches "Keep history" of an entry (0.3.1, D125): on, a tracker's positions are stored for Location History; off, new positions are no longer stored and what is stored stays until
+    /// retention removes it. An unknown entity id does nothing.
+    /// </summary>
+    Task SetKeepHistoryAsync(string entityId, bool keep, CancellationToken cancellationToken = default);
+
     /// <summary>The entities behind the entry with their friendly names, and the Life360 member name; <see cref="RosterIdentity.Unknown"/> when nothing is known.</summary>
     RosterIdentity IdentityOf(string entityId);
 
@@ -76,6 +82,9 @@ public sealed class EmptyRosterEditor : IRosterEditor
 
     /// <inheritdoc />
     public Task ResetAsync(string entityId, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    /// <inheritdoc />
+    public Task SetKeepHistoryAsync(string entityId, bool keep, CancellationToken cancellationToken = default) => Task.CompletedTask;
 
     /// <inheritdoc />
     public RosterIdentity IdentityOf(string entityId) => RosterIdentity.Unknown;

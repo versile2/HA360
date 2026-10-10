@@ -52,7 +52,7 @@ public interface IRealmSession : IAsyncDisposable
 
     /// <summary>
     /// One member's Location History for the local day <paramref name="day"/> (0.3.0, D123): visits, drives and the trail. Null when the member has no history: not tracked,
-    /// a tracker (trackers store no fixes), unknown, or a day outside the retained range. A session that keeps no history keeps this default.
+    /// a tracker that does not keep its history and has nothing stored (0.3.1, D125; a tracker that keeps it has a day, as a person has), unknown, or a day outside the retained range. A session that keeps no history keeps this default.
     /// </summary>
     ValueTask<HistoryDayVm?> GetHistoryDayAsync(string memberId, DateOnly day, CancellationToken ct) => ValueTask.FromResult<HistoryDayVm?>(null);
 

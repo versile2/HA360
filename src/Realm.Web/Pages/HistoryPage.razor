@@ -26,7 +26,7 @@
             <a class="realm-history__back" href="./" data-testid="history-back" aria-label="@HistoryFormatter.BackLabel">
                 <MudIcon Icon="@Icons.Material.Filled.ArrowBack" />
             </a>
-            <DriverAvatar Name="@Name" MemberColor="@_member?.Color" AvatarUrl="@_member?.AvatarUrl" Diameter="40" Ring="true" />
+            <DriverAvatar Name="@Name" MemberColor="@MemberColor" AvatarUrl="@(_member?.AvatarUrl ?? _vehicle?.AvatarUrl)" Diameter="40" Ring="true" />
             <div class="realm-history__who">
                 <h1 class="realm-history__name">@Name</h1>
                 <p class="realm-history__sub" data-testid="history-sub">@Subtitle</p>
@@ -199,6 +199,7 @@
     private bool _tall;
     private bool _mapReady;
     private bool _started;
+    private bool _vehicleHasHistory;
     private bool _disposed;
 
     /// <summary>The circuit's session, cascaded by <c>RealmShell</c>.</summary>
@@ -223,7 +224,10 @@
 
     private bool Range => string.Equals(RangeQuery, "7d", StringComparison.Ordinal);
 
-    private bool Tracked => _member is { Kind: MemberKind.Live };
+    // A person who is tracked, or a tracker that has history (Keep history is on, or positions are still stored from before it was switched off, 0.3.1).
+    private bool Tracked => _member is { Kind: MemberKind.Live } || (_vehicle is not null && _vehicleHasHistory);
+
+    private string? MemberColor => _member?.Color ?? _vehicle?.Color;
 
     private string Name => _member?.DisplayName ?? _vehicle?.Name ?? MemberId;
 
@@ -247,7 +251,7 @@
 
     private string NoHistoryReason =>
         _vehicle is not null
-            ? "A tracker keeps only its latest position, so there is no trail to show."
+            ? "This tracker keeps only its latest position, so there is no trail to show. To keep its history, turn on Keep history for it in Settings, Who's on the map."
             : _member is not null
                 ? "This person is shown as a pin only; there is no recorded trail."
                 : "This person is not tracked, so no history is kept for them.";
@@ -259,6 +263,7 @@
         var now = Session.Time.GetUtcNow();
         _member = snapshot.Members.FirstOrDefault(member => string.Equals(member.Id, MemberId, StringComparison.Ordinal));
         _vehicle = _member is null ? snapshot.Vehicles.FirstOrDefault(vehicle => string.Equals(vehicle.Id, MemberId, StringComparison.Ordinal)) : null;
+        _vehicleHasHistory = _vehicle is not null && await VehicleHasHistoryAsync(_vehicle);
         (_oldest, _today) = HistoryDayMath.Range(now, Session.Zone, snapshot.RetentionFixDays);
         _day = HistoryDayMath.Clamp(HistoryDayMath.Parse(DateQuery) ?? _today, _oldest, _today);
 
@@ -322,8 +327,10 @@
             return;
         }
 
-        var tracked = Session.Current.Members.Any(member => string.Equals(member.Id, MemberId, StringComparison.Ordinal) && member.Kind == MemberKind.Live);
-        if (tracked == Tracked)
+        var snapshot = Session.Current;
+        var tracked = snapshot.Members.Any(member => string.Equals(member.Id, MemberId, StringComparison.Ordinal) && member.Kind == MemberKind.Live);
+        var keeps = snapshot.Vehicles.FirstOrDefault(vehicle => string.Equals(vehicle.Id, MemberId, StringComparison.Ordinal))?.KeepHistory;
+        if (tracked == (_member is { Kind: MemberKind.Live }) && keeps == _vehicle?.KeepHistory)
         {
             return;
         }
@@ -333,6 +340,26 @@
             await OnParametersSetAsync();
             StateHasChanged();
         });
+    }
+
+    // A tracker with Keep history on has history (the day may be empty). With it off, the session says whether positions are still stored (null: none).
+    private async Task<bool> VehicleHasHistoryAsync(VehicleVm vehicle)
+    {
+        if (vehicle.KeepHistory)
+        {
+            return true;
+        }
+
+        try
+        {
+            var (_, today) = HistoryDayMath.Range(Session.Time.GetUtcNow(), Session.Zone, Session.Current.RetentionFixDays);
+            return await Session.GetHistoryDayAsync(vehicle.Id, today, _lifetime.Token) is not null;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogError(exception, "The location history of {MemberId} could not be probed.", vehicle.Id);
+            return false;
+        }
     }
 
     // Today changes while the screen is open (a visit goes on, a drive is stored): the minute re-reads it without a flicker.
@@ -413,14 +440,14 @@
         {
             _rows = HistoryRow.OfRange(days, Name, today, units);
             _printRows = [.. days.OrderBy(d => d.Day).SelectMany(d => HistoryFormatter.PrintRows(d, zone, units))];
-            _mapDay = HistoryMapPayloads.ForRange(MemberId, from, today, days, _member?.Color, zone);
+            _mapDay = HistoryMapPayloads.ForRange(MemberId, from, today, days, MemberColor, zone);
             _announcement = HistoryFormatter.RangeLabel + ". " + days.Count.ToString(System.Globalization.CultureInfo.InvariantCulture) + " days.";
         }
         else if (data is not null)
         {
             _rows = [.. HistoryRow.OfDay(data, Name)];
             _printRows = [.. HistoryFormatter.PrintRows(data, zone, units)];
-            _mapDay = HistoryMapPayloads.ForDay(data, _member?.Color, zone, day == today);
+            _mapDay = HistoryMapPayloads.ForDay(data, MemberColor, zone, day == today);
             if (!quiet)
             {
                 _announcement = HistoryFormatter.DayAnnouncement(data, units);

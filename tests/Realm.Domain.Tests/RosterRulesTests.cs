@@ -398,6 +398,26 @@ public class RosterRulesTests
         Assert.False(reset.IsCustomised);
     }
 
+    // 0.3.1, D125: Keep history is on for every entry unless the owner switched it off; it is a setting, so Reset leaves it and a discovery pass keeps it.
+    [Fact]
+    public void Keep_history_is_on_by_default_and_the_switch_is_kept_by_Reset_and_by_a_discovery_pass()
+    {
+        var tracker = Entry("device_tracker.pickup", RosterGroup.Vehicles);
+        Assert.True(tracker.KeepHistory);
+
+        var off = Assert.Single(RosterRules.SetKeepHistory([tracker], tracker.EntityId, keep: false));
+        Assert.False(off.KeepHistory);
+        Assert.False(Assert.Single(RosterRules.Reset([off], off.EntityId)).KeepHistory);
+        Assert.False(Assert.Single(RosterRules.Edit([off], off.EntityId, "Pickup", null, null, null)).KeepHistory);
+        Assert.False(off.IsCustomised);
+
+        var pass = RosterRules.Reconcile([off], [Tracker("pickup")], NoTrackers, Now);
+        Assert.False(Assert.Single(pass.Entries).KeepHistory);
+
+        Assert.True(Assert.Single(RosterRules.SetKeepHistory([off], off.EntityId, keep: true)).KeepHistory);
+        Assert.Equal([off], RosterRules.SetKeepHistory([off], "device_tracker.zzz", keep: true));
+    }
+
     [Fact]
     public void Reset_and_Edit_of_an_unknown_entity_change_nothing()
     {

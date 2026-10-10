@@ -9,6 +9,7 @@ namespace Realm.Domain;
 /// <param name="Freshness">Fresh, Stale or NoFix, decided by the data layer.</param>
 /// <param name="Color">The roster colour in effect; the pin's face is drawn on it (0.2.1).</param>
 /// <param name="AvatarUrl">The photo (the app's avatar proxy), only when the face is the photo; null otherwise.</param>
+/// <param name="KeepHistory">The owner keeps this tracker's positions for Location History (0.3.1, D125). False: only its latest position; what is stored stays until retention removes it.</param>
 /// <param name="ShowInitial">The face is the first letter of the name (the owner chose it); <see cref="Glyph"/> is then not drawn.</param>
 public record VehicleVm(
     string Id,
@@ -25,4 +26,5 @@ public record VehicleVm(
     Freshness Freshness,
     string Color = "#E8BC4E",
     string? AvatarUrl = null,
-    bool ShowInitial = false);
+    bool ShowInitial = false,
+    bool KeepHistory = true);

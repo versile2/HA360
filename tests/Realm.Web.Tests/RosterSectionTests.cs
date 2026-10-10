@@ -264,6 +264,46 @@ public sealed class RosterSectionTests : ComponentTestBase
         Assert.False(Entry(session, King).IsCustomised);
     }
 
+    // 0.3.1, D125: a tracker's edit panel has the Keep history switch (on by default, with its helper text); a person's has none; Save applies it.
+    [Fact]
+    public async Task ATrackersEditPanel_HasTheKeepHistorySwitch_OnByDefault_AndSaveStoresIt()
+    {
+        await using var session = new DemoRealmSessionFactory().Create(null);
+        var cut = Open(session);
+        const string wagon = "device_tracker.wagon";
+
+        await cut.Find("[data-testid='roster-open-device-tracker-wagon']").TriggerEventAsync("onclick", new MouseEventArgs());
+        var toggle = cut.Find("[data-testid='roster-keep-history']");
+        Assert.Equal("switch", toggle.GetAttribute("role"));
+        Assert.Equal("true", toggle.GetAttribute("aria-checked"));
+        Assert.Contains("Keep history", toggle.TextContent, StringComparison.Ordinal);
+        Assert.Equal("Store this tracker's positions for Location History (about 6–20 MB per 100 days).", cut.Find("[data-testid='roster-keep-history-help']").TextContent);
+        Assert.Empty(cut.FindAll("[data-testid='roster-keep-history-off']"));
+
+        await toggle.TriggerEventAsync("onclick", new MouseEventArgs());
+        Assert.Equal("false", cut.Find("[data-testid='roster-keep-history']").GetAttribute("aria-checked"));
+        Assert.Contains("stays in Location History", cut.Find("[data-testid='roster-keep-history-off']").TextContent, StringComparison.Ordinal);
+        Assert.True(Entry(session, wagon).KeepHistory);   // nothing is stored before Save
+
+        await cut.Find("[data-testid='roster-save']").TriggerEventAsync("onclick", new MouseEventArgs());
+
+        cut.WaitForAssertion(() => Assert.False(Entry(session, wagon).KeepHistory));
+        Assert.False(session.Current.Vehicles.Single(v => v.Id == DemoCast.Wagon.Id).KeepHistory);
+        await cut.Find("[data-testid='roster-open-device-tracker-wagon']").TriggerEventAsync("onclick", new MouseEventArgs());
+        Assert.Equal("false", cut.Find("[data-testid='roster-keep-history']").GetAttribute("aria-checked"));
+    }
+
+    [Fact]
+    public async Task APersonsEditPanel_HasNoKeepHistorySwitch()
+    {
+        await using var session = new DemoRealmSessionFactory().Create(null);
+        var cut = Open(session);
+
+        await cut.Find("[data-testid='roster-open-person-king']").TriggerEventAsync("onclick", new MouseEventArgs());
+
+        Assert.Empty(cut.FindAll("[data-testid='roster-keep-history']"));
+    }
+
     [Fact]
     public async Task Cancel_AndEscape_LeaveTheEntryAsItWas()
     {

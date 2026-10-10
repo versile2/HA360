@@ -701,13 +701,21 @@ public sealed class IngestionPipeline : BackgroundService
         _writes.Add(writer => writer.EnqueueSignal(memberId, signal));
     }
 
-    // A vehicle is a device tracker the owner moved to Vehicles: its position is shown, nothing of it is stored (D113). The tracker is read like a phone's.
+    // A tracker is a device tracker the owner moved to Trackers: its position is shown, and while "Keep history" is on (the default) the fix is stored like a person's, in `fixes`
+    // under the roster id, so Location History, stays and retention work for it (D125). Off: nothing is stored (the 0.2.x behaviour). It is read like a phone's.
     private void ApplyVehicle(VehicleRuntime vehicle, HaEntitySnapshot entity, bool first, DateTimeOffset now)
     {
         var fix = FixParser.ParseTracker(entity, vehicle.Plan.Source, now, vehicle.Fix, first);
         if (fix is not null && (vehicle.Fix is null || fix.Ts >= vehicle.Fix.Ts))
         {
             vehicle.Fix = fix;
+        }
+
+        if (fix is not null && vehicle.Plan.KeepHistory)
+        {
+            // Idempotent in the database (INSERT OR IGNORE on member, time and source), so the same fix arriving twice is harmless.
+            var vehicleId = vehicle.Plan.Id;
+            _writes.Add(writer => writer.EnqueueFix(vehicleId, fix, true, null));
         }
 
         _dirty = true;

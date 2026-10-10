@@ -154,6 +154,24 @@ public class DbWriterTests
     }
 
     [Fact]
+    public async Task Keep_history_is_stored_with_the_roster_row_and_is_on_by_default()
+    {
+        await using var rig = await WriterRig.StartAsync();
+
+        await rig.Writer.WriteRosterAsync(
+            [RosterRow("device_tracker.pickup", RosterGroup.Vehicles, 0) with { KeepHistory = false }, RosterRow("device_tracker.wagon", RosterGroup.Vehicles, 1)],
+            CancellationToken.None);
+
+        var stored = await rig.Queries.GetRosterAsync(CancellationToken.None);
+        Assert.False(Assert.Single(stored, e => e.EntityId == "device_tracker.pickup").KeepHistory);
+        Assert.True(Assert.Single(stored, e => e.EntityId == "device_tracker.wagon").KeepHistory);
+
+        await rig.Writer.WriteRosterAsync([RosterRow("device_tracker.pickup", RosterGroup.Vehicles, 0)], CancellationToken.None);
+
+        Assert.True(Assert.Single(await rig.Queries.GetRosterAsync(CancellationToken.None), e => e.EntityId == "device_tracker.pickup").KeepHistory);
+    }
+
+    [Fact]
     public async Task The_roster_is_stored_by_entity_id_and_a_second_write_replaces_the_row()
     {
         await using var rig = await WriterRig.StartAsync();

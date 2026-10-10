@@ -94,6 +94,13 @@ public sealed class DemoRoster : IRosterEditor
     }
 
     /// <inheritdoc />
+    public Task SetKeepHistoryAsync(string entityId, bool keep, CancellationToken cancellationToken = default)
+    {
+        Apply(entries => RosterRules.SetKeepHistory(entries, entityId, keep));
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
     public string SnapshotIdOf(RosterEntry entry) => CastIdByEntity.GetValueOrDefault(entry.EntityId, entry.Id);
 
     /// <inheritdoc />
