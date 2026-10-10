@@ -92,9 +92,11 @@ test.describe("Settings, Who's on the map", () => {
   test('[ROSTER] a row can be dragged to another group', { tag: ['@phone', '@unfolded'] }, async ({ page }) => {
     await openRoster(page);
 
-    await page.locator('[data-roster-entity="device_tracker.hatchback"]').dragTo(page.getByTestId('roster-group-vehicles'));
-
-    await expect(count(page, 'vehicles'), 'two vehicles').toHaveText('2');
+    // The drag is repeated until it has had its effect: it can land before the list has its drag handlers, and dropping the same row on the same group twice changes nothing more.
+    await expect(async () => {
+      await page.locator('[data-roster-entity="device_tracker.hatchback"]').dragTo(page.getByTestId('roster-group-vehicles'));
+      await expect(count(page, 'vehicles'), 'two vehicles').toHaveText('2', { timeout: 2_500 });
+    }).toPass({ timeout: 20_000 });
     await expect(count(page, 'not-tracked'), 'one not tracked').toHaveText('1');
   });
 
