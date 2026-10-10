@@ -1,0 +1,194 @@
+@implements IDisposable
+@using Realm.Domain
+@using Realm.Web.Components.Driving
+@using Realm.Web.Sheet
+@using Realm.Web.State
+@inject RealmUiState Ui
+
+@* The picker of "+ Add driver" and "+ Add tracker" (0.2.2, D119, D121): every candidate the discovery found, with the avatar the map and the roster draw (RosterAvatar), the name, the Home Assistant
+   entity id and friendly name, and where it comes from. An entry that is already in People or Trackers is greyed out and disabled ("Already on the map"); one that is Not tracked can be chosen. A search
+   box filters by name, entity id, friendly name and source. Choosing one calls OnPicked (the page moves it with the roster service, the same path as the Settings move, and selects it on the map) and closes
+   the dialog. A MudDialog like Settings (full screen below 600 px, realm-map.css); the title takes the focus; Esc, the scrim, the back arrow and the Android Back close it (one overlay layer). *@
+<MudDialog Class="realm-settings realm-picker"
+           TitleClass="realm-settings__head"
+           ContentClass="realm-settings__body"
+           DefaultFocus="DefaultFocus.None"
+           data-testid="add-picker">
+    <TitleContent>
+        <button type="button" class="realm-settings__back" aria-label="Close" data-testid="add-close" @onclick="Close">
+            <MudIcon Icon="@Icons.Material.Filled.ArrowBack" />
+        </button>
+        <span class="realm-settings__titles">
+            <PopupTitle>@AddKinds.Title(Kind)</PopupTitle>
+            <span class="realm-settings__subtitle">@Subtitle</span>
+        </span>
+    </TitleContent>
+    <DialogContent>
+        <label class="realm-picker__search">
+            <span class="realm-sr-only">Search</span>
+            <input type="search" class="realm-roster__input" placeholder="Search by name or entity" autocomplete="off" data-testid="add-search" @bind="Search" @bind:event="oninput" />
+        </label>
+        <p class="realm-picker__status realm-sr-only" role="status" aria-live="polite" data-testid="add-count">@Visible.Count @(Visible.Count == 1 ? "match" : "matches")</p>
+        @if (Visible.Count == 0)
+        {
+            <p class="realm-settings__help realm-picker__empty" data-testid="add-none">@(_entries.Count == 0 ? "Nothing found yet. People and trackers that Home Assistant reports appear here." : "Nothing matches your search.")</p>
+        }
+        else
+        {
+            <ul class="realm-picker__list" data-testid="add-list">
+                @foreach (var entry in Visible)
+                {
+                    var slug = Slug(entry.EntityId);
+                    var onMap = entry.Group != RosterGroup.NotTracked;
+                    var identity = _roster?.IdentityOf(entry.EntityId) ?? RosterIdentity.Unknown;
+                    <li @key="entry.EntityId" class="realm-picker__item">
+                        <button type="button"
+                                class="@(onMap ? "realm-picker__row realm-picker__row--disabled" : "realm-picker__row")"
+                                disabled="@onMap"
+                                aria-disabled="@(onMap ? "true" : null)"
+                                data-testid="@("add-pick-" + slug)"
+                                @onclick="() => PickAsync(entry)">
+                            <RosterAvatar Entry="entry" HasPhoto="@identity.HasPhoto" />
+                            <span class="realm-picker__text">
+                                <span class="realm-roster__name"><span class="realm-roster__name-text">@entry.DisplayName</span></span>
+                                <span class="realm-picker__entity"><code>@entry.EntityId</code>@FriendlyOf(entry, identity)</span>
+                                <span class="realm-picker__source">@(onMap ? "Already on the map" : entry.Source)</span>
+                            </span>
+                        </button>
+                    </li>
+                }
+            </ul>
+        }
+    </DialogContent>
+</MudDialog>
+
+@code {
+    private static readonly OverlayLayer Layer = new(OverlayKind.Dialog, "add-picker");
+
+    private IRosterEditor? _roster;
+    private IReadOnlyList<RosterEntry> _entries = [];
+    private string _search = string.Empty;
+    private bool _closed;
+
+    /// <summary>The dialog this is the content of, cascaded by MudBlazor.</summary>
+    [CascadingParameter]
+    public IMudDialogInstance MudDialog { get; set; } = default!;
+
+    /// <summary>The circuit's session, cascaded by <c>RealmShell</c> (the dialog is drawn inside it); its roster is the list of candidates.</summary>
+    [CascadingParameter]
+    private IRealmSession? Session { get; set; }
+
+    /// <summary>Driver or Tracker: the title, and the group a pick moves the entry into.</summary>
+    [Parameter]
+    public AddKind Kind { get; set; } = AddKind.Driver;
+
+    /// <summary>A candidate was chosen: the page moves it and selects it. The dialog closes after the call.</summary>
+    [Parameter]
+    public Func<RosterEntry, Task>? OnPicked { get; set; }
+
+    private string Search
+    {
+        get => _search;
+        set => _search = value ?? string.Empty;
+    }
+
+    private string Subtitle => Kind == AddKind.Tracker ? "Choose a device to put on the map" : "Choose a person to put on the map";
+
+    private IReadOnlyList<RosterEntry> Visible
+    {
+        get
+        {
+            var terms = _search.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            var wantedKind = Kind == AddKind.Tracker ? RosterKind.Tracker : RosterKind.Person;
+            return
+            [
+                .. _entries
+                    .Where(entry => terms.All(term => Haystack(entry).Contains(term, StringComparison.OrdinalIgnoreCase)))
+                    .OrderBy(entry => entry.Group == RosterGroup.NotTracked ? 0 : 1)
+                    .ThenBy(entry => entry.Kind == wantedKind ? 0 : 1)
+                    .ThenBy(entry => entry.DisplayName, StringComparer.CurrentCultureIgnoreCase),
+            ];
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        Ui.OpenOverlay(Layer, CloseFromBack);
+        _roster = Session?.Roster;
+        if (_roster is not null)
+        {
+            _roster.Changed += OnChanged;
+            _entries = _roster.Entries;
+        }
+    }
+
+    public void Dispose()
+    {
+        _closed = true;
+        if (_roster is not null)
+        {
+            _roster.Changed -= OnChanged;
+        }
+
+        Ui.CloseOverlay(Layer);
+    }
+
+    // A discovery changed the roster while the picker is open; it arrives off the renderer's context.
+    private void OnChanged() =>
+        _ = InvokeAsync(() =>
+        {
+            if (!_closed && _roster is not null)
+            {
+                _entries = _roster.Entries;
+                StateHasChanged();
+            }
+        });
+
+    private void CloseFromBack()
+    {
+        if (_closed)
+        {
+            return;
+        }
+
+        _ = InvokeAsync(() =>
+        {
+            if (!_closed)
+            {
+                MudDialog.Close();
+            }
+        });
+    }
+
+    private void Close() => MudDialog.Close();
+
+    private async Task PickAsync(RosterEntry entry)
+    {
+        if (entry.Group != RosterGroup.NotTracked)
+        {
+            return;
+        }
+
+        if (OnPicked is { } picked)
+        {
+            await picked(entry);
+        }
+
+        MudDialog.Close();
+    }
+
+    private string Haystack(RosterEntry entry)
+    {
+        var identity = _roster?.IdentityOf(entry.EntityId) ?? RosterIdentity.Unknown;
+        var names = string.Join(' ', identity.Entities.Select(item => item.EntityId + " " + item.FriendlyName));
+        return string.Join(' ', entry.DisplayName, entry.EntityId, entry.SourceName, entry.Source, names);
+    }
+
+    private static MarkupString FriendlyOf(RosterEntry entry, RosterIdentity identity)
+    {
+        var friendly = identity.Entities.FirstOrDefault(item => string.Equals(item.EntityId, entry.EntityId, StringComparison.Ordinal))?.FriendlyName ?? entry.SourceName;
+        return string.IsNullOrWhiteSpace(friendly) ? new MarkupString(string.Empty) : new MarkupString(" · " + System.Net.WebUtility.HtmlEncode(friendly));
+    }
+
+    private static string Slug(string entityId) => entityId.Replace('.', '-').Replace('_', '-');
+}

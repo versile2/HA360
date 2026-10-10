@@ -34,4 +34,7 @@ public interface IMapEventHandler
 
     /// <summary>The script caught an exception; <paramref name="message"/> is at most 300 characters and carries no payload data.</summary>
     Task ErrorAsync(string area, string message);
+
+    /// <summary>The pin of a place being placed moved (a drag, an arrow key, a map tap) or appeared (D120). Default: ignore, so a handler that does not place stays unchanged.</summary>
+    Task PlacementMovedAsync(double latitude, double longitude) => Task.CompletedTask;
 }

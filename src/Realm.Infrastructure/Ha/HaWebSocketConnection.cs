@@ -55,6 +55,10 @@ public sealed class HaWebSocketConnection : BackgroundService
     private int _pongId;
     private TaskCompletionSource? _pongWaiter;
 
+    // The established connection and the commands waiting for their answer (CallAsync), both guarded by _gate.
+    private ClientWebSocket? _activeSocket;
+    private readonly Dictionary<int, TaskCompletionSource<HaCommandResult>> _pending = [];
+
     private int _commandId;
     private long _reconnects;
     private long _messages;
@@ -221,6 +225,7 @@ public sealed class HaWebSocketConnection : BackgroundService
 
             connectedAt = _time.GetUtcNow();
             MarkConnected(connectedAt.Value);
+            SetActiveSocket(socket);
             var reason = await ServeAsync(socket, cancellationToken);
             return new SessionOutcome(SessionEnd.Lost, reason, _time.GetUtcNow() - connectedAt.Value);
         }
@@ -232,6 +237,98 @@ public sealed class HaWebSocketConnection : BackgroundService
         catch (Exception ex)
         {
             return new SessionOutcome(SessionEnd.Lost, Describe(ex, socket), connectedAt is { } at ? _time.GetUtcNow() - at : null);
+        }
+        finally
+        {
+            ReleaseActiveSocket(socket);
+        }
+    }
+
+    /// <summary>
+    /// Sends one command of Home Assistant's websocket API on the established connection and waits for its <c>result</c> (0.2.2: <c>zone/create</c>). The id is the
+    /// connection's next command id, <paramref name="writeFields"/> writes the fields after <c>id</c> and <c>type</c>. Never throws for a refusal or a lost connection:
+    /// the answer says it (<see cref="HaCommandResult.ErrorCode"/>: Home Assistant's own code, or <c>not_connected</c>, <c>connection_lost</c>, <c>timeout</c>).
+    /// Only a cancelled <paramref name="cancellationToken"/> throws.
+    /// </summary>
+    /// <param name="type">The command's <c>type</c>.</param>
+    /// <param name="writeFields">Writes the command's own properties.</param>
+    /// <param name="timeout">How long to wait for the answer, on this connection's clock.</param>
+    /// <param name="cancellationToken">Cancels the wait.</param>
+    public async Task<HaCommandResult> CallAsync(string type, Action<Utf8JsonWriter> writeFields, TimeSpan timeout, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(type);
+        ArgumentNullException.ThrowIfNull(writeFields);
+        var completion = new TaskCompletionSource<HaCommandResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        ClientWebSocket? socket;
+        int id;
+        lock (_gate)
+        {
+            socket = _activeSocket;
+            id = socket is null ? 0 : NextCommandId();
+            if (socket is not null)
+            {
+                _pending[id] = completion;
+            }
+        }
+
+        if (socket is null)
+        {
+            return new HaCommandResult(false, "not_connected");
+        }
+
+        try
+        {
+            await SendAsync(socket, Command(writer =>
+            {
+                writer.WriteNumber("id", id);
+                writer.WriteString("type", type);
+                writeFields(writer);
+            }), cancellationToken);
+            return await completion.Task.WaitAsync(timeout, _time, cancellationToken);
+        }
+        catch (TimeoutException)
+        {
+            return new HaCommandResult(false, "timeout");
+        }
+        catch (Exception ex) when (ex is WebSocketException or ObjectDisposedException or InvalidOperationException)
+        {
+            return new HaCommandResult(false, "connection_lost");
+        }
+        finally
+        {
+            lock (_gate)
+            {
+                _pending.Remove(id);
+            }
+        }
+    }
+
+    private void SetActiveSocket(ClientWebSocket socket)
+    {
+        lock (_gate)
+        {
+            _activeSocket = socket;
+        }
+    }
+
+    // The connection is over: a command that is still waiting will never be answered.
+    private void ReleaseActiveSocket(ClientWebSocket socket)
+    {
+        TaskCompletionSource<HaCommandResult>[] waiting;
+        lock (_gate)
+        {
+            if (ReferenceEquals(_activeSocket, socket))
+            {
+                _activeSocket = null;
+            }
+
+            waiting = [.. _pending.Values];
+            _pending.Clear();
+        }
+
+        foreach (var waiter in waiting)
+        {
+            waiter.TrySetResult(new HaCommandResult(false, "connection_lost"));
         }
     }
 
@@ -527,8 +624,45 @@ public sealed class HaWebSocketConnection : BackgroundService
         waiter?.TrySetResult();
     }
 
+    // The answer to a command sent with CallAsync: handed to its waiter, never to the subscription logic below.
+    private bool TryCompletePending(JsonElement message)
+    {
+        if (HaFrame.IdOf(message) is not { } id)
+        {
+            return false;
+        }
+
+        TaskCompletionSource<HaCommandResult>? waiter;
+        lock (_gate)
+        {
+            if (!_pending.Remove(id, out waiter))
+            {
+                return false;
+            }
+        }
+
+        var success = message.TryGetProperty("success", out var flag) && flag.ValueKind == JsonValueKind.True;
+        string? code = null;
+        string? text = null;
+        if (!success && message.TryGetProperty("error", out var error) && error.ValueKind == JsonValueKind.Object)
+        {
+            code = error.TryGetProperty("code", out var c) && c.ValueKind == JsonValueKind.String ? c.GetString() : null;
+            text = error.TryGetProperty("message", out var m) && m.ValueKind == JsonValueKind.String ? m.GetString() : null;
+        }
+
+        waiter.TrySetResult(success
+            ? new HaCommandResult(true)
+            : new HaCommandResult(false, code is { Length: > 0 and <= 64 } ? code : "failed", text is { Length: <= 200 } ? text : null));
+        return true;
+    }
+
     private void HandleResult(JsonElement message)
     {
+        if (TryCompletePending(message))
+        {
+            return;
+        }
+
         lock (_gate)
         {
             if (HaFrame.IdOf(message) != _subscribeCommandId)

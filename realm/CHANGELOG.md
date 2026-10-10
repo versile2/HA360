@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.2.2
+
+### Added
+
+- **Add rows at the end of every list.** The Drivers tab ends with **+ Add driver**, the Trackers tab with **+ Add tracker**
+  and the Places tab with **+ Add place**.
+- **Add driver / Add tracker** open a list of everything Home Assistant and Life360 report (people, GPS trackers and Life360
+  members) with the same picture the map and Settings draw, the name, the Home Assistant entity id and friendly name, and where
+  it comes from. What is already on the map is greyed out ("Already on the map"); what is Not tracked can be chosen. A search
+  box filters. Choosing one moves it to People or Trackers, exactly like Settings, and selects it on the map.
+- **Add place** puts a pin in the middle of the map with a radius circle. Drag the pin (or tap the map, or use the arrow keys),
+  set the radius from 25 m to 2 km, give the place a name and an icon, and press Save: the app creates a real **zone in Home
+  Assistant** (the same as Settings -> Areas, labels and zones -> Zones) and it appears on the map and in Places within a few
+  seconds. Esc, Back or Cancel leave without adding anything. Creating a zone needs a Home Assistant administrator; if Home
+  Assistant refuses, you get a clear message and nothing is added.
+- **A new option, `allow_add`** (on by default). Switch it off to hide the three Add rows. In Demo mode the rows always show and
+  the actions are only simulated: nothing is written to Home Assistant.
+
+### Changed
+
+- This is the first time the app writes a zone to Home Assistant; the persistent notifications are still the only other write.
+  A zone you delete in Home Assistant disappears from the app, as before.
+
 ## 0.2.1
 
 ### Added

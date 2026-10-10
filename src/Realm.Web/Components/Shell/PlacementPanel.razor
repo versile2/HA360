@@ -1,0 +1,137 @@
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.JSInterop
+@using Realm.Domain
+@using Realm.Web.Formatting
+@using Realm.Web.Sheet
+
+@* The bottom panel of "+ Add place" (0.2.2, D119, D120): the map shows a draggable pin and a radius circle (realmMap.js beginPlacement); this panel holds what the map cannot: the name (required), the radius
+   slider (25 m to 2 km in 25 m steps, 100 m to start), the icon (the place kinds of the Places list) and Save / Cancel. It owns the draft (name, kind) and raises OnSave with it; the page owns the pin
+   position and the radius, creates the Home Assistant zone, and says what went wrong in Error (shown here, role="alert"). Esc cancels from the two inputs here, because the global Esc handler (realmShell.js) leaves text fields alone; from anywhere else the global handler pops the page's overlay layer, which cancels too. The heading takes the focus when the panel opens. *@
+<section class="realm-placement" aria-labelledby="realm-placement-title" data-testid="placement-panel">
+    <h2 id="realm-placement-title" @ref="_heading" class="realm-placement__title" tabindex="-1">New place</h2>
+    <p class="realm-settings__help realm-placement__help">Drag the pin, or tap the map, to choose where. Name it and pick how wide it is.</p>
+
+    <label class="realm-roster__field">
+        <span class="realm-settings__label">Name</span>
+        <input type="text" class="realm-roster__input" maxlength="@NewZone.MaxNameLength" placeholder="Grandma's house" autocomplete="off" data-testid="placement-name" @bind="_name" @bind:event="oninput" @onkeydown="OnKeyDownAsync" />
+    </label>
+
+    <div class="realm-roster__field">
+        <label class="realm-settings__label" for="realm-placement-radius">Radius <span class="realm-placement__radius" data-testid="placement-radius-text">@PlacementFormatter.Radius(RadiusM)</span></label>
+        <input id="realm-placement-radius"
+               type="range"
+               class="realm-placement__slider"
+               min="@NewZone.MinRadiusM"
+               max="@NewZone.MaxRadiusM"
+               step="@NewZone.RadiusStepM"
+               value="@RadiusM"
+               aria-valuetext="@PlacementFormatter.Radius(RadiusM)"
+               data-testid="placement-radius"
+               @oninput="OnRadiusAsync"
+               @onkeydown="OnKeyDownAsync" />
+    </div>
+
+    <div class="realm-roster__field">
+        <span id="realm-placement-icon-label" class="realm-settings__label">Icon</span>
+        <div class="realm-placement__kinds" role="radiogroup" aria-labelledby="realm-placement-icon-label">
+            @foreach (var kind in PlaceKindIcons.Pickable)
+            {
+                var choice = kind;
+                <button type="button"
+                        role="radio"
+                        class="realm-placement__kind"
+                        aria-checked="@(_kind == choice ? "true" : "false")"
+                        data-testid="@("placement-kind-" + choice.ToString().ToLowerInvariant())"
+                        @onclick="() => _kind = choice">
+                    <MudIcon Icon="@PlaceKindIcon.Material(choice)" />
+                    <span>@PlaceKindIcons.Label(choice)</span>
+                </button>
+            }
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(ShownError))
+    {
+        <p class="realm-placement__error" role="alert" data-testid="placement-error">@ShownError</p>
+    }
+
+    <div class="realm-roster__actions">
+        <button type="button" class="realm-roster__action realm-roster__action--primary" disabled="@Busy" data-testid="placement-save" @onclick="SaveAsync">@(Busy ? "Saving…" : "Save")</button>
+        <button type="button" class="realm-roster__action" data-testid="placement-cancel" @onclick="OnCancel">Cancel</button>
+    </div>
+</section>
+
+@code {
+    private ElementReference _heading;
+    private string _name = string.Empty;
+    private PlaceKind _kind = PlaceKind.Other;
+    private string? _localError;
+
+    /// <summary>The radius in metres; the page keeps it, because the map draws it.</summary>
+    [Parameter]
+    public double RadiusM { get; set; } = NewZone.DefaultRadiusM;
+
+    /// <summary>The slider moved: the new radius, already clamped and stepped.</summary>
+    [Parameter]
+    public EventCallback<double> RadiusMChanged { get; set; }
+
+    /// <summary>Save was pressed with a name: the draft. The page creates the zone.</summary>
+    [Parameter]
+    public EventCallback<PlacementDraft> OnSave { get; set; }
+
+    /// <summary>Cancel was pressed (or Esc in the panel).</summary>
+    [Parameter]
+    public EventCallback OnCancel { get; set; }
+
+    /// <summary>The page is creating the zone: Save is off.</summary>
+    [Parameter]
+    public bool Busy { get; set; }
+
+    /// <summary>What went wrong when the page tried to create the zone (a sentence); null clears it.</summary>
+    [Parameter]
+    public string? Error { get; set; }
+
+    private string? ShownError => _localError ?? Error;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        try
+        {
+            await _heading.FocusAsync();
+        }
+        catch (Exception exception) when (exception is JSException or JSDisconnectedException or InvalidOperationException or TaskCanceledException)
+        {
+            // A circuit that is gone: there is nothing to focus.
+        }
+    }
+
+    private Task OnRadiusAsync(ChangeEventArgs args)
+    {
+        if (!double.TryParse(Convert.ToString(args.Value, System.Globalization.CultureInfo.InvariantCulture), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var value))
+        {
+            return Task.CompletedTask;
+        }
+
+        return RadiusMChanged.InvokeAsync(NewZone.ClampRadius(value));
+    }
+
+    private async Task SaveAsync()
+    {
+        var name = _name.Trim();
+        if (name.Length == 0)
+        {
+            _localError = "Give the place a name.";
+            return;
+        }
+
+        _localError = null;
+        await OnSave.InvokeAsync(new PlacementDraft(name, _kind));
+    }
+
+    private Task OnKeyDownAsync(KeyboardEventArgs args) => args.Key == "Escape" ? OnCancel.InvokeAsync() : Task.CompletedTask;
+}

@@ -3,7 +3,7 @@ using Microsoft.Extensions.Logging;
 namespace Realm.Infrastructure.Options;
 
 /// <summary>
-/// The add-on options as typed values (02 section 3). Since 0.2.0 (D114) the add-on has six options: <see cref="DemoMode"/>, <see cref="AllowDemoParam"/>,
+/// The add-on options as typed values (02 section 3). Since 0.2.0 (D114) the add-on has six options, and since 0.2.2 (D120) seven: <see cref="DemoMode"/>, <see cref="AllowDemoParam"/>, <see cref="AllowAdd"/>,
 /// <see cref="LogLevel"/>, <see cref="RetentionFixDays"/>, <see cref="DrivingWeekStart"/> and <see cref="DrivingSpeedingMps"/>. <see cref="OptionsBinding"/> is the only
 /// producer and reads those six; every other value is a fixed default that lives here, in one place, and is changed in a test with a <c>with</c> expression
 /// on <see cref="OptionsBinding.Defaults"/>. Who is on the map is not an option: it is the roster in the database (02 section 2.7). Units are SI where the option
@@ -11,7 +11,7 @@ namespace Realm.Infrastructure.Options;
 /// </summary>
 public sealed record RealmOptions
 {
-    // ---- the six add-on options ---------------------------------------------------------------------------------
+    // ---- the seven add-on options ---------------------------------------------------------------------------------
 
     /// <summary>log_level.</summary>
     public LogLevel LogLevel { get; init; } = LogLevel.Information;
@@ -30,6 +30,9 @@ public sealed record RealmOptions
 
     /// <summary>allow_demo_param.</summary>
     public bool AllowDemoParam { get; init; }
+
+    /// <summary>allow_add (0.2.2): the lists show + Add driver, + Add tracker and + Add place. Default true; false hides the three rows.</summary>
+    public bool AllowAdd { get; init; } = true;
 
     // ---- fixed values (they were options before 0.2.0) ----------------------------------------------------------
 

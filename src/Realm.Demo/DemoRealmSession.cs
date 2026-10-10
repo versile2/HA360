@@ -19,6 +19,7 @@ public sealed class DemoRealmSession : IRealmSession
     private volatile Lazy<RealmSnapshot> _current;
     private Action? _changed;
     private ITimer? _timer;
+    private readonly IPlaceEditor _places;
     private bool _restored;
     private bool _disposed;
 
@@ -30,10 +31,16 @@ public sealed class DemoRealmSession : IRealmSession
         _tick = tickInterval ?? DefaultTickInterval;
         _current = NewSnapshot();
         source.Roster.Changed += OnRosterChanged;
+        source.PlacesChanged += OnRosterChanged;
+        _places = new DemoPlaceEditor(source);
     }
 
     /// <inheritdoc />
     public IRosterEditor Roster => _source.Roster;
+
+    /// <inheritdoc />
+    /// <remarks>Simulated (D119): the place is added in memory to this session only; nothing is written anywhere.</remarks>
+    public IPlaceEditor PlaceEditor => _places;
 
     /// <inheritdoc />
     public RealmSnapshot Current => _current.Value;
@@ -141,6 +148,7 @@ public sealed class DemoRealmSession : IRealmSession
         {
             _disposed = true;
             _source.Roster.Changed -= OnRosterChanged;
+            _source.PlacesChanged -= OnRosterChanged;
             _changed = null;
             timer = _timer;
             _timer = null;

@@ -37,6 +37,12 @@ public interface IRosterEditor
 
     /// <summary>The entities behind the entry with their friendly names, and the Life360 member name; <see cref="RosterIdentity.Unknown"/> when nothing is known.</summary>
     RosterIdentity IdentityOf(string entityId);
+
+    /// <summary>
+    /// The id the entry has in the session's snapshot (a member or vehicle id), which the page selects on the map after an Add. In Live it is <see cref="RosterEntry.Id"/>; the Demo's cast has
+    /// its own ids (the hatchback is "chariot"), so it overrides this.
+    /// </summary>
+    string SnapshotIdOf(RosterEntry entry) => entry.Id;
 }
 
 /// <summary>An editor with no entries, for a host that has no roster (a test, or a session that lists nobody).</summary>

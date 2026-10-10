@@ -215,6 +215,20 @@ public sealed class FakeHaSession
 
                 break;
             default:
+                if (_server.SilentCommands.Contains(type))
+                {
+                    break;
+                }
+
+                if (_server.CommandReplies.TryGetValue(type, out var reply))
+                {
+                    var body = reply.Success
+                        ? "\"success\":true,\"result\":" + (reply.ResultJson ?? "null")
+                        : "\"success\":false,\"error\":{\"code\":\"" + reply.Code + "\",\"message\":\"" + reply.Message + "\"}";
+                    await SendTextAsync("{\"id\":" + id + ",\"type\":\"result\"," + body + "}");
+                    break;
+                }
+
                 await SendTextAsync("{\"id\":" + id + ",\"type\":\"result\",\"success\":false,\"error\":{\"code\":\"unknown_command\",\"message\":\"Unknown command.\"}}");
                 break;
         }

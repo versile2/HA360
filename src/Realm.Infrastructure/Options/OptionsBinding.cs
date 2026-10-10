@@ -6,7 +6,7 @@ using Microsoft.Extensions.Logging;
 namespace Realm.Infrastructure.Options;
 
 /// <summary>
-/// The options loader (02 section 3.4), driven by one table: the six flat add-on option keys (D114), their .NET configuration paths and their defaults.
+/// The options loader (02 section 3.4), driven by one table: the seven flat add-on option keys (D114; `allow_add` joined in 0.2.2, D120), their .NET configuration paths and their defaults.
 /// <see cref="Flatten"/> turns the Supervisor's <c>options.json</c> into configuration data at those paths (the job of the options configuration
 /// provider, 03 section 2.1); <see cref="Bind"/> reads <see cref="RealmOptions"/> back from any <see cref="IConfiguration"/>, so an environment
 /// variable that is layered over the file wins. A key that is absent reads as its default. A key that is not in the table, such as an option of an older
@@ -26,6 +26,7 @@ public static class OptionsBinding
         new("retention_fix_days", "Retention:FixDays", OptionKind.Integer, "100"),
         new("demo_mode", "Demo:Mode", OptionKind.Flag, "false"),
         new("allow_demo_param", "Demo:AllowParam", OptionKind.Flag, "false"),
+        new("allow_add", "Ui:AllowAdd", OptionKind.Flag, "true"),
     ];
 
     private static readonly Dictionary<string, OptionBinding> ByKey = Rows.ToDictionary(row => row.Key, StringComparer.Ordinal);
@@ -68,6 +69,7 @@ public static class OptionsBinding
             RetentionFixDays = ReadInteger(configuration, "retention_fix_days"),
             DemoMode = ReadFlag(configuration, "demo_mode"),
             AllowDemoParam = ReadFlag(configuration, "allow_demo_param"),
+            AllowAdd = ReadFlag(configuration, "allow_add"),
         };
     }
 

@@ -36,6 +36,7 @@ public sealed class HaDiscoveryRefresher : BackgroundService
     private readonly TimeProvider _time;
     private readonly ILogger _logger;
     private readonly ServiceCounters? _counters;
+    private readonly ZoneRefreshSignal? _zoneSignal;
     private readonly ResilientLoop _loop;
     private readonly HashSet<string> _warned = new(StringComparer.Ordinal);
     private readonly Channel<bool> _reconnected = Channel.CreateBounded<bool>(new BoundedChannelOptions(1)
@@ -60,6 +61,7 @@ public sealed class HaDiscoveryRefresher : BackgroundService
 
     /// <param name="sink">Receives <see cref="DiscoveryUpdated"/> and <see cref="ZonesUpdated"/>; the pipeline's queue.</param>
     /// <param name="counters">Where the size of the watch list is kept for <c>diagnostics.json</c>; null counts nothing.</param>
+    /// <param name="zoneSignal">The bell that asks for a zone refresh at once (a place was just created, D119); null for none.</param>
     public HaDiscoveryRefresher(
         IHaGateway gateway,
         RosterService roster,
@@ -67,7 +69,8 @@ public sealed class HaDiscoveryRefresher : BackgroundService
         Func<IngestItem, CancellationToken, ValueTask> sink,
         TimeProvider time,
         ILogger<HaDiscoveryRefresher> logger,
-        ServiceCounters? counters = null)
+        ServiceCounters? counters = null,
+        ZoneRefreshSignal? zoneSignal = null)
     {
         _gateway = gateway;
         _roster = roster;
@@ -76,6 +79,7 @@ public sealed class HaDiscoveryRefresher : BackgroundService
         _time = time;
         _logger = logger;
         _counters = counters;
+        _zoneSignal = zoneSignal;
         _loop = new ResilientLoop(nameof(HaDiscoveryRefresher), logger, time);
     }
 
@@ -104,6 +108,7 @@ public sealed class HaDiscoveryRefresher : BackgroundService
             while (!cancellationToken.IsCancellationRequested)
             {
                 var now = _time.GetUtcNow();
+                var zonesRequested = DrainZoneBell();
                 if (now >= discoveryDue)
                 {
                     await DiscoverAsync(cancellationToken);
@@ -113,7 +118,7 @@ public sealed class HaDiscoveryRefresher : BackgroundService
                     zonesAt = now;
                     reconnected = false;
                 }
-                else if (now >= zonesDue || (reconnected && now - zonesAt >= ReconnectZonesMinAge))
+                else if (now >= zonesDue || zonesRequested || (reconnected && now - zonesAt >= ReconnectZonesMinAge))
                 {
                     await RefreshZonesAsync(cancellationToken);
                     now = _time.GetUtcNow();
@@ -142,6 +147,18 @@ public sealed class HaDiscoveryRefresher : BackgroundService
 
     private void OnRosterChanged() => _rosterChanged.Writer.TryWrite(true);
 
+    // A place was created (D119): the zones are read at the next turn of the loop, whatever their age.
+    private bool DrainZoneBell()
+    {
+        var rang = false;
+        while (_zoneSignal is not null && _zoneSignal.Reader.TryRead(out _))
+        {
+            rang = true;
+        }
+
+        return rang;
+    }
+
     private bool DrainRosterBell()
     {
         var rang = false;
@@ -165,11 +182,12 @@ public sealed class HaDiscoveryRefresher : BackgroundService
         var sleep = Task.Delay(wait, _time, stop.Token);
         var ring = _reconnected.Reader.WaitToReadAsync(stop.Token).AsTask();
         var roster = _rosterChanged.Reader.WaitToReadAsync(stop.Token).AsTask();
-        await Task.WhenAny(sleep, ring, roster);
+        var zones = _zoneSignal is null ? Task.Delay(Timeout.InfiniteTimeSpan, stop.Token) : _zoneSignal.Reader.WaitToReadAsync(stop.Token).AsTask();
+        await Task.WhenAny(sleep, ring, roster, zones);
         await stop.CancelAsync();
         try
         {
-            await Task.WhenAll(sleep, ring, roster);
+            await Task.WhenAll(sleep, ring, roster, zones);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {

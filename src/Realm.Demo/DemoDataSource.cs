@@ -48,6 +48,8 @@ public sealed class DemoDataSource
 
     private readonly DemoDrivingData _driving;
     private readonly DateTimeOffset _startedUtc;
+    private readonly object _placesGate = new();
+    private IReadOnlyList<DemoPlace> _added = [];
 
     /// <param name="time">The session's clock; the snapshot is evaluated at its current instant.</param>
     /// <param name="variants">The active variants; null for the default fixture.</param>
@@ -64,6 +66,29 @@ public sealed class DemoDataSource
 
     /// <summary>The roster of this session: in memory, editable from Settings.</summary>
     public DemoRoster Roster { get; }
+
+    /// <summary>
+    /// Adds a place the way the Live app would, but only in memory (0.2.2, D119): nothing is written to Home Assistant, and the place is gone with the session. It is
+    /// listed after the fixture's places and drawn on the map; <see cref="PlacesChanged"/> follows.
+    /// </summary>
+    /// <returns>The place that was added.</returns>
+    public DemoPlace AddPlace(NewZone zone)
+    {
+        ArgumentNullException.ThrowIfNull(zone);
+        DemoPlace added;
+        lock (_placesGate)
+        {
+            var name = zone.Name.Trim();
+            added = new DemoPlace($"added_{_added.Count + 1}", name, name, string.Empty, PlaceKindIcons.KindOf(zone.Icon), zone.Latitude, zone.Longitude, NewZone.ClampRadius(zone.RadiusM));
+            _added = [.. _added, added];
+        }
+
+        PlacesChanged?.Invoke();
+        return added;
+    }
+
+    /// <summary>Raised after <see cref="AddPlace"/> added a place.</summary>
+    public event Action? PlacesChanged;
 
     /// <summary>The active variants.</summary>
     public DemoVariants Variants { get; }
@@ -221,7 +246,13 @@ public sealed class DemoDataSource
         var vehicles = vehicleList.ToArray();
 
         // A member or vehicle is listed under its own place only, stale members included (02 section 4.5).
-        PlaceVm[] places = DemoPlaces.Drawn
+        IReadOnlyList<DemoPlace> added;
+        lock (_placesGate)
+        {
+            added = _added;
+        }
+
+        PlaceVm[] places = DemoPlaces.Drawn.Concat(added)
             .Select(place => new PlaceVm(
                 Id: place.Id,
                 DisplayName: place.Name,

@@ -314,9 +314,9 @@ that has the Supervisor (Home Assistant OS or Supervised) on an amd64 machine.
    (its `person` entities and its GPS `device_tracker`s that have reported in the last 30 days) is put on the map
    at the first start, and you get one notification in Home Assistant saying so. Then open **Settings -> Who's on the
    map** inside the app to sort them: drag a row (or use its menu) between **People**, **Trackers** and **Not tracked**,
-   and tap a row to see which Home Assistant entity it is and to change its name, title, colour and picture. Nothing is typed into the add-on options: they hold six switches
-   and thresholds only (Demo mode, the demo address parameter, the log level, how long positions are kept, the week
-   start and the speeding limit). Your names and entity ids stay in the app's database on your own Home Assistant.
+   and tap a row to see which Home Assistant entity it is and to change its name, title, colour and picture. Nothing is typed into the add-on options: they hold seven switches
+   and thresholds only (Demo mode, the demo address parameter, whether the **+ Add** rows show, the log level, how long positions are kept, the week
+   start and the speeding limit). The last row of each list adds a driver, a tracker or a place (a real Home Assistant zone). Your names and entity ids stay in the app's database on your own Home Assistant.
    They are never part of this repository or the image.
 
 The app's own **Documentation** tab ([realm/DOCS.md](realm/DOCS.md)) covers where the data comes from, what is stored
@@ -335,7 +335,7 @@ name and a token that may read packages).
 - **No cloud, no analytics, no telemetry, no update checks, no geocoding.** Ingress is the only door in; the app opens no port.
 - **No Life360 login.** It reads Home Assistant's entities and never calls Life360's API. The one exception is member
   pictures served from `life360.com`, fetched without credentials.
-- **It writes one thing to Home Assistant:** persistent notifications ("HA Cartographer: ...") when someone joins the map or is moved off it. Nothing else is changed there, and Demo mode sends none.
+- **It writes two things to Home Assistant:** persistent notifications ("HA Cartographer: ...") when someone joins the map or is moved off it, and, only when you use **+ Add place** (the `allow_add` option), the zone you create. Nothing else is changed there, and Demo mode sends nothing.
 - **Map tiles** are fetched by your browser from public servers (OpenFreeMap, and USGS for Satellite), which see your IP
   address and the area in view, not who is on the map. Demo mode uses an offline map and fetches nothing.
 

@@ -1432,3 +1432,34 @@ html[data-sheet-tall] .realm-right-stack:not(.realm-right-stack--panel) {
 html:has(.realm-location) body.scroll-locked {
   padding-right: 0 !important;
 }
+
+/* ---- the Add row, the last row of a list (0.2.2, D119): a 48 px target that looks like a row, after the list and outside it ---- */
+
+.realm-add-wrap {
+  padding: 4px 16px 16px;
+}
+
+.realm-add-row {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 48px;
+  margin: 0;
+  padding: 0 16px;
+  border: 1px dashed var(--realm-line-strong);
+  border-radius: 12px;
+  background: none;
+  color: var(--realm-primary);
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.realm-add-row:focus-visible {
+  outline: 2px solid var(--realm-focus);
+  outline-offset: 2px;
+}

@@ -256,6 +256,35 @@ public sealed class IngestionPipelineTests : IDisposable
         Assert.Equal(new[] { "home", "park" }, rig.State.Current.Places.Select(p => p.Id).Order());
     }
 
+    // D120: zones mirror Home Assistant, so a zone that was deleted there leaves the Places by either path, and the websocket's state change and the next read of the zone list.
+    [Fact]
+    public async Task AZoneDeletedInHa_LeavesThePlaces_WhenItsEntityIsRemoved()
+    {
+        var rig = NewRig();
+        RawPlace park = new("park", "Elm Park", 33.5, -84.5, 300, false);
+        await rig.DiscoverWithAsync([Home, park], null, Plans.Member("king", life360: Plans.KingTracker));
+        var parkEntity = Entity("zone.park", "0", Start, ("latitude", 33.5), ("longitude", -84.5), ("radius", 300.0));
+        await rig.FeedAsync(parkEntity);
+        Assert.Equal(new[] { "home", "park" }, rig.State.Current.Places.Select(p => p.Id).Order());
+
+        await rig.Pipeline.ProcessAsync(new FeedItem(new HaStateChanged("zone.park", null, parkEntity, rig.Time.GetUtcNow())), CancellationToken.None);
+
+        Assert.Equal(new[] { "home" }, rig.State.Current.Places.Select(p => p.Id));
+    }
+
+    [Fact]
+    public async Task AZoneDeletedInHa_LeavesThePlaces_WhenTheNextZoneReadLacksIt()
+    {
+        var rig = NewRig();
+        await rig.DiscoverWithAsync([Home], null, Plans.Member("king", life360: Plans.KingTracker));
+        await rig.Pipeline.ProcessAsync(new ZonesUpdated([Home, new RawPlace("park", "Elm Park", 33.5, -84.5, 300, false)]), CancellationToken.None);
+        Assert.Equal(new[] { "home", "park" }, rig.State.Current.Places.Select(p => p.Id).Order());
+
+        await rig.Pipeline.ProcessAsync(new ZonesUpdated([Home]), CancellationToken.None);
+
+        Assert.Equal(new[] { "home" }, rig.State.Current.Places.Select(p => p.Id));
+    }
+
     // ---- driving ---------------------------------------------------------------------------------------------------
 
     [Fact]

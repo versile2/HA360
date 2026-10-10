@@ -36,6 +36,22 @@ internal sealed class FakeHaGateway : IHaGateway
     /// <summary>When set, <see cref="GetConfigAsync"/> throws it (Home Assistant is down).</summary>
     public Exception? Failure { get; set; }
 
+    /// <summary>The zones <see cref="CreateZoneAsync"/> was asked to create, in order.</summary>
+    public List<NewZone> CreatedZones { get; } = [];
+
+    /// <summary>When set, <see cref="CreateZoneAsync"/> throws it (Home Assistant refused).</summary>
+    public Exception? CreateZoneFailure { get; set; }
+
+    public Task CreateZoneAsync(NewZone zone, CancellationToken ct)
+    {
+        lock (_gate)
+        {
+            CreatedZones.Add(zone);
+        }
+
+        return CreateZoneFailure is { } failure ? Task.FromException(failure) : Task.CompletedTask;
+    }
+
     public int ImageCalls => Volatile.Read(ref _imageCalls);
 
     public int ConfigCalls => Volatile.Read(ref _configCalls);

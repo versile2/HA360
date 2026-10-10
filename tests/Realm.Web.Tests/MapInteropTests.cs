@@ -101,6 +101,64 @@ public sealed class MapInteropTests
     }
 
     [Fact]
+    public async Task PlacementCalls_CallThePlacementExports_WithTheRadiusAndTheLabel()
+    {
+        // 0.2.2 (D120): beginPlacement { radiusM, label }, setPlacementRadius m, endPlacement.
+        var js = new FakeJs();
+        await using var interop = await MapInterop.CreateAsync(js, new MapCallbacks(new RecordingHandler()));
+
+        await interop.BeginPlacementAsync(100, "New place position.");
+        await interop.SetPlacementRadiusAsync(450);
+        await interop.EndPlacementAsync();
+
+        Assert.Equal(["beginPlacement", "setPlacementRadius", "endPlacement"], js.Module.Select(call => call.Identifier));
+        Assert.Equal("""{"radiusM":100,"label":"New place position."}""", JsonSerializer.Serialize(js.Module[0].Args[0], MapJson.Options));
+        Assert.Equal(450d, js.Module[1].Args[0]);
+        Assert.Empty(js.Module[2].Args);
+    }
+
+    [Fact]
+    public async Task APlacementMove_ReachesTheHandler()
+    {
+        var handler = new RecordingHandler();
+        var callbacks = new MapCallbacks(handler);
+        var moved = new List<(double, double)>();
+        var forwarding = new PlacementHandler(moved);
+
+        await new MapCallbacks(forwarding).OnPlacementMoved(33.1, -84.5);
+        await callbacks.OnPlacementMoved(1, 2);   // a handler that does not place ignores it
+
+        Assert.Equal([(33.1, -84.5)], moved);
+    }
+
+    private sealed class PlacementHandler(List<(double, double)> moved) : IMapEventHandler
+    {
+        public Task ReadyAsync(ReadyInfo info) => Task.CompletedTask;
+
+        public Task PinTapAsync(string kind, string id) => Task.CompletedTask;
+
+        public Task MapTapAsync() => Task.CompletedTask;
+
+        public Task BubbleTapAsync(IReadOnlyList<string> ids) => Task.CompletedTask;
+
+        public Task CameraChangedAsync(CameraState camera) => Task.CompletedTask;
+
+        public Task FollowEndedAsync() => Task.CompletedTask;
+
+        public Task StyleResultAsync(StyleResult result) => Task.CompletedTask;
+
+        public Task WebGlUnavailableAsync() => Task.CompletedTask;
+
+        public Task ErrorAsync(string area, string message) => Task.CompletedTask;
+
+        public Task PlacementMovedAsync(double latitude, double longitude)
+        {
+            moved.Add((latitude, longitude));
+            return Task.CompletedTask;
+        }
+    }
+
+    [Fact]
     public async Task SelectionCalls_CallTheSelectionExports_WithTheIdsAndFollow()
     {
         // 03 sections 3.4 and 4.3: setSelection mirrors the selection, then one flight command; the kinds are spelled as the script reads them.
@@ -235,7 +293,7 @@ public sealed class MapInteropTests
             Assert.Null(entry.Attribute.Identifier);   // the C# method name is the name the script uses
         });
         Assert.Equal(
-            ["OnBubbleTap", "OnCameraChanged", "OnError", "OnFollowEnded", "OnMapTap", "OnPinTap", "OnReady", "OnStyleResult", "OnWebGlUnavailable"],
+            ["OnBubbleTap", "OnCameraChanged", "OnError", "OnFollowEnded", "OnMapTap", "OnPinTap", "OnPlacementMoved", "OnReady", "OnStyleResult", "OnWebGlUnavailable"],
             invokable.Select(entry => entry.Method.Name).Order(StringComparer.Ordinal));
         Assert.Empty(called.Except(invokable.Select(entry => entry.Method.Name)));
         Assert.Contains("OnReady", called);

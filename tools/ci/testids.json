@@ -84,6 +84,25 @@
     "print-events",
     "print-event-row",
     "drive-list",
-    "events-pager-{top|bottom}"
+    "events-pager-{top|bottom}",
+    "add-driver",
+    "add-tracker",
+    "add-place",
+    "add-picker",
+    "add-close",
+    "add-search",
+    "add-count",
+    "add-none",
+    "add-list",
+    "add-pick-{entity}",
+    "placement-panel",
+    "placement-pin",
+    "placement-name",
+    "placement-radius",
+    "placement-radius-text",
+    "placement-kind-{kind}",
+    "placement-error",
+    "placement-save",
+    "placement-cancel"
   ]
 }

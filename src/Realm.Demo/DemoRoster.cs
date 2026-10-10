@@ -94,6 +94,9 @@ public sealed class DemoRoster : IRosterEditor
     }
 
     /// <inheritdoc />
+    public string SnapshotIdOf(RosterEntry entry) => CastIdByEntity.GetValueOrDefault(entry.EntityId, entry.Id);
+
+    /// <inheritdoc />
     public RosterIdentity IdentityOf(string entityId) => Identities.GetValueOrDefault(entityId) ?? RosterIdentity.Unknown;
 
     private static RosterIdentity PersonIdentity(string entityId, string name, string key, bool life360) =>

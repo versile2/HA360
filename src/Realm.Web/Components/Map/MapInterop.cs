@@ -120,6 +120,15 @@ public sealed class MapInterop : IAsyncDisposable
     /// <summary>The selection flight to a place: its zone circle fitted into the Peek rectangle.</summary>
     public ValueTask FitPlaceAsync(string id) => CallAsync("fitPlace", id);
 
+    /// <summary>Starts placing a new place: the pin appears at the centre of the free map and its first position comes back through <c>OnPlacementMoved</c> (D120).</summary>
+    public ValueTask BeginPlacementAsync(double radiusM, string label) => CallAsync("beginPlacement", new { radiusM, label });
+
+    /// <summary>The radius circle of the place being placed.</summary>
+    public ValueTask SetPlacementRadiusAsync(double radiusM) => CallAsync("setPlacementRadius", radiusM);
+
+    /// <summary>Removes the pin and the circle.</summary>
+    public ValueTask EndPlacementAsync() => CallAsync("endPlacement");
+
     /// <summary>The recentre button (01 section 4.11): away from the default view the default camera, at it "me alone", from there the default camera again. The script computes the state; it comes back in the next camera report.</summary>
     public ValueTask RecenterAsync() => CallAsync("recenter");
 

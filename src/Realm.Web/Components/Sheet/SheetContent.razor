@@ -113,6 +113,10 @@
                         }
                     }
                 </ul>
+                @if (AllowAdd)
+                {
+                    <AddRow Kind="AddKinds.For(Section)" OnAdd="OnAdd" />
+                }
             }
         </div>
     }
@@ -144,6 +148,14 @@
     /// <summary>A row was tapped: the person, vehicle or place it stands for. The page turns it into the selection (a <c>RowTap</c>).</summary>
     [Parameter]
     public EventCallback<EntityRef> OnSelect { get; set; }
+
+    /// <summary>Show the last row of the list, "+ Add driver", "+ Add tracker" or "+ Add place" (0.2.2, D119). Default: off, so a bare list is only its rows.</summary>
+    [Parameter]
+    public bool AllowAdd { get; set; }
+
+    /// <summary>The Add row was tapped: what it adds.</summary>
+    [Parameter]
+    public EventCallback<AddKind> OnAdd { get; set; }
 
     /// <summary>What shows (D45): the list, the selection header or the detail, as <c>SheetBody.BodyOf</c> derives it. Default: the list.</summary>
     [Parameter]

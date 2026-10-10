@@ -18,6 +18,7 @@
 @inject ILogger<LocationPage> Logger
 @inject DevicePrefs Prefs
 @inject ISnackbar Snackbar
+@inject IDialogService Dialogs
 @inject RealmUiState Ui
 @inject HistorySync History
 
@@ -90,7 +91,19 @@
                  OnBubbleTap="OnBubbleTapAsync"
                  OnMapTap="OnMapTapAsync"
                  OnCameraChanged="OnCameraChangedAsync"
-                 OnFollowEnded="OnFollowEndedAsync" />
+                 OnFollowEnded="OnFollowEndedAsync"
+                 PlacementRadiusM="@(_placing ? _placeRadius : (double?)null)"
+                 OnPlacementMoved="OnPlacementMovedAsync" />
+
+        @if (_placing)
+        {
+            <PlacementPanel RadiusM="@_placeRadius"
+                            RadiusMChanged="OnPlacementRadiusAsync"
+                            OnSave="SavePlaceAsync"
+                            OnCancel="CancelPlacementAsync"
+                            Busy="@_placeBusy"
+                            Error="@_placeError" />
+        }
 
         <RealmSheetHost Mode="@_mode"
                         Size="@Ui.SheetSize"
@@ -114,6 +127,8 @@
                           OnClear="OnClearAsync"
                           OnBack="OnBackAsync"
                           OnHereNow="OnHereNowAsync"
+                          AllowAdd="@AllowAdd"
+                          OnAdd="OnAddAsync"
                           Summary="@summary"
                           ShowSummary="@panel" />
         </RealmSheetHost>
@@ -149,6 +164,20 @@
     private bool _started;
     private bool _disposed;
 
+    // 0.2.2 (D119, D120): adding. The entry just moved by a picker is selected once it is in the snapshot (the roster move reaches the session a moment later); a place being placed has a pin, a radius and a draft.
+    private static readonly OverlayLayer PlacementLayer = new(OverlayKind.Dialog, "add-place");
+    private static readonly DialogOptions PickerOptions = new() { CloseOnEscapeKey = true, BackdropClick = true, CloseButton = false, BackgroundClass = "realm-popup-scrim" };
+    private static readonly TimeSpan PendingWindow = TimeSpan.FromSeconds(30);
+    private PendingSelection? _pending;
+    private sealed record PendingSelection(EntityKind Kind, Func<RealmSnapshot, string?> Find, DateTimeOffset Until);
+
+    private bool _placing;
+    private double _placeRadius = NewZone.DefaultRadiusM;
+    private double? _placeLat;
+    private double? _placeLon;
+    private bool _placeBusy;
+    private string? _placeError;
+
     // S10a: the device preferences (01 section 7.9). A style chosen in the page, else the Demo URL's, else the stored one, else Night; the radius reaches the map as its default-view option.
     private string? _chosenStyle;
     private MapPayloadOptions _mapOptions = MapPayloadOptions.Default;
@@ -167,6 +196,9 @@
     public string? ViewerMemberId { get; set; }
 
     private RealmSnapshot Snapshot => Session.Current;
+
+    // The Add rows (D119): always in the Demo (the actions are simulated there), in Live while the add-on option allow_add is on (the default; an unreadable value counts as on).
+    private bool AllowAdd => Session is DemoRealmSession || !bool.TryParse(Configuration["Ui:AllowAdd"], out var allowed) || allowed;
 
     // A Demo session (Demo mode, or a Live circuit that opened with demo=1 while it is allowed) installs window.__realm, as does
     // the hosting switch Realm:TestHooks (03 section 4.10). The style defaults to Night; Demo and CI ask for demo-offline with ?style=.
@@ -484,8 +516,174 @@
     {
         if (!_disposed)
         {
-            _ = InvokeAsync(StateHasChanged);
+            _ = InvokeAsync(() =>
+            {
+                SelectPending();
+                StateHasChanged();
+            });
         }
+    }
+
+    // ---- adding (0.2.2, D119, D120) -------------------------------------------------------------------------------------------------------------------------------------------
+
+    private Task OnAddAsync(AddKind kind)
+    {
+        if (kind == AddKind.Place)
+        {
+            BeginPlacement();
+            return Task.CompletedTask;
+        }
+
+        var parameters = new DialogParameters<AddEntityDialog>
+        {
+            { dialog => dialog.Kind, kind },
+            { dialog => dialog.OnPicked, (Func<RosterEntry, Task>)(entry => PickedAsync(kind, entry)) },
+        };
+        return Dialogs.ShowAsync<AddEntityDialog>(null, parameters, PickerOptions);
+    }
+
+    // The same path as the Settings move: the roster service. The entity reaches the snapshot a moment later, and then it is selected (SelectPending).
+    private async Task PickedAsync(AddKind kind, RosterEntry entry)
+    {
+        var roster = Session.Roster;
+        await roster.MoveAsync(entry.EntityId, AddKinds.Target(kind));
+        var key = roster.SnapshotIdOf(entry);
+        var until = Session.Time.GetUtcNow() + PendingWindow;
+        _pending = kind == AddKind.Tracker
+            ? new PendingSelection(EntityKind.Vehicle, snapshot => snapshot.Vehicles.Any(vehicle => vehicle.Id == key) ? key : null, until)
+            : new PendingSelection(EntityKind.Member, snapshot => snapshot.Members.Any(member => member.Id == key) ? key : null, until);
+        Snackbar.Add(entry.DisplayName + (kind == AddKind.Tracker ? " is now a tracker." : " is now a driver."), Severity.Success);
+        SelectPending();
+        StateHasChanged();
+    }
+
+    // Selects what was just added as soon as the snapshot has it (a member or vehicle by id, a place by name), and gives up after 30 s.
+    private void SelectPending()
+    {
+        if (_pending is not { } pending)
+        {
+            return;
+        }
+
+        if (Session.Time.GetUtcNow() > pending.Until)
+        {
+            _pending = null;
+            return;
+        }
+
+        if (pending.Find(Snapshot) is not { } id)
+        {
+            return;
+        }
+
+        _pending = null;
+        _ = ApplyAsync(new SheetEvent.RowTap(new EntityRef(pending.Kind, id)));
+    }
+
+    private void BeginPlacement()
+    {
+        if (_placing)
+        {
+            return;
+        }
+
+        _placing = true;
+        _placeRadius = NewZone.DefaultRadiusM;
+        _placeLat = null;
+        _placeLon = null;
+        _placeBusy = false;
+        _placeError = null;
+        Ui.OpenOverlay(PlacementLayer, PlacementClosedByBack);
+        StateHasChanged();
+    }
+
+    // The Android Back or Esc popped the layer already (it arrives off the renderer's context).
+    private void PlacementClosedByBack() =>
+        _ = InvokeAsync(() =>
+        {
+            if (_placing)
+            {
+                _placing = false;
+                StateHasChanged();
+            }
+        });
+
+    private void EndPlacement()
+    {
+        if (!_placing)
+        {
+            return;
+        }
+
+        _placing = false;
+        Ui.CloseOverlay(PlacementLayer);
+        StateHasChanged();
+    }
+
+    private Task CancelPlacementAsync()
+    {
+        EndPlacement();
+        return Task.CompletedTask;
+    }
+
+    private Task OnPlacementMovedAsync((double Latitude, double Longitude) at)
+    {
+        _placeLat = at.Latitude;
+        _placeLon = at.Longitude;
+        return Task.CompletedTask;
+    }
+
+    private Task OnPlacementRadiusAsync(double radiusM)
+    {
+        _placeRadius = NewZone.ClampRadius(radiusM);
+        return Task.CompletedTask;
+    }
+
+    // Save: ask Home Assistant for the zone through the session's place editor. A refusal is a toast and a line in the panel, and nothing is kept here; success closes the panel and the
+    // zone comes back through the normal zone sync, when it is selected (SelectPending).
+    private async Task SavePlaceAsync(PlacementDraft draft)
+    {
+        if (_placeBusy)
+        {
+            return;
+        }
+
+        if (_placeLat is not { } latitude || _placeLon is not { } longitude)
+        {
+            _placeError = "Move the pin onto the map first.";
+            return;
+        }
+
+        var zone = new NewZone(draft.Name, latitude, longitude, _placeRadius, PlaceKindIcons.HaIcon(draft.Kind));
+        var known = Snapshot.Places.Select(place => place.Id).ToHashSet(StringComparer.Ordinal);   // before the call: the Demo adds the place at once
+        _placeBusy = true;
+        _placeError = null;
+        StateHasChanged();
+        PlaceCreateResult result;
+        try
+        {
+            result = await Session.PlaceEditor.CreateAsync(zone);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogWarning(exception, "Adding a place failed.");
+            result = PlaceCreateResult.Failure("The place could not be added.");
+        }
+
+        _placeBusy = false;
+        if (!result.Ok)
+        {
+            _placeError = result.Message ?? "The place could not be added.";
+            Snackbar.Add(_placeError, Severity.Error);
+            StateHasChanged();
+            return;
+        }
+
+        Snackbar.Add(zone.Name + " was added to Places.", Severity.Success);
+        EndPlacement();
+        var name = zone.Name;
+        _pending = new PendingSelection(EntityKind.Place, snapshot => snapshot.Places.FirstOrDefault(place => !known.Contains(place.Id) && place.DisplayName == name)?.Id, Session.Time.GetUtcNow() + PendingWindow);
+        SelectPending();
     }
 
     // The ten minutes of R1-12 count from the moment the page goes away, not from the last report: the camera read from the script (else the last one reported) is stamped now. A circuit that is

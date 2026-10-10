@@ -44,6 +44,12 @@ public interface IRealmSession : IAsyncDisposable
     /// </summary>
     IRosterEditor Roster { get; }
 
+    /// <summary>
+    /// Adds a place (0.2.2, D119): a Live session asks Home Assistant to create a zone, a Demo session simulates it. A session that cannot add places keeps the default,
+    /// which refuses every attempt with a sentence.
+    /// </summary>
+    IPlaceEditor PlaceEditor => UnavailablePlaceEditor.Instance;
+
     /// <summary>The member whose person link matches the HA user id; null if none. Synchronous: a lookup over in-memory members.</summary>
     string? ResolveMe(string? haUserId);
 }
