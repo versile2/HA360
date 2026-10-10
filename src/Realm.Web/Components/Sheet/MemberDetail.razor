@@ -12,7 +12,7 @@
    when the fix is poor, the full address when the data layer sent one, and the week's three tiles with the link to the full report. The static member (the prince) has the header and the
    status only: his distance, the sentence about his own counsel, and a street address only when the option shows it (D30); no battery, no week. No Today timeline and no Show-trail button
    (v1.1, 01 section 13). Every string comes from VmFactory and SelectionHeaderFormatter, the row's own, so the detail and its row agree.
-   The week comes from the cascaded session (GetDriverWeekAsync, and the report's top speed), loaded when the member changes; the answer of a member that is no longer shown is dropped. A
+   The History button (0.3.0) opens the person's Location History at /history/{id}; the static member has none. The week comes from the cascaded session (GetDriverWeekAsync, and the report's top speed), loaded when the member changes; the answer of a member that is no longer shown is dropped. A
    Week given as a parameter is shown as it is and nothing is loaded. A week that cannot be read leaves the tiles at "—". FocusOnOpen moves the focus to the back button once, when the
    detail was opened with the handle or a tap on the header (01 section 10.2); a detail that appears because a pin was tapped in the panel leaves the focus where it is. *@
 @{
@@ -110,6 +110,14 @@
         @if (address is not null)
         {
             <p class="realm-detail-address">@address</p>
+        }
+        @if (!isStatic)
+        {
+            <a class="realm-detail-history" href="@HistoryFormatter.MemberHref(Member.Id)" data-testid="detail-history" aria-label="@HistoryFormatter.ButtonAccessibleName(row.Name)">
+                <MudIcon Icon="@Icons.Material.Filled.History" />
+                <span>@HistoryFormatter.ButtonLabel</span>
+                <MudIcon Icon="@Icons.Material.Filled.ChevronRight" Class="realm-detail-history-chevron" />
+            </a>
         }
         @if (!isStatic)
         {

@@ -47,6 +47,7 @@ public sealed class DemoDataSource
     private const double PoorAccuracyM = 800;
 
     private readonly DemoDrivingData _driving;
+    private readonly DemoHistory _history;
     private readonly DateTimeOffset _startedUtc;
     private readonly object _placesGate = new();
     private IReadOnlyList<DemoPlace> _added = [];
@@ -60,6 +61,7 @@ public sealed class DemoDataSource
         Variants = variants ?? DemoVariants.None;
         Zone = TimeZoneInfo.FindSystemTimeZoneById(ZoneId);
         _driving = new DemoDrivingData(Variants, Zone);
+        _history = new DemoHistory(Zone);
         _startedUtc = time.GetUtcNow();
         Roster = roster ?? new DemoRoster();
     }
@@ -122,6 +124,30 @@ public sealed class DemoDataSource
 
     /// <summary>One driver's period over the fixture's drives; null for an unknown or non-report member.</summary>
     public DriverWeek? GetDriverPeriod(string memberId, ReportWindow window) => _driving.DriverPeriod(memberId, window);
+
+    /// <summary>
+    /// The days <paramref name="from"/> to <paramref name="to"/> of a person's Location History (0.3.0, D123), newest first, built by the same rules as the Live app over the
+    /// generated fixes and trips (<see cref="DemoHistory"/>); empty for anyone who has none. The zones are the drawn ones and the ones added in this session.
+    /// </summary>
+    public IReadOnlyList<HistoryDayVm> HistoryDays(string memberId, DateOnly from, DateOnly to, bool includeTrail)
+    {
+        if (!_history.Has(memberId) || to < from)
+        {
+            return [];
+        }
+
+        IReadOnlyList<DemoPlace> added;
+        lock (_placesGate)
+        {
+            added = _added;
+        }
+
+        var zones = DemoPlaces.Drawn.Concat(added).Select(place => new RawPlace(place.Id, place.Name, place.Lat, place.Lon, place.RadiusM, false)).ToList();
+        var window = HistoryRange.ReadWindow(from, to, Zone);
+        var fixes = _history.Fixes(memberId).Where(fix => fix.Ts >= window.StartUtc && fix.Ts < window.EndUtc).ToList();
+        var trips = _history.Trips(memberId).Where(trip => trip.StartUtc >= window.StartUtc && trip.StartUtc < window.EndUtc).ToList();
+        return HistoryRange.Build(memberId, from, to, Zone, fixes, trips, zones, Time.GetUtcNow(), includeTrail);
+    }
 
     /// <summary>
     /// The snapshot at the clock's current instant, with the snapshot variants applied. <paramref name="homeAssistantRestored"/>

@@ -92,7 +92,23 @@ test.describe("Settings, Who's on the map", () => {
   test('[ROSTER] a row can be dragged to another group', { tag: ['@phone', '@unfolded'] }, async ({ page }) => {
     await openRoster(page);
 
-    await page.locator('[data-roster-entity="device_tracker.hatchback"]').dragTo(page.getByTestId('roster-group-vehicles'));
+    // The drag starts from the centre of the row, so the row must have stopped moving (the dialog is still opening and the list still settling on a slow runner): a drag that starts on
+    // the row that slid into the place of the hatchback moves that one instead (seen on CI: Alden went to Trackers).
+    const source = page.locator('[data-roster-entity="device_tracker.hatchback"]');
+    let last = '';
+    await expect
+      .poll(
+        async () => {
+          const box = await source.boundingBox();
+          const now = box === null ? '' : `${Math.round(box.x)},${Math.round(box.y)}`;
+          const stable = now !== '' && now === last;
+          last = now;
+          return stable;
+        },
+        { message: 'the hatchback row has stopped moving', intervals: [150], timeout: 10_000 },
+      )
+      .toBe(true);
+    await source.dragTo(page.getByTestId('roster-group-vehicles'));
 
     await expect(count(page, 'vehicles'), 'two vehicles').toHaveText('2');
     await expect(count(page, 'not-tracked'), 'one not tracked').toHaveText('1');

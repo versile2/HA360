@@ -1,0 +1,123 @@
+@using MudBlazor
+@using Realm.Web.Components.History
+
+@* The chronological list of the Location History screen (0.3.0, D123). One row per place visit or drive, every row 72 px, in a MudVirtualize so that a week of days costs only the rows
+   in view. A visit reads "At Hearth Haven" over "8:05 am – 5:42 pm · 9 hrs 37 mins"; a drive reads "Drive · 12.4 mi · 24 mins · top 71 mph" over its span and "from → to" with
+   chips for speeding and phone use. In the day view a row is a button that selects the entry (the page focuses it on the map); in the range view the day headings and the rows are links
+   that open the day. The selected row is marked with aria-pressed. Names come from HistoryFormatter, so the list, the map markers and the printed table agree. *@
+<div class="realm-history__list" data-testid="history-list" role="region" aria-label="@HistoryFormatter.TimelineLabel" tabindex="-1">
+    <MudVirtualize T="HistoryRow" Items="@Rows" ItemSize="@HistoryRow.HeightPx" OverscanCount="6" Enabled="true" Context="row">
+            <div class="realm-history__item">
+            @switch (row)
+            {
+                case DayHeaderRow header:
+                    <a class="realm-history__row realm-history__row--day" href="@HistoryFormatter.DayHref(MemberId, header.Day)" data-testid="@("history-day-" + HistoryDayMath.Iso(header.Day))">
+                        <span class="realm-history__row-main">
+                            <span class="realm-history__row-title">@header.Heading</span>
+                            <span class="realm-history__row-detail">@header.Summary</span>
+                        </span>
+                        <MudIcon Icon="@Icons.Material.Filled.ChevronRight" Class="realm-history__row-chevron" />
+                    </a>
+                    break;
+                case NoteRow note:
+                    <p class="realm-history__row realm-history__row--note" data-testid="history-note">@note.Text</p>
+                    break;
+                case EntryRow { Entry: HistoryStay stay } entry:
+                    @RowShell(entry, stay.Id, "stay", HistoryFormatter.StayTitle(stay), HistoryFormatter.StayDetail(stay, Zone), null, Icons.Material.Filled.Place)
+                    break;
+                case EntryRow { Entry: HistoryDrive drive } entry:
+                    @RowShell(entry, drive.Id, "drive", HistoryFormatter.DriveTitle(drive, Units), HistoryFormatter.DriveSpan(drive, Zone) + " · " + HistoryFormatter.Route(drive), drive, Icons.Material.Filled.DirectionsCar)
+                    break;
+            }
+            </div>
+    </MudVirtualize>
+</div>
+
+@code {
+    /// <summary>The rows, in order (a day's entries, or the days of the range with their headings).</summary>
+    [Parameter, EditorRequired]
+    public List<HistoryRow> Rows { get; set; } = [];
+
+    /// <summary>The id of the selected entry; null for none.</summary>
+    [Parameter]
+    public string? SelectedId { get; set; }
+
+    /// <summary>True in the range view: rows are links to their day, nothing is selected.</summary>
+    [Parameter]
+    public bool Range { get; set; }
+
+    /// <summary>The person, for the links of the range view.</summary>
+    [Parameter]
+    public string MemberId { get; set; } = string.Empty;
+
+    /// <summary>The session's zone.</summary>
+    [Parameter]
+    public TimeZoneInfo Zone { get; set; } = TimeZoneInfo.Utc;
+
+    /// <summary>Miles and mph for now (D35).</summary>
+    [Parameter]
+    public UnitSystem Units { get; set; } = UnitSystem.Imperial;
+
+    /// <summary>An entry was tapped (day view).</summary>
+    [Parameter]
+    public EventCallback<HistoryEntry> OnSelect { get; set; }
+
+    private RenderFragment RowShell(EntryRow row, string id, string kind, string title, string detail, HistoryDrive? drive, string icon) => __builder =>
+    {
+        var selected = !Range && string.Equals(SelectedId, id, StringComparison.Ordinal);
+        var chips = drive is null ? new List<string>() : Chips(drive);
+        var name = HistoryFormatter.EntryAccessibleName(row.Entry, Zone, Units);
+        var classes = "realm-history__row realm-history__row--" + kind + (selected ? " is-selected" : string.Empty);
+        if (Range)
+        {
+            <a class="@classes" href="@HistoryFormatter.DayHref(MemberId, row.Day)" data-testid="@("history-entry-" + id)" aria-label="@name">
+                @Content(icon, title, detail, chips)
+            </a>
+        }
+        else
+        {
+            <button type="button" class="@classes" data-testid="@("history-entry-" + id)" data-kind="@kind" aria-pressed="@(selected ? "true" : "false")" aria-label="@name" @onclick="@(() => OnSelect.InvokeAsync(row.Entry))">
+                @Content(icon, title, detail, chips)
+            </button>
+        }
+    };
+
+    private static RenderFragment Content(string icon, string title, string detail, IReadOnlyList<string> chips) => __builder =>
+    {
+        <span class="realm-history__row-icon" aria-hidden="true"><MudIcon Icon="@icon" /></span>
+        <span class="realm-history__row-main">
+            <span class="realm-history__row-title" title="@title">@title</span>
+            <span class="realm-history__row-detail" title="@detail">@detail</span>
+            @if (chips.Count > 0)
+            {
+                <span class="realm-history__chips">
+                    @foreach (var chip in chips)
+                    {
+                        <span class="realm-history__chip">@chip</span>
+                    }
+                </span>
+            }
+        </span>
+    };
+
+    private static List<string> Chips(HistoryDrive drive)
+    {
+        var chips = new List<string>(3);
+        if (HistoryFormatter.SpeedingChip(drive) is { } speeding)
+        {
+            chips.Add(speeding);
+        }
+
+        if (HistoryFormatter.PhoneChip(drive) is { } phone)
+        {
+            chips.Add(phone);
+        }
+
+        if (drive.Coarse)
+        {
+            chips.Add(HistoryFormatter.RoughPathChip);
+        }
+
+        return chips;
+    }
+}

@@ -59,6 +59,11 @@
                 <dd>@(lastUpdate ?? DrivingFormatter.Dash)</dd>
             </div>
         </dl>
+        <a class="realm-detail-history" href="@HistoryFormatter.MemberHref(Vehicle.Id)" data-testid="detail-history" aria-label="@HistoryFormatter.ButtonAccessibleName(row.Name)">
+            <MudIcon Icon="@Icons.Material.Filled.History" />
+            <span>@HistoryFormatter.ButtonLabel</span>
+            <MudIcon Icon="@Icons.Material.Filled.ChevronRight" Class="realm-detail-history-chevron" />
+        </a>
     </div>
 </section>
 

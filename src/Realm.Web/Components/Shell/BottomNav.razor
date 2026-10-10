@@ -12,8 +12,8 @@
    (preventDefault) and runs the rules of the table: a tab change releases the history entries of the page it leaves and navigates with a REPLACE, and a re-tap of the tab you are on is
    a "home" gesture (Location: Peek and nothing selected; Driving: back to the top and This week). A modifier click is not told apart: Blazor's preventDefault is fixed per render. *@
 <nav class="realm-nav" aria-label="Main">
-    <a class="realm-nav-link" href="./" data-testid="nav-location" aria-current="@(OnLocation ? "page" : null)" @onclick="OnLocationTapAsync" @onclick:preventDefault="true">
-        <MudIcon Icon="@(OnLocation ? Icons.Material.Filled.LocationOn : Icons.Material.Outlined.LocationOn)" />
+    <a class="realm-nav-link" href="./" data-testid="nav-location" aria-current="@(OnLocation || OnHistory ? "page" : null)" @onclick="OnLocationTapAsync" @onclick:preventDefault="true">
+        <MudIcon Icon="@(OnLocation || OnHistory ? Icons.Material.Filled.LocationOn : Icons.Material.Outlined.LocationOn)" />
         <span class="realm-nav-label">Location</span>
     </a>
     <a class="realm-nav-link" href="driving" data-testid="nav-driving" aria-current="@(OnDriving ? "page" : null)" @onclick="OnDrivingTapAsync" @onclick:preventDefault="true">
@@ -53,6 +53,9 @@
 
     private bool OnLocation => CurrentPath.Length == 0;
 
+    // Location History (0.3.0) belongs to the Location tab: it is opened from a person's detail and its Back returns there.
+    private bool OnHistory => CurrentPath.StartsWith("history/", StringComparison.Ordinal);
+
     private bool OnDriving => CurrentPath is "driving" || CurrentPath.StartsWith("driving/", StringComparison.Ordinal);
 
     protected override void OnInitialized() => Navigation.LocationChanged += OnLocationChanged;
@@ -62,7 +65,7 @@
     // Location: on Location the tab is a home gesture, the sheet to Peek and the selection cleared (the reducer's NavReTap, which the history then follows by itself); from anywhere else it
     // is a tab change.
     private Task OnLocationTapAsync() =>
-        OnLocation ? ReTapLocationAsync() : ChangeTabAsync("./");
+        OnLocation ? ReTapLocationAsync() : ChangeTabAsync("./");   // from History it is a tab change too: back to the map
 
     // Driving: on a Driving route the tab scrolls the page to the top and selects This week; from anywhere else it is a tab change.
     private Task OnDrivingTapAsync() =>

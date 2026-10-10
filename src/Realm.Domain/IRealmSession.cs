@@ -1,7 +1,7 @@
 namespace Realm.Domain;
 
 /// <summary>
-/// The only data surface the UI sees, one per circuit. The surface is these ten members (0.2.0 added the two period reads): the snapshot, its change event, the clock, the zone, the two
+/// The only data surface the UI sees, one per circuit. The surface is these ten members (0.2.0 added the two period reads; 0.3.0 adds two history reads with defaults): the snapshot, its change event, the clock, the zone, the two
 /// weekly Driving reports, the two period reads, "me", and the roster that Settings edits.
 /// </summary>
 public interface IRealmSession : IAsyncDisposable
@@ -49,6 +49,17 @@ public interface IRealmSession : IAsyncDisposable
     /// which refuses every attempt with a sentence.
     /// </summary>
     IPlaceEditor PlaceEditor => UnavailablePlaceEditor.Instance;
+
+    /// <summary>
+    /// One member's Location History for the local day <paramref name="day"/> (0.3.0, D123): visits, drives and the trail. Null when the member has no history: not tracked,
+    /// a tracker (trackers store no fixes), unknown, or a day outside the retained range. A session that keeps no history keeps this default.
+    /// </summary>
+    ValueTask<HistoryDayVm?> GetHistoryDayAsync(string memberId, DateOnly day, CancellationToken ct) => ValueTask.FromResult<HistoryDayVm?>(null);
+
+    /// <summary>
+    /// The days <paramref name="from"/> to <paramref name="to"/> (inclusive) of one member, newest first, without trails (the range list). Empty when the member has no history.
+    /// </summary>
+    ValueTask<IReadOnlyList<HistoryDayVm>> GetHistoryRangeAsync(string memberId, DateOnly from, DateOnly to, CancellationToken ct) => ValueTask.FromResult<IReadOnlyList<HistoryDayVm>>([]);
 
     /// <summary>The member whose person link matches the HA user id; null if none. Synchronous: a lookup over in-memory members.</summary>
     string? ResolveMe(string? haUserId);

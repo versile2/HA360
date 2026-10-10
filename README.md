@@ -73,6 +73,12 @@ Status: experimental. [realm/CHANGELOG.md](realm/CHANGELOG.md) lists what each v
     <td align="center"><img src="assets/screenshots/phone-popup-speeding.png" width="230" alt="A popup explaining the Speeding statistic with a bar for each driver"></td>
   </tr>
   <tr>
+    <td colspan="2" valign="top">
+      <h3>Location History</h3>
+      Open a person and press <b>History</b> for their day: the trail on the map, every place they stayed (named after your Home Assistant zones, never "unknown") and every drive, with times, distance, top speed and speeding or phone-use chips. Step through the days, look at the last 7 days, tap a row to see it on the map, and print the day or save it as PDF.
+    </td>
+  </tr>
+  <tr>
     <td width="50%" valign="top">
       <h3>Places that mean something</h3>
       Saved places are drawn as circles on the map and listed with who is there. Open one for its address, who is
