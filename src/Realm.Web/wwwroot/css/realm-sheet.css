@@ -1200,6 +1200,35 @@ div[mudsheet] .mud-sheet-container.mud-sheet-position-bottom[data-testid="sheet"
   -webkit-tap-highlight-color: transparent;
 }
 
+/* The History button of a person's or tracker's detail (0.3.0): a 48 px row-wide link to /history/{id}. */
+.realm-detail-history {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-sizing: border-box;
+  min-height: 48px;
+  margin: 8px 0;
+  padding: 0 16px;
+  border: 1px solid var(--realm-line);
+  border-radius: 24px;
+  background: var(--realm-surface-2);
+  color: var(--realm-primary);
+  font-size: 0.9375rem;
+  font-weight: 700;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.realm-detail-history-chevron {
+  margin-left: auto;
+  color: var(--realm-text-2);
+}
+
+.realm-detail-history:focus-visible {
+  outline: 3px solid var(--realm-focus);
+  outline-offset: 2px;
+}
+
 .realm-detail-tiles {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

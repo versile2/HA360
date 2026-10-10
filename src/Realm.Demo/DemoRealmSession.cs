@@ -116,6 +116,34 @@ public sealed class DemoRealmSession : IRealmSession
     }
 
     /// <inheritdoc />
+    /// <remarks>Only the live people on the map have a history: someone moved to Not tracked has none (their history is not shown), and a day outside the 400 retained days is none.</remarks>
+    public ValueTask<HistoryDayVm?> GetHistoryDayAsync(string memberId, DateOnly day, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        var days = HistoryDays(memberId, day, day, includeTrail: true);
+        return ValueTask.FromResult(days.Count == 0 ? null : days[0]);
+    }
+
+    /// <inheritdoc />
+    public ValueTask<IReadOnlyList<HistoryDayVm>> GetHistoryRangeAsync(string memberId, DateOnly from, DateOnly to, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        return ValueTask.FromResult(HistoryDays(memberId, from, to, includeTrail: false));
+    }
+
+    private IReadOnlyList<HistoryDayVm> HistoryDays(string memberId, DateOnly from, DateOnly to, bool includeTrail)
+    {
+        var member = Current.Members.FirstOrDefault(m => string.Equals(m.Id, memberId, StringComparison.Ordinal));
+        if (member is null || member.Kind != MemberKind.Live)
+        {
+            return [];
+        }
+
+        var (oldest, newest) = HistoryDayMath.Range(Time.GetUtcNow(), Zone, DemoDataSource.DemoRetentionFixDays);
+        return _source.HistoryDays(memberId, HistoryDayMath.Clamp(from, oldest, newest), HistoryDayMath.Clamp(to, oldest, newest), includeTrail);
+    }
+
+    /// <inheritdoc />
     public string? ResolveMe(string? haUserId) => _source.ResolveMe(haUserId);
 
     /// <summary>

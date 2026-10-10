@@ -1,0 +1,507 @@
+/*
+ * Location History (0.3.0, D123). Tokens only: every colour is a var(--realm-*) (the no-colour-literals guard). The screen is a fixed box between the top of the page and the bottom
+ * navigation. Compact (the default): the header, the map and the timeline as a bottom sheet stacked in one column, so the map is never covered and needs no padding arithmetic.
+ * Expanded (840 x 560 and up, the same breakpoint as the Location screen): the timeline is a side panel on the left and the header and the map fill the rest.
+ * Every control is at least 48 px; every list row is 72 px (HistoryRow.HeightPx), which is what lets the list be virtualized.
+ */
+
+.realm-history {
+  --realm-history-sheet: 46%;
+  --realm-history-panel-w: 400px;
+  position: fixed;
+  inset: 0 0 calc(var(--realm-nav-h) + env(safe-area-inset-bottom)) 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top);
+  background: var(--realm-bg);
+  color: var(--realm-text);
+}
+
+.realm-history--tall {
+  --realm-history-sheet: 78%;
+}
+
+/* The screen never scrolls as a page; the timeline scrolls inside its panel. */
+html:has(.realm-history),
+html:has(.realm-history) body {
+  height: 100%;
+  overflow: hidden;
+}
+
+/* ---- the header ---- */
+
+.realm-history__header {
+  flex: none;
+  position: relative;
+  z-index: 2;
+  background: var(--realm-surface);
+  border-bottom: 1px solid var(--realm-line);
+}
+
+.realm-history__bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px 4px 4px;
+}
+
+.realm-history__back,
+.realm-history__tool,
+.realm-history__step {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  box-sizing: border-box;
+  min-width: 48px;
+  min-height: 48px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 24px;
+  background: transparent;
+  color: var(--realm-text);
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.realm-history__tool {
+  color: var(--realm-text-2);
+}
+
+.realm-history__range {
+  padding: 0 12px;
+  border: 1px solid var(--realm-line);
+}
+
+.realm-history__range[aria-pressed="true"] {
+  border-color: var(--realm-primary);
+  background: var(--realm-primary);
+  color: var(--realm-on-primary);
+}
+
+.realm-history__tool-label {
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+
+.realm-history__who {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.realm-history__name {
+  margin: 0;
+  overflow: hidden;
+  font-size: 1.125rem;
+  font-weight: 700;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.realm-history__sub {
+  margin: 0;
+  overflow: hidden;
+  color: var(--realm-text-2);
+  font-size: 0.8125rem;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.realm-history__days {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 8px 6px;
+}
+
+.realm-history__datewrap {
+  position: relative;
+  flex: 1 1 auto;
+  max-width: 260px;
+}
+
+.realm-history__datebtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 48px;
+  padding: 0 16px;
+  border: 1px solid var(--realm-line);
+  border-radius: 24px;
+  background: var(--realm-surface-2);
+  color: var(--realm-text);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.realm-history__date-icon {
+  color: var(--realm-primary);
+}
+
+/* The picker is only the thing the date button opens; it takes no space and is out of the tab order (inert). */
+.realm-history__picker {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.realm-history__today {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-height: 48px;
+  padding: 0 16px;
+  border: 1px solid var(--realm-line);
+  border-radius: 24px;
+  background: transparent;
+  color: var(--realm-primary);
+  font: inherit;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.realm-history__step:disabled,
+.realm-history__today:disabled {
+  color: var(--realm-text-disabled);
+  cursor: default;
+}
+
+/* ---- the map ---- */
+
+.realm-history__map {
+  flex: 1 1 0;
+  min-height: 160px;
+  position: relative;
+  background: var(--realm-bg);
+}
+
+.realm-history__map--unavailable {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  text-align: center;
+  color: var(--realm-text-2);
+}
+
+/* MapLibre's attribution (i) is 29 px by default; its tap area is raised to 48 px. */
+.realm-history__map .maplibregl-ctrl-attrib-button {
+  width: 48px;
+  height: 48px;
+}
+
+.realm-history-stop {
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  width: 32px;
+  height: 32px;
+  margin: 0;
+  padding: 0;
+  border: 3px solid var(--realm-pin-outline);
+  border-radius: 50%;
+  background: var(--realm-surface-2);
+  color: var(--realm-text);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+/* A marker is 32 px to look at and 48 px to hit. */
+.realm-history-stop::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
+}
+
+.realm-history-stop.is-active {
+  width: 40px;
+  height: 40px;
+  border-color: var(--realm-primary);
+  background: var(--realm-primary);
+  color: var(--realm-on-primary);
+  z-index: 2;
+}
+
+.realm-history-stop:disabled {
+  cursor: default;
+  opacity: 0.9;
+}
+
+.realm-history-end {
+  display: block;
+  box-sizing: border-box;
+  width: 16px;
+  height: 16px;
+  border: 3px solid var(--realm-pin-outline);
+  border-radius: 50%;
+}
+
+.realm-history-end--start {
+  background: var(--realm-success);
+}
+
+.realm-history-end--end {
+  background: var(--realm-error);
+}
+
+/* ---- the timeline panel ---- */
+
+.realm-history__panel {
+  flex: 0 0 var(--realm-history-sheet);
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  border-radius: 16px 16px 0 0;
+  border-top: 1px solid var(--realm-line);
+  background: var(--realm-surface);
+  box-shadow: 0 -4px 16px color-mix(in srgb, var(--realm-scrim) 55%, transparent);
+}
+
+.realm-history__handle {
+  flex: none;
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 48px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.realm-history__grip {
+  display: block;
+  width: 40px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--realm-line-strong);
+}
+
+.realm-history__summary {
+  flex: none;
+  margin: 0;
+  padding: 0 16px 8px;
+  color: var(--realm-text-2);
+  font-size: 0.875rem;
+}
+
+.realm-history__banner {
+  margin: 8px 16px;
+  padding: 12px 16px;
+  border: 1px solid var(--realm-warning);
+  border-radius: 12px;
+  color: var(--realm-text);
+}
+
+.realm-history__skeleton {
+  padding: 0 16px;
+}
+
+.realm-history__skeleton-row {
+  height: 56px;
+  margin-bottom: 16px;
+  border-radius: 12px;
+}
+
+.realm-history__list {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-bottom: 8px;
+}
+
+/* ---- rows: always 72 px ---- */
+
+.realm-history__item {
+  height: 72px;
+  box-sizing: border-box;
+}
+
+.realm-history__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-sizing: border-box;
+  width: 100%;
+  height: 72px;
+  margin: 0;
+  padding: 6px 16px;
+  border: 0;
+  border-bottom: 1px solid var(--realm-line);
+  background: transparent;
+  color: var(--realm-text);
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.realm-history__row.is-selected {
+  background: var(--realm-surface-2);
+  box-shadow: inset 4px 0 0 var(--realm-primary);
+}
+
+.realm-history__row--day {
+  background: var(--realm-surface-2);
+}
+
+.realm-history__row--note {
+  align-items: center;
+  color: var(--realm-text-2);
+  cursor: default;
+}
+
+.realm-history__row-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--realm-surface-2);
+  color: var(--realm-primary);
+}
+
+.realm-history__row-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.realm-history__row-title,
+.realm-history__row-detail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.realm-history__row-title {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.realm-history__row-detail {
+  color: var(--realm-text-2);
+  font-size: 0.8125rem;
+  line-height: 1.3;
+}
+
+.realm-history__row-chevron {
+  flex: none;
+  color: var(--realm-text-2);
+}
+
+.realm-history__chips {
+  display: flex;
+  gap: 6px;
+  height: 18px;
+  overflow: hidden;
+}
+
+.realm-history__chip {
+  flex: none;
+  padding: 0 8px;
+  border: 1px solid var(--realm-warning);
+  border-radius: 9px;
+  color: var(--realm-warning);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+/* ---- a person without history ---- */
+
+.realm-history__none {
+  box-sizing: border-box;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 32px 16px;
+  text-align: center;
+}
+
+.realm-history__none-note {
+  color: var(--realm-text-2);
+}
+
+/* ---- Expanded: the timeline is a side panel ---- */
+
+@media (min-width: 840px) and (min-height: 560px) {
+  .realm-history {
+    display: grid;
+    grid-template-columns: var(--realm-history-panel-w) minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-areas:
+      "panel header"
+      "panel map";
+  }
+
+  .realm-history__header {
+    grid-area: header;
+  }
+
+  .realm-history__map {
+    grid-area: map;
+    min-height: 0;
+  }
+
+  .realm-history__panel {
+    grid-area: panel;
+    border-radius: 0;
+    border-top: 0;
+    border-right: 1px solid var(--realm-line);
+    box-shadow: none;
+  }
+
+  .realm-history__handle {
+    display: none;
+  }
+
+  .realm-history__panel {
+    padding-top: 8px;
+  }
+
+  /* A person without history has no map and no panel: the header and the sentence in one column. */
+  .realm-history--bare {
+    display: flex;
+    flex-direction: column;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .realm-history * {
+    scroll-behavior: auto !important;
+  }
+}

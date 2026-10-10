@@ -87,6 +87,14 @@ public sealed class LiveRealmSession : IRealmSession
         _source.GetDriverPeriodAsync(memberId, window, ct);
 
     /// <inheritdoc />
+    public ValueTask<HistoryDayVm?> GetHistoryDayAsync(string memberId, DateOnly day, CancellationToken ct) =>
+        _source.GetHistoryDayAsync(memberId, day, ct);
+
+    /// <inheritdoc />
+    public ValueTask<IReadOnlyList<HistoryDayVm>> GetHistoryRangeAsync(string memberId, DateOnly from, DateOnly to, CancellationToken ct) =>
+        _source.GetHistoryRangeAsync(memberId, from, to, ct);
+
+    /// <inheritdoc />
     public string? ResolveMe(string? haUserId) => _source.ResolveMe(haUserId);
 
     /// <inheritdoc />

@@ -103,6 +103,24 @@
     "placement-kind-{kind}",
     "placement-error",
     "placement-save",
-    "placement-cancel"
+    "placement-cancel",
+    "detail-history",
+    "history-page",
+    "history-back",
+    "history-prev",
+    "history-date",
+    "history-next",
+    "history-today",
+    "history-range",
+    "history-day-view",
+    "history-panel",
+    "history-list",
+    "history-summary",
+    "history-none",
+    "history-map",
+    "history-entry-{id}",
+    "history-day-{iso}",
+    "print-history",
+    "print-history-row"
   ]
 }

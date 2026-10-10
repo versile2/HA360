@@ -71,6 +71,14 @@ public sealed class HaDataSource
     public ValueTask<DriverWeek?> GetDriverPeriodAsync(string memberId, ReportWindow window, CancellationToken cancellationToken) =>
         _stats.GetDriverPeriodAsync(memberId, window, cancellationToken);
 
+    /// <summary>One member's Location History for a local day (0.3.0); null when the member has none.</summary>
+    public ValueTask<HistoryDayVm?> GetHistoryDayAsync(string memberId, DateOnly day, CancellationToken cancellationToken) =>
+        _stats.GetHistoryDayAsync(memberId, day, cancellationToken);
+
+    /// <summary>The days of one member, newest first, without trails (0.3.0).</summary>
+    public ValueTask<IReadOnlyList<HistoryDayVm>> GetHistoryRangeAsync(string memberId, DateOnly from, DateOnly to, CancellationToken cancellationToken) =>
+        _stats.GetHistoryRangeAsync(memberId, from, to, cancellationToken);
+
     /// <summary>The member whose person is the HA user <paramref name="haUserId"/>; null when there is none. A lookup over the members in memory.</summary>
     public string? ResolveMe(string? haUserId)
     {

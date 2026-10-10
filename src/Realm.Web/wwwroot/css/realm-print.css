@@ -154,4 +154,30 @@
   .realm-print-table th {
     break-after: avoid;
   }
+
+  /* Location History (0.3.0): no map, no panel, no controls; the page is the header line and the table of the day or the range. */
+  .realm-history {
+    position: static !important;
+    display: block !important;
+    padding: 0 !important;
+    background: white;
+    color: black;
+  }
+
+  .realm-history__map,
+  .realm-history__panel,
+  .realm-history__header,
+  .realm-history__none a,
+  .realm-history .maplibregl-map {
+    display: none !important;
+  }
+
+  .realm-history__none {
+    padding: 0;
+    text-align: left;
+  }
+
+  .realm-print-table--history td:first-child {
+    white-space: nowrap;
+  }
 }

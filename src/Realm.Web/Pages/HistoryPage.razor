@@ -1,0 +1,535 @@
+@page "/history/{MemberId}"
+@implements IAsyncDisposable
+@using Microsoft.JSInterop
+@using Realm.Domain
+@using Realm.Web.Components.Driving
+@using Realm.Web.Components.History
+@using Realm.Web.Components.Shell
+@using Realm.Web.Formatting
+@using Realm.Web.Map
+@using Realm.Web.Shell
+@using Realm.Web.State
+@inject NavigationManager Navigation
+@inject ILogger<HistoryPage> Logger
+@inject IJSRuntime JS
+@inject DevicePrefs Prefs
+
+@* Location History (0.3.0, D123): one person's day on the map and as a list. Opened from a person's detail (History button) at /history/{memberId}?date=YYYY-MM-DD (today when the date is
+   missing, wrong or outside the retained range) or /history/{memberId}?range=7d for the last seven days as a list of days. The header has the Back link (to the Location screen, where
+   the person's detail is still open), the person, the range toggle, the print button and the day selector: previous, the date (a MudDatePicker limited to the retained days), next and Today.
+   Day steps replace the history entry, so the browser's Back leaves the screen and does not walk through days. Below the map (Compact: a bottom sheet, Expanded: a side panel, both CSS)
+   the timeline lists the day's place visits and drives; a tap on a row highlights it on the map and a tap on the map selects the row. Nothing here reads a clock: the day is the
+   session's zone and clock. A person without history (not tracked, a tracker, unknown) gets a sentence and the way back. The print view is a table of the same rows, no map. *@
+<section class="@("realm-history" + (_tall ? " realm-history--tall" : string.Empty) + (Tracked ? string.Empty : " realm-history--bare"))" aria-busy="@(_loading ? "true" : "false")" data-testid="history-page" data-mode="@(Range ? "range" : "day")" data-day="@HistoryDayMath.Iso(_day)">
+    <header class="realm-history__header realm-no-print">
+        <div class="realm-history__bar">
+            <a class="realm-history__back" href="./" data-testid="history-back" aria-label="@HistoryFormatter.BackLabel">
+                <MudIcon Icon="@Icons.Material.Filled.ArrowBack" />
+            </a>
+            <DriverAvatar Name="@Name" MemberColor="@_member?.Color" AvatarUrl="@_member?.AvatarUrl" Diameter="40" Ring="true" />
+            <div class="realm-history__who">
+                <h1 class="realm-history__name">@Name</h1>
+                <p class="realm-history__sub" data-testid="history-sub">@Subtitle</p>
+            </div>
+            @if (Tracked)
+            {
+                <button type="button" class="realm-history__tool realm-history__range" data-testid="history-range" aria-pressed="@(Range ? "true" : "false")" aria-label="@HistoryFormatter.RangeToggleName" @onclick="ToggleRange">
+                    <MudIcon Icon="@Icons.Material.Filled.CalendarViewWeek" />
+                    <span class="realm-history__tool-label">@HistoryFormatter.RangeLabel</span>
+                </button>
+                <button type="button" class="realm-history__tool realm-history__print" data-testid="btn-print" aria-label="@HistoryFormatter.PrintLabel" @onclick="PrintAsync">
+                    <MudIcon Icon="@Icons.Material.Filled.Print" />
+                </button>
+            }
+        </div>
+        @if (Tracked && !Range)
+        {
+            <div class="realm-history__days" role="group" aria-label="@HistoryFormatter.DayViewLabel">
+                <button type="button" class="realm-history__step" data-testid="history-prev" aria-label="@HistoryFormatter.PreviousLabel" disabled="@(_day <= _oldest)" @onclick="PreviousDay">
+                    <MudIcon Icon="@Icons.Material.Filled.ChevronLeft" />
+                </button>
+                <span class="realm-history__datewrap">
+                    <button type="button" class="realm-history__datebtn" data-testid="history-date" aria-haspopup="dialog" aria-label="@HistoryFormatter.DayButtonName(_day)" @onclick="OpenPickerAsync">
+                        <MudIcon Icon="@Icons.Material.Filled.CalendarToday" Class="realm-history__date-icon" />
+                        <span>@HistoryFormatter.DayButton(_day)</span>
+                    </button>
+                    <span class="realm-history__picker" aria-hidden="true" inert>
+                        <MudDatePicker @ref="_picker"
+                                       Date="@_day.ToDateTime(TimeOnly.MinValue)"
+                                       DateChanged="OnPickedAsync"
+                                       MinDate="@_oldest.ToDateTime(TimeOnly.MinValue)"
+                                       MaxDate="@_today.ToDateTime(TimeOnly.MinValue)"
+                                       PickerVariant="PickerVariant.Dialog"
+                                       AutoClose="true"
+                                       Editable="false"
+                                       DateFormat="yyyy-MM-dd"
+                                       Label="Choose a day"
+                                       Variant="Variant.Outlined"
+                                       Margin="Margin.Dense" />
+                    </span>
+                </span>
+                <button type="button" class="realm-history__step" data-testid="history-next" aria-label="@HistoryFormatter.NextLabel" disabled="@(_day >= _today)" @onclick="NextDay">
+                    <MudIcon Icon="@Icons.Material.Filled.ChevronRight" />
+                </button>
+                <button type="button" class="realm-history__today" data-testid="history-today" disabled="@(_day >= _today)" @onclick="GoToday">@HistoryFormatter.TodayLabel</button>
+            </div>
+        }
+        else if (Tracked && Range)
+        {
+            <div class="realm-history__days" role="group" aria-label="@HistoryFormatter.RangeLabel">
+                <a class="realm-history__today" data-testid="history-day-view" href="@HistoryFormatter.DayHref(MemberId, _today)">@HistoryFormatter.DayViewLabel</a>
+            </div>
+        }
+    </header>
+
+    @if (Tracked)
+    {
+        @if (_mapReady)
+        {
+            <HistoryMap @ref="_map"
+                        Day="@_mapDay"
+                        Focus="@_focus"
+                        StyleId="@StyleId"
+                        OnPick="OnMapPickAsync" />
+        }
+        else
+        {
+            <div class="realm-history__map" aria-hidden="true"></div>
+        }
+
+        <p class="realm-sr-only" role="status" data-testid="history-status">@_announcement</p>
+
+        <div class="realm-history__panel realm-no-print" data-testid="history-panel">
+            <button type="button" class="realm-history__handle" data-testid="history-handle" aria-expanded="@(_tall ? "true" : "false")" aria-label="@(_tall ? HistoryFormatter.CollapseLabel : HistoryFormatter.ExpandLabel)" @onclick="ToggleTall">
+                <span class="realm-history__grip" aria-hidden="true"></span>
+            </button>
+            @if (_failed)
+            {
+                <p class="realm-history__banner" role="status" data-testid="history-error">@HistoryFormatter.Unavailable</p>
+            }
+            else if (_loading && _rows.Count == 0)
+            {
+                <div class="realm-history__skeleton" aria-hidden="true">
+                    @for (var i = 0; i < 4; i++)
+                    {
+                        <div class="realm-skeleton realm-history__skeleton-row"></div>
+                    }
+                </div>
+                <p class="realm-sr-only" role="status">@HistoryFormatter.Loading</p>
+            }
+            else
+            {
+                <p class="realm-history__summary" data-testid="history-summary">@Summary</p>
+                <HistoryTimeline Rows="@_rows"
+                                 SelectedId="@_selected?.Id"
+                                 Range="@Range"
+                                 MemberId="@MemberId"
+                                 Zone="@Session.Zone"
+                                 Units="@Session.Current.UnitSystem"
+                                 OnSelect="OnSelectAsync" />
+            }
+        </div>
+
+        <p class="realm-print-only realm-print-header" data-testid="print-header">@PrintHeader</p>
+        @if (_loaded)
+        {
+            <table class="realm-print-only realm-print-table realm-print-table--history" data-testid="print-history">
+                <thead>
+                    <tr>
+                        <th scope="col">Day</th>
+                        @foreach (var column in HistoryFormatter.PrintColumns)
+                        {
+                            <th scope="col">@column</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in _printRows)
+                    {
+                        <tr data-testid="print-history-row">
+                            <td>@row.Day</td>
+                            @foreach (var cell in row.Cells)
+                            {
+                                <td>@cell</td>
+                            }
+                        </tr>
+                    }
+                    @if (_printRows.Count == 0)
+                    {
+                        <tr><td colspan="@(HistoryFormatter.PrintColumns.Count + 1)">@PrintEmpty</td></tr>
+                    }
+                </tbody>
+            </table>
+            <p class="realm-print-only realm-print-footer" data-testid="print-footer">@HistoryFormatter.PrintFooter</p>
+        }
+    }
+    else
+    {
+        <div class="realm-history__none" data-testid="history-none">
+            <p>@HistoryFormatter.NoHistory(Name)</p>
+            <p class="realm-history__none-note">@NoHistoryReason</p>
+            <a class="realm-history__today" href="./">@HistoryFormatter.BackToLocation</a>
+        </div>
+    }
+</section>
+
+@code {
+    private readonly CancellationTokenSource _lifetime = new();
+    private CancellationTokenSource? _load;
+    private MinuteTicker? _ticker;
+    private HistoryMap? _map;
+    private MudDatePicker? _picker;
+    private MemberVm? _member;
+    private VehicleVm? _vehicle;
+    private DateOnly _day;
+    private DateOnly _today;
+    private DateOnly _oldest;
+    private HistoryDayVm? _data;
+    private IReadOnlyList<HistoryDayVm> _days = [];
+    private List<HistoryRow> _rows = [];
+    private List<HistoryPrintRow> _printRows = [];
+    private HistoryDayPayload? _mapDay;
+    private HistoryFocusPayload? _focus;
+    private HistoryEntry? _selected;
+    private string _announcement = string.Empty;
+    private string? _loadedKey;
+    private bool _loading = true;
+    private bool _loaded;
+    private bool _failed;
+    private bool _tall;
+    private bool _mapReady;
+    private bool _started;
+    private bool _disposed;
+
+    /// <summary>The circuit's session, cascaded by <c>RealmShell</c>.</summary>
+    [CascadingParameter]
+    public IRealmSession Session { get; set; } = default!;
+
+    /// <summary>The Appendix-B overrides of this circuit (the map style here), cascaded by <c>RealmShell</c>.</summary>
+    [CascadingParameter]
+    public DemoUiOverrides? Overrides { get; set; }
+
+    /// <summary>The member id of the route, such as <c>king</c>.</summary>
+    [Parameter]
+    public string MemberId { get; set; } = string.Empty;
+
+    /// <summary><c>?date=YYYY-MM-DD</c>: the local day shown. Anything else, or a day outside the retained range, is today (or the nearest retained day).</summary>
+    [SupplyParameterFromQuery(Name = "date")]
+    public string? DateQuery { get; set; }
+
+    /// <summary><c>?range=7d</c>: the last seven days as a list of days.</summary>
+    [SupplyParameterFromQuery(Name = "range")]
+    public string? RangeQuery { get; set; }
+
+    private bool Range => string.Equals(RangeQuery, "7d", StringComparison.Ordinal);
+
+    private bool Tracked => _member is { Kind: MemberKind.Live };
+
+    private string Name => _member?.DisplayName ?? _vehicle?.Name ?? MemberId;
+
+    private string StyleId => Overrides?.Style ?? Prefs.MapStyle;
+
+    private DateOnly RangeFrom => _today.AddDays(-6) < _oldest ? _oldest : _today.AddDays(-6);
+
+    private string Subtitle =>
+        !Tracked
+            ? HistoryFormatter.Title
+            : Range ? HistoryFormatter.RangeLabel + " · " + HistoryFormatter.RangeText(RangeFrom, _today) : HistoryFormatter.DayHeading(_day, _today);
+
+    private string Summary =>
+        Range
+            ? HistoryFormatter.RangeLabel + " · " + HistoryFormatter.RangeText(RangeFrom, _today)
+            : _data is { } data ? HistoryFormatter.DaySummary(data, Session.Current.UnitSystem) : string.Empty;
+
+    private string PrintHeader => HistoryFormatter.PrintHeader(Name, Range ? RangeFrom : _day, Range ? _today : _day);
+
+    private string PrintEmpty => _data is { } data && !Range ? HistoryFormatter.EmptyDay(data, Name) : HistoryFormatter.EmptyDay(HistoryDayVm.Empty(MemberId, _day, default, default), Name);
+
+    private string NoHistoryReason =>
+        _vehicle is not null
+            ? "A tracker keeps only its latest position, so there is no trail to show."
+            : _member is not null
+                ? "This person is shown as a pin only; there is no recorded trail."
+                : "This person is not tracked, so no history is kept for them.";
+
+    // Prerendering runs this twice (the prerender scope, then the circuit); both only read the session and the query.
+    protected override async Task OnParametersSetAsync()
+    {
+        var snapshot = Session.Current;
+        var now = Session.Time.GetUtcNow();
+        _member = snapshot.Members.FirstOrDefault(member => string.Equals(member.Id, MemberId, StringComparison.Ordinal));
+        _vehicle = _member is null ? snapshot.Vehicles.FirstOrDefault(vehicle => string.Equals(vehicle.Id, MemberId, StringComparison.Ordinal)) : null;
+        (_oldest, _today) = HistoryDayMath.Range(now, Session.Zone, snapshot.RetentionFixDays);
+        _day = HistoryDayMath.Clamp(HistoryDayMath.Parse(DateQuery) ?? _today, _oldest, _today);
+
+        var key = $"{MemberId}|{Tracked}|{(Range ? "range:" + HistoryDayMath.Iso(_today) : HistoryDayMath.Iso(_day))}";
+        if (string.Equals(key, _loadedKey, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _loadedKey = key;
+        _selected = null;
+        _focus = null;
+        if (!Tracked)
+        {
+            _loading = false;
+            _loaded = false;
+            return;
+        }
+
+        _loading = true;
+        _failed = false;
+        await LoadAsync(quiet: false);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _started || _disposed)
+        {
+            return;
+        }
+
+        _started = true;
+        Session.Changed += OnSessionChanged;
+        try
+        {
+            await Prefs.EnsureLoadedAsync();
+        }
+        catch (Exception exception) when (exception is JSException or JSDisconnectedException or OperationCanceledException)
+        {
+            // The stored style cannot be read: the default one is used.
+            Logger.LogWarning(exception, "The history screen could not read the stored map style.");
+        }
+
+        if (_disposed)
+        {
+            return;
+        }
+
+        _mapReady = true;
+        _ticker = new MinuteTicker(Session.Time);
+        _ticker.Tick += OnMinute;
+        _ticker.Start();
+        StateHasChanged();
+    }
+
+    // A person who becomes tracked (the snapshot arrives after the page) or stops being tracked (moved to Not tracked in Settings) changes what the page can show.
+    private void OnSessionChanged()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        var tracked = Session.Current.Members.Any(member => string.Equals(member.Id, MemberId, StringComparison.Ordinal) && member.Kind == MemberKind.Live);
+        if (tracked == Tracked)
+        {
+            return;
+        }
+
+        _ = InvokeAsync(async () =>
+        {
+            await OnParametersSetAsync();
+            StateHasChanged();
+        });
+    }
+
+    // Today changes while the screen is open (a visit goes on, a drive is stored): the minute re-reads it without a flicker.
+    private void OnMinute()
+    {
+        if (_disposed || !Tracked || (!Range && _day != _today))
+        {
+            return;
+        }
+
+        _ = InvokeAsync(async () =>
+        {
+            await LoadAsync(quiet: true);
+            StateHasChanged();
+        });
+    }
+
+    // One load at a time: a newer one (another day or person) cancels the one in flight, whose result is then dropped.
+    private async Task LoadAsync(bool quiet)
+    {
+        _load?.Cancel();
+        _load?.Dispose();
+        var load = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
+        _load = load;
+        var token = load.Token;
+        var range = Range;
+        var day = _day;
+        var from = RangeFrom;
+        var today = _today;
+        HistoryDayVm? data = null;
+        IReadOnlyList<HistoryDayVm> days = [];
+        var failed = false;
+        try
+        {
+            if (range)
+            {
+                days = await Session.GetHistoryRangeAsync(MemberId, from, today, token);
+            }
+            else
+            {
+                data = await Session.GetHistoryDayAsync(MemberId, day, token);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (Exception exception)
+        {
+            failed = true;
+            Logger.LogError(exception, "The location history of {MemberId} could not be loaded for {Day}.", MemberId, range ? "the last 7 days" : HistoryDayMath.Iso(day));
+        }
+
+        if (token.IsCancellationRequested || _disposed)
+        {
+            return;
+        }
+
+        if (failed)
+        {
+            if (!quiet)
+            {
+                _failed = true;
+                _loading = false;
+            }
+
+            return;
+        }
+
+        var zone = Session.Zone;
+        var units = Session.Current.UnitSystem;
+        _failed = false;
+        _loading = false;
+        _loaded = true;
+        _data = data;
+        _days = days;
+        if (range)
+        {
+            _rows = HistoryRow.OfRange(days, Name, today, units);
+            _printRows = [.. days.OrderBy(d => d.Day).SelectMany(d => HistoryFormatter.PrintRows(d, zone, units))];
+            _mapDay = HistoryMapPayloads.ForRange(MemberId, from, today, days, _member?.Color, zone);
+            _announcement = HistoryFormatter.RangeLabel + ". " + days.Count.ToString(System.Globalization.CultureInfo.InvariantCulture) + " days.";
+        }
+        else if (data is not null)
+        {
+            _rows = [.. HistoryRow.OfDay(data, Name)];
+            _printRows = [.. HistoryFormatter.PrintRows(data, zone, units)];
+            _mapDay = HistoryMapPayloads.ForDay(data, _member?.Color, zone, day == today);
+            if (!quiet)
+            {
+                _announcement = HistoryFormatter.DayAnnouncement(data, units);
+            }
+
+            _selected = _selected is { } kept ? data.Entries.FirstOrDefault(entry => entry.Id == kept.Id) : null;
+        }
+        else
+        {
+            // The session has no history for this person (it was moved to Not tracked meanwhile).
+            _rows = [];
+            _printRows = [];
+            _mapDay = null;
+        }
+    }
+
+    // ---- the day selector ---------------------------------------------------------------------------------------------------------------------
+
+    private void GoTo(DateOnly day) => Navigation.NavigateTo(HistoryFormatter.DayHref(MemberId, HistoryDayMath.Clamp(day, _oldest, _today)), replace: true);
+
+    private void PreviousDay() => GoTo(_day.AddDays(-1));
+
+    private void NextDay() => GoTo(_day.AddDays(1));
+
+    private void GoToday() => GoTo(_today);
+
+    private void ToggleRange() =>
+        Navigation.NavigateTo(Range ? HistoryFormatter.DayHref(MemberId, _today) : HistoryFormatter.RangeHref(MemberId), replace: true);
+
+    private async Task OpenPickerAsync()
+    {
+        if (_picker is not null)
+        {
+            await _picker.OpenAsync();
+        }
+    }
+
+    private void OnPickedAsync(DateTime? picked)
+    {
+        if (picked is { } value)
+        {
+            GoTo(DateOnly.FromDateTime(value));
+        }
+    }
+
+    // ---- the list and the map ----------------------------------------------------------------------------------------------------------------
+
+    private void ToggleTall()
+    {
+        _tall = !_tall;
+        _ = InvokeAsync(async () =>
+        {
+            // The map's element changes size with the sheet; the map is told after the layout.
+            await Task.Yield();
+            if (_map is not null)
+            {
+                await _map.ResizeAsync();
+            }
+        });
+    }
+
+    private Task OnSelectAsync(HistoryEntry entry)
+    {
+        // A second tap on the selected row lets go of it and shows the whole day again.
+        _selected = _selected is { } current && current.Id == entry.Id ? null : entry;
+        _focus = HistoryMapPayloads.ForFocus(_selected);
+        return Task.CompletedTask;
+    }
+
+    private async Task OnMapPickAsync(string id)
+    {
+        var entry = string.IsNullOrEmpty(id) ? null : _data?.Entries.FirstOrDefault(candidate => candidate.Id == id);
+        _selected = entry;
+        _focus = HistoryMapPayloads.ForFocus(entry);
+        StateHasChanged();
+        if (entry is not null && _map is not null)
+        {
+            var index = _rows.FindIndex(row => row is EntryRow found && found.Entry.Id == entry.Id);
+            if (index >= 0)
+            {
+                await _map.ScrollListAsync(".realm-history__list", Math.Max(0, (index - 1) * HistoryRow.HeightPx));
+            }
+        }
+    }
+
+    private async Task PrintAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("print");
+        }
+        catch (Exception exception) when (exception is JSException or JSDisconnectedException or TaskCanceledException)
+        {
+            Logger.LogWarning(exception, "The history screen could not open the print dialog.");
+        }
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        _disposed = true;
+        if (_started)
+        {
+            Session.Changed -= OnSessionChanged;
+        }
+
+        _ticker?.Dispose();
+        _lifetime.Cancel();
+        _load?.Dispose();
+        _lifetime.Dispose();
+        return ValueTask.CompletedTask;
+    }
+}

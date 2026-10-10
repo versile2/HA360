@@ -120,6 +120,46 @@ public sealed class StatsService
     }
 
     /// <summary>
+    /// One member's Location History for a local day (0.3.0, D123): null for a member that has none (not tracked, a tracker, a static pin, unknown) and for a day outside the
+    /// retained range. Reads only the day and a day either side (two indexed range queries).
+    /// </summary>
+    public async ValueTask<HistoryDayVm?> GetHistoryDayAsync(string memberId, DateOnly day, CancellationToken cancellationToken)
+    {
+        var days = await ReadHistoryAsync(memberId, day, day, includeTrail: true, cancellationToken);
+        return days.Count == 0 ? null : days[0];
+    }
+
+    /// <summary>The days <paramref name="from"/> to <paramref name="to"/> of one member, newest first, without trails; empty when the member has no history.</summary>
+    public ValueTask<IReadOnlyList<HistoryDayVm>> GetHistoryRangeAsync(string memberId, DateOnly from, DateOnly to, CancellationToken cancellationToken) =>
+        ReadHistoryAsync(memberId, from, to, includeTrail: false, cancellationToken);
+
+    private async ValueTask<IReadOnlyList<HistoryDayVm>> ReadHistoryAsync(string memberId, DateOnly from, DateOnly to, bool includeTrail, CancellationToken cancellationToken)
+    {
+        var snapshot = _state.Current;
+        var member = snapshot.Members.FirstOrDefault(m => string.Equals(m.Id, memberId, StringComparison.Ordinal));
+        if (member is null || member.Kind != MemberKind.Live)
+        {
+            return [];
+        }
+
+        var now = _time.GetUtcNow();
+        var zone = Zone;
+        var (oldest, newest) = HistoryDayMath.Range(now, zone, snapshot.RetentionFixDays);
+        from = HistoryDayMath.Clamp(from, oldest, newest);
+        to = HistoryDayMath.Clamp(to, oldest, newest);
+        if (to < from)
+        {
+            return [];
+        }
+
+        var window = HistoryRange.ReadWindow(from, to, zone);
+        var fixes = await _queries.GetFixesAsync(memberId, window.StartUtc, window.EndUtc, cancellationToken);
+        var trips = await _queries.GetTripsAsync(window.StartUtc, window.EndUtc, memberId, cancellationToken);
+        var places = snapshot.Places.Select(p => new RawPlace(p.Id, p.DisplayName, p.Lat, p.Lon, p.RadiusM, false)).ToList();
+        return HistoryRange.Build(memberId, from, to, zone, fixes, trips, places, now, includeTrail);
+    }
+
+    /// <summary>
     /// Stores a trip the detector closed: attaches the phone-use count (<see cref="PhoneUseDetector"/> over the stored signals, with Android Auto time left
     /// out), writes it after everything queued before it has been committed, and counts <see cref="RealmSnapshot.StatsVersion"/> up when a new row was
     /// written. A trip that is already stored (a replay finds the same trip again) changes nothing and returns false.

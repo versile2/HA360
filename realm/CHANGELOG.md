@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.3.0
+
+### Added
+
+- **Location History.** Open a person (or a tracker) on the map, open their detail and press **History**. The screen shows one day
+  at a time: the trail on the map (drives as solid lines in the person's colour, a dashed line where only a rough path was
+  recorded, a gap where there is no data), a numbered marker for every place they stayed, and the two ends of the day.
+  Below the map (a side panel on a wide screen) the timeline lists the day as it happened: **At Hearth Haven - 8:05 am to
+  5:42 pm - 9 hrs 37 mins**, then **Drive - 12.4 mi - 24 mins - top 71 mph** with where it started and ended and chips for
+  speeding and phone use. Tap a row to see it on the map; tap a drive's path on the map to find its row.
+- **A day selector.** Previous and next day, a date button that opens a calendar limited to the days the app keeps, and **Today**.
+  The day is the Home Assistant time zone's day (a day when the clocks change has 23 or 25 hours and is measured right).
+  `/history/{person}?date=YYYY-MM-DD` opens a day directly.
+- **Last 7 days.** A toggle lists the last seven days, newest first, each with its visits and drives; tap a day to open it.
+- **Places are named, never "unknown".** A visit is at a zone you drew in Home Assistant, otherwise at the town or street the
+  position is in ("Pinebrook", "near Pinebrook"). A visit counts when the person stayed at least 5 minutes.
+- **Print.** The History screen prints (or saves as PDF) as a table of the day or of the seven days, with the header
+  "Location History - name - date", without the map.
+- **Demo.** The demo cast has a believable week of visits and drives.
+
+### Notes
+
+- History is built from the positions and trips the app already keeps, for as many days as `retention_fix_days` allows (100 by
+  default). Nothing new is stored, there is no migration and no new option. A person who is **Not tracked**, and a tracker (which
+  keeps only its latest position), have no history. Days before the app first recorded a person are empty.
+
 ## 0.2.2
 
 ### Added
